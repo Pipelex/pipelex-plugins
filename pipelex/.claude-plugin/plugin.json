@@ -1,0 +1,11 @@
+{
+  "author": {
+    "name": "Pipelex staff",
+    "email": "oss@pipelex.com"
+  },
+  "repository": "https://github.com/Pipelex/pipelex-plugins",
+  "license": "Apache-2.0",
+  "name": "pipelex",
+  "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
+  "version": "0.1.0"
+}

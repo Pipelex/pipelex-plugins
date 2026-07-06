@@ -1,0 +1,11 @@
+{#- Shared frontmatter fields — included by all SKILL.md.j2 templates.
+   Place between the opening --- and closing --- of the YAML frontmatter. -#}
+{% if platform == "claude" -%}
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+{% endif -%}

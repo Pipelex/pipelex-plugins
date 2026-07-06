@@ -1,0 +1,9 @@
+[plugin]
+name = "pipelex-vibe"
+version = "0.1.0"
+description = "Pipelex skills and hooks for Mistral Vibe."
+source = "pipelex-vibe/"
+
+[vars]
+platform = "mistral-vibe"
+harness_name = "Mistral Vibe"

@@ -1,0 +1,18 @@
+{
+  "name": "pipelex-plugins",
+  "owner": {
+    "name": "Pipelex staff",
+    "email": "oss@pipelex.com"
+  },
+  "metadata": {
+    "description": "Pipelex skills and hooks for working with AI methods following the MTHDS standard.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "pipelex",
+      "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
+      "source": "./pipelex"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "pipelex-plugins",
+  "interface": {
+    "displayName": "Pipelex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "pipelex",
+      "source": {
+        "source": "local",
+        "path": "./pipelex-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
