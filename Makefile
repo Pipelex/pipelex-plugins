@@ -1,0 +1,203 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
+
+TARGET ?= prod
+
+VIRTUAL_ENV := $(CURDIR)/.venv
+VENV_PYTHON := "$(VIRTUAL_ENV)/bin/python"
+VENV_PYTEST := "$(VIRTUAL_ENV)/bin/pytest"
+VENV_RUFF := "$(VIRTUAL_ENV)/bin/ruff"
+VENV_PYRIGHT := "$(VIRTUAL_ENV)/bin/pyright"
+VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
+
+UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"[^0-9]*([0-9][0-9.]*).*/\1/')
+
+.PHONY: \
+	help env check-uv install lock li \
+	gen-skill-docs build check check-shared check-claude check-codex agent-check \
+	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
+	test agent-test gha-tests tp \
+	cleanderived cleanenv cleanall reinstall ri \
+	codex-use-local codex-use-official codex-refresh codex-status
+
+##########################################################################################
+### SETUP
+##########################################################################################
+
+check-uv: ## Ensure uv is installed (auto-installs if missing)
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "uv not found – installing latest (minimum $(UV_MIN_VERSION)) …"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	}
+	@uv self update >/dev/null 2>&1 || true
+
+env: check-uv ## Create virtual environment
+	@test -d "$(VIRTUAL_ENV)" || uv venv "$(VIRTUAL_ENV)" --quiet
+
+lock: env ## Refresh uv.lock without updating anything
+	@uv lock
+
+install: env ## Create venv + install all deps
+	@uv sync --all-extras --quiet
+
+li: lock install ## Lock + install
+	@echo "> done: li = lock install"
+
+##########################################################################################
+### CLEANING
+##########################################################################################
+
+cleanderived: ## Remove caches/compiled files
+	@find . -name '.coverage' -delete && \
+	find . -wholename '**/*.pyc' -delete && \
+	find . -type d -wholename '__pycache__' -exec rm -rf {} + && \
+	find . -type d -wholename './.cache' -exec rm -rf {} + && \
+	find . -type d -wholename './.mypy_cache' -exec rm -rf {} + && \
+	find . -type d -wholename './.ruff_cache' -exec rm -rf {} + && \
+	find . -type d -wholename '.pytest_cache' -exec rm -rf {} + && \
+	find . -type d -wholename '**/.pytest_cache' -exec rm -rf {} + && \
+	echo "Cleaned up derived files"
+
+cleanenv: ## Remove virtual env and lock files
+	@find . -name 'uv.lock' -delete && \
+	find . -type d -wholename './.venv' -exec rm -rf {} + && \
+	echo "Cleaned up virtual env and lock files"
+
+cleanall: cleanderived cleanenv ## Remove all derived files + env
+
+reinstall: cleanenv install ## Clean env and reinstall
+	@echo "Reinstalled dependencies"
+
+ri: reinstall ## Shorthand -> reinstall
+
+##########################################################################################
+### LINTING & FORMATTING
+##########################################################################################
+
+ruff-format: install ## Format Python with ruff
+	@$(VENV_RUFF) format .
+
+ruff-lint: install ## Lint Python with ruff
+	@$(VENV_RUFF) check . --fix
+
+format: ruff-format ## Format all
+	@echo "> done: format"
+
+lint: ruff-lint ## Lint all
+	@echo "> done: lint"
+
+pyright: install ## Type-check with pyright
+	@$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+
+mypy: install ## Type-check with mypy
+	@$(VENV_MYPY)
+
+fix-unused-imports: install ## Fix unused imports with ruff
+	@$(VENV_RUFF) check --select=F401 --fix .
+
+fui: fix-unused-imports ## Shorthand -> fix-unused-imports
+
+##########################################################################################
+### CHECKS
+##########################################################################################
+
+check-shared: install ## Verify shared refs + target versions + template freshness + format + lint + typecheck
+	@$(VENV_PYTHON) scripts/check.py --scope shared
+	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all --check
+	@$(VENV_RUFF) format --check .
+	@$(VENV_RUFF) check .
+	@$(MAKE) --no-print-directory pyright mypy
+
+check-claude: install ## Verify Claude marketplace packaging consistency
+	@$(VENV_PYTHON) scripts/check.py --scope claude
+
+check-codex: install ## Verify Codex packaging consistency (canonical packaging/codex-marketplace.json)
+	@$(VENV_PYTHON) scripts/check.py --scope codex
+
+check: check-shared check-claude check-codex ## Run shared, Claude, and Codex checks
+
+agent-check: fix-unused-imports format lint ## Full quality check (for AI agents)
+	@$(MAKE) --no-print-directory check
+	@echo "• All checks passed."
+
+##########################################################################################
+### TESTING
+##########################################################################################
+
+test: install ## Run unit tests
+	@$(VENV_PYTEST) tests/ -v
+
+tp: install ## Run tests with prints (TEST=name to filter)
+	@if [ -n "$(TEST)" ]; then \
+		$(VENV_PYTEST) tests/ -s -v -k "$(TEST)"; \
+	else \
+		$(VENV_PYTEST) tests/ -s -v; \
+	fi
+
+gha-tests: install ## Run tests for GitHub Actions (exit on first failure, quiet)
+	@$(VENV_PYTEST) --exitfirst --quiet
+
+agent-test: install ## Run unit tests quietly (output only on failure)
+	@echo "• Running unit tests..."
+	@tmpfile=$$(mktemp); \
+	if $(VENV_PYTEST) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; then \
+		exit_code=0; \
+	else \
+		exit_code=$$?; \
+	fi; \
+	if [ $$exit_code -ne 0 ]; then cat "$$tmpfile"; fi; \
+	rm -f "$$tmpfile"; \
+	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
+	exit $$exit_code
+
+##########################################################################################
+### HELP
+##########################################################################################
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
+
+##########################################################################################
+### BUILD
+##########################################################################################
+
+gen-skill-docs: install ## Generate SKILL.md from .j2 templates (use TARGET=name to build one target)
+	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target $(TARGET)
+
+build: install ## Build all targets (prod + codex + mistral-vibe)
+	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all
+	@echo "Done: built all targets"
+
+##########################################################################################
+### CODEX MARKETPLACE SOURCE (local dev vs published GitHub)
+##########################################################################################
+
+CODEX_MARKETPLACE_NAME := pipelex-plugins
+CODEX_OFFICIAL_SOURCE  := Pipelex/pipelex-plugins
+CODEX_LOCAL_SOURCE     := $(CURDIR)
+
+codex-use-local: ## Point Codex at this local pipelex-plugins checkout (refreshes plugin cache)
+	@codex plugin marketplace remove $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@codex plugin marketplace add "$(CODEX_LOCAL_SOURCE)"
+	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@echo "• Codex marketplace '$(CODEX_MARKETPLACE_NAME)' now points at $(CODEX_LOCAL_SOURCE)"
+	@echo "  Restart Codex to pick up the swap. The 'pipelex' plugin stays installed —"
+	@echo "  only /plugins → uninstall/reinstall if skills still look stale after restart."
+
+codex-use-official: ## Point Codex back at the published GitHub marketplace (refreshes plugin cache)
+	@codex plugin marketplace remove $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@codex plugin marketplace add $(CODEX_OFFICIAL_SOURCE)
+	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@echo "• Codex marketplace '$(CODEX_MARKETPLACE_NAME)' now points at $(CODEX_OFFICIAL_SOURCE)"
+	@echo "  Restart Codex to pick up the swap. The 'pipelex' plugin stays installed —"
+	@echo "  only /plugins → uninstall/reinstall if skills still look stale after restart."
+
+codex-refresh: ## Re-sync plugin cache from the active marketplace source (run after editing pipelex-codex/)
+	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME)
+
+codex-status: ## Show which source is currently registered for the Codex pipelex marketplace
+	@awk '/^\[marketplaces\.$(CODEX_MARKETPLACE_NAME)\]/{flag=1; next} /^\[/{flag=0} flag' \
+		"$$HOME/.codex/config.toml" \
+		| grep -E "^(source_type|source|last_revision|last_updated)" \
+		|| echo "• No '$(CODEX_MARKETPLACE_NAME)' marketplace registered."
