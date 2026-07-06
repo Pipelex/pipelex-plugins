@@ -425,6 +425,51 @@ def check_codex_no_claude_artifacts(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
+    """Check that Mistral Vibe targets emit Vibe-only hook artifacts.
+
+    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths
+    and hooks from hooks.toml. The generated target must therefore not carry a
+    plugin manifest, and it must render the after_tool hook config/script pair.
+    """
+    errors: list[str] = []
+    configs = load_target_configs(base_dir)
+    defaults = load_defaults_vars(base_dir)
+    for target_name, config in configs.items():
+        if _platform_for_config(config, defaults) != Platform.MISTRAL_VIBE:
+            continue
+        source = config.get("plugin", {}).get("source", "./")
+        output_dir = base_dir if source == "./" else base_dir / str(source).rstrip("/")
+
+        for dirname in (".claude-plugin", ".codex-plugin"):
+            if (output_dir / dirname).exists():
+                errors.append(f"[{target_name}] {dirname}/ found in Vibe output {source}")
+
+        hook_config = output_dir / "hooks" / "vibe-hooks.toml"
+        hook_script = output_dir / "hooks" / "validate-mthds-vibe.sh"
+        if not hook_config.is_file():
+            errors.append(f"[{target_name}] hooks/vibe-hooks.toml missing")
+        else:
+            text = hook_config.read_text(encoding="utf-8")
+            if 'type = "after_tool"' not in text:
+                errors.append(f'[{target_name}] hooks/vibe-hooks.toml must use type = "after_tool"')
+            if 'match = "re:^(edit|write_file)$"' not in text:
+                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must match edit/write_file")
+            if "validate-mthds-vibe.sh" not in text:
+                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must call validate-mthds-vibe.sh")
+
+        if not hook_script.is_file():
+            errors.append(f"[{target_name}] hooks/validate-mthds-vibe.sh missing")
+        elif not hook_script.stat().st_mode & 0o111:
+            errors.append(f"[{target_name}] hooks/validate-mthds-vibe.sh is not executable")
+
+        for filename in ("hooks.json", "codex-hooks.json", "validate-mthds.sh"):
+            if (output_dir / "hooks" / filename).exists():
+                errors.append(f"[{target_name}] hooks/{filename} is not a Vibe artifact")
+
+    return errors
+
+
 def _run_check(title: str, errors: list[str], failure_message: str, success_message: str) -> bool:
     """Print a formatted check result and return whether it failed."""
     print(title)
@@ -487,6 +532,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_no_templates_in_output(base_dir),
         "FAIL: Found .j2 template files in output directories (should be in templates/).",
         "  No leaked templates found.",
+    )
+    failed |= _run_check(
+        "Checking Mistral Vibe target artifacts...",
+        check_vibe_target_artifacts(base_dir),
+        "FAIL: Mistral Vibe target artifacts are inconsistent.",
+        "  Mistral Vibe target artifacts are consistent.",
     )
 
     return failed

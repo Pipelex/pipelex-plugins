@@ -1,0 +1,8 @@
+[[hooks]]
+name = "validate-mthds"
+type = "after_tool"
+match = "re:^(edit|write_file)$"
+command = "./hooks/validate-mthds-vibe.sh"
+timeout = 30.0
+strict = false
+description = "Validate .mthds files after Vibe file edits."

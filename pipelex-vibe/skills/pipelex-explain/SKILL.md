@@ -1,0 +1,64 @@
+---
+name: pipelex-explain
+description: Explain and document MTHDS bundles. Use when user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "document this pipeline", "how does this work?", or wants to understand an existing MTHDS method bundle.
+
+---
+
+# Explain MTHDS bundles
+
+Analyze and explain existing MTHDS method bundles in plain language.
+
+This skill is read-only: it reads a bundle and explains it. It never modifies the `.mthds` file.
+
+## Process
+
+### Step 1: Read the .mthds File
+
+Read the entire bundle file to understand its structure.
+
+### Step 2: Identify Components
+
+List all components found in the bundle:
+- **Domain**: the top-level `domain` key (bundle header, not a `[domain]` section)
+- **Concepts**: all `[concept.*]` blocks — note which are custom vs references to native concepts
+- **Pipes**: all `[pipe.*]` blocks — identify the main pipe and sub-pipes
+- **Main pipe**: the top-level `main_pipe` key (bundle header, not a `[bundle]` section)
+
+### Step 3: Trace Execution Flow
+
+Starting from the main pipe, trace the execution path:
+1. For **PipeSequence**: follow the `steps` array in order
+2. For **PipeBatch**: identify `batch_over` and `batch_as`, then the inner pipe
+3. For **PipeParallel**: list all branches
+4. For **PipeCondition**: map condition → pipe for each branch
+5. For **PipeLLM / PipeExtract / PipeImgGen / PipeSearch / PipeFunc**: these are leaf operations
+
+### Step 4: Present Explanation
+
+Structure the explanation as:
+
+1. **Purpose**: one-sentence summary of what the method does
+2. **Inputs**: list each input with its concept type and expected content
+3. **Output**: the final output concept and what it contains
+4. **Step-by-step flow**: walk through execution in order, explaining what each pipe does
+5. **Key concepts**: explain any custom concepts defined in the bundle
+
+### Step 5: Generate Flow Diagram
+
+Create a text diagram showing the execution flow. Example:
+
+```
+main_sequence
+  1. step_one (PipeLLM) -> intermediate_result
+  2. step_two (PipeExtract) -> final_output
+
+Inputs: input_a, input_b
+Output: final_output
+```
+
+Adapt the format to the method structure (linear, branching, batched).
+
+## Reference
+
+- [MTHDS Language Reference](../shared/mthds-reference.md) — read for concept definitions and syntax
+- [Native Content Types](../shared/native-content-types.md) — read when explaining what data flows through pipes (e.g., what attributes Page or Image content carries)

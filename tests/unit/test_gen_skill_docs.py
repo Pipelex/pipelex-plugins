@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -32,9 +33,32 @@ FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
+# Minimal hook templates for every platform. render_templates declares hooks
+# per platform (Claude: hooks.json + validate-mthds.sh; Codex: codex-hooks.json;
+# Vibe: vibe-hooks.toml + validate-mthds-vibe.sh), so any test tree that reaches
+# skill/hook rendering must provide them or render fails with "hook template not
+# found".
+HOOK_TEMPLATE_BODIES = {
+    "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
+    "hooks/validate-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
+    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n',
+    "hooks/validate-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+}
+
+
+def _create_hook_templates(templates_dir: Path) -> None:
+    """Create minimal per-platform hook templates so render_templates resolves them."""
+    for name, body in HOOK_TEMPLATE_BODIES.items():
+        path = templates_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text(body)
+
+
 def _create_shared_templates(templates_dir: Path) -> None:
     """Create all shared template files required by render_templates, plus the
-    include-only frontmatter partial."""
+    include-only frontmatter partial and the per-platform hook templates."""
     for name in SHARED_TEMPLATES:
         path = templates_dir / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,6 +68,7 @@ def _create_shared_templates(templates_dir: Path) -> None:
     partial.parent.mkdir(parents=True, exist_ok=True)
     if not partial.exists():
         partial.write_text(FRONTMATTER_BODY)
+    _create_hook_templates(templates_dir)
 
 
 @pytest.fixture()
@@ -55,6 +80,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
+    _create_hook_templates(templates_dir)
 
     skill_dir = templates_dir / "skills" / "pipelex-test"
     skill_dir.mkdir()
@@ -80,6 +106,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "mthds-reference.md.j2").write_text("Ref.\n")
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
+    _create_hook_templates(templates_dir)
 
     skill_dir = templates_dir / "skills" / "pipelex-test"
     skill_dir.mkdir()
@@ -464,9 +491,38 @@ class TestPluginManifests:
         assert codex_manifest not in result.files
 
 
-class TestHookTemplatesByPlatform:
-    def test_all_platforms_present_and_empty_until_hooks_land(self) -> None:
-        """Hooks are ported in a later phase; every platform is wired but empty."""
+class TestHookRendering:
+    def test_all_platforms_declare_their_hook_templates(self) -> None:
+        """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
-        for hook_list in HOOK_TEMPLATES_BY_PLATFORM.values():
-            assert hook_list == []
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/validate-mthds.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"]
+
+    def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
+        results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
+        output_names = {path.name for path in results}
+        assert "hooks.json" in output_names
+        assert "validate-mthds.sh" in output_names
+        assert "codex-hooks.json" not in output_names
+
+    def test_codex_renders_only_codex_hook(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "codex"})
+        output_names = {path.name for path in results}
+        assert "codex-hooks.json" in output_names
+        assert "hooks.json" not in output_names
+        assert "validate-mthds.sh" not in output_names
+
+    def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
+        output_names = {path.name for path in results}
+        assert "vibe-hooks.toml" in output_names
+        assert "validate-mthds-vibe.sh" in output_names
+
+    def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        hook_script = template_tree / "pipelex" / "hooks" / "validate-mthds.sh"
+        assert hook_script.is_file()
+        assert os.access(hook_script, os.X_OK)

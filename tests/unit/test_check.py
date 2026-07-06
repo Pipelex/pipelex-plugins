@@ -16,6 +16,7 @@ from scripts.check import (
     check_shared_files_exist,
     check_stale_references,
     check_target_plugin_versions,
+    check_vibe_target_artifacts,
     resolve_target_var,
 )
 
@@ -303,6 +304,70 @@ class TestCodexNoClaudeArtifacts:
         (skill_dir / "SKILL.md").write_text("---\nname: t\nallowed-tools:\n  - Bash\n---\n\nBody.\n")
         errors = check_codex_no_claude_artifacts(tmp_path)
         assert any("allowed-tools" in error for error in errors)
+
+
+class TestVibeTargetArtifacts:
+    def _vibe_targets(self, tmp_path: Path) -> Path:
+        """Write a prod + Mistral Vibe target pair and return the Vibe hooks dir."""
+        _write_target_configs(tmp_path, {"prod": {"name": "pipelex", "version": "0.1.0", "source": "pipelex/"}})
+        (tmp_path / "targets" / "mistral-vibe.toml").write_text(
+            '[plugin]\nname = "pipelex-vibe"\nversion = "0.1.0"\nsource = "pipelex-vibe/"\n\n[vars]\nplatform = "mistral-vibe"\n'
+        )
+        hooks_dir = tmp_path / "pipelex-vibe" / "hooks"
+        hooks_dir.mkdir(parents=True)
+        return hooks_dir
+
+    def _write_valid_hooks(self, hooks_dir: Path) -> None:
+        (hooks_dir / "vibe-hooks.toml").write_text(
+            '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n'
+        )
+        hook_script = hooks_dir / "validate-mthds-vibe.sh"
+        hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
+        hook_script.chmod(0o755)
+
+    def test_matching(self, tmp_path: Path) -> None:
+        self._write_valid_hooks(self._vibe_targets(tmp_path))
+        assert check_vibe_target_artifacts(tmp_path) == []
+
+    def test_rejects_plugin_manifest(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        (tmp_path / "pipelex-vibe" / ".claude-plugin").mkdir(parents=True)
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any(".claude-plugin" in error for error in errors)
+
+    def test_requires_after_tool_hook(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        (hooks_dir / "vibe-hooks.toml").write_text('[[hooks]]\ntype = "before_tool"\n')
+        hook_script = hooks_dir / "validate-mthds-vibe.sh"
+        hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
+        hook_script.chmod(0o755)
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any('type = "after_tool"' in error for error in errors)
+
+    def test_missing_hook_config(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        hook_script = hooks_dir / "validate-mthds-vibe.sh"
+        hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
+        hook_script.chmod(0o755)
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("vibe-hooks.toml missing" in error for error in errors)
+
+    def test_non_executable_script(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        (hooks_dir / "vibe-hooks.toml").write_text(
+            '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n'
+        )
+        (hooks_dir / "validate-mthds-vibe.sh").write_text("#!/usr/bin/env bash\n")
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("not executable" in error for error in errors)
+
+    def test_rejects_claude_hook_artifact(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        (hooks_dir / "validate-mthds.sh").write_text("#!/usr/bin/env bash\n")
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("not a Vibe artifact" in error for error in errors)
 
 
 class TestResolveTargetVar:

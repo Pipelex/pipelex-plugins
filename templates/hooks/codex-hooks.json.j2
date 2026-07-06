@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'command -v mthds-agent >/dev/null && exec mthds-agent codex hook; exit 0'",
+            "timeout": 30,
+            "statusMessage": "Validating .mthds files"
+          }
+        ]
+      }
+    ]
+  }
+}

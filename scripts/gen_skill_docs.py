@@ -69,25 +69,31 @@ SHARED_TEMPLATES = [
     "skills/shared/native-content-types.md.j2",
 ]
 
-# Hook templates rendered per target. Hooks land in a later phase (the
-# `.mthds`-on-edit validation hook, ported with a missing-CLI silent-pass
-# adaptation), at which point these lists gain their entries. Until then the
-# renderer produces skills + shared references only.
-HOOK_TEMPLATES: list[str] = []
+# Hook templates rendered for the Claude target: the PostToolUse wiring plus the
+# bundled `.mthds`-on-edit validation script. The CLI-free posture ports the
+# validation pipeline but flips missing-CLI behavior from block-with-install-hint
+# to silent pass — the hook no-ops when `plxt`/`mthds-agent`/`node` are absent
+# instead of blocking every edit. The predecessor's session-start doctor hook is
+# left behind (CLI-lifecycle territory).
+HOOK_TEMPLATES = [
+    "hooks/hooks.json.j2",
+    "hooks/validate-mthds.sh.j2",
+]
 
-# Hook templates by platform. Populated when hooks are ported:
+# Hook templates by platform:
 # - Claude: hooks/hooks.json + the bundled validate-mthds.sh script.
-# - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config, run
-#   via `mthds-agent codex hook`).
+# - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
+#   referenced from the Codex manifest's `hooks` field; the command is wrapped
+#   so a missing `mthds-agent` exits cleanly rather than erroring on every patch).
 # - Mistral Vibe: hooks/vibe-hooks.toml + validate-mthds-vibe.sh (after_tool).
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
-    Platform.CODEX: [],
-    Platform.MISTRAL_VIBE: [],
+    Platform.CODEX: ["hooks/codex-hooks.json.j2"],
+    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"],
 }
 
-# Files that should be made executable after rendering (hook scripts). Inert
-# until the hooks are ported; a chmod only touches files that were produced.
+# Files that should be made executable after rendering (hook scripts). A chmod
+# only touches files that were produced.
 EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-vibe.sh"}
 
 

@@ -10,7 +10,7 @@ This is the **CLI-free** plugin generation. Unlike the `mthds-plugins` predecess
 templates/                      source of truth (all .j2 files)
 ├── skills/*/SKILL.md.j2        skill templates
 ├── skills/shared/*.md.j2       shared language references (+ the include-only frontmatter partial)
-└── hooks/*.j2                  hook templates (added when hooks are ported)
+└── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
        |
        v
 targets/defaults.toml          common variable defaults
@@ -23,10 +23,13 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
        |
        +---> pipelex/skills/*/SKILL.md                 (prod target, output)
        +---> pipelex/skills/shared/*.md                (prod target, output)
+       +---> pipelex/hooks/{hooks.json,validate-mthds.sh}  (prod target, PostToolUse hook)
        +---> pipelex/.claude-plugin/plugin.json        (generated: plugin-base.json + target overrides)
        +---> pipelex-codex/skills/*/SKILL.md           (codex target, output)
+       +---> pipelex-codex/hooks/codex-hooks.json      (codex target, bundled hook config)
        +---> pipelex-codex/.codex-plugin/plugin.json   (generated: plugin-base.json + target overrides)
        +---> pipelex-vibe/skills/*/SKILL.md            (Mistral Vibe target, output — manifestless)
+       +---> pipelex-vibe/hooks/{vibe-hooks.toml,validate-mthds-vibe.sh}  (Vibe after_tool hook)
        +---> .agents/plugins/marketplace.json          (verbatim copy of packaging/codex-marketplace.json)
 ```
 
@@ -72,9 +75,9 @@ source = "pipelex/"     # output directory
 
 The target platform is selected with `[vars].platform`:
 
-- `claude` (default): renders Claude plugin metadata (and, once ported, `PostToolUse` hooks).
-- `codex`: renders Codex plugin metadata (and, once ported, the bundled hook config).
-- `mistral-vibe`: renders skills (and, once ported, Vibe `after_tool` hook files), with no Claude/Codex plugin manifest.
+- `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `validate-mthds.sh`).
+- `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
+- `mistral-vibe`: renders skills and the Vibe `after_tool` hook files (`vibe-hooks.toml` + `validate-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
 
 ### Variable resolution
 
@@ -94,6 +97,9 @@ Each target specifies a `source` directory where its output is written. Claude/C
 pipelex/                       (prod target)
 ├── .claude-plugin/
 │   └── plugin.json           generated (inherits author/repo/license from plugin-base.json)
+├── hooks/
+│   ├── hooks.json            PostToolUse wiring (Write|Edit → validate-mthds.sh)
+│   └── validate-mthds.sh     .mthds validation script (executable; silent-pass when CLIs absent)
 └── skills/
     ├── pipelex-explain/
     │   └── SKILL.md           rendered with the target's variables
@@ -104,7 +110,7 @@ pipelex/                       (prod target)
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.
 
-The Mistral Vibe target is manifestless: it emits skills (and, once ported, the Vibe hook files) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
+The Mistral Vibe target is manifestless: it emits skills plus the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/validate-mthds-vibe.sh`) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
 
 ## Codex marketplace discovery
 
@@ -169,4 +175,4 @@ All targets share the same version string in lockstep — `make check` fails on 
 
 The files in `templates/skills/shared/` listed in `SHARED_TEMPLATES` (`gen_skill_docs.py`) — the MTHDS language references — are rendered per target and written to `skills/shared/`. `frontmatter.md.j2` is a deliberate exception: it is an **include-only partial** ({% include %}-d by skill templates for their YAML frontmatter), so it is not listed in `SHARED_TEMPLATES` and is never rendered standalone.
 
-Hook templates (`templates/hooks/`) are rendered per target when the hooks are ported. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `after_tool` over `edit|write_file`.
+Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `after_tool` over `edit|write_file`. See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
