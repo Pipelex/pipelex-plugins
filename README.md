@@ -32,7 +32,7 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 # Restart Codex, then run /plugins to install pipelex
 ```
 
-To enable the bundled `.mthds` validation hook — only meaningful when the MTHDS CLIs are present — set `[features] hooks = true` in `~/.codex/config.toml` and **trust** the plugin hook on first run (Codex persists trusted hashes under `[hooks.state]`). Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
+The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It runs the full validation pipeline only when the MTHDS CLIs are present; otherwise it passes silently. Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
 
 ### Mistral Vibe
 

@@ -33,12 +33,11 @@ Claude and Codex use `hookSpecificOutput.additionalContext`; Vibe uses `hook_spe
 
 The Codex command is wrapped — `bash -c 'command -v mthds-agent >/dev/null && exec mthds-agent codex hook; exit 0'` — so a missing `mthds-agent` exits cleanly instead of erroring on every `apply_patch`. The validation logic lives in the mthds-js package (versioned with the npm release), not in the plugin.
 
-## Enabling the Codex hook (CLI-present environments only)
+## The Codex hook — loading and trust (CLI-present environments only)
 
-Verified against **Codex 0.142.5**. The hook engine graduated out of "under development" across 0.139 → 0.142, so enablement is now a small, documented manual step:
+Verified against **Codex 0.142.5**. The hook engine graduated out of "under development" across 0.139 → 0.142: the `hooks` feature is now `Stage::Stable` and **enabled by default**, so the plugin-bundled hook is discovered from the manifest and loads on its own — there is no `[features] hooks = true` line to set (`plugin_hooks` / `codex_hooks` are honored deprecated aliases; set `hooks = false` only to disable). The one manual step is trust:
 
-1. Set `[features] hooks = true` in `~/.codex/config.toml`. Use `hooks` — `plugin_hooks` / `codex_hooks` are deprecated aliases.
-2. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). For automation, `--dangerously-bypass-hook-trust` bypasses the prompt.
+- On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). For automation, `--dangerously-bypass-hook-trust` bypasses the prompt.
 
 `PostToolUse` officially fires for `apply_patch` edits and MCP tool calls, so the `.mthds`-on-edit hook fires reliably. The standardized block protocol (`{"decision":"block","reason":…}` or exit 2 + stderr) maps cleanly onto the stage-3 domain-based block/context decision model above. See [decisions.md](decisions.md) for the full finding.
 
