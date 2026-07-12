@@ -121,7 +121,7 @@ This is transitional. The iteration path swaps the CLI invocations for hosted-AP
 
 The Codex hook command is `mthds-agent codex hook` (validation logic lives in mthds-js), wrapped so a missing `mthds-agent` exits cleanly rather than erroring on every patch. Since Codex 0.141 the hook engine matured out of "under development":
 
-- The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`plugin_hooks` / `codex_hooks` are deprecated aliases).
+- The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`codex_hooks` is a deprecated alias; `plugin_hooks` is not an alias but an obsolete independent opt-in, removed in Codex 0.134 and ignored since).
 - Native per-source **trust model** (`[hooks.state]` trusted hashes; `--dangerously-bypass-hook-trust` for automation).
 - `PostToolUse` officially fires for `apply_patch` edits and MCP tool calls — which de-risks the `.mthds`-on-edit hook.
 - Standardized block protocol (`{"decision":"block","reason":...}` or exit 2 + stderr) maps cleanly onto the Stage 3 decision model.

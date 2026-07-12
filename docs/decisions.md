@@ -24,7 +24,7 @@ The `.mthds` validation hooks ship on all targets. Their behavior differs from `
 
 The Codex hook engine matured across 0.139 → 0.142 (out of `Stage::UnderDevelopment`):
 
-- The canonical feature key is now **`hooks`**, marked `Stage::Stable` and **enabled by default** (`plugin_hooks` / `codex_hooks` are deprecated aliases).
+- The canonical feature key is now **`hooks`**, marked `Stage::Stable` and **enabled by default** (`codex_hooks` is a deprecated alias). `plugin_hooks` is *not* an alias: it was an independent opt-in for plugin-bundled hooks that disabled them on Codex ≤ 0.133, removed in 0.134 and ignored since (semantics pinned down in mthds-js v0.18.0, which hard-errors on all three hook-disabling keys in its `apply-config`/`doctor` — machinery this CLI-free plugin deliberately doesn't carry).
 - Native per-source **trust model**: persisted `[hooks.state]` trusted hashes; `--dangerously-bypass-hook-trust` for automation.
 - `PostToolUse` officially fires for **`apply_patch` edits and MCP tool calls**, not just Bash — which de-risks the whole `.mthds`-on-edit validation hook.
 - Standardized block protocol: `{"decision":"block","reason":...}` (or exit 2 + stderr); Codex replaces the tool result with the feedback and continues. This maps cleanly onto the Stage 3 domain-based block/context decision model.

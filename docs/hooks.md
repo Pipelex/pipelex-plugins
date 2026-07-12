@@ -35,7 +35,7 @@ The Codex command is wrapped — `bash -c 'command -v mthds-agent >/dev/null && 
 
 ## The Codex hook — loading and trust (CLI-present environments only)
 
-Verified against **Codex 0.142.5**. The hook engine graduated out of "under development" across 0.139 → 0.142: the `hooks` feature is now `Stage::Stable` and **enabled by default**, so the plugin-bundled hook is discovered from the manifest and loads on its own — there is no `[features] hooks = true` line to set (`plugin_hooks` / `codex_hooks` are honored deprecated aliases; set `hooks = false` only to disable). The one manual step is trust:
+Verified against **Codex 0.142.5**. The hook engine graduated out of "under development" across 0.139 → 0.142: the `hooks` feature is now `Stage::Stable` and **enabled by default**, so the plugin-bundled hook is discovered from the manifest and loads on its own — there is no `[features] hooks = true` line to set (`codex_hooks` is an honored deprecated alias; set `hooks = false` only to disable). Note that `plugin_hooks` is **not** an alias of `hooks` — it was an independent opt-in for plugin-bundled hooks, removed in Codex 0.134 and ignored since; a stale `plugin_hooks = false` line is a harmless leftover on supported Codex versions but should be removed. The one manual step is trust:
 
 - On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). For automation, `--dangerously-bypass-hook-trust` bypasses the prompt.
 
