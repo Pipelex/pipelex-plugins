@@ -1,225 +1,44 @@
 #!/usr/bin/env bash
-# PostToolUse hook: lint, format, and validate .mthds files after Write/Edit
-# Reads tool_input JSON from stdin, then runs (in order):
-#   1. plxt lint                  — TOML/schema-level linting (blocks on errors)
-#   2. plxt fmt                   — auto-format the file (only if lint passes)
-#   3. mthds-agent validate bundle — semantic validation, lenient
-#      (--allow-signatures: in-progress PipeSignature headers don't block;
-#      blocks on input-domain errors; emits agent additionalContext for
-#      config/runtime errors and for leftover unimplemented signatures)
-# CLI-free posture: passes silently (exit 0, no block) when node / plxt /
-# mthds-agent are absent — this plugin does not manage CLI installation, so a
-# missing toolchain no-ops instead of blocking every edit. Also passes silently
-# if the file is not .mthds. When the CLIs ARE present the full pipeline runs.
-# Uses Node.js for JSON encoding of the PostToolUse hook output (decision/additionalContext).
+# PostToolUse hook: lint, format, and validate .mthds files after Write/Edit.
+#
+# Two-layer design: this thin wrapper is the fail-open guard and the
+# per-platform seam; ALL validation logic lives in the vendored check.mjs
+# bundle beside it (built in pipelex-sdk-js — see docs/hooks.md):
+#   1. local lint   (@pipelex/tools-wasm — offline, no credentials) → block on errors
+#   2. local format (same engine) → write back in place when changed
+#   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)
+#      → block on an invalid verdict; non-blocking nudge on pending signatures
+#
+# Fail-open posture (Claude Code, CLI-free): no Node on PATH → the whole
+# hook passes silently (exit 0, no block); no PIPELEX_API_KEY / API unreachable
+# → check.mjs skips only the validate stage while the local lint/format
+# verdicts still apply. Nothing here shells out to plxt or mthds-agent.
 
 set -euo pipefail
 
-# --- Read stdin (PostToolUse JSON) and extract file path ---
+# --- Read stdin (PostToolUse JSON) once; re-fed to check.mjs below ---
 INPUT=$(cat)
 
-# Fast pre-filter: this hook only cares about .mthds files. Exit silently
-# for everything else — no Node, no plxt, no mthds-agent, no risk of
-# blocking unrelated edits if any later stage misbehaves.
+# Fast pre-filter: this hook only cares about .mthds files. Exit silently for
+# everything else — no Node process spawned for unrelated edits.
 if ! [[ "$INPUT" =~ \"file_path\"[[:space:]]*:[[:space:]]*\"[^\"]*\.mthds\" ]]; then
   exit 0
 fi
 
-# --- Node.js is required for JSON parsing; without it, silently pass ---
-# (CLI-free posture: Node ships with the mthds toolchain, so its absence means
-# the toolchain isn't installed — no-op rather than block.)
+# --- Node.js is required to run the bundle; without it, silently pass ---
 if ! command -v node &>/dev/null; then
   exit 0
 fi
 
-# --- JSON helpers (Node.js) ---
-# Extract a value from JSON. $1=json_string, $2=JS expression using `d` as the parsed object.
-# NOTE: $2 is interpolated into the JS code — must be a trusted literal, never user input.
-_jv() { node -e "let d;try{d=JSON.parse(process.argv[1])}catch{d=null};const r=d?($2):undefined;process.stdout.write(r==null?'':String(r))" "$1"; }
-# Output a {"decision":"block","reason":...} JSON object. $1=reason string.
-_block() {
-  node -e "process.stdout.write(JSON.stringify({decision:'block',reason:process.argv[1]})+'\n')" "$1" \
-    || printf '{"decision":"block","reason":"Hook error: could not format block reason"}\n'
-}
+# Resolve the bundle beside this script (works with or without
+# CLAUDE_PLUGIN_ROOT in the environment).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHECK_MJS="$SCRIPT_DIR/check.mjs"
 
-FILE_PATH=$(_jv "$INPUT" "d.tool_input?.file_path") || {
-  _block "Failed to parse tool input JSON (Node.js error)"
-  exit 0
-}
-
-# Guard: no file path or not a .mthds file → pass silently
-if [[ -z "$FILE_PATH" || "$FILE_PATH" != *.mthds || ! -f "$FILE_PATH" ]]; then
+# Missing bundle = broken install — fail open rather than block every edit.
+if [[ ! -f "$CHECK_MJS" ]]; then
+  echo "[mthds-hook] check.mjs not found beside validate-mthds.sh — passing (reinstall the plugin)" >&2
   exit 0
 fi
 
-# --- plxt and mthds-agent required; without them, silently pass ---
-# (CLI-free posture: this plugin does not install or manage the mthds CLIs, so a
-# missing binary means validation is unavailable here — no-op rather than block.
-# When API/MCP-backed validation lands, this branch disappears entirely.)
-if ! command -v plxt &>/dev/null || ! command -v mthds-agent &>/dev/null; then
-  exit 0
-fi
-
-TMPOUT=$(mktemp)
-TMPERR=$(mktemp)
-trap 'rm -f "$TMPOUT" "$TMPERR"' EXIT
-
-# =====================================================================
-# STAGE 1: plxt lint — TOML/schema-level linting
-# =====================================================================
-LINT_EXIT=0
-plxt lint --quiet "$FILE_PATH" >"$TMPOUT" 2>"$TMPERR" || LINT_EXIT=$?
-
-if [[ "$LINT_EXIT" -ne 0 ]]; then
-  LINT_OUTPUT=$(cat "$TMPERR")
-  [[ -z "$LINT_OUTPUT" ]] && LINT_OUTPUT=$(cat "$TMPOUT")
-  [[ -z "$LINT_OUTPUT" ]] && LINT_OUTPUT="lint exited with code $LINT_EXIT (no output)"
-
-  _block "TOML/schema lint errors in $FILE_PATH:
-$LINT_OUTPUT"
-  exit 0
-fi
-
-# =====================================================================
-# STAGE 2: plxt fmt — auto-format the file in-place (lint passed)
-# =====================================================================
-FMT_EXIT=0
-plxt fmt "$FILE_PATH" >"$TMPOUT" 2>"$TMPERR" || FMT_EXIT=$?
-if [[ "$FMT_EXIT" -ne 0 ]]; then
-  FMT_ERR=$(cat "$TMPERR")
-  echo "[mthds-hook] Warning: plxt fmt failed (exit $FMT_EXIT): ${FMT_ERR:-no output}" >&2
-fi
-
-# =====================================================================
-# STAGE 3: mthds-agent validate bundle — semantic validation (lenient)
-# Reads the STRUCTURED verdict from JSON, not the exit code or a markdown grep
-# (--format json / --error-format json are pinned so the machine read holds under
-# ANY configured runner — pipelex or api). Validated leniently (--allow-signatures)
-# so a bundle whose graph still reaches PipeSignature headers isn't blocked
-# mid-construction (recursive/stepwise builds); on a signature-free bundle lenient
-# ≡ strict, so it's a no-op for vibe/build/hand-edits. The strict gate lives in the
-# skill's finalize step + `run` (which always rejects signatures).
-#
-# A VALID bundle (is_valid:true) PASSES even when it is not yet runnable: unimplemented
-# PipeSignature placeholders ride the success envelope on stdout with is_valid:true (plus
-# the pending_signatures list — see the nudge below), and validity (not runnability) is
-# what a post-edit hook should gate. An INVALID verdict (is_valid:false) rides the JSON
-# error envelope on stderr: BLOCK on input-domain errors (agent fixes the bundle), emit
-# additionalContext on config/runtime errors (environment issue — agent informed, do not
-# edit the file).
-# =====================================================================
-PARENT_DIR=$(dirname "$FILE_PATH")
-
-EXIT_CODE=0
-mthds-agent validate bundle "$FILE_PATH" -L "$PARENT_DIR/" --allow-signatures --format json --error-format json >"$TMPOUT" 2>"$TMPERR" || EXIT_CODE=$?
-
-# Valid verdict → pass. The success envelope (is_valid:true) rides stdout even when
-# the exit code is non-zero (the strict not-runnable signature gate exits non-zero
-# while the bundle is structurally valid). Read is_valid, NOT the exit code.
-if [[ "$(_jv "$(cat "$TMPOUT")" "d.is_valid === true ? 'y' : ''")" == "y" ]]; then
-  # Valid → pass. If the assembled library still has unimplemented PipeSignature
-  # placeholders, emit a NON-BLOCKING nudge so the agent implements them before
-  # running for real. pending_signatures rides the same success envelope — the
-  # library-wide list of pipes still typed PipeSignature (empty when complete).
-  # Headers persist additively after they're satisfied, so this field — NOT a grep
-  # for "PipeSignature" — is the source of truth for what remains.
-  PENDING=$(_jv "$(cat "$TMPOUT")" "Array.isArray(d.pending_signatures)?d.pending_signatures.join(', '):''") || PENDING=""
-  if [[ -n "$PENDING" ]]; then
-    node -e '
-      const pending = process.argv[1];
-      process.stdout.write(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "PostToolUse",
-          additionalContext: "Bundle is valid but not yet runnable. Signatures still unimplemented (PipeSignature placeholders): "
-            + pending
-            + ". They mock their output on dry-run; implement them before running the method for real."
-        }
-      }) + "\n");
-    ' "$PENDING" || true
-  fi
-  exit 0
-fi
-# A clean exit 0 WITHOUT the structured `is_valid:true` success envelope means we got no
-# machine-readable verdict (e.g. an older/regressed mthds-agent that exits 0 with no/garbled
-# JSON). This hook treats the structured verdict as the source of truth, so BLOCK rather than
-# silently allow an unverifiable edit — fail safe for a write gate.
-if [[ "$EXIT_CODE" -eq 0 ]]; then
-  _block "Validation failed for $FILE_PATH (mthds-agent exited 0 with no structured success envelope — is_valid:true not found on stdout; if this persists, upgrade mthds-agent)"
-  exit 0
-fi
-
-# Invalid / no-verdict → the JSON error envelope is on stderr.
-ERR_JSON=$(cat "$TMPERR")
-
-# Unparseable / non-error stderr → block (no actionable structured content).
-if [[ -z "$(_jv "$ERR_JSON" "(d.error === true || d.is_valid === false) ? 'y' : ''")" ]]; then
-  _block "Validation failed for $FILE_PATH (mthds-agent exited $EXIT_CODE with no structured error envelope)"
-  exit 0
-fi
-
-# error_domain straight from the structured envelope (no markdown grep). Trimmed so
-# stray whitespace/\r (e.g. Windows-origin JSON) can't make the case below miss
-# config|runtime and fall through to a wrong BLOCK. Empty when the surfaced error
-# class has no error_domain set. The `|| DOMAIN=""` fallback keeps a killed `node`
-# (OOM/SIGKILL) from aborting the hook under `set -e` — a write-gate fail-open.
-DOMAIN=$(_jv "$ERR_JSON" "(d.error_domain ?? '').trim()") || DOMAIN=""
-
-case "$DOMAIN" in
-  config|runtime)
-    # Environment issue, not a bundle issue. Surface to user (stderr) AND agent
-    # (additionalContext) — both informed, neither blocks the write. The stderr line
-    # carries the validator message too so the user can debug without reading the
-    # agent's additionalContext.
-    MSG=$(_jv "$ERR_JSON" "d.message || '(no message)'") || MSG="(no message)"
-    printf '[mthds-hook] Validation warning (domain=%s) for %s: %s\n' "$DOMAIN" "$FILE_PATH" "$MSG" >&2
-    node -e '
-      let env; try { env = JSON.parse(process.argv[1]); } catch { env = {}; }
-      const file = process.argv[2];
-      const domain = process.argv[3];
-      const MAX = 9500;
-      const body = String(env.message || "(no message)");
-      const trimmed = body.length > MAX
-        ? body.slice(0, MAX) + "\n\n[truncated, " + (body.length - MAX) + " chars omitted]"
-        : body;
-      const header = "Validation warning for " + file + " (" + domain + " domain — environment issue, do not edit the file):\n\n";
-      process.stdout.write(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "PostToolUse",
-          additionalContext: header + trimmed
-        }
-      }) + "\n");
-    ' "$ERR_JSON" "$FILE_PATH" "$DOMAIN" || {
-      _block "Hook error: could not format additionalContext for $FILE_PATH"
-    }
-    exit 0
-    ;;
-  *)
-    # input-domain (or unknown/empty — default to BLOCK for safety). Build the
-    # agent-actionable reason from the structured envelope: the message plus each
-    # validation_errors item with its locators.
-    REASON=$(node -e '
-      let env; try { env = JSON.parse(process.argv[1]); } catch { env = {}; }
-      const file = process.argv[2];
-      const lines = ["Validation failed for " + file + ":", "", String(env.message || "Bundle is invalid.")];
-      const errs = Array.isArray(env.validation_errors) ? env.validation_errors : [];
-      if (errs.length) {
-        lines.push("");
-        for (const e of errs) {
-          const loc = [
-            e.pipe_code && ("pipe " + e.pipe_code),
-            e.concept_code && ("concept " + e.concept_code),
-            e.field_name && ("field " + e.field_name),
-            e.source && ("source " + e.source),
-          ].filter(Boolean).join(", ");
-          lines.push("- [" + (e.category || "error") + "] " + String(e.message || "") + (loc ? " (" + loc + ")" : ""));
-        }
-      }
-      const MAX = 9500;
-      const out = lines.join("\n");
-      process.stdout.write(out.length > MAX ? out.slice(0, MAX) + "\n\n[truncated, " + (out.length - MAX) + " chars omitted]" : out);
-    ' "$ERR_JSON" "$FILE_PATH" 2>/dev/null) || REASON=""
-    [[ -z "$REASON" ]] && REASON="Validation failed for $FILE_PATH"
-    _block "$REASON"
-    exit 0
-    ;;
-esac
+exec node "$CHECK_MJS" <<<"$INPUT"

@@ -92,6 +92,18 @@ HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"],
 }
 
+# Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
+# rendering) from templates/hooks/assets/ to the target's hooks/ directory.
+# Today that is the vendored `check.mjs` bundle — the .mthds validation hook
+# built in pipelex-sdk-js (`npm run build:hook`, see docs/hooks.md for the
+# re-vendor procedure). It carries a provenance header and inlines a WASM
+# engine, so it must never pass through the template engine.
+STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
+    Platform.CLAUDE: ["hooks/assets/check.mjs"],
+    Platform.CODEX: [],
+    Platform.MISTRAL_VIBE: [],
+}
+
 # Files that should be made executable after rendering (hook scripts). A chmod
 # only touches files that were produced.
 EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-vibe.sh"}
@@ -289,6 +301,15 @@ def render_templates(
     if not all_j2_paths:
         return {}
 
+    # Collect static hook assets (copied verbatim, no rendering — must all exist)
+    static_asset_paths: list[Path] = []
+    for name in STATIC_HOOK_ASSETS_BY_PLATFORM.get(platform, []):
+        path = templates_dir / name
+        if not path.is_file():
+            msg = f"Declared static hook asset not found: {name} — re-vendor it (see docs/hooks.md)"
+            raise SystemExit(msg)
+        static_asset_paths.append(path)
+
     skill_j2_set = set(j2_paths)
     results: dict[Path, str] = {}
     for j2_path in all_j2_paths:
@@ -311,6 +332,12 @@ def render_templates(
         output_rel = j2_path.relative_to(templates_dir).with_suffix("")  # strip .j2
         output_path = base_dir / output_rel
         results[output_path] = rendered
+
+    # Static hook assets: templates/hooks/assets/X -> hooks/X (verbatim copy,
+    # the assets/ segment is dropped — the asset ships beside the hook scripts).
+    for asset_path in static_asset_paths:
+        output_path = base_dir / "hooks" / asset_path.name
+        results[output_path] = asset_path.read_text(encoding="utf-8")
 
     return results
 

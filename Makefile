@@ -14,7 +14,7 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 
 .PHONY: \
 	help env check-uv install lock li \
-	gen-skill-docs build check check-shared check-claude check-codex agent-check \
+	gen-skill-docs build vendor-hook check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
 	test agent-test gha-tests tp \
 	cleanderived cleanenv cleanall reinstall ri \
@@ -168,6 +168,17 @@ gen-skill-docs: install ## Generate SKILL.md from .j2 templates (use TARGET=name
 build: install ## Build all targets (prod + codex + mistral-vibe)
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all
 	@echo "Done: built all targets"
+
+# Where the check.mjs hook bundle is built (override for a non-sibling checkout).
+SDK_JS_DIR ?= ../pipelex-sdk-js
+TOOLS_WASM_DIR ?= ../vscode-pipelex
+
+vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js (release wasm) and vendor it into templates/hooks/assets/
+	@cd "$(TOOLS_WASM_DIR)" && RELEASE=true make tools-wasm
+	@cd "$(SDK_JS_DIR)" && npm run build:hook
+	@cp "$(SDK_JS_DIR)/dist-hooks/check.mjs" templates/hooks/assets/check.mjs
+	@head -3 templates/hooks/assets/check.mjs | tail -1
+	@echo "• Vendored check.mjs — now run 'make build' to propagate it to the targets"
 
 ##########################################################################################
 ### CODEX MARKETPLACE SOURCE (local dev vs published GitHub)

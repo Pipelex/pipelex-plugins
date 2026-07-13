@@ -13,6 +13,7 @@ from scripts.gen_skill_docs import (
     CODEX_DISCOVERY_MARKETPLACE_SRC,
     HOOK_TEMPLATES_BY_PLATFORM,
     SHARED_TEMPLATES,
+    STATIC_HOOK_ASSETS_BY_PLATFORM,
     Platform,
     TargetConfig,
     build_target,
@@ -46,10 +47,22 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/validate-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
 }
 
+# Static hook assets are copied verbatim — the fixture body stands in for the
+# vendored check.mjs bundle (whose real content is a 4+ MB esbuild artifact).
+STATIC_ASSET_BODIES = {
+    "hooks/assets/check.mjs": "// vendored hook bundle {{ not_a_template }}\n",
+}
+
 
 def _create_hook_templates(templates_dir: Path) -> None:
-    """Create minimal per-platform hook templates so render_templates resolves them."""
+    """Create minimal per-platform hook templates and static assets so
+    render_templates resolves them."""
     for name, body in HOOK_TEMPLATE_BODIES.items():
+        path = templates_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text(body)
+    for name, body in STATIC_ASSET_BODIES.items():
         path = templates_dir / name
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
@@ -526,3 +539,39 @@ class TestHookRendering:
         hook_script = template_tree / "pipelex" / "hooks" / "validate-mthds.sh"
         assert hook_script.is_file()
         assert os.access(hook_script, os.X_OK)
+
+    def test_claude_declares_check_mjs_static_asset(self) -> None:
+        """The vendored check.mjs ships on the Claude target only (for now)."""
+        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.CLAUDE] == ["hooks/assets/check.mjs"]
+        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.CODEX] == []
+        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.MISTRAL_VIBE] == []
+
+    def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
+        """check.mjs must bypass Jinja: its body (a generated bundle) may contain
+        brace sequences that a template pass would mangle or reject."""
+        results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
+        asset_output = template_tree / "hooks" / "check.mjs"
+        assert asset_output in results
+        assert results[asset_output] == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+
+    def test_generate_writes_static_asset_into_target(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        asset = template_tree / "pipelex" / "hooks" / "check.mjs"
+        assert asset.is_file()
+        assert asset.read_text() == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+
+    def test_missing_static_asset_raises(self, template_tree: Path) -> None:
+        (template_tree / "templates" / "hooks" / "assets" / "check.mjs").unlink()
+        with pytest.raises(SystemExit, match="static hook asset not found"):
+            render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
+
+    def test_check_freshness_detects_stale_static_asset(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        (template_tree / "pipelex" / "hooks" / "check.mjs").write_text("// stale bundle\n")
+        assert check_freshness(template_tree, "prod") == 1
+
+    def test_vibe_ships_no_static_asset(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
+        output_names = {path.name for path in results}
+        assert "check.mjs" not in output_names
