@@ -9,7 +9,7 @@ This is the plugin generation that pairs with the hosted Pipelex API and the (cl
 ## What's inside
 
 - **Skills** — Pipelex skills (starting with `pipelex-explain`) for reading and reasoning about MTHDS bundles.
-- **Hooks** — a validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). On **Claude Code** the hook is CLI-free: lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. On Codex and Mistral Vibe the transitional CLI pipeline still runs when the MTHDS CLIs happen to be present, and passes silently when they're absent (this plugin does not manage CLI installation). See [docs/hooks.md](docs/hooks.md).
+- **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
 - **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
 
 ## Install
@@ -41,7 +41,7 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 # Restart Codex, then run /plugins to install pipelex
 ```
 
-The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It runs the full validation pipeline only when the MTHDS CLIs are present; otherwise it passes silently. Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
+The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It is CLI-free: lint/format run through the bundled WASM engine, and semantic validation uses the Pipelex API when `PIPELEX_API_KEY` is set (a network-sandboxed session simply skips the validate stage). Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
 
 ### Mistral Vibe
 
@@ -60,7 +60,7 @@ name = "validate-mthds"
 type = "after_tool"
 match = "re:^(edit|write_file)$"
 command = "/absolute/path/to/pipelex-vibe/hooks/validate-mthds-vibe.sh"
-timeout = 30.0
+timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."
 ```

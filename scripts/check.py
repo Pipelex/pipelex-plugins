@@ -463,7 +463,7 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
         elif not hook_script.stat().st_mode & 0o111:
             errors.append(f"[{target_name}] hooks/validate-mthds-vibe.sh is not executable")
 
-        for filename in ("hooks.json", "codex-hooks.json", "validate-mthds.sh"):
+        for filename in ("hooks.json", "codex-hooks.json", "validate-mthds.sh", "validate-mthds-codex.sh"):
             if (output_dir / "hooks" / filename).exists():
                 errors.append(f"[{target_name}] hooks/{filename} is not a Vibe artifact")
 

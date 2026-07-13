@@ -43,6 +43,7 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/validate-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
+    "hooks/validate-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n',
     "hooks/validate-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
 }
@@ -509,7 +510,7 @@ class TestHookRendering:
         """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/validate-mthds.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/validate-mthds-codex.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"]
 
     def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
@@ -524,6 +525,7 @@ class TestHookRendering:
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "codex"})
         output_names = {path.name for path in results}
         assert "codex-hooks.json" in output_names
+        assert "validate-mthds-codex.sh" in output_names
         assert "hooks.json" not in output_names
         assert "validate-mthds.sh" not in output_names
 
@@ -540,11 +542,10 @@ class TestHookRendering:
         assert hook_script.is_file()
         assert os.access(hook_script, os.X_OK)
 
-    def test_claude_declares_check_mjs_static_asset(self) -> None:
-        """The vendored check.mjs ships on the Claude target only (for now)."""
-        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.CLAUDE] == ["hooks/assets/check.mjs"]
-        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.CODEX] == []
-        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.MISTRAL_VIBE] == []
+    def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
+        """One vendored check.mjs bundle serves all three platforms."""
+        for platform in Platform:
+            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs"]
 
     def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
         """check.mjs must bypass Jinja: its body (a generated bundle) may contain
@@ -570,8 +571,9 @@ class TestHookRendering:
         (template_tree / "pipelex" / "hooks" / "check.mjs").write_text("// stale bundle\n")
         assert check_freshness(template_tree, "prod") == 1
 
-    def test_vibe_ships_no_static_asset(self, tmp_path: Path) -> None:
+    def test_vibe_and_codex_ship_the_static_asset(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
-        results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
-        output_names = {path.name for path in results}
-        assert "check.mjs" not in output_names
+        for platform in ("mistral-vibe", "codex"):
+            results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": platform})
+            output_names = {path.name for path in results}
+            assert "check.mjs" in output_names

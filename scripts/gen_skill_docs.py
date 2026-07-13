@@ -81,14 +81,16 @@ HOOK_TEMPLATES = [
 ]
 
 # Hook templates by platform:
-# - Claude: hooks/hooks.json + the bundled validate-mthds.sh script.
+# - Claude: hooks/hooks.json + the validate-mthds.sh wrapper.
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
-#   referenced from the Codex manifest's `hooks` field; the command is wrapped
-#   so a missing `mthds-agent` exits cleanly rather than erroring on every patch).
-# - Mistral Vibe: hooks/vibe-hooks.toml + validate-mthds-vibe.sh (after_tool).
+#   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
+#   substituted by Codex's hook engine) + the validate-mthds-codex.sh wrapper.
+# - Mistral Vibe: hooks/vibe-hooks.toml + the validate-mthds-vibe.sh wrapper.
+# Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
+# invoked with the matching --platform flag.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
-    Platform.CODEX: ["hooks/codex-hooks.json.j2"],
+    Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/validate-mthds-codex.sh.j2"],
     Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"],
 }
 
@@ -97,16 +99,17 @@ HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # Today that is the vendored `check.mjs` bundle — the .mthds validation hook
 # built in pipelex-sdk-js (`npm run build:hook`, see docs/hooks.md for the
 # re-vendor procedure). It carries a provenance header and inlines a WASM
-# engine, so it must never pass through the template engine.
+# engine, so it must never pass through the template engine. One bundle
+# serves all three platforms behind its --platform flag.
 STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: ["hooks/assets/check.mjs"],
-    Platform.CODEX: [],
-    Platform.MISTRAL_VIBE: [],
+    Platform.CODEX: ["hooks/assets/check.mjs"],
+    Platform.MISTRAL_VIBE: ["hooks/assets/check.mjs"],
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod
 # only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-vibe.sh"}
+EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-codex.sh", "validate-mthds-vibe.sh"}
 
 
 @dataclass

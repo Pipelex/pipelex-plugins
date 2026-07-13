@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'command -v mthds-agent >/dev/null && exec mthds-agent codex hook; exit 0'",
-            "timeout": 30,
+            "command": "${PLUGIN_ROOT}/hooks/validate-mthds-codex.sh",
+            "timeout": 15,
             "statusMessage": "Validating .mthds files"
           }
         ]
