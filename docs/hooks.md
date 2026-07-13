@@ -42,15 +42,15 @@ A machine consumer branches on the structured verdict, never on transport — an
 
 ### Re-vendoring check.mjs
 
-`check.mjs` is a **static hook asset** (`templates/hooks/assets/check.mjs` — copied verbatim by the build, never rendered through Jinja). When the hook source in `pipelex-sdk-js` (or the wasm engine in `vscode-pipelex`) changes:
+`check.mjs` is a **static hook asset** (`templates/hooks/assets/check.mjs` — copied verbatim by the build, never rendered through Jinja). When the hook source in `pipelex-sdk-js` changes (or its `@pipelex/tools-wasm` npm dependency is bumped):
 
 ```bash
-make vendor-hook   # RELEASE=true wasm build + npm run build:hook + copy into templates/hooks/assets/
+make vendor-hook   # npm run build:hook in pipelex-sdk-js + copy into templates/hooks/assets/
 make build         # propagate to pipelex/hooks/check.mjs
 make check         # freshness + packaging gates
 ```
 
-`make vendor-hook` accepts `SDK_JS_DIR=` / `TOOLS_WASM_DIR=` overrides for non-sibling checkouts. The provenance header (SDK + tools-wasm versions and commits) identifies any vendored copy.
+`make vendor-hook` accepts a `SDK_JS_DIR=` override for a non-sibling checkout. The wasm engine comes from the published `@pipelex/tools-wasm` npm package; to vendor an unreleased engine build instead, set `PIPELEX_TOOLS_WASM_PATH` to a `vscode-pipelex/js/tools-wasm` checkout (with a `RELEASE=true make tools-wasm` build) before running. The provenance header (SDK version + commit, tools-wasm version + origin) identifies any vendored copy.
 
 ## Per-platform wiring
 

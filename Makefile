@@ -171,10 +171,8 @@ build: install ## Build all targets (prod + codex + mistral-vibe)
 
 # Where the check.mjs hook bundle is built (override for a non-sibling checkout).
 SDK_JS_DIR ?= ../pipelex-sdk-js
-TOOLS_WASM_DIR ?= ../vscode-pipelex
 
-vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js (release wasm) and vendor it into templates/hooks/assets/
-	@cd "$(TOOLS_WASM_DIR)" && RELEASE=true make tools-wasm
+vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js and vendor it into templates/hooks/assets/
 	@cd "$(SDK_JS_DIR)" && npm run build:hook
 	@cp "$(SDK_JS_DIR)/dist-hooks/check.mjs" templates/hooks/assets/check.mjs
 	@head -3 templates/hooks/assets/check.mjs | tail -1
