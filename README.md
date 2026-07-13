@@ -9,7 +9,7 @@ This is the plugin generation that pairs with the hosted Pipelex API and the (cl
 ## What's inside
 
 - **Skills** — Pipelex skills (starting with `pipelex-explain`) for reading and reasoning about MTHDS bundles.
-- **Hooks** — a validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). When the MTHDS CLIs happen to be present locally it runs the full validation pipeline; when they're absent it passes silently (this plugin does not manage CLI installation). The iteration path swaps these for hosted-API / MCP-backed validation. See [docs/hooks.md](docs/hooks.md).
+- **Hooks** — a validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). On **Claude Code** the hook is CLI-free: lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. On Codex and Mistral Vibe the transitional CLI pipeline still runs when the MTHDS CLIs happen to be present, and passes silently when they're absent (this plugin does not manage CLI installation). See [docs/hooks.md](docs/hooks.md).
 - **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
 
 ## Install
@@ -23,7 +23,16 @@ claude plugin marketplace add Pipelex/pipelex-plugins
 claude plugin install pipelex@pipelex-plugins
 ```
 
-The `.mthds` validation hook loads automatically. It runs the full validation pipeline only when the MTHDS CLIs (`plxt`, `mthds-agent`) happen to be on your `PATH`; otherwise it passes silently.
+The `.mthds` validation hook loads automatically and needs no local toolchain beyond Node.js (which Claude Code already requires): lint runs and canonical formatting is applied locally on every `.mthds` edit, offline and credential-free.
+
+To also get full semantic validation (bundle load, cross-file resolution, dry-run) on every edit, set an API key:
+
+```bash
+export PIPELEX_API_KEY=...            # get one at https://app.pipelex.com
+export PIPELEX_BASE_URL=...           # optional — defaults to https://api.pipelex.com
+```
+
+Everything fails open: with no key (or the API unreachable) the local lint/format verdicts still apply and only the validate stage is skipped — no blocked edits, no nagging. **Privacy note:** with a key set, the `.mthds` files around the edited one are sent to the API on each validate call; unset `PIPELEX_API_KEY` to keep validation fully local (lint/format only).
 
 ### Codex
 
