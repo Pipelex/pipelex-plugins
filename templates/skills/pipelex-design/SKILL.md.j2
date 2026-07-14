@@ -75,10 +75,10 @@ Determine the three things that *are* the requirement:
 
 **Specify the boundary concepts fully now.** The top input and output concepts are the client-facing data contract — give them their structure at Layer 0. Intermediate concepts come later, each introduced by the controller that owns it.
 
-**Write the root file** `mthds-wip/<bundle_dir>/bundle.mthds`:
+**Write the root file** `pipelex-wip/<bundle_dir>/main.mthds` (the root is always named `main.mthds` unless the user asks for another name):
 
-1. `mkdir -p mthds-wip/<bundle_dir>/`.
-2. Write `bundle.mthds` with the **Write** tool. It carries the `domain` header, `description`, `main_pipe`, optional `system_prompt`, the fully-specified boundary concepts, and the top pipe as a single `PipeSignature` whose code is the `main_pipe`:
+1. `mkdir -p pipelex-wip/<bundle_dir>/`.
+2. Write `main.mthds` with the **Write** tool. It carries the `domain` header, `description`, `main_pipe`, optional `system_prompt`, the fully-specified boundary concepts, and the top pipe as a single `PipeSignature` whose code is the `main_pipe`:
 
    ```toml
    domain      = "<snake_case_domain>"
@@ -122,7 +122,7 @@ Given one pending signature `S` (its frozen contract — `inputs`, `output`, `de
 
 1. **Decide operator or controller.** The `signature_for` hint usually pre-answers it. Heuristic when absent or wrong: a single cognitive/IO step → operator; multiple steps, iteration, branching, or parallelism → controller.
 
-2. **Add `<code>.mthds`** to the bundle dir, where `<code>` is `S`'s **bare** pipe code — strip the domain prefix. The backlog lists each signature namespaced as `domain.code`, but the file and the `[pipe.<code>]` it defines use the bare code so they satisfy the forward-declared header (a namespaced `[pipe.domain.code]` would mint a different pipe and leave the signature pending — the refinement would never converge). Every non-root file carries **only** `domain = "<same_domain>"` for membership — omit `description`, `system_prompt`, `main_pipe` (those live in the root).
+2. **Add `<code>.mthds`** to the bundle dir, where `<code>` is `S`'s **bare** pipe code — strip the domain prefix. The backlog lists each signature namespaced as `domain.code`, but the file and the `[pipe.<code>]` it defines use the bare code so they satisfy the forward-declared header (a namespaced `[pipe.domain.code]` would mint a different pipe and leave the signature pending — the refinement would never converge). Every non-root file carries **only** `domain = "<same_domain>"` for membership — omit `description`, `system_prompt`, `main_pipe` (those live in the root). If a pipe code would collide with the root file's name (a pipe literally coded `main`), suffix the definition file (`main_pipe.mthds`) — file names are free, only the `[pipe.<code>]` code matters.
 
    - **Operator (leaf):** write the concrete operator (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`) and fill its type-specific fields. No new signatures — this branch is done.
    - **Controller (composite):** write the controller (`PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`), wire its sub-pipes, **forward-declare each not-yet-trivial sub-pipe as a new `PipeSignature` header** (contract + `signature_for`) in this same file, and declare any intermediate concepts the wiring needs. The new headers join the backlog.
@@ -152,13 +152,15 @@ There is no separate strict-validation call — validation always permits signat
 
 Once the runnable verdict holds:
 
-1. **Input schema** — Call `mthds_inputs` with the same `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
+1. **Organize the bundle** — invoke `/pipelex-organize` on the bundle directory (automatic, no approval). It regroups the one-file-per-signature construction layout into a clear, browsable one — related pipes gathered into coherent module files (or a single `main.mthds` when the method is simple), satisfied signature headers dropped, declarations ordered for top-down reading — and proves via `mthds_validate` that the runnable verdict is preserved before swapping the layout.
 
-2. **Method graph** — Where the host renders MCP views, an interactive method graph accompanied the valid verdicts; point the user to it. In terminal hosts, offer a text flow diagram of the final structure instead.
+2. **Input schema** — Call `mthds_inputs` with the organized `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
 
-3. **Next step** — Suggest preparing real inputs with `/pipelex-inputs`.
+3. **Method graph** — Where the host renders MCP views, an interactive method graph accompanied the valid verdicts; point the user to it. In terminal hosts, offer a text flow diagram of the final structure instead.
 
-**Early-stop variant.** If the user stops before the backlog is empty, deliver the valid design scaffold instead: confirm it passes validation, list the unimplemented signatures (the current `## Pending signatures` list), and explain that resuming means expanding them — no external state is needed, the bundle is its own todo list. A validated design skeleton is a legitimate deliverable.
+4. **Next step** — Suggest preparing real inputs with `/pipelex-inputs`.
+
+**Early-stop variant.** If the user stops before the backlog is empty, deliver the valid design scaffold instead: confirm it passes validation, list the unimplemented signatures (the current `## Pending signatures` list), and explain that resuming means expanding them — no external state is needed, the bundle is its own todo list. A validated design skeleton is a legitimate deliverable. Do **not** auto-organize a scaffold; offer `/pipelex-organize` (it preserves pending signatures, so resuming works either way) and let the user decide.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 

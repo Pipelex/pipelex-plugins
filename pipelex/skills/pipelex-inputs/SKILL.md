@@ -80,9 +80,9 @@ This skill extracts the method's input template through the **`mthds_inputs`** t
 
 ### Step 1: Identify the Target Method
 
-Determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `bundle.mthds` (e.g., `mthds-wip/pipeline_01/`).
+Determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `main.mthds` (e.g., `pipelex-wip/pipeline_01/`).
 
-The `inputs.json` file is saved directly in this directory (next to `bundle.mthds`):
+The `inputs.json` file is saved directly in this directory (next to `main.mthds`):
 - `<output_dir>/inputs.json`
 
 If data files need to be generated or copied (images, PDFs, etc.), they go in a subdirectory:
@@ -135,7 +135,7 @@ The fastest path. Produces a placeholder `inputs.json` that the user can fill in
   good: `"<VARNAME-url-or-path-relative-to-this-inputs-file>"` ✅ do this
   bad:  `"<path-to-VARNAME>"` ❌ don't do that
 This placeholder means "replace with either a real URL, an absolute path, or a path relative to the saved `inputs.json` file itself," not relative to the current working directory.
-3. Save it to `<output_dir>/inputs.json` (next to `bundle.mthds`)
+3. Save it to `<output_dir>/inputs.json` (next to `main.mthds`)
 4. Report the saved file path and show the template content
 5. Offer: "To populate this with realistic test data, re-run /pipelex-inputs and ask for synthetic data. Or provide your own files."
 
@@ -183,7 +183,7 @@ When inputs require actual files (Image, Document), generate them — see [Docum
 
 ### Assemble and Save
 
-Fill the Step 2 template in place and save it to `<output_dir>/inputs.json` (next to `bundle.mthds`). Any generated data files go in `<output_dir>/inputs/`.
+Fill the Step 2 template in place and save it to `<output_dir>/inputs.json` (next to `main.mthds`). Any generated data files go in `<output_dir>/inputs/`.
 
 ---
 
@@ -253,7 +253,7 @@ For each matched file, set the input's light value:
 
 ### Step F: Assemble and Save
 
-Fill all matched values into the Step 2 template and save it as `<output_dir>/inputs.json` (next to `bundle.mthds`).
+Fill all matched values into the Step 2 template and save it as `<output_dir>/inputs.json` (next to `main.mthds`).
 
 ### Step G: Report
 
@@ -415,7 +415,7 @@ Call `mthds_inputs` with the bundle files; the template comes back as:
 }
 ```
 
-Save it (with a placeholder or real theme) directly to `mthds-wip/pipeline_01/inputs.json`.
+Save it (with a placeholder or real theme) directly to `pipelex-wip/pipeline_01/inputs.json`.
 
 ### Example 2: Synthetic data for an image analysis pipeline
 

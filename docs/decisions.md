@@ -48,7 +48,7 @@ The build system (`docs/build-targets.md`) was ported from `mthds-plugins` and t
 
 ## MCP server declaration (2026-07-14)
 
-The plugin declares the **`pipelex-mcp`** server (streamable HTTP; tools `mthds_validate`, `mthds_inputs`) so the MCP-backed skills (`pipelex-design`, `pipelex-inputs`) can call it natively — no vendored script, no `curl` recipes.
+The plugin declares the **`pipelex-mcp`** server (streamable HTTP; tools `mthds_validate`, `mthds_inputs`) so the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-inputs`) can call it natively — no vendored script, no `curl` recipes.
 
 - **Location: inline `mcpServers` in the generated Claude `plugin.json`** (not a plugin-root `.mcp.json` — both are supported by Claude Code; inline keeps everything in the one generated manifest). The build injects `{"pipelex": {"type": "http", "url": "${PIPELEX_MCP_URL:-<mcp_server_url>}"}}` for Claude-platform targets, sourced from the `mcp_server_url` template variable (`targets/defaults.toml`, overridable per target). Claude Code honors `${VAR:-default}` expansion inside plugin MCP configs and connects plugin-declared servers automatically at session start; the tools reach the model as `mcp__plugin_pipelex_pipelex__<tool>`.
 - **The baked default is a placeholder** (`https://mcp.pipelex.com/mcp`) until `pipelex-mcp` has its deployed URL — always use the `PIPELEX_MCP_URL` override meanwhile (local dev: `http://localhost:3000/mcp` via `make dev` in `../pipelex-mcp`).

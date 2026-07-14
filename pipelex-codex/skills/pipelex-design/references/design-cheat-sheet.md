@@ -1,6 +1,6 @@
 # Design Cheat Sheet — Writing `.mthds` Directly
 
-A focused, copy-pasteable reference for hand-writing MTHDS code in a `bundle.mthds`.
+A focused, copy-pasteable reference for hand-writing MTHDS code in a `main.mthds`.
 
 ## 1. Bundle Skeleton
 

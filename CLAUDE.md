@@ -29,7 +29,10 @@ targets/
 └── mistral-vibe.toml          # Mistral Vibe target config (version, identity)
 templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 ├── skills/
-│   ├── pipelex-explain/SKILL.md.j2   # First skill (pure read-and-explain)
+│   ├── pipelex-explain/SKILL.md.j2   # Read-and-explain a bundle (no MCP dependency)
+│   ├── pipelex-design/SKILL.md.j2    # Top-down design by stepwise refinement (MCP-backed)
+│   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle into a browsable module layout (MCP-backed; auto-run at end of pipelex-design)
+│   ├── pipelex-inputs/SKILL.md.j2    # inputs.json preparation (MCP-backed)
 │   └── shared/
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
@@ -126,4 +129,4 @@ So there is nothing to enable — the bundled hook loads on its own (hooks are S
 
 ## Key dependency
 
-The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs`; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL is a placeholder until `pipelex-mcp` deploys — override per session (`PIPELEX_MCP_URL` on Claude; `[mcp_servers.pipelex]` in `~/.codex/config.toml` on Codex).
+The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs`; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL is a placeholder until `pipelex-mcp` deploys — override per session (`PIPELEX_MCP_URL` on Claude; `[mcp_servers.pipelex]` in `~/.codex/config.toml` on Codex).
