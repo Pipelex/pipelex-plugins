@@ -22,5 +22,10 @@
   },
   "name": "pipelex",
   "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "mcpServers": {
+    "pipelex": {
+      "url": "https://mcp.pipelex.com/mcp"
+    }
+  }
 }

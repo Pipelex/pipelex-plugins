@@ -185,25 +185,31 @@ vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js and vendor it into templates
 CODEX_MARKETPLACE_NAME := pipelex-plugins
 CODEX_OFFICIAL_SOURCE  := Pipelex/pipelex-plugins
 CODEX_LOCAL_SOURCE     := $(CURDIR)
+CODEX_PLUGIN_REF       := pipelex@$(CODEX_MARKETPLACE_NAME)
+
+# Codex >= 0.144 runs installed plugins from a cache copy
+# ($CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>) taken at
+# install time, and `codex plugin marketplace upgrade` only refreshes Git
+# marketplace snapshots. So for a local-path marketplace the cache re-sync is
+# an idempotent `codex plugin add` — that is what codex-refresh does, and both
+# codex-use-* targets end with it.
 
 codex-use-local: ## Point Codex at this local pipelex-plugins checkout (refreshes plugin cache)
 	@codex plugin marketplace remove $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
 	@codex plugin marketplace add "$(CODEX_LOCAL_SOURCE)"
-	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@codex plugin add $(CODEX_PLUGIN_REF)
 	@echo "• Codex marketplace '$(CODEX_MARKETPLACE_NAME)' now points at $(CODEX_LOCAL_SOURCE)"
-	@echo "  Restart Codex to pick up the swap. The 'pipelex' plugin stays installed —"
-	@echo "  only /plugins → uninstall/reinstall if skills still look stale after restart."
+	@echo "  Restart Codex to pick up the swap. If the hook config changed, re-trust it on first run."
 
 codex-use-official: ## Point Codex back at the published GitHub marketplace (refreshes plugin cache)
 	@codex plugin marketplace remove $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
 	@codex plugin marketplace add $(CODEX_OFFICIAL_SOURCE)
-	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME) >/dev/null 2>&1 || true
+	@codex plugin add $(CODEX_PLUGIN_REF)
 	@echo "• Codex marketplace '$(CODEX_MARKETPLACE_NAME)' now points at $(CODEX_OFFICIAL_SOURCE)"
-	@echo "  Restart Codex to pick up the swap. The 'pipelex' plugin stays installed —"
-	@echo "  only /plugins → uninstall/reinstall if skills still look stale after restart."
+	@echo "  Restart Codex to pick up the swap. If the hook config changed, re-trust it on first run."
 
-codex-refresh: ## Re-sync plugin cache from the active marketplace source (run after editing pipelex-codex/)
-	@codex plugin marketplace upgrade $(CODEX_MARKETPLACE_NAME)
+codex-refresh: ## Re-sync the installed plugin's cache copy from the marketplace source (run after make build)
+	@codex plugin add $(CODEX_PLUGIN_REF)
 
 codex-status: ## Show which source is currently registered for the Codex pipelex marketplace
 	@awk '/^\[marketplaces\.$(CODEX_MARKETPLACE_NAME)\]/{flag=1; next} /^\[/{flag=0} flag' \

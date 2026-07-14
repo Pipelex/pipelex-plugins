@@ -482,12 +482,14 @@ class TestPluginManifests:
         plugin_json = make_plugin_json(tree, config)
         assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "${PIPELEX_MCP_URL:-https://mcp.test/mcp}"}}
 
-    def test_codex_plugin_json_has_no_mcp_server(self, tmp_path: Path) -> None:
-        """Plugin-bundled MCP support is unverified on Codex — no entry is injected."""
+    def test_codex_plugin_json_declares_mcp_server_literal_url(self, tmp_path: Path) -> None:
+        """The Codex manifest carries the pipelex MCP server with a literal URL —
+        Codex does no env expansion in MCP config; the bare url selects the
+        streamable-HTTP transport structurally (verified against Codex 0.144.4)."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "codex")
         plugin_json = make_plugin_json(tree, config)
-        assert "mcpServers" not in plugin_json
+        assert plugin_json["mcpServers"] == {"pipelex": {"url": "https://mcp.test/mcp"}}
 
     def test_claude_plugin_json_without_mcp_server_url_skips_entry(self, template_tree: Path) -> None:
         """A tree that defines no mcp_server_url gets no mcpServers key."""

@@ -48,9 +48,17 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 # Restart Codex, then run /plugins to install pipelex
 ```
 
-The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It is CLI-free: lint/format run through the bundled WASM engine, and semantic validation uses the Pipelex API when `PIPELEX_API_KEY` is set (a network-sandboxed session simply skips the validate stage). Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
+The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It is CLI-free: lint/format run through the bundled WASM engine, and semantic validation uses the Pipelex API when `PIPELEX_API_KEY` is set (a network-sandboxed session simply skips the validate stage). Requires Codex 0.141+ (matured hook engine; verified in live sessions against 0.144.4). See [docs/hooks.md](docs/hooks.md).
 
-**MCP server (manual, for the MCP-backed skills):** plugin-bundled MCP declarations are unverified on Codex, so register the `pipelex-mcp` server once at user level in `~/.codex/config.toml` under `[mcp_servers]` (streamable HTTP; see the Codex MCP docs for the exact client shape on your version). The MCP-backed skills stop with a setup instruction when the tools are absent.
+**MCP server (automatic):** the plugin manifest declares the `pipelex-mcp` server (streamable HTTP), so Codex connects it on its own — the tools reach the model as `mcp__pipelex__mthds_validate` / `mcp__pipelex__mthds_inputs`, and `codex mcp list` shows the `pipelex` entry. The baked URL is a placeholder until the server deploys; Codex does no env expansion in MCP config, so point sessions at a running server with a same-named override, which outranks the plugin declaration:
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.pipelex]
+url = "http://localhost:3000/mcp"   # e.g. a local pipelex-mcp dev server
+```
+
+(or per invocation: `codex -c 'mcp_servers.pipelex.url="http://localhost:3000/mcp"' …`). The MCP-backed skills stop with a setup instruction when the tools are absent.
 
 ### Mistral Vibe
 

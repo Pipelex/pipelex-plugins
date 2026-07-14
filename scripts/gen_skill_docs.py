@@ -111,14 +111,19 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 # only touches files that were produced.
 EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-codex.sh", "validate-mthds-vibe.sh"}
 
-# Name of the plugin-declared MCP server entry injected into the Claude
-# manifest. Its tools reach the model as mcp__plugin_<plugin>_<server>__<tool>
-# (e.g. mcp__plugin_pipelex_pipelex__mthds_validate).
+# Name of the plugin-declared MCP server entry injected into the Claude and
+# Codex manifests. Its tools reach the model as
+# mcp__plugin_<plugin>_<server>__<tool> on Claude Code
+# (mcp__plugin_pipelex_pipelex__mthds_validate) and mcp__<server>__<tool> on
+# Codex (mcp__pipelex__mthds_validate).
 MCP_SERVER_NAME = "pipelex"
 
 # Env var that overrides the baked MCP server URL at session start. Claude Code
 # expands ${VAR:-default} inside plugin MCP configs, which keeps the dev/prod
-# switch rebuild-free.
+# switch rebuild-free. Codex performs NO env expansion in MCP config (verified
+# against the 0.144.4 source), so its manifest gets the literal URL; the Codex
+# dev override is a same-named [mcp_servers.pipelex] entry in config.toml,
+# which outranks the plugin declaration.
 MCP_URL_ENV_VAR = "PIPELEX_MCP_URL"
 
 
@@ -372,19 +377,32 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     base["description"] = config.plugin_description
     base["version"] = config.plugin_version
 
-    # Claude manifests declare the pipelex-mcp server inline (mcpServers) so the
-    # harness connects it at session start. Codex/Vibe get no entry: plugin-bundled
-    # MCP support is unverified there — their registration is a documented manual
-    # step (see README). Skipped when the target defines no mcp_server_url.
-    if config.platform == Platform.CLAUDE:
-        mcp_server_url = str(config.template_vars.get("mcp_server_url", "") or "")
-        if mcp_server_url:
-            base["mcpServers"] = {
-                MCP_SERVER_NAME: {
-                    "type": "http",
-                    "url": f"${{{MCP_URL_ENV_VAR}:-{mcp_server_url}}}",
+    # Claude and Codex manifests declare the pipelex-mcp server inline
+    # (mcpServers) so the harness connects it at session start. Claude gets the
+    # ${VAR:-default} wrapper (Claude Code expands it); Codex gets the literal
+    # URL (its loader does no env expansion — the dev override is a same-named
+    # [mcp_servers] entry in config.toml, which outranks the plugin tier; Codex
+    # picks the streamable-HTTP transport structurally from the bare url).
+    # Vibe gets no entry (no manifest, and plugin MCP support is unverified
+    # there). Skipped when the target defines no mcp_server_url.
+    mcp_server_url = str(config.template_vars.get("mcp_server_url", "") or "")
+    if mcp_server_url:
+        match config.platform:
+            case Platform.CLAUDE:
+                base["mcpServers"] = {
+                    MCP_SERVER_NAME: {
+                        "type": "http",
+                        "url": f"${{{MCP_URL_ENV_VAR}:-{mcp_server_url}}}",
+                    }
                 }
-            }
+            case Platform.CODEX:
+                base["mcpServers"] = {
+                    MCP_SERVER_NAME: {
+                        "url": mcp_server_url,
+                    }
+                }
+            case Platform.MISTRAL_VIBE:
+                pass
     return base
 
 
