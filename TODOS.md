@@ -79,18 +79,18 @@ Templates in `templates/skills/` are the only source of truth (`.j2`); generated
 
 **CHECKPOINT 2 — reached (2026-07-14).** Both skills render on all targets, gates green. Handoff wired both ways (`pipelex-design` Deliver → `/pipelex-inputs`; `pipelex-inputs` strategy heuristics reference `/pipelex-design`). Claude frontmatter allows `mcp__plugin_pipelex_pipelex__mthds_inputs` (same naming caveat as Checkpoint 1 — confirm live). No other deviations; live verification next.
 
-## Phase 3 — end-to-end verification (live session)
+## Phase 3— end-to-end verification (live session)
 
 Setup: `cd ../pipelex-api && make run` (serves `:8081`) · `cd ../pipelex-mcp` with `MTHDS_BASE_URL=http://localhost:8081` in `.env`, `make dev` (MCP at `http://localhost:3000/mcp`) · this repo installed as local marketplace (see `CLAUDE.md` § Local development) · launch `PIPELEX_MCP_URL=http://localhost:3000/mcp claude`.
 
-- [ ] Plugin MCP server connects from the plugin declaration; `${PIPELEX_MCP_URL:-…}` env expansion behaves as designed (baked default overridden).
-- [ ] `/pipelex-design` builds a small method end-to-end: Layer-0 signature → refinement rounds draining the backlog via `mthds_validate` → finalize gate (`is_runnable: true`, empty `pending_signatures`) → Deliver shows the light input template via `mthds_inputs`.
-- [ ] PostToolUse hook coexistence: `.mthds` writes get lint/format from the hook while the skill validates via MCP.
-- [ ] Deliver handoff into `/pipelex-inputs`: produces a light-shape `inputs.json` next to the bundle.
-- [ ] D2 posture in practice: with the MCP down (or a config-class error), the skill stops with the one-line instruction, no silent skip.
-- [ ] Update this doc; close out.
+- [x] Plugin MCP server connects from the plugin declaration; `${PIPELEX_MCP_URL:-…}` env expansion behaves as designed (baked default overridden). → verified in a headless session (`claude --plugin-dir …/pipelex` + env override): the tools list as `mcp__plugin_pipelex_pipelex__mthds_validate` / `__mthds_inputs` (exactly the names the frontmatter allows) and a validate call round-tripped to the local API (`status: ok`, `is_valid/is_runnable: true`, `available_view_specs: ["dry_run_graph"]`).
+- [x] `/pipelex-design` builds a small method end-to-end: Layer-0 signature → refinement rounds draining the backlog via `mthds_validate` → finalize gate (`is_runnable: true`, empty `pending_signatures`) → Deliver shows the light input template via `mthds_inputs`. → verified: a meeting-minutes method (PipeParallel controller + two PipeLLM leaves + structured concepts) built in 4 validate rounds, including recovery from a genuine `is_valid: false` verdict (a boundary-concept shape error); final light template `{"transcript": "text_value"}`; no `inputs.json` written.
+- [x] PostToolUse hook coexistence: `.mthds` writes get lint/format from the hook while the skill validates via MCP. → the hook fired on every write; it correctly blocked an intermediate write that used `type = "PipeSignature"` (a header omits `type` — the model mislabeled this as a "stale hook schema" bug; re-running the generated hook over all final files passes silently). Defensive fix applied: the cheat sheet now states explicitly, in the rules and in Common Mistakes, that a signature header has NO `type` field.
+- [x] Deliver handoff into `/pipelex-inputs`: produces a light-shape `inputs.json` next to the bundle. → verified twice: template strategy on the built method (`{"transcript": "text_value"}` saved next to `bundle.mthds`, whole-bundle `files[]` submission, defaults — no `pipe_ref`/`format`/`explicit`), and on a Document+Text method where the file-ish placeholder rule rendered exactly as specified (`"<contract-url-or-path-relative-to-this-inputs-file>"`).
+- [x] D2 posture in practice: with the MCP down (or a config-class error), the skill stops with the one-line instruction, no silent skip. → both arms verified: dead `PIPELEX_MCP_URL` → tools absent → skill stopped with the exact setup line, zero files written; a second MCP instance pointed at a dead upstream → first validate returned a `config`-class error → skill stopped, surfaced the class, refused to claim success (files written before the first validate call are inherent to that arm — the error only surfaces on the call).
+- [x] Update this doc; close out.
 
-**CHECKPOINT 3 (close)** — port verified end-to-end; plan complete. Record the verification matrix and any environment caveats here.
+**CHECKPOINT 3 (close) — reached (2026-07-14): port verified end-to-end; plan complete.** All Phase 3 cells verified in real headless Claude Code sessions (`claude -p` with `--plugin-dir` and the `PIPELEX_MCP_URL` override) against the local stack (`pipelex-mcp` dev on `:3000` → local `pipelex-api` on `:8081`). Environment caveats worth knowing: (1) skybridge's dev port env var is `__PORT`, not `PORT` (useful for running a second test instance); (2) a nested headless session may resolve Write-tool paths absolutely — one config-error test session wrote its test bundle into this repo's `mthds-wip/` instead of its cwd (removed; not a skill defect); (3) the hosted-URL default remains a placeholder — the "Left for later" swap below still stands.
 
 ## Left for later (out of scope here)
 

@@ -430,6 +430,7 @@ signature_for = "PipeLLM"   # optional hint: the intended implementation type
 ```
 
 **Rules:**
+- **No `type` field** — a pipe entry *is* a signature because it omits `type`. Writing `type = "PipeSignature"` is invalid and gets rejected at lint time; never write it.
 - **No implementation fields** — no `prompt`, `steps`, `branch_pipe_code`, `outcomes`, etc. The signature is purely the contract.
 - `inputs` and `output` are declared **explicitly**, exactly as any pipe — pipes never infer `inputs` from prompt sigils. Multiplicity (`[]`, `[N]`) works as usual.
 - `signature_for` records the *intended* next-level type. It is a **hint, not a binding contract** — the implementation may override it. It may **not** be `"PipeSignature"`. Omit it if unsure.
@@ -492,6 +493,7 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 - ❌ Referencing a variable in a prompt without declaring it in `inputs` — validation will fail.
 - ❌ Declaring an `input` that no prompt references — also rejected.
 - ❌ Adding implementation fields (`prompt`, `steps`, …) to a `PipeSignature` — it is contract-only.
+- ❌ Writing `type = "PipeSignature"` — a signature header has NO `type` field at all; omitting `type` is what makes it a signature.
 - ❌ `signature_for = "PipeSignature"` — must name a real implementation type, or omit it entirely.
 - ❌ A definition whose `inputs`/`output` contract differs from its header's — they must match by concept identity.
 
