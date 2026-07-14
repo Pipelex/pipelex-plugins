@@ -97,6 +97,6 @@ Setup: `cd ../pipelex-api && make run` (serves `:8081`) · `cd ../pipelex-mcp` w
 ## Left for later (out of scope here)
 
 - Deployed Alpic URL → set `mcp_server_url` in target TOMLs, `make build` (D1 placeholder swap). Blocked upstream: `pipelex-mcp` must publish/re-pin its `file:`-linked deps before `alpic deploy`.
-- Codex/Vibe MCP registration verification (empirical, like the Codex hooks got); until then README documents manual registration.
+- Codex/Vibe MCP registration verification (empirical, like the Codex hooks got); until then README documents manual registration. **Likely unblocked by Codex 0.144.4** (its binary carries plugin-manifest/plugin-file MCP loader strings) — the verification tasks, binary findings, and cold-start prompt are in `../wip/plugins/codex-0144-followups.md`, together with the pending in-session Codex hook verification.
 - Runtime-side acceptance of light-shape `inputs.json` (separate workstream).
 - Migration of the MCP's upstream from local `pipelex-api` to the hosted API.
