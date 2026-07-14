@@ -138,7 +138,9 @@ def _create_codex_tree(tmp_path: Path) -> Path:
 
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
-    (targets_dir / "defaults.toml").write_text('[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\n')
+    (targets_dir / "defaults.toml").write_text(
+        '[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\nmcp_server_url = "https://mcp.test/mcp"\n'
+    )
     (targets_dir / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex/"\n')
     (targets_dir / "codex.toml").write_text(
         '[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex-codex/"\n\n[vars]\nplatform = "codex"\n'
@@ -472,6 +474,26 @@ class TestPluginManifests:
         assert plugin_json["name"] == "pipelex"
         assert "skills" not in plugin_json
         assert "interface" not in plugin_json
+
+    def test_claude_plugin_json_declares_mcp_server(self, tmp_path: Path) -> None:
+        """The Claude manifest carries the pipelex MCP server with the env-default URL wrapper."""
+        tree = _create_codex_tree(tmp_path)
+        config = load_target_config(tree / "targets", "prod")
+        plugin_json = make_plugin_json(tree, config)
+        assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "${PIPELEX_MCP_URL:-https://mcp.test/mcp}"}}
+
+    def test_codex_plugin_json_has_no_mcp_server(self, tmp_path: Path) -> None:
+        """Plugin-bundled MCP support is unverified on Codex — no entry is injected."""
+        tree = _create_codex_tree(tmp_path)
+        config = load_target_config(tree / "targets", "codex")
+        plugin_json = make_plugin_json(tree, config)
+        assert "mcpServers" not in plugin_json
+
+    def test_claude_plugin_json_without_mcp_server_url_skips_entry(self, template_tree: Path) -> None:
+        """A tree that defines no mcp_server_url gets no mcpServers key."""
+        config = load_target_config(template_tree / "targets", "prod")
+        plugin_json = make_plugin_json(template_tree, config)
+        assert "mcpServers" not in plugin_json
 
     def test_build_codex_target_writes_codex_plugin_dir(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)

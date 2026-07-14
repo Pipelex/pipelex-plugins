@@ -39,6 +39,19 @@ The build system (`docs/build-targets.md`) was ported from `mthds-plugins` and t
 - **Hooks are wired (Phase 4).** `HOOK_TEMPLATES_BY_PLATFORM` renders the `.mthds` validation hooks per target (Claude `hooks.json` + `validate-mthds.sh`; Codex `codex-hooks.json`; Vibe `vibe-hooks.toml` + `validate-mthds-vibe.sh`), and `.codex-plugin/plugin-base.json` carries the `hooks` field. See [hooks.md](hooks.md).
 - **Dropped from the predecessor's checker:** the stale-install-reference check and the `min_mthds_version` frontmatter check (both CLI-coupled). The Vibe hook-artifact check landed with the hooks (Phase 4).
 
+## MCP server declaration (2026-07-14)
+
+The plugin declares the **`pipelex-mcp`** server (streamable HTTP; tools `mthds_validate`, `mthds_inputs`) so the MCP-backed skills (`pipelex-design`, `pipelex-inputs`) can call it natively — no vendored script, no `curl` recipes.
+
+- **Location: inline `mcpServers` in the generated Claude `plugin.json`** (not a plugin-root `.mcp.json` — both are supported by Claude Code; inline keeps everything in the one generated manifest). The build injects `{"pipelex": {"type": "http", "url": "${PIPELEX_MCP_URL:-<mcp_server_url>}"}}` for Claude-platform targets, sourced from the `mcp_server_url` template variable (`targets/defaults.toml`, overridable per target). Claude Code honors `${VAR:-default}` expansion inside plugin MCP configs and connects plugin-declared servers automatically at session start; the tools reach the model as `mcp__plugin_pipelex_pipelex__<tool>`.
+- **The baked default is a placeholder** (`https://mcp.pipelex.com/mcp`) until `pipelex-mcp` has its deployed URL — always use the `PIPELEX_MCP_URL` override meanwhile (local dev: `http://localhost:3000/mcp` via `make dev` in `../pipelex-mcp`).
+- **Codex / Vibe get no baked entry**: plugin-bundled MCP declarations are unverified on those platforms (same empirical-verification bar the Codex hooks got). Interim: one-time manual registration documented in the README (Codex: user-level `[mcp_servers]` in `config.toml`; Vibe: TBD).
+- **Auth is server-side.** The MCP holds the upstream API key (`MTHDS_API_KEY` in its hosting env); `PIPELEX_API_KEY` is a hook-only concern and plays no role in the skills' validation path.
+
+## MCP-unavailable posture for skills (2026-07-14)
+
+Unlike the fail-open hook, the MCP-backed skills **require** their tools to do their job. When the tool is absent from the session (harness didn't connect the plugin MCP server) or a call returns `status: "error"` with class `config` (server unreachable / upstream misconfigured / auth), the skill **stops with a one-line setup instruction** (check the MCP connection via `/mcp`, or point `PIPELEX_MCP_URL` at a running server; surface the error's `hint`). Never silently skip validation. Related skill-level adaptations are recorded in `TODOS.md` (D3–D6): honest graph surfacing (`available_view_specs`, no `dry_run.html`), no ported CLI-era shared references, the runnable gate replacing strict validation (the MCP always validates leniently), and the whole-bundle `files[]` submission convention.
+
 ## License & distribution
 
 **Apache 2.0**; repo made public when ready (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.

@@ -50,9 +50,10 @@ Defines the variables shared by all targets. The CLI-free posture keeps this set
 marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
+mcp_server_url = "https://mcp.pipelex.com/mcp"
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it (e.g. an `mcp_server_url`-style variable would arrive with MCP registration). Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — `mcp_server_url` arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude `plugin.json`; a placeholder until `pipelex-mcp` is deployed, overridden at session start via `PIPELEX_MCP_URL`). Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
@@ -169,6 +170,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
+| `mcp_server_url` | `defaults.toml` (overridable per target) | `make_plugin_json()` — baked default URL of the plugin-declared `pipelex-mcp` server (Claude manifests only; wrapped as `${PIPELEX_MCP_URL:-<url>}`, see [decisions.md](decisions.md)) |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
 
 ### Shared template files
