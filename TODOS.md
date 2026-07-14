@@ -1,5 +1,7 @@
 # TODOS — port the design & inputs skills to pipelex-plugins (CLI-free, MCP-backed)
 
+**STATUS (2026-07-14): COMPLETE — Checkpoints 1–3 all reached; PAUSED here in a clean state.** All phases done and committed on `feature/Build` (`311c0ed` MCP wiring → `c9bad2f` pipelex-design → `535696d` pipelex-inputs → `6f307c8` e2e verification + plan close); `make build`/`make agent-check`/`make agent-test` green; working tree clean; `mthds-plugins/` untouched; nothing pushed (this repo has never been pushed — see the foundations tracker's M2). A cold-start session should read this doc top to bottom: the port itself needs no further work; the open follow-ups are in "Left for later" at the bottom (deployed-URL swap, Codex/Vibe MCP registration verification, runtime light-shape acceptance, hosted-API migration).
+
 **Kickoff:** `../wip/plugins/pipelex-plugins-build-skills-kickoff.md` (workspace root). This doc is the phased implementation plan that kickoff requires; it is the cold-start tracker — keep it current at every checkpoint (completed phases, decisions taken, open questions, code state).
 
 **Branch:** `feature/Build` in `pipelex-plugins/`. Never modify `mthds-plugins/`.
