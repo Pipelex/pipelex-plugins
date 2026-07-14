@@ -53,17 +53,17 @@ Templates in `templates/skills/` are the only source of truth (`.j2`); generated
 
 ## Phase 1 — `pipelex-design` (from `mthds-recursive`)
 
-- [ ] `templates/skills/pipelex-design/SKILL.md.j2` — port with:
-  - [ ] Rename + de-recursive the vocabulary everywhere (name `pipelex-design`, "design"/"top-down design"/"stepwise refinement" wording; frontmatter description rewritten; keep `disable-model-invocation: true` for non-codex platforms and the shared frontmatter include).
-  - [ ] Drop Step 0 env-check block, the "CLI is required" framing, the backend-setup note, and `can_run_methods` branches. Files are written normally; note the plugin's PostToolUse hook lint/formats every `.mthds` edit (no `plxt` instructions).
-  - [ ] Replace every `mthds-agent validate … --allow-signatures --graph` step with an `mthds_validate` call per D6; read the backlog from the Markdown summary's `## Pending signatures` (mirrored in `pending_signatures[]`); branch per the verdict discipline; D2 stop on missing tool / config error.
-  - [ ] Step 3 Finalize per D5; Step 4 Deliver: input schema via `mthds_inputs` (show the light template, do NOT save `inputs.json`), graph note per D3, handoff to `/pipelex-inputs`.
-  - [ ] Fix reference links: `references/design-cheat-sheet.md`, `../shared/native-content-types.md`; drop error-handling/mthds-agent-guide links (D4).
-- [ ] `skills/pipelex-design/references/design-cheat-sheet.md` — port `recursive-cheat-sheet.md` renamed and de-recursived; §6 PipeSignature: replace the lenient/strict `mthds-agent` bash block with the MCP validation semantics (always-lenient tool; runnable gate per D5).
-- [ ] `make build`; verify rendering across all three targets; gates green.
-- [ ] CHANGELOG + docs touched in the same change; commit.
+- [x] `templates/skills/pipelex-design/SKILL.md.j2` — port with:
+  - [x] Rename + de-recursive the vocabulary everywhere (name `pipelex-design`, "design"/"top-down design"/"stepwise refinement" wording; frontmatter description rewritten; keep `disable-model-invocation: true` for non-codex platforms and the shared frontmatter include).
+  - [x] Drop Step 0 env-check block, the "CLI is required" framing, the backend-setup note, and `can_run_methods` branches. Files are written normally; note the plugin's PostToolUse hook lint/formats every `.mthds` edit (no `plxt` instructions).
+  - [x] Replace every `mthds-agent validate … --allow-signatures --graph` step with an `mthds_validate` call per D6; read the backlog from the Markdown summary's `## Pending signatures` (mirrored in `pending_signatures[]`); branch per the verdict discipline; D2 stop on missing tool / config error.
+  - [x] Step 3 Finalize per D5; Step 4 Deliver: input schema via `mthds_inputs` (show the light template, do NOT save `inputs.json`), graph note per D3, handoff to `/pipelex-inputs`.
+  - [x] Fix reference links: `references/design-cheat-sheet.md`, `../shared/native-content-types.md`; drop error-handling/mthds-agent-guide links (D4).
+- [x] `skills/pipelex-design/references/design-cheat-sheet.md` — port `recursive-cheat-sheet.md` renamed and de-recursived; §6 PipeSignature: replace the lenient/strict `mthds-agent` bash block with the MCP validation semantics (always-lenient tool; runnable gate per D5).
+- [x] `make build`; verify rendering across all three targets; gates green.
+- [x] CHANGELOG + docs touched in the same change; commit.
 
-**CHECKPOINT 1** — `pipelex-design` renders on all targets, gates green. Update this doc (status, deviations, open questions) before moving on.
+**CHECKPOINT 1 — reached (2026-07-14).** `pipelex-design` renders on all targets, gates green. One addition beyond the plan: the Claude frontmatter's `allowed-tools` list now also carries the two MCP tools (`mcp__plugin_pipelex_pipelex__mthds_validate` / `__mthds_inputs`) so the skill's tool restriction cannot block its own MCP calls — naming to be confirmed live in Phase 3. README updated (skills bullet, MCP server notes per platform incl. the Codex/Vibe manual-registration interim). No other deviations.
 
 ## Phase 2 — `pipelex-inputs` (from `mthds-inputs`)
 

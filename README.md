@@ -8,8 +8,9 @@ This is the plugin generation that pairs with the hosted Pipelex API and the (cl
 
 ## What's inside
 
-- **Skills** — Pipelex skills (starting with `pipelex-explain`) for reading and reasoning about MTHDS bundles.
+- **Skills** — Pipelex skills for working with MTHDS bundles: `pipelex-explain` (read and explain a bundle), `pipelex-design` (design a method top-down by stepwise refinement, validated at every layer through the Pipelex MCP server).
 - **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
+- **MCP server declaration** — the Claude plugin declares the `pipelex-mcp` server (streamable HTTP; tools `mthds_validate` for bundle validation and `mthds_inputs` for input templates), which the MCP-backed skills require. It connects automatically at session start; override the baked URL with `PIPELEX_MCP_URL` (e.g. a local dev server). Unlike the fail-open hook, the MCP-backed skills stop with a setup instruction when the server isn't reachable. See [docs/decisions.md](docs/decisions.md).
 - **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
 
 ## Install
@@ -34,6 +35,12 @@ export PIPELEX_BASE_URL=...           # optional — defaults to https://api.pip
 
 Everything fails open: with no key (or the API unreachable) the local lint/format verdicts still apply and only the validate stage is skipped — no blocked edits, no nagging. **Privacy note:** with a key set, the `.mthds` files around the edited one are sent to the API on each validate call; unset `PIPELEX_API_KEY` to keep validation fully local (lint/format only).
 
+The plugin also declares the **`pipelex-mcp` server**, which the MCP-backed skills (`pipelex-design`) use for validation and input templates; it connects automatically. The baked URL is a placeholder until the server is deployed — point the session at a running server with:
+
+```bash
+export PIPELEX_MCP_URL=http://localhost:3000/mcp   # e.g. a local pipelex-mcp dev server
+```
+
 ### Codex
 
 ```
@@ -42,6 +49,8 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 ```
 
 The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It is CLI-free: lint/format run through the bundled WASM engine, and semantic validation uses the Pipelex API when `PIPELEX_API_KEY` is set (a network-sandboxed session simply skips the validate stage). Requires Codex 0.141+ (matured hook engine; verified against 0.142.5). See [docs/hooks.md](docs/hooks.md).
+
+**MCP server (manual, for the MCP-backed skills):** plugin-bundled MCP declarations are unverified on Codex, so register the `pipelex-mcp` server once at user level in `~/.codex/config.toml` under `[mcp_servers]` (streamable HTTP; see the Codex MCP docs for the exact client shape on your version). The MCP-backed skills stop with a setup instruction when the tools are absent.
 
 ### Mistral Vibe
 
@@ -66,6 +75,8 @@ description = "Validate .mthds files after Vibe file edits."
 ```
 
 Requires Mistral Vibe 2.15.0+ for `after_tool` hooks.
+
+**MCP server (manual, for the MCP-backed skills):** Vibe has no plugin-bundled MCP mechanism here — register the `pipelex-mcp` server (streamable HTTP) through Vibe's own MCP configuration if/where supported. The MCP-backed skills stop with a setup instruction when the tools are absent.
 
 ## Local development
 

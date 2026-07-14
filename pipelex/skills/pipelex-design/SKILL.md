@@ -1,0 +1,193 @@
+---
+name: pipelex-design
+description: Design a method bundle top-down by stepwise refinement — capture the whole job as one pipe signature, then refine it layer by layer into a runnable method that is valid at every step.
+disable-model-invocation: true
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+
+  - mcp__plugin_pipelex_pipelex__mthds_validate
+  - mcp__plugin_pipelex_pipelex__mthds_inputs
+---
+
+# Design a MTHDS bundle top-down (stepwise refinement)
+
+Design a `.mthds` method **top-down by stepwise refinement**. Capture the whole job as a single pipe *signature* (the client contract — inputs, output, semantics). Then refine one signature at a time, one level down, into operators and controllers, leaving the not-yet-designed parts as further signatures. Validate after each layer with the `mthds_validate` tool (its validation is lenient — signatures are always permitted); the library is always valid and always resumable. Stop when no signatures remain (the verdict reports the method is runnable), or stop early and keep the valid design scaffold.
+
+## Scope (what this skill can emit)
+
+- Bundle headers: `domain`, `description`, `main_pipe`, `system_prompt`.
+- Concepts: simple, refining, structured (field types `text`, `integer`, `boolean`, `number`, `date`, `concept`, `list`).
+- Pipes: `PipeSignature` (contract-only header), `PipeLLM`, `PipeCompose`, `PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeFunc`.
+
+**Outside this skill's scope:** `dict` field types, `PipeStructure`, inline `templating_style` blocks, and other advanced features. When the user asks for those, write the closest in-scope equivalent and call out the deviation; do not silently emit unsupported constructs.
+
+---
+
+## How it works — read this first
+
+- **The artifact is a library, not one file.** A directory of same-domain `.mthds` files, validated together as one submission. The runtime merges them into one domain; pipes and concepts reference each other across files by bare code.
+- **Construction is additive.** A `PipeSignature` is a forward declaration ("header"); the concrete pipe is its "definition". Each refinement **adds a new `<code>.mthds` file**; no existing file is ever rewritten — no merge step. At merge, a concrete satisfies the signature of the same code (the definition wins), so the same code legitimately appears as a header in one file and a concrete in another.
+- **Invariant:** every undesigned pipe is a reachable signature, so the assembled library passes validation at every step (validation permits signatures by default).
+- **Operation (one refinement step):** take one unimplemented signature, **add** its definition file one level down — an operator (done), or a controller that wires sub-pipes, forward-declares each not-yet-designed sub-pipe as a new header, and owns any intermediate concepts it introduces — then re-validate.
+- **The backlog is the bundle's own todo list.** It is exactly the `## Pending signatures` list that validation reports (declared signatures with no concrete definition yet). Drain it round by round until empty → the verdict reports the method is runnable.
+
+See [design-cheat-sheet.md](references/design-cheat-sheet.md) for the `PipeSignature` syntax, the `signature_for` hint, the operator-vs-controller decision, and all pipe-type field rules — it is the syntax source of truth.
+
+---
+
+## Requirements — the Pipelex MCP tools
+
+This skill validates through the **`mthds_validate`** tool and projects input schemas through the **`mthds_inputs`** tool, both served by the plugin's `pipelex` MCP server. They are required — this skill never guesses at validity.
+
+- **If the tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection (`/mcp`), or launch with `PIPELEX_MCP_URL` pointing at a running `pipelex-mcp` server."* Do not write `.mthds` files without validation available.
+- **If a call returns `status: "error"` with an error of class `config`** (server unreachable, upstream API misconfigured, auth), STOP the same way and surface the error's `hint`. Never silently skip validation.
+- No API key is needed on your side — the MCP server authenticates to the validation API itself.
+
+> **No backend setup needed**: designing and validating never run the method, so no inference backends are required.
+
+**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
+
+### How to validate (used at every step below)
+
+1. Gather **all** `.mthds` files in the bundle directory (the whole library — a broken sibling fails the verdict too, and the report names it).
+2. Call `mthds_validate` with `files: [{content: <file content>, uri: <path relative to the bundle dir>}]` for every file.
+3. Branch on the **structured verdict**, never on transport:
+   - `status: "ok"`, `is_valid: true`, `pending_signatures` non-empty → valid design scaffold, not yet runnable. The Markdown summary's `## Pending signatures` section is the backlog.
+   - `status: "ok"`, `is_valid: true`, `is_runnable: true`, `pending_signatures` empty → the method is complete and runnable.
+   - `status: "ok"`, `is_valid: false` → a produced failure verdict: read `validation_errors[]` and the Markdown summary (it carries locators and names the offending file), fix, re-validate.
+   - `status: "error"` → no verdict was produced: class `input_domain` means the submission is malformed (fix the call); class `config` → stop per the rule above; class `runtime` → report it and retry once before stopping.
+
+The Markdown summary in the tool's text output is written for you — read the verdict line and the backlog from it directly. Where the host renders MCP views (e.g. claude.ai), an interactive method graph accompanies valid verdicts (`available_view_specs: ["dry_run_graph"]`); in terminal hosts there is no visible graph — the summary is the review surface.
+
+---
+
+## Step 1 — Capture the whole job as one signature (Layer 0)
+
+Read [design-cheat-sheet.md](references/design-cheat-sheet.md) **before writing**.
+
+Determine the three things that *are* the requirement:
+
+- **Input concept(s)** — what the client provides.
+- **Output concept** — what the client gets back.
+- **Description** — the semantics, in prose precise enough to implement against.
+
+**Specify the boundary concepts fully now.** The top input and output concepts are the client-facing data contract — give them their structure at Layer 0. Intermediate concepts come later, each introduced by the controller that owns it.
+
+**Write the root file** `mthds-wip/<bundle_dir>/bundle.mthds`:
+
+1. `mkdir -p mthds-wip/<bundle_dir>/`.
+2. Write `bundle.mthds` with the **Write** tool. It carries the `domain` header, `description`, `main_pipe`, optional `system_prompt`, the fully-specified boundary concepts, and the top pipe as a single `PipeSignature` whose code is the `main_pipe`:
+
+   ```toml
+   domain      = "<snake_case_domain>"
+   description = "<what the job means>"
+   main_pipe   = "<top_pipe_code>"
+
+   # boundary concepts — specified fully (structure if structured)
+   # ...
+
+   [pipe.<top_pipe_code>]
+   description   = "<precise semantics of the whole job>"
+   inputs        = { <name> = "<InputConcept>" }
+   output        = "<OutputConcept>"
+   signature_for = "<intended impl type, e.g. PipeSequence>"
+   ```
+
+3. The root file is written **once and persists** — refinement never touches it again. The concrete main pipe is added later in its own `<top_pipe_code>.mthds` file (like any other definition; `main_pipe` is a reference, not the implementation).
+
+Validate (the one-signature library passes, with the top pipe pending).
+
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics) before refining, so the user can interject — non-blocking. *This is the only step with optional interactivity* (see Autonomy below).
+
+---
+
+## Step 2 — Refine layer by layer (auto)
+
+Drain the signature backlog breadth-first, **serially** (one signature at a time — no parallel workers in this version). Repeat this loop until the backlog is empty:
+
+1. **Read the backlog.** Validate; the summary states runnability in plain English and lists what remains:
+
+   - **Still pending** → the summary shows a `## Pending signatures (N)` heading, a `⚠️ This method is NOT yet runnable …` line, and one bullet per library-wide pipe still declared as a signature (mirrored in the structured `pending_signatures[]`). That list is the backlog.
+   - **Done** → the summary shows `✅ All pipes are concretely implemented … this method is runnable.` and **no** `## Pending signatures` section. The backlog is empty → go to Step 3.
+
+2. **Expand each pending signature, one at a time** (see "To expand one signature" below). Each expansion **adds exactly one new `<code>.mthds` file** and never edits an existing one.
+
+3. **Re-validate, recompute the backlog, repeat.** Expanding a controller forward-declares its children, which become newly pending; expanding an operator removes one. Draining the whole current pending set each round walks the tree breadth-first by construction.
+
+### To expand one signature
+
+Given one pending signature `S` (its frozen contract — `inputs`, `output`, `description`, `signature_for`):
+
+1. **Decide operator or controller.** The `signature_for` hint usually pre-answers it. Heuristic when absent or wrong: a single cognitive/IO step → operator; multiple steps, iteration, branching, or parallelism → controller.
+
+2. **Add `<code>.mthds`** to the bundle dir, where `<code>` is `S`'s **bare** pipe code — strip the domain prefix. The backlog lists each signature namespaced as `domain.code`, but the file and the `[pipe.<code>]` it defines use the bare code so they satisfy the forward-declared header (a namespaced `[pipe.domain.code]` would mint a different pipe and leave the signature pending — the refinement would never converge). Every non-root file carries **only** `domain = "<same_domain>"` for membership — omit `description`, `system_prompt`, `main_pipe` (those live in the root).
+
+   - **Operator (leaf):** write the concrete operator (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`) and fill its type-specific fields. No new signatures — this branch is done.
+   - **Controller (composite):** write the controller (`PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`), wire its sub-pipes, **forward-declare each not-yet-trivial sub-pipe as a new `PipeSignature` header** (contract + `signature_for`) in this same file, and declare any intermediate concepts the wiring needs. The new headers join the backlog.
+
+3. **Declare `inputs` and `output` explicitly**, repeating `S`'s contract. Pipes never infer `inputs` from prompt sigils, so a definition that omits them mismatches its header. Spelling is free — the contract reconciles by **concept identity** (bare↔qualified, native equivalents, multiplicity structural), so `output = "Brief"` and `output = "thisdomain.Brief"` match.
+
+4. **Prevent concept collisions (do this before introducing a new intermediate concept).** Check the concept code is not already declared anywhere in the assembled library or pending set; if it is, **derive a unique code** by namespacing from the parent pipe code. Each concept is declared **once**, in the file of the pipe that introduces it. (A duplicate is the loud backstop: validation fails with `Concept '<code>' is declared in two different bundle files … rename one of the concepts`.)
+
+5. **Fix each concept's shape when you introduce it — you cannot add fields later.** A concept is declared **once**, in its introducing file; the additive model never lets a later file add structure (a second declaration is the same hard "declared in two different bundle files" error). So decide the shape from the consumers this controller wires: if any downstream consumer **field-reads** the concept (`$x.field`, or a construct `from = "x.field"`), declare it **structured now** — a field-read on a simple concept fails validation even while signatures remain. If the concept is only ever consumed **whole** (`@x` in a prompt, or mapped wholesale), keep it **simple** (often `refines` a native). When a sibling field-reads a concept, hoist that concept up to the common parent controller that wires both its producer and that consumer, and structure it there.
+
+### If validation fails after an expansion
+
+The failure is, by construction, in the file you just added — bounding the fix.
+
+- **Contract mismatch** (the definition's `inputs`/`output` diverges from its header): conform the **definition** to the frozen header. **Never edit the header** — the parent depends on that contract. (Changing a contract is a propagating change that means revising the parent too; if the header itself is genuinely wrong, stop and flag it rather than silently editing it.)
+- **Other semantic errors:** the verdict's `validation_errors[]` and the Markdown summary carry locators and name the offending file. Map the error to the relevant cheat-sheet section, fix the added file with the **Edit** tool, re-validate.
+
+---
+
+## Step 3 — Finalize (the runnable gate)
+
+There is no separate strict-validation call — validation always permits signatures. The gate that says *runnable* is the verdict itself: re-validate and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`** (the summary reprints the `✅ … this method is runnable` verdict with no pending section). Fix any remaining whole-bundle semantic errors and re-validate until that verdict holds.
+
+---
+
+## Step 4 — Deliver
+
+Once the runnable verdict holds:
+
+1. **Input schema** — Call `mthds_inputs` with the same `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
+
+2. **Method graph** — Where the host renders MCP views, an interactive method graph accompanied the valid verdicts; point the user to it. In terminal hosts, offer a text flow diagram of the final structure instead.
+
+3. **Next step** — Suggest preparing real inputs with `/pipelex-inputs`.
+
+**Early-stop variant.** If the user stops before the backlog is empty, deliver the valid design scaffold instead: confirm it passes validation, list the unimplemented signatures (the current `## Pending signatures` list), and explain that resuming means expanding them — no external state is needed, the bundle is its own todo list. A validated design skeleton is a legitimate deliverable.
+
+> **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
+
+---
+
+## Invariants & rules (keep these true at every step)
+
+- **Contract stability.** A definition preserves its header's `inputs`/`output` contract, matched by **concept identity** (not byte-string). Choose a signature's internals freely; never change its surface without revising the parent too.
+- **`main_pipe` is the anchor.** The top signature's code and its inputs/output are frozen after Layer 0. Its body arrives as a separate definition file; its identity and surface never change.
+- **Additive writes.** One concrete definition per file; headers persist after they're satisfied. Never overwrite an existing file — always add a new `<code>.mthds`.
+- **A concept's shape is fixed at introduction.** Boundary concepts structured at Layer 0; an intermediate concept's shape is decided in its introducing file — structured if any consumer field-reads it, simple if consumed whole — and cannot be changed in a later file.
+- **Backlog = `{signatures} − {concretes}`.** Recomputed each layer from the verdict's `## Pending signatures` list (or `pending_signatures[]`) — never hand-tracked, never reconstructed as a depth tree.
+
+---
+
+## Autonomy
+
+This skill is **automatic by default**.
+
+- **Requirements (Step 1)** — infer the contract and proceed; always *announce* it (non-blocking). Engage in discussion *only* when the request is genuinely ambiguous about inputs/output/semantics, or when the user signals they want to discuss.
+- **Refinement (Step 2+)** — always auto. No per-layer approval prompts. The per-layer valid checkpoints and their validation summaries are the review surface; the user can interrupt at any time.
+- Pause and ask only if validation fails twice on the same construct, or a header itself appears wrong (a propagating contract change).
+
+---
+
+## Reference
+
+- [Design Cheat Sheet](references/design-cheat-sheet.md) — **read before writing**. The MTHDS code subset this skill writes, including the `PipeSignature` header and the runnable gate.
+- [Native Content Types](../shared/native-content-types.md) — attributes of native concepts (`Image.url`, `Page.text_and_images`, ...) for `$var.field` references and construct `from` paths.
