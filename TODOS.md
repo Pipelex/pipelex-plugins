@@ -67,17 +67,17 @@ Templates in `templates/skills/` are the only source of truth (`.j2`); generated
 
 ## Phase 2 — `pipelex-inputs` (from `mthds-inputs`)
 
-- [ ] `templates/skills/pipelex-inputs/SKILL.md.j2` — port with:
-  - [ ] Keep: mode selection, strategy detection heuristics, the four strategies (template/synthetic/user-data/mixed), file-type → concept mapping tables, matching rules, worked examples (rewritten to light shape).
-  - [ ] Step 2 collapses to: call `mthds_inputs` per D6 (defaults: no `explicit`, no `format`), branch on `is_valid`; D2 stop on missing tool / config error. The returned template is authoritative.
-  - [ ] Rewrite ALL examples and the strategy steps around the **light shape** (bare string / number / boolean / URL-or-path string; structured → content dict; lists of those). Placeholder rule for file-ish inputs stays (`<VARNAME-url-or-path-relative-to-this-inputs-file>`), now as the bare string value.
-  - [ ] Drop: `remote_storage_inputs` branches (`mthds-agent inputs upload` — no storage tool yet), `can_run_methods` image-synthesis section, the "Validate & Run" offer-to-run tail, Step 0/preamble, error-handling/mthds-agent-guide references.
-  - [ ] Replace `"$(uv tool dir)/pipelex/bin/python"` reportlab invocations with environment-neutral ones (`uv run --with reportlab python`, plain `python3` fallback); keep the docx/xlsx skill-or-python fallbacks (already environment-neutral).
-  - [ ] Don't duplicate "Native Concept Content Structures" — link `../shared/native-content-types.md` and keep only a short light-shape mapping note.
-  - [ ] Path-resolution rule (relative to `inputs.json`) and `<output_dir>/inputs/` copying convention stay.
-- [ ] `make build`; all targets render; gates green; CHANGELOG; commit.
+- [x] `templates/skills/pipelex-inputs/SKILL.md.j2` — port with:
+  - [x] Keep: mode selection, strategy detection heuristics, the four strategies (template/synthetic/user-data/mixed), file-type → concept mapping tables, matching rules, worked examples (rewritten to light shape).
+  - [x] Step 2 collapses to: call `mthds_inputs` per D6 (defaults: no `explicit`, no `format`), branch on `is_valid`; D2 stop on missing tool / config error. The returned template is authoritative.
+  - [x] Rewrite ALL examples and the strategy steps around the **light shape** (bare string / number / boolean / URL-or-path string; structured → content dict; lists of those). Placeholder rule for file-ish inputs stays (`<VARNAME-url-or-path-relative-to-this-inputs-file>`), now as the bare string value.
+  - [x] Drop: `remote_storage_inputs` branches (`mthds-agent inputs upload` — no storage tool yet), `can_run_methods` image-synthesis section, the "Validate & Run" offer-to-run tail, Step 0/preamble, error-handling/mthds-agent-guide references.
+  - [x] Replace `"$(uv tool dir)/pipelex/bin/python"` reportlab invocations with environment-neutral ones (`uv run --with reportlab python`, plain `python3` fallback); keep the docx/xlsx skill-or-python fallbacks (already environment-neutral).
+  - [x] Don't duplicate "Native Concept Content Structures" — link `../shared/native-content-types.md` and keep only a short light-shape mapping note.
+  - [x] Path-resolution rule (relative to `inputs.json`) and `<output_dir>/inputs/` copying convention stay.
+- [x] `make build`; all targets render; gates green; CHANGELOG; commit.
 
-**CHECKPOINT 2** — both skills exist and render on all targets, Deliver-phase handoff wired both ways, gates green. Update this doc before live verification.
+**CHECKPOINT 2 — reached (2026-07-14).** Both skills render on all targets, gates green. Handoff wired both ways (`pipelex-design` Deliver → `/pipelex-inputs`; `pipelex-inputs` strategy heuristics reference `/pipelex-design`). Claude frontmatter allows `mcp__plugin_pipelex_pipelex__mthds_inputs` (same naming caveat as Checkpoint 1 — confirm live). No other deviations; live verification next.
 
 ## Phase 3 — end-to-end verification (live session)
 
