@@ -9,7 +9,10 @@ allowed-tools:
   - Grep
   - Glob
 
-  - mcp__plugin_pipelex_pipelex__mthds_inputs
+  - mcp__plugin_pipelex_pipelex__mthds_inputs_template
+  - mcp__plugin_pipelex_pipelex__mthds_run
+  - mcp__plugin_pipelex_pipelex__mthds_run_status
+  - mcp__plugin_pipelex_pipelex__mthds_run_results
 ---
 
 # Prepare Inputs for MTHDS methods
@@ -18,11 +21,12 @@ Prepare input data for running MTHDS method bundles. This skill is the single en
 
 ## Requirements — the Pipelex MCP tool
 
-This skill extracts the method's input template through the **`mthds_inputs`** tool, served by the plugin's `pipelex` MCP server. It is required — never hand-derive the template from the `.mthds` source.
+This skill extracts the method's input template through the **`mthds_inputs_template`** tool, served by the plugin's `pipelex` MCP server. It is required — never hand-derive the template from the `.mthds` source.
 
 - **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection (`/mcp`), or launch with `PIPELEX_MCP_URL` pointing at a running `pipelex-mcp` server."*
 - **If a call returns `status: "error"` with an error of class `config`** (server unreachable, upstream API misconfigured, auth), STOP the same way and surface the error's `hint`. Never silently improvise a template.
 - No API key is needed on your side — the MCP server authenticates to the API itself.
+- The **run tools** (`mthds_run`, `mthds_run_status`, `mthds_run_results`) are optional — they only power the closing [offer to run](#offer-to-run). When they are absent from the session, finish without the offer; never stop for them.
 
 ## Mode Selection
 
@@ -96,7 +100,7 @@ The `/inputs` subdirectory is only created when there are actual data files to s
 
 ### Step 2: Get the Input Template
 
-Call the **`mthds_inputs`** tool with the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`. Pass no other arguments — the defaults resolve the method's declared `main_pipe` and return the canonical **light** template. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
+Call the **`mthds_inputs_template`** tool with the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`. Pass no other arguments — the defaults resolve the method's declared `main_pipe` and return the canonical **light** template. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
 
 Branch on the structured verdict, never on transport:
 
@@ -380,11 +384,27 @@ After assembling the inputs, confirm readiness:
 
 (Or, for the Template strategy: point out which placeholders the user still needs to fill.)
 
+### Offer to run
+
+When the inputs are complete, close by offering to run the method. Offer — never start unprompted: a run executes on the hosted Pipelex API and **spends inference credit**.
+
+Offer only when all of these hold:
+
+- The `mthds_run` tool is present in the session (it is optional — when absent, just finish).
+- No placeholders remain (a Template-strategy result has nothing to run yet).
+- The inputs are **hosted-runnable**: every file-ish value (Image, Document) is a reachable `https` URL. The hosted API cannot read local disk, so a path — relative like `inputs/invoice.pdf` or absolute — does not reach it. When local paths are present, don't offer; instead state that the method can be run once those files are hosted at reachable URLs (text, scalar, and structured values are sent inline and are always fine).
+
+On acceptance:
+
+1. Call `mthds_run` with the same whole-bundle `files` submission as Step 2 and `inputs` set to the parsed content of `inputs.json` — the light shape is exactly what the tool takes. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
+2. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
+3. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
+
 ---
 
 ## Value shapes (light format)
 
-`inputs.json` uses the **light** shape — the same shape the `mthds_inputs` template arrives in. Scalars are bare values; structured concepts are their content dict, with **no** `{concept, content}` envelope:
+`inputs.json` uses the **light** shape — the same shape the `mthds_inputs_template` template arrives in. Scalars are bare values; structured concepts are their content dict, with **no** `{concept, content}` envelope:
 
 | Declared concept | Value in `inputs.json` |
 |------------------|------------------------|
@@ -407,7 +427,7 @@ For composite natives (`Page`, `TextAndImages`, `JSON`) and any structured conce
 
 **Method**: Haiku pipeline expecting `theme: Text`
 
-Call `mthds_inputs` with the bundle files; the template comes back as:
+Call `mthds_inputs_template` with the bundle files; the template comes back as:
 
 ```json
 {

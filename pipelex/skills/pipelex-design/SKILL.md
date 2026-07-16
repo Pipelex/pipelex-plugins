@@ -11,7 +11,7 @@ allowed-tools:
   - Glob
 
   - mcp__plugin_pipelex_pipelex__mthds_validate
-  - mcp__plugin_pipelex_pipelex__mthds_inputs
+  - mcp__plugin_pipelex_pipelex__mthds_inputs_template
 ---
 
 # Design a MTHDS bundle top-down (stepwise refinement)
@@ -42,7 +42,7 @@ See [writing-mthds.md](references/writing-mthds.md) for the `PipeSignature` synt
 
 ## Requirements — the Pipelex MCP tools
 
-This skill validates through the **`mthds_validate`** tool and projects input schemas through the **`mthds_inputs`** tool, both served by the plugin's `pipelex` MCP server. They are required — this skill never guesses at validity.
+This skill validates through the **`mthds_validate`** tool and projects input schemas through the **`mthds_inputs_template`** tool, both served by the plugin's `pipelex` MCP server. They are required — this skill never guesses at validity.
 
 - **If the tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection (`/mcp`), or launch with `PIPELEX_MCP_URL` pointing at a running `pipelex-mcp` server."* Do not write `.mthds` files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (server unreachable, upstream API misconfigured, auth), STOP the same way and surface the error's `hint`. Never silently skip validation.
@@ -157,7 +157,7 @@ Once the runnable verdict holds:
 
 1. **Organize the bundle** — invoke `/pipelex-organize` on the bundle directory (automatic, no approval). It regroups the one-file-per-signature construction layout into a clear, browsable one — related pipes gathered into coherent module files (or a single `main.mthds` when the method is simple), satisfied signature headers dropped, declarations ordered for top-down reading — and proves via `mthds_validate` that the runnable verdict is preserved before swapping the layout.
 
-2. **Input schema** — Call `mthds_inputs` with the organized `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
+2. **Input schema** — Call `mthds_inputs_template` with the organized `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
 
 3. **Method graph** — Where the host renders MCP views, an interactive method graph accompanied the valid verdicts; point the user to it. In terminal hosts, offer a text flow diagram of the final structure instead.
 
