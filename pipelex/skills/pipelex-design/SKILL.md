@@ -36,7 +36,7 @@ Design a `.mthds` method **top-down by stepwise refinement**. Capture the whole 
 - **Operation (one refinement step):** take one unimplemented signature, **add** its definition file one level down — an operator (done), or a controller that wires sub-pipes, forward-declares each not-yet-designed sub-pipe as a new header, and owns any intermediate concepts it introduces — then re-validate.
 - **The backlog is the bundle's own todo list.** It is exactly the `## Pending signatures` list that validation reports (declared signatures with no concrete definition yet). Drain it round by round until empty → the verdict reports the method is runnable.
 
-See [design-cheat-sheet.md](references/design-cheat-sheet.md) for the `PipeSignature` syntax, the `signature_for` hint, the operator-vs-controller decision, and all pipe-type field rules — it is the syntax source of truth.
+See [writing-mthds.md](references/writing-mthds.md) for the `PipeSignature` syntax, the `signature_for` hint, the operator-vs-controller decision, and all pipe-type field rules — it is the syntax source of truth.
 
 ---
 
@@ -68,7 +68,7 @@ The Markdown summary in the tool's text output is written for you — read the v
 
 ## Step 1 — Capture the whole job as one signature (Layer 0)
 
-Read [design-cheat-sheet.md](references/design-cheat-sheet.md) **before writing**.
+Read [writing-mthds.md](references/writing-mthds.md) **before writing**.
 
 Determine the three things that *are* the requirement:
 
@@ -141,7 +141,7 @@ Given one pending signature `S` (its frozen contract — `inputs`, `output`, `de
 The failure is, by construction, in the file you just added — bounding the fix.
 
 - **Contract mismatch** (the definition's `inputs`/`output` diverges from its header): conform the **definition** to the frozen header. **Never edit the header** — the parent depends on that contract. (Changing a contract is a propagating change that means revising the parent too; if the header itself is genuinely wrong, stop and flag it rather than silently editing it.)
-- **Other semantic errors:** the verdict's `validation_errors[]` and the Markdown summary carry locators and name the offending file. Map the error to the relevant cheat-sheet section, fix the added file with the **Edit** tool, re-validate.
+- **Other semantic errors:** the verdict's `validation_errors[]` and the Markdown summary carry locators and name the offending file. Map the error to the relevant `writing-mthds.md` section, fix the added file with the **Edit** tool, re-validate.
 
 ---
 
@@ -191,5 +191,5 @@ This skill is **automatic by default**.
 
 ## Reference
 
-- [Design Cheat Sheet](references/design-cheat-sheet.md) — **read before writing**. The MTHDS code subset this skill writes, including the `PipeSignature` header and the runnable gate.
+- [Writing `.mthds` Directly](references/writing-mthds.md) — **read before writing**. The MTHDS code subset this skill writes, including the `PipeSignature` header and the runnable gate.
 - [Native Content Types](../shared/native-content-types.md) — attributes of native concepts (`Image.url`, `Page.text_and_images`, ...) for `$var.field` references and construct `from` paths.

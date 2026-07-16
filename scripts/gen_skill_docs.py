@@ -77,21 +77,21 @@ SHARED_TEMPLATES = [
 # left behind (CLI-lifecycle territory).
 HOOK_TEMPLATES = [
     "hooks/hooks.json.j2",
-    "hooks/validate-mthds.sh.j2",
+    "hooks/check-mthds.sh.j2",
 ]
 
 # Hook templates by platform:
-# - Claude: hooks/hooks.json + the validate-mthds.sh wrapper.
+# - Claude: hooks/hooks.json + the check-mthds.sh wrapper.
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
-#   substituted by Codex's hook engine) + the validate-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml + the validate-mthds-vibe.sh wrapper.
+#   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
+# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
-    Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/validate-mthds-codex.sh.j2"],
-    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"],
+    Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
+    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
 }
 
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
@@ -109,7 +109,7 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 
 # Files that should be made executable after rendering (hook scripts). A chmod
 # only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"validate-mthds.sh", "validate-mthds-codex.sh", "validate-mthds-vibe.sh"}
+EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh"}
 
 # Name of the plugin-declared MCP server entry injected into the Claude and
 # Codex manifests. Its tools reach the model as

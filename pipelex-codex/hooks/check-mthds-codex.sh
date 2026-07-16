@@ -42,7 +42,7 @@ CHECK_MJS="$SCRIPT_DIR/check.mjs"
 
 # Missing bundle = broken install — fail open rather than block every patch.
 if [[ ! -f "$CHECK_MJS" ]]; then
-  echo "[mthds-codex-hook] check.mjs not found beside validate-mthds-codex.sh — passing (reinstall the plugin)" >&2
+  echo "[mthds-codex-hook] check.mjs not found beside check-mthds-codex.sh — passing (reinstall the plugin)" >&2
   exit 0
 fi
 

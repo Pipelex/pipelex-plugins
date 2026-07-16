@@ -41,9 +41,9 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
     ├── hooks.json.j2                # Claude PostToolUse hook config
     ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
     ├── vibe-hooks.toml.j2           # Mistral Vibe after_tool hook config
-    ├── validate-mthds.sh.j2         # Claude wrapper (fail-open guard → check.mjs)
-    ├── validate-mthds-codex.sh.j2   # Codex wrapper (apply_patch envelope → check.mjs)
-    ├── validate-mthds-vibe.sh.j2    # Vibe wrapper (AfterToolInvocation → check.mjs)
+    ├── check-mthds.sh.j2            # Claude wrapper (fail-open guard → check.mjs)
+    ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
+    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (AfterToolInvocation → check.mjs)
     └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
@@ -117,7 +117,7 @@ Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after ever
 
 ### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 
-The Codex hook command is `${PLUGIN_ROOT}/hooks/validate-mthds-codex.sh` — the wrapper feeds the `apply_patch` envelope to `check.mjs --platform=codex` (several `.mthds` files per patch; outcomes merged, any block wins). Engine facts that make this work:
+The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — the wrapper feeds the `apply_patch` envelope to `check.mjs --platform=codex` (several `.mthds` files per patch; outcomes merged, any block wins). Engine facts that make this work:
 
 - The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`codex_hooks` is a deprecated alias, still honored in 0.144.4; `plugin_hooks` is not an alias but an obsolete independent opt-in, removed in Codex 0.134 and formally `Stage::Removed` since 0.144).
 - Native per-source **trust model** (`[hooks.state]` trusted hashes; `--dangerously-bypass-hook-trust` for automation).

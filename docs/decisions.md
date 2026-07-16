@@ -43,7 +43,7 @@ Installed plugins run from a **cache copy** (`$CODEX_HOME/plugins/cache/<marketp
 The build system (`docs/build-targets.md`) was ported from `mthds-plugins` and trimmed. A few deliberate choices for anyone joining mid-way:
 
 - **`frontmatter.md.j2` is an include-only partial.** It is `{% include %}`-d by skill templates for their YAML frontmatter but is *not* in `SHARED_TEMPLATES`, so it is never rendered standalone. (The predecessor rendered it standalone; with `min_mthds_version` dropped it would only ship a near-empty artifact.)
-- **Hooks are wired (Phase 4).** `HOOK_TEMPLATES_BY_PLATFORM` renders the `.mthds` validation hooks per target (Claude `hooks.json` + `validate-mthds.sh`; Codex `codex-hooks.json`; Vibe `vibe-hooks.toml` + `validate-mthds-vibe.sh`), and `.codex-plugin/plugin-base.json` carries the `hooks` field. See [hooks.md](hooks.md).
+- **Hooks are wired (Phase 4).** `HOOK_TEMPLATES_BY_PLATFORM` renders the `.mthds` validation hooks per target (Claude `hooks.json` + `check-mthds.sh`; Codex `codex-hooks.json`; Vibe `vibe-hooks.toml` + `check-mthds-vibe.sh`), and `.codex-plugin/plugin-base.json` carries the `hooks` field. See [hooks.md](hooks.md).
 - **Dropped from the predecessor's checker:** the stale-install-reference check and the `min_mthds_version` frontmatter check (both CLI-coupled). The Vibe hook-artifact check landed with the hooks (Phase 4).
 
 ## MCP server declaration (2026-07-14)

@@ -6,7 +6,7 @@ The plugin runs a validation hook against `.mthds` files after every edit, on al
 
 Two layers ship in each target's `hooks/`:
 
-- **A thin wrapper script** (`validate-mthds.sh` on Claude, `validate-mthds-codex.sh` on Codex, `validate-mthds-vibe.sh` on Vibe) — fast `.mthds` pre-filter on the stdin JSON, `command -v node` guard (no Node → silent pass), then `exec node check.mjs --platform=<claude|codex|vibe>` with stdin passed through. It is the fail-open guard and the per-platform seam; it contains no validation logic.
+- **A thin wrapper script** (`check-mthds.sh` on Claude, `check-mthds-codex.sh` on Codex, `check-mthds-vibe.sh` on Vibe) — fast `.mthds` pre-filter on the stdin JSON, `command -v node` guard (no Node → silent pass), then `exec node check.mjs --platform=<claude|codex|vibe>` with stdin passed through. It is the fail-open guard and the per-platform seam; it contains no validation logic.
 - **`check.mjs`** — one vendored, dependency-free ~4 MB ESM bundle shared by all targets (built in `pipelex-sdk-js`, provenance header at the top; the `--platform` flag selects the input parser and the stdout dialect) holding the whole pipeline:
   1. **Local lint** via `@pipelex/tools-wasm` — the same Rust engine as `plxt lint` / `/v1/lint`, compiled to WASM and inlined into the bundle. Fully offline, no credentials. Any diagnostic **blocks** with line/col spans.
   2. **Local format** (same engine) — writes the canonical formatting back in place, exactly like `plxt fmt` did. A format failure only warns on stderr.
@@ -56,11 +56,11 @@ make check         # freshness + packaging gates
 
 | Platform | Config | Script | Event / matcher |
 |---|---|---|---|
-| Claude Code | `hooks/hooks.json` (bundled, auto-loaded; 15 s timeout) | `hooks/validate-mthds.sh` → `hooks/check.mjs` | `PostToolUse` over `Write\|Edit`, gated to `*.mthds` |
-| Codex | `hooks/codex-hooks.json`, referenced from the manifest `hooks` field (15 s timeout) | `hooks/validate-mthds-codex.sh` → `hooks/check.mjs --platform=codex` | `PostToolUse` over `apply_patch` |
-| Mistral Vibe | `hooks/vibe-hooks.toml` (15 s timeout) | `hooks/validate-mthds-vibe.sh` → `hooks/check.mjs --platform=vibe` | `after_tool` over `edit\|write_file` |
+| Claude Code | `hooks/hooks.json` (bundled, auto-loaded; 15 s timeout) | `hooks/check-mthds.sh` → `hooks/check.mjs` | `PostToolUse` over `Write\|Edit`, gated to `*.mthds` |
+| Codex | `hooks/codex-hooks.json`, referenced from the manifest `hooks` field (15 s timeout) | `hooks/check-mthds-codex.sh` → `hooks/check.mjs --platform=codex` | `PostToolUse` over `apply_patch` |
+| Mistral Vibe | `hooks/vibe-hooks.toml` (15 s timeout) | `hooks/check-mthds-vibe.sh` → `hooks/check.mjs --platform=vibe` | `after_tool` over `edit\|write_file` |
 
-The Codex hook command is `${PLUGIN_ROOT}/hooks/validate-mthds-codex.sh` — Codex's hook engine substitutes `${PLUGIN_ROOT}` (and honors `${CLAUDE_PLUGIN_ROOT}` for compatibility) with the installed plugin root before spawning; Codex 0.144+ also provides `${PLUGIN_DATA}` / `${CLAUDE_PLUGIN_DATA}` (per-plugin data dir), unused here. A Codex session may run network-sandboxed; the validate stage then reads as unavailable (its in-bundle 10 s ceiling keeps a blocked call from hanging the hook) while lint/format still gate locally.
+The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — Codex's hook engine substitutes `${PLUGIN_ROOT}` (and honors `${CLAUDE_PLUGIN_ROOT}` for compatibility) with the installed plugin root before spawning; Codex 0.144+ also provides `${PLUGIN_DATA}` / `${CLAUDE_PLUGIN_DATA}` (per-plugin data dir), unused here. A Codex session may run network-sandboxed; the validate stage then reads as unavailable (its in-bundle 10 s ceiling keeps a blocked call from hanging the hook) while lint/format still gate locally.
 
 ## The Codex hook — loading and trust
 
@@ -74,4 +74,4 @@ Dev-machine note: if the CLI-era `mthds@mthds-plugins` plugin is also installed,
 
 ## Checks
 
-`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`after_tool`, matching `edit|write_file`, calling `validate-mthds-vibe.sh`) and an executable `hooks/validate-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts (`check.mjs` is a shared asset, allowed everywhere). The renderer marks all three wrapper scripts executable, and the freshness check fails if the exec bit is lost. Static hook assets (`check.mjs`) are declared per platform in `gen_skill_docs.py` (`STATIC_HOOK_ASSETS_BY_PLATFORM`); a missing asset fails the build, and a stale vendored copy in a target fails the freshness check.
+`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`after_tool`, matching `edit|write_file`, calling `check-mthds-vibe.sh`) and an executable `hooks/check-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts (`check.mjs` is a shared asset, allowed everywhere). The renderer marks all three wrapper scripts executable, and the freshness check fails if the exec bit is lost. Static hook assets (`check.mjs`) are declared per platform in `gen_skill_docs.py` (`STATIC_HOOK_ASSETS_BY_PLATFORM`); a missing asset fails the build, and a stale vendored copy in a target fails the freshness check.

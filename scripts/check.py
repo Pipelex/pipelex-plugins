@@ -446,7 +446,7 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
                 errors.append(f"[{target_name}] {dirname}/ found in Vibe output {source}")
 
         hook_config = output_dir / "hooks" / "vibe-hooks.toml"
-        hook_script = output_dir / "hooks" / "validate-mthds-vibe.sh"
+        hook_script = output_dir / "hooks" / "check-mthds-vibe.sh"
         if not hook_config.is_file():
             errors.append(f"[{target_name}] hooks/vibe-hooks.toml missing")
         else:
@@ -455,15 +455,15 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
                 errors.append(f'[{target_name}] hooks/vibe-hooks.toml must use type = "after_tool"')
             if 'match = "re:^(edit|write_file)$"' not in text:
                 errors.append(f"[{target_name}] hooks/vibe-hooks.toml must match edit/write_file")
-            if "validate-mthds-vibe.sh" not in text:
-                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must call validate-mthds-vibe.sh")
+            if "check-mthds-vibe.sh" not in text:
+                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must call check-mthds-vibe.sh")
 
         if not hook_script.is_file():
-            errors.append(f"[{target_name}] hooks/validate-mthds-vibe.sh missing")
+            errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh missing")
         elif not hook_script.stat().st_mode & 0o111:
-            errors.append(f"[{target_name}] hooks/validate-mthds-vibe.sh is not executable")
+            errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh is not executable")
 
-        for filename in ("hooks.json", "codex-hooks.json", "validate-mthds.sh", "validate-mthds-codex.sh"):
+        for filename in ("hooks.json", "codex-hooks.json", "check-mthds.sh", "check-mthds-codex.sh"):
             if (output_dir / "hooks" / filename).exists():
                 errors.append(f"[{target_name}] hooks/{filename} is not a Vibe artifact")
 

@@ -12,7 +12,7 @@
 #   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)
 #      → deny on an invalid verdict; non-blocking context on pending signatures
 #
-# Fail-open posture (Mistral Vibe, CLI-free): no Node on PATH → the whole
+# Fail-open posture ({{ harness_name }}, CLI-free): no Node on PATH → the whole
 # hook passes silently (exit 0, no deny); no PIPELEX_API_KEY / API unreachable
 # → check.mjs skips only the validate stage while the local lint/format
 # verdicts still apply. Nothing here shells out to plxt or mthds-agent.
@@ -39,7 +39,7 @@ CHECK_MJS="$SCRIPT_DIR/check.mjs"
 
 # Missing bundle = broken install — fail open rather than deny every edit.
 if [[ ! -f "$CHECK_MJS" ]]; then
-  echo "[mthds-vibe-hook] check.mjs not found beside validate-mthds-vibe.sh — passing (reinstall the plugin)" >&2
+  echo "[mthds-vibe-hook] check.mjs not found beside check-mthds-vibe.sh — passing (reinstall the plugin)" >&2
   exit 0
 fi
 

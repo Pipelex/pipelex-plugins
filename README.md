@@ -73,10 +73,10 @@ Then wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.
 
 ```toml
 [[hooks]]
-name = "validate-mthds"
+name = "check-mthds"
 type = "after_tool"
 match = "re:^(edit|write_file)$"
-command = "/absolute/path/to/pipelex-vibe/hooks/validate-mthds-vibe.sh"
+command = "/absolute/path/to/pipelex-vibe/hooks/check-mthds-vibe.sh"
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."

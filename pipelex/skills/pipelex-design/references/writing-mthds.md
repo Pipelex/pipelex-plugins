@@ -1,4 +1,4 @@
-# Design Cheat Sheet — Writing `.mthds` Directly
+# Writing `.mthds` Directly
 
 A focused, copy-pasteable reference for hand-writing MTHDS code in a `main.mthds`.
 

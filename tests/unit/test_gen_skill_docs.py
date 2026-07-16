@@ -35,17 +35,17 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 
 # Minimal hook templates for every platform. render_templates declares hooks
-# per platform (Claude: hooks.json + validate-mthds.sh; Codex: codex-hooks.json;
-# Vibe: vibe-hooks.toml + validate-mthds-vibe.sh), so any test tree that reaches
+# per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
+# Vibe: vibe-hooks.toml + check-mthds-vibe.sh), so any test tree that reaches
 # skill/hook rendering must provide them or render fails with "hook template not
 # found".
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
-    "hooks/validate-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
-    "hooks/validate-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n',
-    "hooks/validate-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
+    "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
 }
 
 # Static hook assets are copied verbatim — the fixture body stands in for the
@@ -533,15 +533,15 @@ class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/validate-mthds.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/validate-mthds-codex.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
 
     def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
         output_names = {path.name for path in results}
         assert "hooks.json" in output_names
-        assert "validate-mthds.sh" in output_names
+        assert "check-mthds.sh" in output_names
         assert "codex-hooks.json" not in output_names
 
     def test_codex_renders_only_codex_hook(self, tmp_path: Path) -> None:
@@ -549,20 +549,20 @@ class TestHookRendering:
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "codex"})
         output_names = {path.name for path in results}
         assert "codex-hooks.json" in output_names
-        assert "validate-mthds-codex.sh" in output_names
+        assert "check-mthds-codex.sh" in output_names
         assert "hooks.json" not in output_names
-        assert "validate-mthds.sh" not in output_names
+        assert "check-mthds.sh" not in output_names
 
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
         output_names = {path.name for path in results}
         assert "vibe-hooks.toml" in output_names
-        assert "validate-mthds-vibe.sh" in output_names
+        assert "check-mthds-vibe.sh" in output_names
 
     def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
-        hook_script = template_tree / "pipelex" / "hooks" / "validate-mthds.sh"
+        hook_script = template_tree / "pipelex" / "hooks" / "check-mthds.sh"
         assert hook_script.is_file()
         assert os.access(hook_script, os.X_OK)
 
