@@ -170,7 +170,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
-| `mcp_server_url` | `defaults.toml` (overridable per target) | `make_plugin_json()` — baked default URL of the plugin-declared `pipelex-mcp` server (Claude: wrapped as `${PIPELEX_MCP_URL:-<url>}`; Codex: literal, no env expansion there — see [decisions.md](decisions.md)) |
+| `mcp_server_url` | `defaults.toml` (overridable per target) | `make_plugin_json()` — baked URL of the plugin-declared `pipelex-mcp` server, **literal on every platform** (no `${VAR:-default}` wrapper — the Claude desktop app does no env expansion in plugin MCP config; see [decisions.md](decisions.md)). Dev override: edit the TOML + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
 
 ### Shared template files

@@ -100,6 +100,7 @@ Only after the candidate verdict matches:
 1. **Write every file of the new layout** (Write tool — the hook lints and reformats each in place; a new file may legitimately reuse an old file's name, e.g. `main.mthds`).
 2. **Delete every `.mthds` file that is not part of the new layout.** Delete only `.mthds` files; leave `inputs.json`, input files, and anything else in the directory alone.
 3. **Confirm on disk**: re-gather the directory's `.mthds` files and validate once more — this catches anything the formatting hook changed.
+4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` (no verdict — e.g. the MCP dropped mid-swap) or a verdict that does not match the baseline, roll back: you still hold every original file's content from Step 1 — rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
 
