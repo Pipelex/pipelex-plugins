@@ -16,7 +16,7 @@ It is a **content-preserving transformation** — the method's semantics never c
 
 Equivalence is checked through the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — this skill never reorganizes without proving the verdict is preserved.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection, or launch with `PIPELEX_MCP_URL` pointing at a running `pipelex-mcp` server."* Do not touch the bundle files without validation available.
+- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection; the plugin manifest must point at a running `pipelex-mcp` server."* Do not touch the bundle files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (server unreachable, upstream API misconfigured, auth), STOP the same way and surface the error's `hint`. Never reorganize unvalidated.
 - No API key is needed on your side — the MCP server authenticates to the validation API itself.
 

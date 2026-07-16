@@ -11,7 +11,7 @@
   "mcpServers": {
     "pipelex": {
       "type": "http",
-      "url": "${PIPELEX_MCP_URL:-https://chubby-regions-invent-639.alpic.dev/mcp}"
+      "url": "https://chubby-regions-invent-639.alpic.dev/mcp"
     }
   }
 }

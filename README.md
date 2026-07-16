@@ -35,11 +35,7 @@ export PIPELEX_BASE_URL=...           # optional — defaults to https://api.pip
 
 Everything fails open: with no key (or the API unreachable) the local lint/format verdicts still apply and only the validate stage is skipped — no blocked edits, no nagging. **Privacy note:** with a key set, the `.mthds` files around the edited one are sent to the API on each validate call; unset `PIPELEX_API_KEY` to keep validation fully local (lint/format only).
 
-The plugin also declares the **`pipelex-mcp` server**, which the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-inputs`) use for validation and input templates; it connects automatically. The baked URL currently points at the dev tunnel of the not-yet-released `pipelex-mcp` server (it will switch to the stable URL when the server deploys) — point the session at a different server with:
-
-```bash
-export PIPELEX_MCP_URL=http://localhost:3000/mcp   # e.g. a local pipelex-mcp dev server
-```
+The plugin also declares the **`pipelex-mcp` server**, which the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`) use for validation and input templates; it connects automatically. The URL is baked literally into the manifest (the Claude desktop app does no env expansion in plugin MCP config, so there is no env-var override) and currently points at the dev tunnel of the not-yet-released `pipelex-mcp` server — it will switch to the stable URL when the server deploys. To use a different server (e.g. a local `pipelex-mcp` dev server on `http://localhost:3000/mcp`), edit `mcp_server_url` in `targets/defaults.toml` and rebuild via the dogfood loop below.
 
 ### Codex
 

@@ -476,11 +476,13 @@ class TestPluginManifests:
         assert "interface" not in plugin_json
 
     def test_claude_plugin_json_declares_mcp_server(self, tmp_path: Path) -> None:
-        """The Claude manifest carries the pipelex MCP server with the env-default URL wrapper."""
+        """The Claude manifest carries the pipelex MCP server with a literal URL —
+        the Claude desktop app does no env expansion in plugin MCP config, so a
+        ${VAR:-default} wrapper would reach it verbatim and break the connection."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         plugin_json = make_plugin_json(tree, config)
-        assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "${PIPELEX_MCP_URL:-https://mcp.test/mcp}"}}
+        assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "https://mcp.test/mcp"}}
 
     def test_codex_plugin_json_declares_mcp_server_literal_url(self, tmp_path: Path) -> None:
         """The Codex manifest carries the pipelex MCP server with a literal URL —

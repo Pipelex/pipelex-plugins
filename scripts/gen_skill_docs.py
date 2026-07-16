@@ -118,14 +118,6 @@ EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vib
 # Codex (mcp__pipelex__mthds_validate).
 MCP_SERVER_NAME = "pipelex"
 
-# Env var that overrides the baked MCP server URL at session start. Claude Code
-# expands ${VAR:-default} inside plugin MCP configs, which keeps the dev/prod
-# switch rebuild-free. Codex performs NO env expansion in MCP config (verified
-# against the 0.144.4 source), so its manifest gets the literal URL; the Codex
-# dev override is a same-named [mcp_servers.pipelex] entry in config.toml,
-# which outranks the plugin declaration.
-MCP_URL_ENV_VAR = "PIPELEX_MCP_URL"
-
 
 @dataclass
 class TargetConfig:
@@ -378,13 +370,16 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     base["version"] = config.plugin_version
 
     # Claude and Codex manifests declare the pipelex-mcp server inline
-    # (mcpServers) so the harness connects it at session start. Claude gets the
-    # ${VAR:-default} wrapper (Claude Code expands it); Codex gets the literal
-    # URL (its loader does no env expansion — the dev override is a same-named
-    # [mcp_servers] entry in config.toml, which outranks the plugin tier; Codex
-    # picks the streamable-HTTP transport structurally from the bare url).
-    # Vibe gets no entry (no manifest, and plugin MCP support is unverified
-    # there). Skipped when the target defines no mcp_server_url.
+    # (mcpServers) so the harness connects it at session start. Both get the
+    # literal URL: the Claude desktop app does no ${VAR:-default} expansion in
+    # plugin MCP config (a wrapped URL reaches it verbatim and breaks the
+    # connection — only the CLI expands), and Codex's loader never expands.
+    # Dev override: Claude uses the local-marketplace dogfood loop (edit
+    # targets/*.toml + make build); Codex uses a same-named [mcp_servers]
+    # entry in config.toml, which outranks the plugin tier (it picks the
+    # streamable-HTTP transport structurally from the bare url). Vibe gets no
+    # entry (no manifest, and plugin MCP support is unverified there).
+    # Skipped when the target defines no mcp_server_url.
     mcp_server_url = str(config.template_vars.get("mcp_server_url", "") or "")
     if mcp_server_url:
         match config.platform:
@@ -392,7 +387,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
                 base["mcpServers"] = {
                     MCP_SERVER_NAME: {
                         "type": "http",
-                        "url": f"${{{MCP_URL_ENV_VAR}:-{mcp_server_url}}}",
+                        "url": mcp_server_url,
                     }
                 }
             case Platform.CODEX:
