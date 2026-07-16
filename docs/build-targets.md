@@ -53,7 +53,7 @@ harness_name = "Claude Code"
 mcp_server_url = "https://mcp.pipelex.com/mcp"
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it — `mcp_server_url` arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests; a placeholder until `pipelex-mcp` is deployed, overridden per session via `PIPELEX_MCP_URL` on Claude or a same-named `[mcp_servers.pipelex]` config entry on Codex). Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — `mcp_server_url` arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests; currently the `pipelex-mcp` dev tunnel until the stable deploy, overridden per session via `PIPELEX_MCP_URL` on Claude or a same-named `[mcp_servers.pipelex]` config entry on Codex). Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 

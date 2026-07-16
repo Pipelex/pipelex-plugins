@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a method bundle top-down by stepwise refinement — capture the whole job as one pipe signature, then refine it layer by layer into a runnable method that is valid at every step.
+description: Design a method bundle top-down by stepwise refinement — capture the whole job as one pipe signature, then refine it layer by layer into a runnable method that is valid at every step. Also re-enters an existing method for structural or contract changes — reopen the affected pipes to signatures, then re-refine.
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -169,11 +169,27 @@ Once the runnable verdict holds:
 
 ---
 
+## Editing an existing method (re-entry)
+
+Structural changes to an existing method — adding, removing, or rewiring steps; changing a pipe's contract; reshaping a concept — are design work, not spot edits (contract-preserving tweaks belong to `/pipelex-edit`, which routes structural requests here). Re-entry runs the same refinement loop as construction, started from an existing bundle:
+
+1. **Baseline.** Validate the whole bundle (organized or construction layout — both work). Record the verdict: runnable, or a scaffold with its pending set. If it doesn't validate, fix that first — never redesign on a broken baseline.
+2. **Reopen the smallest sufficient region.** Identify the pipes whose structure or contract changes:
+   - **Internals only (surface intact):** in the module file where the pipe's concrete definition lives, replace the definition with a `PipeSignature` header carrying the same frozen contract (plus a `signature_for` hint for the new intended type). The pipe joins the backlog.
+   - **Contract change:** a propagating change — reopen the pipe **and** its parent controller (the wiring must adapt). If the changed surface is the main pipe's, the client contract changes: the root's boundary concepts move too, and any saved `inputs.json` is invalidated.
+   - **Concept reshape:** a concept's shape is fixed at introduction — reopen its introducing declaration and every consumer that field-reads it.
+3. **Re-refine.** Drain the backlog with the standard Step 2 loop. New definitions are added as new `<code>.mthds` files even when the bundle is organized — the layout is reconciled at the end, not during.
+4. **Converge and deliver.** The finalize gate must restore at least the baseline verdict: a runnable method leaves runnable; a scaffold keeps its intentional pending set. Then re-run `/pipelex-organize`, re-project the input template (`mthds_inputs_template`), and if an `inputs.json` exists, flag the drift and hand the refresh to `/pipelex-inputs`.
+
+Re-entry is the one scoped exception to the additive-writes invariant: it may rewrite exactly the files it reopens — nothing else.
+
+---
+
 ## Invariants & rules (keep these true at every step)
 
 - **Contract stability.** A definition preserves its header's `inputs`/`output` contract, matched by **concept identity** (not byte-string). Choose a signature's internals freely; never change its surface without revising the parent too.
 - **`main_pipe` is the anchor.** The top signature's code and its inputs/output are frozen after Layer 0. Its body arrives as a separate definition file; its identity and surface never change.
-- **Additive writes.** One concrete definition per file; headers persist after they're satisfied. Never overwrite an existing file — always add a new `<code>.mthds`.
+- **Additive writes.** One concrete definition per file; headers persist after they're satisfied. Never overwrite an existing file — always add a new `<code>.mthds`. (Re-entry on an existing method is the scoped exception: it rewrites exactly the files it reopens — see "Editing an existing method".)
 - **A concept's shape is fixed at introduction.** Boundary concepts structured at Layer 0; an intermediate concept's shape is decided in its introducing file — structured if any consumer field-reads it, simple if consumed whole — and cannot be changed in a later file.
 - **Backlog = `{signatures} − {concretes}`.** Recomputed each layer from the verdict's `## Pending signatures` list (or `pending_signatures[]`) — never hand-tracked, never reconstructed as a depth tree.
 

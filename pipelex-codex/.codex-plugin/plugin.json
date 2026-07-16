@@ -25,7 +25,7 @@
   "version": "0.1.0",
   "mcpServers": {
     "pipelex": {
-      "url": "https://mcp.pipelex.com/mcp"
+      "url": "https://chubby-regions-invent-639.alpic.dev/mcp"
     }
   }
 }

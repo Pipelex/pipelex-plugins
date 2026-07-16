@@ -98,7 +98,7 @@ Setup: `cd ../pipelex-api && make run` (serves `:8081`) · `cd ../pipelex-mcp` w
 
 ## Left for later (out of scope here)
 
-- Deployed Alpic URL → set `mcp_server_url` in target TOMLs, `make build` (D1 placeholder swap). Blocked upstream: `pipelex-mcp` must publish/re-pin its `file:`-linked deps before `alpic deploy`.
+- Deployed Alpic URL → set `mcp_server_url` in target TOMLs, `make build` (D1 placeholder swap). Blocked upstream: `pipelex-mcp` must publish/re-pin its `file:`-linked deps before `alpic deploy`. *(Interim, 2026-07-16: the baked default now points at the Alpic **dev tunnel** so Claude-desktop marketplace installs reach a live server — the stable-URL swap here still stands.)*
 - ~~Codex MCP registration verification + in-session Codex hook verification~~ **DONE (2026-07-14, Codex 0.144.4)** — both verified and landed; the Codex manifest now bakes the `mcpServers` entry (literal URL; config-level `[mcp_servers.pipelex]` is the dev override) and the hook was verified in live sessions. See `../wip/plugins/codex-0144-followups.md` (closed) and `docs/decisions.md`. **Vibe** MCP registration verification remains open; until then the README documents manual registration for Vibe only.
 - Runtime-side acceptance of light-shape `inputs.json` (separate workstream).
 - Migration of the MCP's upstream from local `pipelex-api` to the hosted API.

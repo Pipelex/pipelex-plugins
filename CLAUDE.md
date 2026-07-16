@@ -32,6 +32,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   ├── pipelex-explain/SKILL.md.j2   # Read-and-explain a bundle (no MCP dependency)
 │   ├── pipelex-design/SKILL.md.j2    # Top-down design by stepwise refinement (MCP-backed)
 │   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle into a browsable module layout (MCP-backed; auto-run at end of pipelex-design)
+│   ├── pipelex-edit/SKILL.md.j2      # Contract-preserving edits to an existing bundle; routes structural changes to pipelex-design (MCP-backed)
 │   ├── pipelex-inputs/SKILL.md.j2    # inputs.json preparation (MCP-backed)
 │   └── shared/
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
@@ -129,4 +130,4 @@ So there is nothing to enable — the bundled hook loads on its own (hooks are S
 
 ## Key dependency
 
-The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`, plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL is a placeholder until `pipelex-mcp` deploys — override per session (`PIPELEX_MCP_URL` on Claude; `[mcp_servers.pipelex]` in `~/.codex/config.toml` on Codex).
+The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`, plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL currently points at the `pipelex-mcp` Alpic dev tunnel (interim until the stable deploy) — override per session (`PIPELEX_MCP_URL` on Claude; `[mcp_servers.pipelex]` in `~/.codex/config.toml` on Codex).
