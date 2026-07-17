@@ -13,6 +13,7 @@ from scripts.gen_skill_docs import (
     CODEX_DISCOVERY_MARKETPLACE_SRC,
     HOOK_TEMPLATES_BY_PLATFORM,
     SHARED_TEMPLATES,
+    STATIC_HOOK_ASSETS_BY_PLATFORM,
     Platform,
     TargetConfig,
     build_target,
@@ -34,22 +35,35 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 
 # Minimal hook templates for every platform. render_templates declares hooks
-# per platform (Claude: hooks.json + validate-mthds.sh; Codex: codex-hooks.json;
-# Vibe: vibe-hooks.toml + validate-mthds-vibe.sh), so any test tree that reaches
+# per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
+# Vibe: vibe-hooks.toml + check-mthds-vibe.sh), so any test tree that reaches
 # skill/hook rendering must provide them or render fails with "hook template not
 # found".
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
-    "hooks/validate-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
-    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/validate-mthds-vibe.sh"\n',
-    "hooks/validate-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
+    "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+}
+
+# Static hook assets are copied verbatim — the fixture body stands in for the
+# vendored check.mjs bundle (whose real content is a 4+ MB esbuild artifact).
+STATIC_ASSET_BODIES = {
+    "hooks/assets/check.mjs": "// vendored hook bundle {{ not_a_template }}\n",
 }
 
 
 def _create_hook_templates(templates_dir: Path) -> None:
-    """Create minimal per-platform hook templates so render_templates resolves them."""
+    """Create minimal per-platform hook templates and static assets so
+    render_templates resolves them."""
     for name, body in HOOK_TEMPLATE_BODIES.items():
+        path = templates_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text(body)
+    for name, body in STATIC_ASSET_BODIES.items():
         path = templates_dir / name
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
@@ -124,7 +138,9 @@ def _create_codex_tree(tmp_path: Path) -> Path:
 
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
-    (targets_dir / "defaults.toml").write_text('[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\n')
+    (targets_dir / "defaults.toml").write_text(
+        '[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\nmcp_server_url = "https://mcp.test/mcp"\n'
+    )
     (targets_dir / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex/"\n')
     (targets_dir / "codex.toml").write_text(
         '[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex-codex/"\n\n[vars]\nplatform = "codex"\n'
@@ -459,6 +475,30 @@ class TestPluginManifests:
         assert "skills" not in plugin_json
         assert "interface" not in plugin_json
 
+    def test_claude_plugin_json_declares_mcp_server(self, tmp_path: Path) -> None:
+        """The Claude manifest carries the pipelex MCP server with a literal URL —
+        the Claude desktop app does no env expansion in plugin MCP config, so a
+        ${VAR:-default} wrapper would reach it verbatim and break the connection."""
+        tree = _create_codex_tree(tmp_path)
+        config = load_target_config(tree / "targets", "prod")
+        plugin_json = make_plugin_json(tree, config)
+        assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "https://mcp.test/mcp"}}
+
+    def test_codex_plugin_json_declares_mcp_server_literal_url(self, tmp_path: Path) -> None:
+        """The Codex manifest carries the pipelex MCP server with a literal URL —
+        Codex does no env expansion in MCP config; the bare url selects the
+        streamable-HTTP transport structurally (verified against Codex 0.144.4)."""
+        tree = _create_codex_tree(tmp_path)
+        config = load_target_config(tree / "targets", "codex")
+        plugin_json = make_plugin_json(tree, config)
+        assert plugin_json["mcpServers"] == {"pipelex": {"url": "https://mcp.test/mcp"}}
+
+    def test_claude_plugin_json_without_mcp_server_url_skips_entry(self, template_tree: Path) -> None:
+        """A tree that defines no mcp_server_url gets no mcpServers key."""
+        config = load_target_config(template_tree / "targets", "prod")
+        plugin_json = make_plugin_json(template_tree, config)
+        assert "mcpServers" not in plugin_json
+
     def test_build_codex_target_writes_codex_plugin_dir(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "codex")
@@ -491,19 +531,36 @@ class TestPluginManifests:
         assert codex_manifest not in result.files
 
 
+class TestSkillFailureDiscipline:
+    """The disk-mutating MCP-backed skills must instruct a recovery path when
+    the post-write validation yields no verdict: the Step-1 in-memory content
+    is the recovery source (no git/backup machinery — the bundle dir is not
+    guaranteed to be a git repo). Pins the real templates, not fixtures."""
+
+    REPO_TEMPLATES = Path(__file__).parents[2] / "templates" / "skills"
+
+    def test_organize_restores_original_layout_on_failed_confirmation(self) -> None:
+        body = (self.REPO_TEMPLATES / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "restore the original layout" in body
+
+    def test_edit_offers_restore_on_no_verdict(self) -> None:
+        body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "applied but **unproven**" in body
+
+
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/validate-mthds.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/validate-mthds-vibe.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
 
     def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
         output_names = {path.name for path in results}
         assert "hooks.json" in output_names
-        assert "validate-mthds.sh" in output_names
+        assert "check-mthds.sh" in output_names
         assert "codex-hooks.json" not in output_names
 
     def test_codex_renders_only_codex_hook(self, tmp_path: Path) -> None:
@@ -511,18 +568,55 @@ class TestHookRendering:
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "codex"})
         output_names = {path.name for path in results}
         assert "codex-hooks.json" in output_names
+        assert "check-mthds-codex.sh" in output_names
         assert "hooks.json" not in output_names
-        assert "validate-mthds.sh" not in output_names
+        assert "check-mthds.sh" not in output_names
 
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
         output_names = {path.name for path in results}
         assert "vibe-hooks.toml" in output_names
-        assert "validate-mthds-vibe.sh" in output_names
+        assert "check-mthds-vibe.sh" in output_names
 
     def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
-        hook_script = template_tree / "pipelex" / "hooks" / "validate-mthds.sh"
+        hook_script = template_tree / "pipelex" / "hooks" / "check-mthds.sh"
         assert hook_script.is_file()
         assert os.access(hook_script, os.X_OK)
+
+    def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
+        """One vendored check.mjs bundle serves all three platforms."""
+        for platform in Platform:
+            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs"]
+
+    def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
+        """check.mjs must bypass Jinja: its body (a generated bundle) may contain
+        brace sequences that a template pass would mangle or reject."""
+        results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
+        asset_output = template_tree / "hooks" / "check.mjs"
+        assert asset_output in results
+        assert results[asset_output] == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+
+    def test_generate_writes_static_asset_into_target(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        asset = template_tree / "pipelex" / "hooks" / "check.mjs"
+        assert asset.is_file()
+        assert asset.read_text() == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+
+    def test_missing_static_asset_raises(self, template_tree: Path) -> None:
+        (template_tree / "templates" / "hooks" / "assets" / "check.mjs").unlink()
+        with pytest.raises(SystemExit, match="static hook asset not found"):
+            render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
+
+    def test_check_freshness_detects_stale_static_asset(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        (template_tree / "pipelex" / "hooks" / "check.mjs").write_text("// stale bundle\n")
+        assert check_freshness(template_tree, "prod") == 1
+
+    def test_vibe_and_codex_ship_the_static_asset(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        for platform in ("mistral-vibe", "codex"):
+            results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": platform})
+            output_names = {path.name for path in results}
+            assert "check.mjs" in output_names

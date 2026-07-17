@@ -1,46 +1,77 @@
 # Validation hooks
 
-The plugin runs a validation hook against `.mthds` files after every edit, on all three targets. The pipeline shape is identical across platforms; only the wiring and the block/deny vocabulary differ.
+The plugin runs a validation hook against `.mthds` files after every edit, on all three targets — and all three are now **CLI-free**: nothing shells out to `plxt` or `mthds-agent`. The pipeline is identical everywhere (lint → format → validate, same Stage-3 decision model); only the wiring and the block/deny vocabulary differ per harness.
 
-## What the hook does (CLIs present)
+## The wasm+API pipeline (all targets)
 
-When the MTHDS CLIs are on `PATH`, each hook runs the same three stages against the edited file:
+Two layers ship in each target's `hooks/`:
 
-1. **`plxt lint`** — TOML/schema-level linting. Errors block the edit.
-2. **`plxt fmt`** — auto-format the file in place (lint passed). A format failure only warns.
-3. **`mthds-agent validate bundle … --allow-signatures --format json --error-format json`** — semantic validation. The hook reads the **structured JSON verdict**, never the exit code or a markdown grep:
-   - `is_valid: true` on stdout → **pass** (even when the bundle isn't yet runnable — unimplemented `PipeSignature` placeholders ride the success envelope with a non-blocking `pending_signatures` nudge).
-   - `is_valid: false` on stderr, `error_domain` **input** (or unknown/empty → default to block for safety) → **block/deny** with the validation report as the agent-actionable reason.
-   - `error_domain` **config** / **runtime** → **do not block**; surface the message to the user (stderr) and the agent (`additionalContext`). This is an environment problem, not a bundle problem — the agent must not edit the file to "fix" it.
+- **A thin wrapper script** (`check-mthds.sh` on Claude, `check-mthds-codex.sh` on Codex, `check-mthds-vibe.sh` on Vibe) — fast `.mthds` pre-filter on the stdin JSON, `command -v node` guard (no Node → silent pass), then `exec node check.mjs --platform=<claude|codex|vibe>` with stdin passed through. It is the fail-open guard and the per-platform seam; it contains no validation logic.
+- **`check.mjs`** — one vendored, dependency-free ~4 MB ESM bundle shared by all targets (built in `pipelex-sdk-js`, provenance header at the top; the `--platform` flag selects the input parser and the stdout dialect) holding the whole pipeline:
+  1. **Local lint** via `@pipelex/tools-wasm` — the same Rust engine as `plxt lint` / `/v1/lint`, compiled to WASM and inlined into the bundle. Fully offline, no credentials. Any diagnostic **blocks** with line/col spans.
+  2. **Local format** (same engine) — writes the canonical formatting back in place, exactly like `plxt fmt` did. A format failure only warns on stderr.
+  3. **API validate** — `POST /v1/validate` through `@pipelex/sdk` with `allow_signatures: true`, sending the `.mthds` files gathered recursively under the edited file's parent directory (the old `-L "$PARENT_DIR/"` scope; dot-dirs and the runtime's excluded dirs are skipped; capped at 50 files / 2 MiB — on overflow the stage reads as unavailable rather than risking a false block on an under-supplied bundle). The verdict is the **200 body discriminated on `is_valid`**, never the transport:
+     - `is_valid: true` → **pass**; unimplemented `PipeSignature` placeholders emit a non-blocking `additionalContext` nudge listing `pending_signatures`.
+     - `is_valid: false` → **block**, forwarding the server-rendered `rendered_markdown` verbatim as the reason (falling back to a client-side rendering of `validation_errors[]` with locators).
 
-`--allow-signatures` keeps in-progress bundles (whose graph still reaches `PipeSignature` headers) from being blocked mid-construction; on a signature-free bundle, lenient ≡ strict. The two-stream `--format json --error-format json` pinning is what lets the machine read hold under any configured runner — see the workspace-root `docs/specs` and `pipelex/cli/agent_cli/CLAUDE.md` §"Output format".
+Note the bundle scope means a broken **sibling** `.mthds` file fails the verdict too — same as the plxt-era `-L` behavior; the block reason names the offending file via its `source` attribution.
 
-## CLI-free posture (CLIs absent)
+Per-platform input handling inside the bundle: Claude reads one file from `tool_input.file_path`; **Codex** parses the `apply_patch` envelope in `tool_input.command` (`*** Update File: / Add File: / Move to:` headers — one patch can touch several `.mthds` files; each runs the full pipeline and the outcomes merge, any block wins); **Vibe** reads the AfterToolInvocation payload (`tool_status: "success"` gate, path from `tool_output.file`/`.path` or `tool_input.file_path`/`.path`, resolved against `cwd`). Output dialects: Claude/Codex `{"decision":"block",…}` + `hookSpecificOutput.additionalContext`; Vibe `{"decision":"deny",…}` + `{"decision":"allow","hook_specific_output":{"additional_context":…}}`.
 
-This plugin does **not** install or manage the MTHDS CLIs. So when `node`, `plxt`, or `mthds-agent` is **absent**, every hook **passes silently** (`exit 0`, no block, no deny, no install nagging) instead of blocking the edit. This is the one deliberate behavioral difference from `mthds-plugins`, whose hooks block-with-install-hint.
+### Failure posture (fail-open)
 
-It is a transitional state. The iteration path swaps the CLI invocations for hosted-API / MCP calls; once API/MCP-backed validation lands, the missing-CLI branch disappears entirely and validation no longer depends on a local toolchain.
+| Condition | Behavior |
+|---|---|
+| Not a `.mthds` edit / unparseable stdin | silent pass (wrapper pre-filter) |
+| No `node` on PATH | silent pass (wrapper) |
+| `check.mjs` missing beside the wrapper | silent pass + stderr note (broken install) |
+| WASM engine fails to load | silent pass (whole hook unavailable) |
+| No `PIPELEX_API_KEY` | lint/format verdicts apply; **validate stage skipped silently** |
+| API unreachable / timeout (10 s) / any non-2xx | same — local verdicts apply, validate skipped |
+
+A machine consumer branches on the structured verdict, never on transport — an invalid bundle is a produced verdict on a 200; a non-2xx means *no verdict*, which for a write gate degrades to the local stages.
+
+### Environment
+
+- `PIPELEX_API_KEY` — required **for the validate stage only**; lint/format work offline with no key. Without it the hook is a local lint+format gate.
+- `PIPELEX_BASE_URL` — optional; defaults to the hosted `https://api.pipelex.com`. Point it at a local `pipelex-api` (`http://localhost:8081`) to validate against your own runner.
+
+**Privacy note:** with a key set, the gathered bundle contents leave the machine on every validate call — something the plxt-era hook never did. Unset `PIPELEX_API_KEY` to keep everything local.
+
+**Schema pinning:** the WASM engine embeds the MTHDS schema frozen at `@pipelex/tools-wasm` build time, so plugin releases are the local schema update cadence; the server-side validate is the authoritative verdict when the two skew.
+
+### Re-vendoring check.mjs
+
+`check.mjs` is a **static hook asset** (`templates/hooks/assets/check.mjs` — copied verbatim by the build, never rendered through Jinja). When the hook source in `pipelex-sdk-js` changes (or its `@pipelex/tools-wasm` npm dependency is bumped):
+
+```bash
+make vendor-hook   # npm run build:hook in pipelex-sdk-js + copy into templates/hooks/assets/
+make build         # propagate to pipelex/hooks/check.mjs
+make check         # freshness + packaging gates
+```
+
+`make vendor-hook` accepts a `SDK_JS_DIR=` override for a non-sibling checkout. The wasm engine comes from the published `@pipelex/tools-wasm` npm package; to vendor an unreleased engine build instead, set `PIPELEX_TOOLS_WASM_PATH` to a `vscode-pipelex/js/tools-wasm` checkout (with a `RELEASE=true make tools-wasm` build) before running. The provenance header (SDK version + commit, tools-wasm version + origin) identifies any vendored copy.
 
 ## Per-platform wiring
 
 | Platform | Config | Script | Event / matcher |
 |---|---|---|---|
-| Claude Code | `hooks/hooks.json` (bundled, auto-loaded) | `hooks/validate-mthds.sh` | `PostToolUse` over `Write\|Edit`, gated to `*.mthds` |
-| Codex | `hooks/codex-hooks.json`, referenced from the manifest `hooks` field | `mthds-agent codex hook` (in mthds-js) | `PostToolUse` over `apply_patch` |
-| Mistral Vibe | `hooks/vibe-hooks.toml` | `hooks/validate-mthds-vibe.sh` | `after_tool` over `edit\|write_file` |
+| Claude Code | `hooks/hooks.json` (bundled, auto-loaded; 15 s timeout) | `hooks/check-mthds.sh` → `hooks/check.mjs` | `PostToolUse` over `Write\|Edit`, gated to `*.mthds` |
+| Codex | `hooks/codex-hooks.json`, referenced from the manifest `hooks` field (15 s timeout) | `hooks/check-mthds-codex.sh` → `hooks/check.mjs --platform=codex` | `PostToolUse` over `apply_patch` |
+| Mistral Vibe | `hooks/vibe-hooks.toml` (15 s timeout) | `hooks/check-mthds-vibe.sh` → `hooks/check.mjs --platform=vibe` | `after_tool` over `edit\|write_file` |
 
-Claude and Codex use `hookSpecificOutput.additionalContext`; Vibe uses `hook_specific_output.additional_context`. Claude/Codex "block"; Vibe "deny".
+The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — Codex's hook engine substitutes `${PLUGIN_ROOT}` (and honors `${CLAUDE_PLUGIN_ROOT}` for compatibility) with the installed plugin root before spawning; Codex 0.144+ also provides `${PLUGIN_DATA}` / `${CLAUDE_PLUGIN_DATA}` (per-plugin data dir), unused here. A Codex session may run network-sandboxed; the validate stage then reads as unavailable (its in-bundle 10 s ceiling keeps a blocked call from hanging the hook) while lint/format still gate locally.
 
-The Codex command is wrapped — `bash -c 'command -v mthds-agent >/dev/null && exec mthds-agent codex hook; exit 0'` — so a missing `mthds-agent` exits cleanly instead of erroring on every `apply_patch`. The validation logic lives in the mthds-js package (versioned with the npm release), not in the plugin.
+## The Codex hook — loading and trust
 
-## The Codex hook — loading and trust (CLI-present environments only)
-
-Verified against **Codex 0.142.5**. The hook engine graduated out of "under development" across 0.139 → 0.142: the `hooks` feature is now `Stage::Stable` and **enabled by default**, so the plugin-bundled hook is discovered from the manifest and loads on its own — there is no `[features] hooks = true` line to set (`plugin_hooks` / `codex_hooks` are honored deprecated aliases; set `hooks = false` only to disable). The one manual step is trust:
+Verified against **Codex 0.142.5**, re-verified — including **in live sessions** — against **Codex 0.144.4** (block with lint diagnostics relayed to the model, format-in-place on pass, silence on non-`.mthds` patches). The hook engine graduated out of "under development" across 0.139 → 0.142: the `hooks` feature is `Stage::Stable` and **enabled by default**, so the plugin-bundled hook is discovered from the manifest and loads on its own — there is no `[features] hooks = true` line to set (`codex_hooks` is an honored deprecated alias, still present in 0.144.4; set `hooks = false` only to disable). Note that `plugin_hooks` is **not** an alias of `hooks` — it was an independent opt-in for plugin-bundled hooks, removed in Codex 0.134 and ignored since (formally `Stage::Removed` in 0.144); a stale `plugin_hooks = false` line is a harmless leftover on supported Codex versions but should be removed. The one manual step is trust:
 
 - On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). For automation, `--dangerously-bypass-hook-trust` bypasses the prompt.
 
-`PostToolUse` officially fires for `apply_patch` edits and MCP tool calls, so the `.mthds`-on-edit hook fires reliably. The standardized block protocol (`{"decision":"block","reason":…}` or exit 2 + stderr) maps cleanly onto the stage-3 domain-based block/context decision model above. See [decisions.md](decisions.md) for the full finding.
+`PostToolUse` officially fires for `apply_patch` edits and MCP tool calls, so the `.mthds`-on-edit hook fires reliably. The standardized block protocol (`{"decision":"block","reason":…}` or exit 2 + stderr) maps cleanly onto the stage-3 domain-based block/context decision model above. See [decisions.md](decisions.md) for the full finding, including the plugin **cache model** on 0.144.x: installed plugins run from a cache copy, so after `make build` propagate local edits with `make codex-refresh` (an idempotent `codex plugin add`).
+
+Dev-machine note: if the CLI-era `mthds@mthds-plugins` plugin is also installed, both hooks fire on the same `.mthds` edit and Codex concatenates the block reasons — expected coexistence, not a bug.
 
 ## Checks
 
-`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`after_tool`, matching `edit|write_file`, calling `validate-mthds-vibe.sh`) and an executable `hooks/validate-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts. The renderer marks `validate-mthds.sh` and `validate-mthds-vibe.sh` executable, and the freshness check fails if the exec bit is lost.
+`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`after_tool`, matching `edit|write_file`, calling `check-mthds-vibe.sh`) and an executable `hooks/check-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts (`check.mjs` is a shared asset, allowed everywhere). The renderer marks all three wrapper scripts executable, and the freshness check fails if the exec bit is lost. Static hook assets (`check.mjs`) are declared per platform in `gen_skill_docs.py` (`STATIC_HOOK_ASSETS_BY_PLATFORM`); a missing asset fails the build, and a stale vendored copy in a target fails the freshness check.

@@ -29,17 +29,23 @@ targets/
 └── mistral-vibe.toml          # Mistral Vibe target config (version, identity)
 templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 ├── skills/
-│   ├── pipelex-explain/SKILL.md.j2   # First skill (pure read-and-explain)
+│   ├── pipelex-explain/SKILL.md.j2   # Read-and-explain a bundle (no MCP dependency)
+│   ├── pipelex-design/SKILL.md.j2    # Top-down design by stepwise refinement (MCP-backed)
+│   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle into a browsable module layout (MCP-backed; auto-run at end of pipelex-design)
+│   ├── pipelex-edit/SKILL.md.j2      # Contract-preserving edits to an existing bundle; routes structural changes to pipelex-design (MCP-backed)
+│   ├── pipelex-inputs/SKILL.md.j2    # inputs.json preparation (MCP-backed)
 │   └── shared/
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
 │       └── native-content-types.md.j2 # Native content-type documentation
 └── hooks/
-    ├── hooks.json.j2              # Claude PostToolUse hook config
-    ├── codex-hooks.json.j2        # Codex PostToolUse hook config (plugin-bundled)
-    ├── vibe-hooks.toml.j2         # Mistral Vibe after_tool hook config
-    ├── validate-mthds.sh.j2       # Claude .mthds file validator (silent-pass when CLIs absent)
-    └── validate-mthds-vibe.sh.j2  # Vibe .mthds file validator
+    ├── hooks.json.j2                # Claude PostToolUse hook config
+    ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
+    ├── vibe-hooks.toml.j2           # Mistral Vibe after_tool hook config
+    ├── check-mthds.sh.j2            # Claude wrapper (fail-open guard → check.mjs)
+    ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
+    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (AfterToolInvocation → check.mjs)
+    └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
 pipelex-vibe/                  # Mistral Vibe target (generated, checked in; loaded via skill_paths)
@@ -106,28 +112,22 @@ The marketplace serves the **prod** output (`pipelex/`). Iteration loop after ed
 
 Session-only alternative that leaves global config untouched: `claude --plugin-dir /absolute/path/to/pipelex-plugins/pipelex`.
 
-## PostToolUse Hook — CLI-free posture
+## PostToolUse Hook — CLI-free wasm+API pipeline
 
-Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `after_tool`. The validation pipeline is the same shape across all three targets (`plxt lint` → `plxt fmt` → `validate`, with the Stage 3 domain-based block/context decision model).
+Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `after_tool`. Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
 
-The one behavioral difference from `mthds-plugins`:
+### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 
-- **CLIs present** (dev machines that installed the mthds stack for other reasons): the full validation pipeline runs unchanged, including `--format json --error-format json --allow-signatures` pinning.
-- **CLIs absent** (the CLI-free environments this plugin targets): the hook detects the missing binaries and **passes silently** — no block, no install nagging, because this plugin does not manage CLI installation.
+The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — the wrapper feeds the `apply_patch` envelope to `check.mjs --platform=codex` (several `.mthds` files per patch; outcomes merged, any block wins). Engine facts that make this work:
 
-This is transitional. The iteration path swaps the CLI invocations for hosted-API / MCP calls, at which point the missing-CLI branch disappears entirely.
-
-### Codex specifics (verified against Codex 0.142.5)
-
-The Codex hook command is `mthds-agent codex hook` (validation logic lives in mthds-js), wrapped so a missing `mthds-agent` exits cleanly rather than erroring on every patch. Since Codex 0.141 the hook engine matured out of "under development":
-
-- The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`plugin_hooks` / `codex_hooks` are deprecated aliases).
+- The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`codex_hooks` is a deprecated alias, still honored in 0.144.4; `plugin_hooks` is not an alias but an obsolete independent opt-in, removed in Codex 0.134 and formally `Stage::Removed` since 0.144).
 - Native per-source **trust model** (`[hooks.state]` trusted hashes; `--dangerously-bypass-hook-trust` for automation).
 - `PostToolUse` officially fires for `apply_patch` edits and MCP tool calls — which de-risks the `.mthds`-on-edit hook.
 - Standardized block protocol (`{"decision":"block","reason":...}` or exit 2 + stderr) maps cleanly onto the Stage 3 decision model.
+- Installed plugins run from a **cache copy** (`$CODEX_HOME/plugins/cache/...`), and `codex plugin marketplace upgrade` refreshes Git snapshots only — propagate local edits with `make codex-refresh` (an idempotent `codex plugin add`).
 
 So there is nothing to enable — the bundled hook loads on its own (hooks are Stable/default-on) and only needs trusting on first run; no `[features] hooks = true` line and no `apply-config` command. See `docs/decisions.md` and `docs/hooks.md`.
 
-## Key dependency (transitional)
+## Key dependency
 
-Today the hooks and any run-capable skills shell out to the MTHDS CLIs (`plxt`, `mthds-agent`) **only when present** — the plugin itself imports nothing and requires no install. As MCP capabilities land, these invocations move to hosted-API / MCP tool calls and the CLI branch is removed.
+The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`, plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL currently points at the `pipelex-mcp` Alpic dev tunnel (interim until the stable deploy). It is a literal URL on both platforms — the Claude desktop app does no env expansion in plugin MCP config, so there is no `${PIPELEX_MCP_URL:-…}` wrapper anymore. Dev override: edit `mcp_server_url` in `targets/defaults.toml` + `make build` on Claude; a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex.

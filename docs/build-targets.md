@@ -23,13 +23,13 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
        |
        +---> pipelex/skills/*/SKILL.md                 (prod target, output)
        +---> pipelex/skills/shared/*.md                (prod target, output)
-       +---> pipelex/hooks/{hooks.json,validate-mthds.sh}  (prod target, PostToolUse hook)
+       +---> pipelex/hooks/{hooks.json,check-mthds.sh}  (prod target, PostToolUse hook)
        +---> pipelex/.claude-plugin/plugin.json        (generated: plugin-base.json + target overrides)
        +---> pipelex-codex/skills/*/SKILL.md           (codex target, output)
        +---> pipelex-codex/hooks/codex-hooks.json      (codex target, bundled hook config)
        +---> pipelex-codex/.codex-plugin/plugin.json   (generated: plugin-base.json + target overrides)
        +---> pipelex-vibe/skills/*/SKILL.md            (Mistral Vibe target, output — manifestless)
-       +---> pipelex-vibe/hooks/{vibe-hooks.toml,validate-mthds-vibe.sh}  (Vibe after_tool hook)
+       +---> pipelex-vibe/hooks/{vibe-hooks.toml,check-mthds-vibe.sh}  (Vibe after_tool hook)
        +---> .agents/plugins/marketplace.json          (verbatim copy of packaging/codex-marketplace.json)
 ```
 
@@ -50,9 +50,10 @@ Defines the variables shared by all targets. The CLI-free posture keeps this set
 marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
+mcp_server_url = "https://mcp.pipelex.com/mcp"
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it (e.g. an `mcp_server_url`-style variable would arrive with MCP registration). Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — `mcp_server_url` arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests as a literal URL — the Claude desktop app does no env expansion in plugin MCP config; currently the `pipelex-mcp` dev tunnel until the stable deploy. Dev override: edit the TOML + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
@@ -75,9 +76,9 @@ source = "pipelex/"     # output directory
 
 The target platform is selected with `[vars].platform`:
 
-- `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `validate-mthds.sh`).
+- `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
-- `mistral-vibe`: renders skills and the Vibe `after_tool` hook files (`vibe-hooks.toml` + `validate-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
+- `mistral-vibe`: renders skills and the Vibe `after_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
 
 ### Variable resolution
 
@@ -98,8 +99,8 @@ pipelex/                       (prod target)
 ├── .claude-plugin/
 │   └── plugin.json           generated (inherits author/repo/license from plugin-base.json)
 ├── hooks/
-│   ├── hooks.json            PostToolUse wiring (Write|Edit → validate-mthds.sh)
-│   └── validate-mthds.sh     .mthds validation script (executable; silent-pass when CLIs absent)
+│   ├── hooks.json            PostToolUse wiring (Write|Edit → check-mthds.sh)
+│   └── check-mthds.sh        .mthds validation script (executable; silent-pass when CLIs absent)
 └── skills/
     ├── pipelex-explain/
     │   └── SKILL.md           rendered with the target's variables
@@ -110,7 +111,7 @@ pipelex/                       (prod target)
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.
 
-The Mistral Vibe target is manifestless: it emits skills plus the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/validate-mthds-vibe.sh`) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
+The Mistral Vibe target is manifestless: it emits skills plus the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
 
 ## Codex marketplace discovery
 
@@ -169,6 +170,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
+| `mcp_server_url` | `defaults.toml` (overridable per target) | `make_plugin_json()` — baked URL of the plugin-declared `pipelex-mcp` server, **literal on every platform** (no `${VAR:-default}` wrapper — the Claude desktop app does no env expansion in plugin MCP config; see [decisions.md](decisions.md)). Dev override: edit the TOML + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
 
 ### Shared template files
