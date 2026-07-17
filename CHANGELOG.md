@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-07-17
 
 ### Added
 
@@ -21,7 +21,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - New skill: `pipelex-edit` — the modification entry point for existing bundles (the CLI-era `mthds-edit` rethought for the MCP posture). Unlike `pipelex-design` (explicit-invoke only), it is model-invocable and owns the natural-language edit triggers ("change this pipe", "rename this concept", ...). It applies **contract-preserving** edits itself — prompt/instruction text, descriptions, model references, operator settings, and mechanical renames of pipes/concepts/input variables with a no-stale-reference bar — under a baseline-verdict discipline: whole-bundle `mthds_validate` before touching anything (never edit on a broken baseline — regressions and pre-existing errors must stay distinguishable), the baseline verdict restored after, and an inputs-refresh check through `mthds_inputs_template` when a rename touches the client-facing template (pure key renames applied in place, anything more routed to `/pipelex-inputs`). Structural or contract changes are out of scope by design and route to `/pipelex-design`. Rendered across all three targets.
 - `pipelex-design` gains a re-entry section, "Editing an existing method": structural and contract changes to a finished (or scaffold) bundle run the same refinement loop started from a baseline verdict — reopen the smallest sufficient region (replace a concrete definition with its same-contract `PipeSignature`; a contract change also reopens the parent controller; a concept reshape reopens the introducer and every field-reader), re-refine until the baseline verdict is restored, then re-organize and re-project the input template. Re-entry is the scoped exception to the additive-writes invariant: it may rewrite exactly the files it reopens.
 - Codex 0.144.4 verification and dev-loop fixes: the `.mthds` validation hook was verified in live Codex sessions (broken `.mthds` blocked with lint diagnostics relayed to the model, valid-but-unformatted write formatted in place, non-`.mthds` patches silent), and the `make codex-refresh` / `codex-use-*` targets were adapted to the 0.144 plugin cache model — installed plugins run from a cache copy, `codex plugin marketplace upgrade` is Git-only now, so local edits propagate via an idempotent `codex plugin add`.
-
-## [0.1.0] — Unreleased
-
-Initial foundation of the Pipelex plugins.
+- Repo maintainer tooling: a local `/release` skill (`.claude/skills/release/`) that automates cutting a release — runs `make check`, keeps every `targets/*.toml` and the Claude marketplace version in matched-version lockstep, finalizes `CHANGELOG.md`, runs `make build`, and opens a `release/vX.Y.Z` PR to `main`. Adapted from the `mthds-plugins` release skill for this repo's CLI-free three-target layout (prod / codex / mistral-vibe; the Vibe target ships no `plugin.json`, and the Codex marketplace specs carry no version to bump).
