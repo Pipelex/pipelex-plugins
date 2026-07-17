@@ -70,7 +70,7 @@ Use the Edit tool on the affected files. For renames, the edit is only done when
 
 ### Step 5: Re-validate
 
-Same whole-bundle `mthds_validate` call as Step 2. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable/scaffold state unchanged (a renamed pending signature legitimately renames its backlog entry — anything else in the pending set should be untouched). On `is_valid: false`, the failure is in your edit: use the summary's locators, fix, re-validate. If the same construct fails twice, pause and show the user instead of thrashing.
+Same whole-bundle `mthds_validate` call as Step 2. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable/scaffold state unchanged (a renamed pending signature legitimately renames its backlog entry — anything else in the pending set should be untouched). On `is_valid: false`, the failure is in your edit: use the summary's locators, fix, re-validate. If the same construct fails twice, pause and show the user instead of thrashing. On `status: "error"` (no verdict — e.g. the MCP connection dropped after the write), the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1 or to retry validation once the server is reachable again.
 
 ### Step 6: Inputs refresh check
 

@@ -531,6 +531,23 @@ class TestPluginManifests:
         assert codex_manifest not in result.files
 
 
+class TestSkillFailureDiscipline:
+    """The disk-mutating MCP-backed skills must instruct a recovery path when
+    the post-write validation yields no verdict: the Step-1 in-memory content
+    is the recovery source (no git/backup machinery — the bundle dir is not
+    guaranteed to be a git repo). Pins the real templates, not fixtures."""
+
+    REPO_TEMPLATES = Path(__file__).parents[2] / "templates" / "skills"
+
+    def test_organize_restores_original_layout_on_failed_confirmation(self) -> None:
+        body = (self.REPO_TEMPLATES / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "restore the original layout" in body
+
+    def test_edit_offers_restore_on_no_verdict(self) -> None:
+        body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "applied but **unproven**" in body
+
+
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
