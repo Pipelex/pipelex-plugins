@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`pipelex-design` writing-mthds reference: whole-stuff copies in PipeCompose construct.** The construct section now documents that `{ from = "..." }` accepts a whole input variable, not just a dotted path — a whole native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) converts automatically into a native-typed target field, required or optional — with a worked example. Matches the conversion fixes shipped in pipelex v0.39.2.
+
 ## [0.1.0] - 2026-07-17
 
 Initial release — Pipelex plugins (skills + hooks for working with `.mthds` bundles) for Claude Code, Codex, and Mistral Vibe, packaged through the `pipelex-plugins` marketplace. This is the hosted-API / MCP-era generation: no local-CLI dependency and none of the install/upgrade/env-check machinery of its `mthds-plugins` predecessor.
