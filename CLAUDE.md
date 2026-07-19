@@ -41,10 +41,10 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 └── hooks/
     ├── hooks.json.j2                # Claude PostToolUse hook config
     ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
-    ├── vibe-hooks.toml.j2           # Mistral Vibe after_tool hook config
+    ├── vibe-hooks.toml.j2           # Mistral Vibe post_tool hook config
     ├── check-mthds.sh.j2            # Claude wrapper (fail-open guard → check.mjs)
     ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
-    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (AfterToolInvocation → check.mjs)
+    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (post_tool payload → check.mjs)
     └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
@@ -114,7 +114,7 @@ Session-only alternative that leaves global config untouched: `claude --plugin-d
 
 ## PostToolUse Hook — CLI-free wasm+API pipeline
 
-Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `after_tool`. Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
+Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `post_tool` (stable hooks API, Vibe 2.21.0+). Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
 
 ### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 

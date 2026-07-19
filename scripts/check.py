@@ -430,7 +430,7 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
 
     Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths
     and hooks from hooks.toml. The generated target must therefore not carry a
-    plugin manifest, and it must render the after_tool hook config/script pair.
+    plugin manifest, and it must render the post_tool hook config/script pair.
     """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
@@ -451,8 +451,8 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
             errors.append(f"[{target_name}] hooks/vibe-hooks.toml missing")
         else:
             text = hook_config.read_text(encoding="utf-8")
-            if 'type = "after_tool"' not in text:
-                errors.append(f'[{target_name}] hooks/vibe-hooks.toml must use type = "after_tool"')
+            if 'type = "post_tool"' not in text:
+                errors.append(f'[{target_name}] hooks/vibe-hooks.toml must use type = "post_tool"')
             if 'match = "re:^(edit|write_file)$"' not in text:
                 errors.append(f"[{target_name}] hooks/vibe-hooks.toml must match edit/write_file")
             if "check-mthds-vibe.sh" not in text:
