@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "template", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "template", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle or from a registered method's catalog id (mt_…) — also use when the user names a method id, e.g. "prepare inputs for mt_abc123" or "run method mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
 allowed-tools:
   - Bash
   - Read
@@ -18,6 +18,8 @@ allowed-tools:
 # Prepare Inputs for MTHDS methods
 
 Prepare input data for running MTHDS method bundles. This skill is the single entry point for all input preparation needs: extracting a placeholder template, generating synthetic test data, integrating user-provided files, or any combination.
+
+The target method comes in two forms, and every MCP call in this skill takes whichever one applies: a **local bundle** (a directory of `.mthds` files, submitted as `files`) or a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id` — no local files needed).
 
 ## Requirements — the Pipelex MCP tool
 
@@ -84,9 +86,11 @@ This skill extracts the method's input template through the **`mthds_inputs_temp
 
 ### Step 1: Identify the Target Method
 
-Determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `main.mthds` (e.g., `pipelex-wip/pipeline_01/`).
+**Local bundle** (the usual case): determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `main.mthds` (e.g., `pipelex-wip/pipeline_01/`).
 
-The `inputs.json` file is saved directly in this directory (next to `main.mthds`):
+**Registered method**: when the user targets a catalog method by its `mt_…` id (and no local bundle is in play), there is no bundle directory — use the id as `method_id` in every MCP call instead of submitting `files`. `<output_dir>` is then a directory the user names, defaulting to a new `./<method_id>/` directory, and `inputs.json` goes there. A by-id call reads the method's **current stored content** from the org-scoped catalog, so it requires the API key.
+
+The `inputs.json` file is saved directly in this directory:
 - `<output_dir>/inputs.json`
 
 If data files need to be generated or copied (images, PDFs, etc.), they go in a subdirectory:
@@ -100,13 +104,13 @@ The `/inputs` subdirectory is only created when there are actual data files to s
 
 ### Step 2: Get the Input Template
 
-Call the **`mthds_inputs_template`** tool with the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`. Pass no other arguments — the defaults resolve the method's declared `main_pipe` and return the canonical **light** template. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
+Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content — never supply both, files would win and `method_id` would be ignored). Pass no other arguments — the defaults resolve the method's declared `main_pipe` and return the canonical **light** template. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
 
 Branch on the structured verdict, never on transport:
 
 - `status: "ok"`, `is_valid: true` → the template is in `inputs`, with the resolved `pipe_ref`. This template is **authoritative** — fill in its values; never invent shapes it doesn't have.
-- `status: "ok"`, `is_valid: false` → the bundle itself doesn't validate: report `validation_errors[]` (and the summary) to the user; repair the bundle first (e.g. via `/pipelex-design` resumption), then retry.
-- `status: "error"` → no verdict: class `config` → stop per the Requirements above; class `input_domain` → the call is malformed (an unknown `pipe_ref`, or `main_pipe` unresolvable — pass an explicit `pipe_ref`); class `runtime` → report and retry once.
+- `status: "ok"`, `is_valid: false` → the method itself doesn't validate: report `validation_errors[]` (and the summary) to the user. For a local bundle, repair it first (e.g. via `/pipelex-design` resumption), then retry; for a registered method, the stored content is broken — it must be fixed where the method is edited (e.g. the webapp editor), not here.
+- `status: "error"` → no verdict: class `config` → stop per the Requirements above; class `input_domain` → the call is malformed (an unknown `pipe_ref`, or `main_pipe` unresolvable — pass an explicit `pipe_ref`; for a by-id call, an error located at `method_id` means the id is unknown to the key's organization — the catalog is org-scoped, so another org's method reads exactly like a miss — or the stored method has no MTHDS source yet); class `runtime` → report and retry once.
 
 **Example template** (light shape — the tool's default):
 
@@ -139,7 +143,7 @@ The fastest path. Produces a placeholder `inputs.json` that the user can fill in
   good: `"<VARNAME-url-or-path-relative-to-this-inputs-file>"` ✅ do this
   bad:  `"<path-to-VARNAME>"` ❌ don't do that
 This placeholder means "replace with either a real URL, an absolute path, or a path relative to the saved `inputs.json` file itself," not relative to the current working directory.
-3. Save it to `<output_dir>/inputs.json` (next to `main.mthds`)
+3. Save it to `<output_dir>/inputs.json`
 4. Report the saved file path and show the template content
 5. Offer: "To populate this with realistic test data, re-run /pipelex-inputs and ask for synthetic data. Or provide your own files."
 
@@ -187,7 +191,7 @@ When inputs require actual files (Image, Document), generate them — see [Docum
 
 ### Assemble and Save
 
-Fill the Step 2 template in place and save it to `<output_dir>/inputs.json` (next to `main.mthds`). Any generated data files go in `<output_dir>/inputs/`.
+Fill the Step 2 template in place and save it to `<output_dir>/inputs.json`. Any generated data files go in `<output_dir>/inputs/`.
 
 ---
 
@@ -257,7 +261,7 @@ For each matched file, set the input's light value:
 
 ### Step F: Assemble and Save
 
-Fill all matched values into the Step 2 template and save it as `<output_dir>/inputs.json` (next to `main.mthds`).
+Fill all matched values into the Step 2 template and save it as `<output_dir>/inputs.json`.
 
 ### Step G: Report
 
@@ -396,9 +400,10 @@ Offer only when all of these hold:
 
 On acceptance:
 
-1. Call `mthds_run` with the same whole-bundle `files` submission as Step 2 and `inputs` set to the parsed content of `inputs.json` — the light shape is exactly what the tool takes. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
-2. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
-3. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
+1. For a **by-id** target: a run executes the method's **current stored content** (methods are not versioned — it does not pin what Step 2 projected), so re-call `mthds_inputs_template` with the same `method_id` — and the same `pipe_ref`, if Step 2 passed one, so the drift check compares against the pipe actually targeted rather than falling back to `main_pipe` — to catch drift since Step 2. If the returned keys no longer match `inputs.json`, the method changed underneath you — stop, report the drift, and send the user back to `/pipelex-inputs` to re-prepare before spending credit on a run that won't match. Same keys → proceed.
+2. Call `mthds_run` with the same target as Step 2 — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method — and `inputs` set to the parsed content of `inputs.json` — the light shape is exactly what the tool takes. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
+3. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
+4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
 
 ---
 

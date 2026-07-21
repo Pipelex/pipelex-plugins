@@ -99,6 +99,12 @@ Unlike the fail-open hook, the MCP-backed skills **require** their tools to do t
 
 One refinement (2026-07-16): the stop-posture applies to a skill's **required** tools only. Tools that power a convenience are soft dependencies — `pipelex-inputs`' closing offer-to-run needs the `mthds_run` family, and when those tools are absent the skill finishes without the offer instead of stopping. A skill must state which of its tools are which.
 
+## Registered-method ids in skills — only where the target can be remote (2026-07-22)
+
+`pipelex-mcp` 0.6.0/0.7.0 taught `mthds_run`, `mthds_inputs_template`, and `mthds_validate` to take a registered method's catalog id (`mt_…`) as `method_id`, as an alternative to submitted files: a by-id call operates on the method's **current stored content** (methods are not versioned) and requires an API key, since the catalog is org-scoped. With both supplied, files win — except on `mthds_run`, where the files run and `method_id` is recorded as run-history linkage.
+
+Skill adoption follows the target, not the tool surface: **only `pipelex-inputs` gains a by-id mode** (prepare inputs for, and offer to run, a catalog method with no local bundle — the one flow where the method legitimately isn't on disk). The file-based skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`) stay submitted-files only: their loops validate in-flight local content, where a by-id call would silently check the *stored* method instead of the edit under scrutiny — exactly the wrong verdict. Don't add `method_id` plumbing to a skill whose subject is a local working copy.
+
 ## Edit vs design — who owns method modification (2026-07-16)
 
 The CLI-era plugin had `mthds-edit` next to `mthds-build`. The port splits that ground along the **contract line** instead of recreating a monolithic edit skill:
