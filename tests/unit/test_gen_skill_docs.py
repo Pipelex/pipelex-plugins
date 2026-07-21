@@ -42,7 +42,6 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/launch-pipelex-mcp.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
@@ -481,10 +480,10 @@ class TestPluginManifests:
 
     def test_claude_plugin_json_declares_mcp_server_with_user_config(self, tmp_path: Path) -> None:
         """With a user_config block, the Claude manifest declares userConfig
-        (prompted at enable time) and routes the MCP spawn through the
-        launch-pipelex-mcp.sh wrapper, injecting each option as
-        PIPELEX_PLUGIN_<KEY> via `${user_config.*}` substitution — the only
-        credential channel on GUI launches (Claude Desktop has no shell env)."""
+        (prompted at enable time) and spawns the workshop command directly,
+        injecting each option as PIPELEX_<KEY> via `${user_config.*}`
+        substitution in the env block — the only credential channel on GUI
+        launches (Claude Desktop has no shell env)."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         plugin_json = make_plugin_json(tree, config)
@@ -495,11 +494,11 @@ class TestPluginManifests:
         assert plugin_json["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
-                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-                "args": [],
+                "command": "npx",
+                "args": ["-y", "@pipelex/mcp@latest"],
                 "env": {
-                    "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
-                    "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}",
+                    "PIPELEX_API_KEY": "${user_config.api_key}",
+                    "PIPELEX_BASE_URL": "${user_config.base_url}",
                 },
             }
         }
@@ -630,7 +629,7 @@ class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
 

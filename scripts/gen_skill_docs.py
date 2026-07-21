@@ -84,7 +84,6 @@ SHARED_TEMPLATES = [
 HOOK_TEMPLATES = [
     "hooks/hooks.json.j2",
     "hooks/check-mthds.sh.j2",
-    "hooks/launch-pipelex-mcp.sh.j2",
 ]
 
 # Hook templates by platform:
@@ -116,7 +115,7 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 
 # Files that should be made executable after rendering (hook scripts). A chmod
 # only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh", "launch-pipelex-mcp.sh"}
+EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh"}
 
 # Name of the plugin-declared MCP server entry injected into the Claude and
 # Codex manifests. Its tools reach the model as
@@ -396,13 +395,14 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # delivery differs per platform:
     # - Claude: the [vars.mcp_server.user_config] tables become the manifest's
     #   `userConfig` (prompted at enable time; sensitive values go to the OS
-    #   keychain) and the entry spawns the launch-pipelex-mcp.sh wrapper with
-    #   each option injected as PIPELEX_PLUGIN_<KEY> via `${user_config.*}`
-    #   substitution. The wrapper promotes non-empty values to their real
-    #   PIPELEX_* names, keeping the session env as fallback — GUI launches
-    #   (Claude Desktop) carry no shell env, so userConfig is the only
-    #   credential channel there. Without a user_config block the entry
-    #   spawns the workshop command directly (full shell env passthrough).
+    #   keychain) and the entry spawns the workshop command directly with each
+    #   option injected as PIPELEX_<KEY> via `${user_config.*}` substitution
+    #   in the env block. Plugin config is the canonical credential channel —
+    #   GUI launches (Claude Desktop) carry no shell env at all, so it is the
+    #   ONLY channel there. The declared env is merged over the inherited
+    #   session env, so on terminals the plugin options shadow same-named
+    #   shell variables. Without a user_config block the entry spawns the
+    #   workshop command with no env block (full shell env passthrough).
     # - Codex: spawns with a minimal whitelist env, so its entry carries
     #   `env_vars` — variable NAMES forwarded from each user's own env,
     #   never values.
@@ -424,28 +424,19 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
         raw_user_config = mcp_server.get("user_config")
         match config.platform:
             case Platform.CLAUDE:
+                claude_entry: dict[str, object] = {
+                    "type": "stdio",
+                    "command": command,
+                    "args": launcher_args,
+                }
                 if isinstance(raw_user_config, dict):
                     user_config = cast("dict[str, object]", raw_user_config)
                     base["userConfig"] = user_config
                     option_env: dict[str, str] = {}
                     for option_key in user_config:
-                        option_env[f"PIPELEX_PLUGIN_{option_key.upper()}"] = f"${{user_config.{option_key}}}"
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-                            "args": [],
-                            "env": option_env,
-                        }
-                    }
-                else:
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": command,
-                            "args": launcher_args,
-                        }
-                    }
+                        option_env[f"PIPELEX_{option_key.upper()}"] = f"${{user_config.{option_key}}}"
+                    claude_entry["env"] = option_env
+                base["mcpServers"] = {MCP_SERVER_NAME: claude_entry}
             case Platform.CODEX:
                 codex_entry: dict[str, object] = {
                     "command": command,

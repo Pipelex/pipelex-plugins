@@ -20,11 +20,11 @@ harness_name = "Claude Code"
 # with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
 # - Claude: the `user_config` tables below become the manifest's `userConfig`
 #   (Claude prompts for them when the plugin is enabled; sensitive values go
-#   to the OS keychain) and are injected into the spawn as PIPELEX_PLUGIN_*
-#   via `${user_config.*}` substitution. The launch-pipelex-mcp.sh wrapper
-#   promotes each one to its real PIPELEX_* name only when non-empty, so the
-#   session env still works as a fallback. This is required for GUI launches
-#   (Claude Desktop), which carry no shell environment at all.
+#   to the OS keychain) and are injected straight into the MCP spawn env as
+#   PIPELEX_* via `${user_config.*}` substitution — plugin config is the
+#   canonical credential channel. This is required for GUI launches (Claude
+#   Desktop), which carry no shell environment at all; on terminals the
+#   declared env shadows same-named shell variables.
 # - Codex: `env_vars` names the variables Codex forwards into the spawn
 #   (Codex whitelist-filters MCP spawn env; terminal sessions carry them).
 # Dev override: point command/args at a local checkout
@@ -37,8 +37,8 @@ args = ["-y", "@pipelex/mcp@latest"]
 env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]
 
 # Claude plugin user configuration. Keys map onto env variables by convention:
-# option `foo` is injected as PIPELEX_PLUGIN_FOO and promoted to PIPELEX_FOO
-# (MCP launcher) / read from CLAUDE_PLUGIN_OPTION_FOO (hook wrapper).
+# option `foo` is injected into the MCP spawn env as PIPELEX_FOO and read from
+# CLAUDE_PLUGIN_OPTION_FOO by the hook wrapper.
 [vars.mcp_server.user_config.api_key]
 type = "string"
 title = "Pipelex API key"
