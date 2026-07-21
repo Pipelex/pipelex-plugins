@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "name": "pipelex",
   "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "userConfig": {
     "api_key": {
       "type": "string",
@@ -24,11 +24,14 @@
   "mcpServers": {
     "pipelex": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-      "args": [],
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pipelex/mcp@latest"
+      ],
       "env": {
-        "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
-        "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}"
+        "PIPELEX_API_KEY": "${user_config.api_key}",
+        "PIPELEX_BASE_URL": "${user_config.base_url}"
       }
     }
   }

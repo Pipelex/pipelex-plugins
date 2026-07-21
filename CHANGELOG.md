@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.1] - 2026-07-21
+
+### Changed
+
+- **Dropped the `launch-pipelex-mcp.sh` MCP wrapper.** The Claude manifest's MCP entry now spawns the workshop command directly, injecting the `userConfig` values straight into the spawn env as `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` via `${user_config.*}` substitution. The wrapper's non-empty-promotion guard was needless indirection: the workshop already treats empty env values as absent, so an empty option degrades to the keyless fail-open posture. The plugin config dialog is the canonical credential channel; a shell-exported key on terminal launches may be shadowed when the plugin option is left empty.
+
 ## [0.3.0] - 2026-07-21
 
 ### Added

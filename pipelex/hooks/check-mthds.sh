@@ -34,8 +34,9 @@ fi
 # value to hook processes as CLAUDE_PLUGIN_OPTION_<KEY>. Promote them to the
 # real PIPELEX_* variables when non-empty — GUI launches (Claude Desktop)
 # carry no shell environment, so these are the only credential channel there.
-# A set option wins over inherited session env (same precedence as the MCP
-# launcher); an empty one leaves the session env untouched.
+# A set option wins over inherited session env (matching the manifest's MCP
+# entry, which injects the same options into the spawn env directly); an
+# empty one leaves the session env untouched.
 if [[ -n "${CLAUDE_PLUGIN_OPTION_API_KEY:-}" ]]; then
   export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"
 fi
