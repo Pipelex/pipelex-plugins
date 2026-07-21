@@ -25,7 +25,15 @@
   "version": "0.1.0",
   "mcpServers": {
     "pipelex": {
-      "url": "https://chubby-regions-invent-639.alpic.dev/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pipelex/mcp@latest"
+      ],
+      "env_vars": [
+        "PIPELEX_API_KEY",
+        "PIPELEX_BASE_URL"
+      ]
     }
   }
 }

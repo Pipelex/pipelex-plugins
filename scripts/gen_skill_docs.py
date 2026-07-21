@@ -33,6 +33,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import TypeAlias, cast
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, TemplateSyntaxError, UndefinedError
 
@@ -41,6 +42,11 @@ class Platform(StrEnum):
     CLAUDE = "claude"
     CODEX = "codex"
     MISTRAL_VIBE = "mistral-vibe"
+
+
+# A template variable is a scalar (coerced to str), a bool switch, a list, or a
+# nested TOML table (e.g. [vars.mcp_server] carrying the launcher command).
+TemplateVarValue: TypeAlias = "str | bool | list[str] | dict[str, object]"
 
 
 TARGETS_DIR_NAME = "targets"
@@ -128,7 +134,7 @@ class TargetConfig:
     plugin_version: str
     plugin_description: str
     source: str
-    template_vars: dict[str, str | bool]
+    template_vars: dict[str, TemplateVarValue]
     include_skills: list[str] | None = None
 
     @property
@@ -155,21 +161,33 @@ class BuildResult:
     plugin_json: dict[str, object] | None = None
 
 
-def load_defaults(targets_dir: Path) -> dict[str, str | bool]:
+def _coerce_var(value: object) -> TemplateVarValue:
+    """Coerce a TOML value to a template variable: bools, lists, and nested
+    tables pass through; scalars become strings."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, list):
+        return [str(item) for item in cast("list[object]", value)]
+    if isinstance(value, dict):
+        return {str(key): item for key, item in cast("dict[object, object]", value).items()}
+    return str(value)
+
+
+def load_defaults(targets_dir: Path) -> dict[str, TemplateVarValue]:
     """Load default template variables from defaults.toml."""
     defaults_path = targets_dir / DEFAULTS_FILE
     if not defaults_path.is_file():
         msg = f"Defaults file not found: {defaults_path}"
         raise SystemExit(msg)
     raw = tomllib.loads(defaults_path.read_text(encoding="utf-8"))
-    defaults: dict[str, str | bool] = {}
+    defaults: dict[str, TemplateVarValue] = {}
     if "vars" in raw:
         for key, value in raw["vars"].items():
-            defaults[key] = value if isinstance(value, bool) else str(value)
+            defaults[key] = _coerce_var(value)
     return defaults
 
 
-def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, str | bool] | None = None) -> TargetConfig:
+def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, TemplateVarValue] | None = None) -> TargetConfig:
     """Load a target config, merging defaults with target-specific overrides.
 
     Args:
@@ -196,7 +214,7 @@ def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, 
     template_vars = dict(defaults)
     if "vars" in raw:
         for key, value in raw["vars"].items():
-            template_vars[key] = value if isinstance(value, bool) else str(value)
+            template_vars[key] = _coerce_var(value)
     template_vars["plugin_name"] = plugin["name"]
 
     include_skills: list[str] | None = None
@@ -230,7 +248,7 @@ def resolve_output_dir(base_dir: Path, source: str) -> Path:
     return base_dir / source.rstrip("/")
 
 
-def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, str | bool]) -> str:
+def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, TemplateVarValue]) -> str:
     """Render one template by name, turning Jinja errors into a clean SystemExit."""
     try:
         return env.get_template(template_name).render(**template_vars)
@@ -248,7 +266,7 @@ def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[
 def render_templates(
     templates_dir: Path,
     base_dir: Path,
-    template_vars: Mapping[str, str | bool],
+    template_vars: Mapping[str, TemplateVarValue],
     include_skills: list[str] | None = None,
     target_name: str | None = None,
 ) -> dict[Path, str]:
@@ -370,32 +388,46 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     base["version"] = config.plugin_version
 
     # Claude and Codex manifests declare the pipelex-mcp server inline
-    # (mcpServers) so the harness connects it at session start. Both get the
-    # literal URL: the Claude desktop app does no ${VAR:-default} expansion in
-    # plugin MCP config (a wrapped URL reaches it verbatim and breaks the
-    # connection — only the CLI expands), and Codex's loader never expands.
-    # Dev override: Claude uses the local-marketplace dogfood loop (edit
-    # targets/*.toml + make build); Codex uses a same-named [mcp_servers]
-    # entry in config.toml, which outranks the plugin tier (it picks the
-    # streamable-HTTP transport structurally from the bare url). Vibe gets no
-    # entry (no manifest, and plugin MCP support is unverified there).
-    # Skipped when the target defines no mcp_server_url.
-    mcp_server_url = str(config.template_vars.get("mcp_server_url", "") or "")
-    if mcp_server_url:
+    # (mcpServers) so the harness connects it at session start. The declared
+    # server is the LOCAL WORKSHOP LAUNCHER (stdio, from the [vars.mcp_server]
+    # block) — the hosted console is never baked: a plugin is a shared literal
+    # artifact with no channel for a per-user key, while the launcher reads
+    # PIPELEX_API_KEY from the session env (the same variable the hook
+    # documents). Env delivery differs per platform: Claude Code passes the
+    # full shell env to the spawned server; Codex spawns MCP servers with a
+    # minimal whitelist env, so its entry carries `env_vars` — variable NAMES
+    # forwarded from each user's own env, never values. Dev override: point
+    # command/args at a local checkout (e.g. command = "node",
+    # args = ["../pipelex-mcp/dist/local/main.js"]) in targets/defaults.toml +
+    # `make build` on Claude; a same-named [mcp_servers.pipelex] entry in
+    # ~/.codex/config.toml outranks the plugin tier on Codex. Vibe gets no
+    # entry (no manifest; docs point at manual launcher registration).
+    # Skipped when the target defines no mcp_server block.
+    mcp_server = config.template_vars.get("mcp_server")
+    if isinstance(mcp_server, dict):
+        raw_command = mcp_server.get("command", "")
+        command = str(raw_command)
+        raw_args = mcp_server.get("args", [])
+        launcher_args = [str(item) for item in cast("list[object]", raw_args)] if isinstance(raw_args, list) else []
+        raw_env_vars = mcp_server.get("env_vars", [])
+        env_var_names = [str(item) for item in cast("list[object]", raw_env_vars)] if isinstance(raw_env_vars, list) else []
         match config.platform:
             case Platform.CLAUDE:
                 base["mcpServers"] = {
                     MCP_SERVER_NAME: {
-                        "type": "http",
-                        "url": mcp_server_url,
+                        "type": "stdio",
+                        "command": command,
+                        "args": launcher_args,
                     }
                 }
             case Platform.CODEX:
-                base["mcpServers"] = {
-                    MCP_SERVER_NAME: {
-                        "url": mcp_server_url,
-                    }
+                codex_entry: dict[str, object] = {
+                    "command": command,
+                    "args": launcher_args,
                 }
+                if env_var_names:
+                    codex_entry["env_vars"] = env_var_names
+                base["mcpServers"] = {MCP_SERVER_NAME: codex_entry}
             case Platform.MISTRAL_VIBE:
                 pass
     return base

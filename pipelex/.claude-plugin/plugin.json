@@ -10,8 +10,12 @@
   "version": "0.1.0",
   "mcpServers": {
     "pipelex": {
-      "type": "http",
-      "url": "https://chubby-regions-invent-639.alpic.dev/mcp"
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pipelex/mcp@latest"
+      ]
     }
   }
 }

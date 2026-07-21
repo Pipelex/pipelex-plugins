@@ -17,7 +17,16 @@ Deferred findings from SWE-agent review of [PR #1](https://github.com/Pipelex/pi
 
 **Release gate (hard, before the repo/marketplace goes public):**
 
-- [ ] Swap `mcp_server_url` in `targets/defaults.toml` to the stable `pipelex-mcp` production endpoint + `make build`.
-- [ ] Verify the endpoint's inbound auth/deny posture for the `mthds_run` family — the endpoint must default-deny unauthenticated clients or otherwise gate credit-spending tools.
+- [x] Swap `mcp_server_url` in `targets/defaults.toml` to the stable `pipelex-mcp` production endpoint + `make build`. — RESOLVED by supersession, see below.
+- [x] Verify the endpoint's inbound auth/deny posture for the `mthds_run` family — the endpoint must default-deny unauthenticated clients or otherwise gate credit-spending tools. — RESOLVED, see below.
 
 **Interim hardening (optional, now):** confirm the Alpic dev tunnel's server env does not hold a funded `PIPELEX_API_KEY`, so leaked-URL run calls return a `config` no-verdict instead of spending credit.
+
+## Resolution (2026-07-21, `feature/Dual-MCP`)
+
+The Dual-MCP flip (see `TODOS.md` and `docs/decisions.md` "Dual-MCP flip" entry) closes both gate items — the root condition they shared, a baked hosted URL, no longer exists:
+
+1. **No URL is baked anywhere anymore.** `mcp_server_url` is retired from the renderer and `targets/defaults.toml`; every generated manifest now declares the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio). There is no dev tunnel — or any hosted endpoint — in anyone's install, so "prod installs on a dev tunnel" is moot. The hosted console is only ever a connector users add in their host's own UI, never a plugin declaration.
+2. **Auth posture is resolved on both servers.** The workshop authenticates with the *caller's* `PIPELEX_API_KEY` from the session env (forwarded by name via `env_vars` on Codex) — no shared credential exists to leak. The hosted console became bring-your-own-key in `@pipelex/mcp` 0.5.0: it holds no server-side `PIPELEX_API_KEY`, so keyless `mthds_run` calls spend nothing and return an instructive `config` no-verdict. The interim-hardening ask (no funded key in the deployed server env) is thereby satisfied structurally, not just operationally.
+
+The pre-publication release gate is **closed**. Going public is now a product decision, not a security one.

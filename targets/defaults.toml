@@ -12,10 +12,19 @@ marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
 
-# Baked default URL of the plugin-declared `pipelex-mcp` server (streamable
-# HTTP). Currently the Alpic dev tunnel, so marketplace installs (e.g. the
-# Claude desktop app, where no env var can be set) reach a live server —
-# switch to the stable URL when pipelex-mcp deploys. Baked as a LITERAL URL
-# on every platform (the Claude desktop app does no ${VAR:-default} expansion
-# in plugin MCP config); for a different server, edit this value and rebuild.
-mcp_server_url = "https://chubby-regions-invent-639.alpic.dev/mcp"
+# The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
+# (stdio) — definitive, not a BYOK workaround: builders authoring local files
+# are the plugin's audience, and the hosted console is a connector users add
+# in their host's own UI, never a plugin declaration (rationale:
+# ../pipelex-mcp/wip/plugin-reconciliation.md §8). The workshop authenticates
+# with PIPELEX_API_KEY from the session env — the same variable the hook
+# documents. `env_vars` names the variables Codex forwards into the spawn
+# (Codex whitelist-filters MCP spawn env; Claude Code passes the full shell
+# env on its own). Dev override: point command/args at a local checkout
+# (e.g. command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) +
+# `make build` on Claude; a same-named [mcp_servers.pipelex] entry in
+# ~/.codex/config.toml on Codex.
+[vars.mcp_server]
+command = "npx"
+args = ["-y", "@pipelex/mcp@latest"]
+env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]
