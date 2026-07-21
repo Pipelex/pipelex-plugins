@@ -1,6 +1,6 @@
 [plugin]
 name = "pipelex-vibe"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pipelex skills and hooks for Mistral Vibe."
 source = "pipelex-vibe/"
 
