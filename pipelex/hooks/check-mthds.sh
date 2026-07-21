@@ -30,6 +30,19 @@ if ! command -v node &>/dev/null; then
   exit 0
 fi
 
+# Plugin user-config credentials: Claude Code exports each `userConfig`
+# value to hook processes as CLAUDE_PLUGIN_OPTION_<KEY>. Promote them to the
+# real PIPELEX_* variables when non-empty — GUI launches (Claude Desktop)
+# carry no shell environment, so these are the only credential channel there.
+# A set option wins over inherited session env (same precedence as the MCP
+# launcher); an empty one leaves the session env untouched.
+if [[ -n "${CLAUDE_PLUGIN_OPTION_API_KEY:-}" ]]; then
+  export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"
+fi
+if [[ -n "${CLAUDE_PLUGIN_OPTION_BASE_URL:-}" ]]; then
+  export PIPELEX_BASE_URL="$CLAUDE_PLUGIN_OPTION_BASE_URL"
+fi
+
 # Resolve the bundle beside this script (works with or without
 # CLAUDE_PLUGIN_ROOT in the environment).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

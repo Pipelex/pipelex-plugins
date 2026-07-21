@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] - 2026-07-21
+
+### Added
+
+- **Claude plugin user configuration for API credentials.** The Claude manifest now declares `userConfig` (`api_key` sensitive + `base_url`), so Claude prompts for the Pipelex API key when the plugin is enabled and stores it in the OS keychain — the credential channel that works on Claude Desktop, where GUI-launched apps carry no shell environment and an exported `PIPELEX_API_KEY` never reaches the session (previously the spawned workshop sent unauthenticated requests and surfaced a misleading "Unauthorized — check PIPELEX_API_KEY" error). The MCP entry now spawns a `hooks/launch-pipelex-mcp.sh` wrapper that promotes the injected `${user_config.*}` values to `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` only when non-empty, and the Claude hook wrapper does the same with the delivered `CLAUDE_PLUGIN_OPTION_*` variables — a set option wins over the session environment, an empty one leaves it untouched, and keyless use stays fail-open. Codex (`env_vars` name-forwarding) and Vibe (manual registration) are unchanged.
+
 ## [0.2.0] - 2026-07-21
 
 ### Changed

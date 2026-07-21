@@ -7,15 +7,29 @@
   "license": "Apache-2.0",
   "name": "pipelex",
   "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
-  "version": "0.2.0",
+  "version": "0.3.0",
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "title": "Pipelex API key",
+      "description": "API key for the hosted Pipelex API (bundle validation and runs). Get one at https://app.pipelex.com. Leave empty to work offline: local lint/format still run; validation and runs are skipped.",
+      "sensitive": true
+    },
+    "base_url": {
+      "type": "string",
+      "title": "Pipelex API base URL",
+      "description": "Origin of the Pipelex API, host-only (e.g. https://api.pipelex.com). Leave empty for the hosted default."
+    }
+  },
   "mcpServers": {
     "pipelex": {
       "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@pipelex/mcp@latest"
-      ]
+      "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
+      "args": [],
+      "env": {
+        "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
+        "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}"
+      }
     }
   }
 }

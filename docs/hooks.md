@@ -6,7 +6,7 @@ The plugin runs a validation hook against `.mthds` files after every edit, on al
 
 Two layers ship in each target's `hooks/`:
 
-- **A thin wrapper script** (`check-mthds.sh` on Claude, `check-mthds-codex.sh` on Codex, `check-mthds-vibe.sh` on Vibe) — fast `.mthds` pre-filter on the stdin JSON, `command -v node` guard (no Node → silent pass), then `exec node check.mjs --platform=<claude|codex|vibe>` with stdin passed through. It is the fail-open guard and the per-platform seam; it contains no validation logic.
+- **A thin wrapper script** (`check-mthds.sh` on Claude, `check-mthds-codex.sh` on Codex, `check-mthds-vibe.sh` on Vibe) — fast `.mthds` pre-filter on the stdin JSON, `command -v node` guard (no Node → silent pass), then `exec node check.mjs --platform=<claude|codex|vibe>` with stdin passed through. It is the fail-open guard and the per-platform seam; it contains no validation logic. The Claude wrapper additionally promotes plugin user-config credentials (`CLAUDE_PLUGIN_OPTION_API_KEY` / `CLAUDE_PLUGIN_OPTION_BASE_URL`, exported by Claude Code from the manifest's `userConfig`) to `PIPELEX_API_KEY` / `PIPELEX_BASE_URL` when non-empty — a set option wins over inherited session env; an empty one leaves the session env untouched.
 - **`check.mjs`** — one vendored, dependency-free ~4 MB ESM bundle shared by all targets (built in `pipelex-sdk-js`, provenance header at the top; the `--platform` flag selects the input parser and the stdout dialect) holding the whole pipeline:
   1. **Local lint** via `@pipelex/tools-wasm` — the same Rust engine as `plxt lint` / `/v1/lint`, compiled to WASM and inlined into the bundle. Fully offline, no credentials. Any diagnostic **blocks** with line/col spans.
   2. **Local format** (same engine) — writes the canonical formatting back in place, exactly like `plxt fmt` did. A format failure only warns on stderr.
@@ -35,6 +35,8 @@ A machine consumer branches on the structured verdict, never on transport — an
 
 - `PIPELEX_API_KEY` — required **for the validate stage only**; lint/format work offline with no key. Without it the hook is a local lint+format gate.
 - `PIPELEX_BASE_URL` — optional; defaults to the hosted `https://api.pipelex.com`. Point it at a local `pipelex-api` (`http://localhost:8081`) to validate against your own runner.
+
+On Claude Code, both variables can come from the **plugin configuration** instead of the shell: the manifest's `userConfig` prompts for them when the plugin is enabled (the key is stored in the OS keychain), and the wrapper promotes the delivered `CLAUDE_PLUGIN_OPTION_*` values as described above. This is the supported channel for GUI launches (Claude Desktop), which carry no shell environment at all — see `docs/decisions.md` ("Claude credentials move to plugin userConfig").
 
 **Privacy note:** with a key set, the gathered bundle contents leave the machine on every validate call — something the plxt-era hook never did. Unset `PIPELEX_API_KEY` to keep everything local.
 

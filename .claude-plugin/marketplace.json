@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Pipelex skills and hooks for working with AI methods following the MTHDS standard.",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "plugins": [
     {
