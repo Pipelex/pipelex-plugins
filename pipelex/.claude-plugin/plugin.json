@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "name": "pipelex",
   "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "userConfig": {
     "api_key": {
       "type": "string",
