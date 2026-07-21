@@ -84,6 +84,7 @@ SHARED_TEMPLATES = [
 HOOK_TEMPLATES = [
     "hooks/hooks.json.j2",
     "hooks/check-mthds.sh.j2",
+    "hooks/launch-pipelex-mcp.sh.j2",
 ]
 
 # Hook templates by platform:
@@ -115,7 +116,7 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 
 # Files that should be made executable after rendering (hook scripts). A chmod
 # only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh"}
+EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh", "launch-pipelex-mcp.sh"}
 
 # Name of the plugin-declared MCP server entry injected into the Claude and
 # Codex manifests. Its tools reach the model as
@@ -391,18 +392,27 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # (mcpServers) so the harness connects it at session start. The declared
     # server is the LOCAL WORKSHOP LAUNCHER (stdio, from the [vars.mcp_server]
     # block) — the hosted console is never baked: a plugin is a shared literal
-    # artifact with no channel for a per-user key, while the launcher reads
-    # PIPELEX_API_KEY from the session env (the same variable the hook
-    # documents). Env delivery differs per platform: Claude Code passes the
-    # full shell env to the spawned server; Codex spawns MCP servers with a
-    # minimal whitelist env, so its entry carries `env_vars` — variable NAMES
-    # forwarded from each user's own env, never values. Dev override: point
-    # command/args at a local checkout (e.g. command = "node",
-    # args = ["../pipelex-mcp/dist/local/main.js"]) in targets/defaults.toml +
-    # `make build` on Claude; a same-named [mcp_servers.pipelex] entry in
-    # ~/.codex/config.toml outranks the plugin tier on Codex. Vibe gets no
-    # entry (no manifest; docs point at manual launcher registration).
-    # Skipped when the target defines no mcp_server block.
+    # artifact with no channel for a hardcoded per-user key. Credential
+    # delivery differs per platform:
+    # - Claude: the [vars.mcp_server.user_config] tables become the manifest's
+    #   `userConfig` (prompted at enable time; sensitive values go to the OS
+    #   keychain) and the entry spawns the launch-pipelex-mcp.sh wrapper with
+    #   each option injected as PIPELEX_PLUGIN_<KEY> via `${user_config.*}`
+    #   substitution. The wrapper promotes non-empty values to their real
+    #   PIPELEX_* names, keeping the session env as fallback — GUI launches
+    #   (Claude Desktop) carry no shell env, so userConfig is the only
+    #   credential channel there. Without a user_config block the entry
+    #   spawns the workshop command directly (full shell env passthrough).
+    # - Codex: spawns with a minimal whitelist env, so its entry carries
+    #   `env_vars` — variable NAMES forwarded from each user's own env,
+    #   never values.
+    # Dev override: point command/args at a local checkout (e.g.
+    # command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) in
+    # targets/defaults.toml + `make build` on Claude; a same-named
+    # [mcp_servers.pipelex] entry in ~/.codex/config.toml outranks the plugin
+    # tier on Codex. Vibe gets no entry (no manifest; docs point at manual
+    # launcher registration). Skipped when the target defines no mcp_server
+    # block.
     mcp_server = config.template_vars.get("mcp_server")
     if isinstance(mcp_server, dict):
         raw_command = mcp_server.get("command", "")
@@ -411,15 +421,31 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
         launcher_args = [str(item) for item in cast("list[object]", raw_args)] if isinstance(raw_args, list) else []
         raw_env_vars = mcp_server.get("env_vars", [])
         env_var_names = [str(item) for item in cast("list[object]", raw_env_vars)] if isinstance(raw_env_vars, list) else []
+        raw_user_config = mcp_server.get("user_config")
         match config.platform:
             case Platform.CLAUDE:
-                base["mcpServers"] = {
-                    MCP_SERVER_NAME: {
-                        "type": "stdio",
-                        "command": command,
-                        "args": launcher_args,
+                if isinstance(raw_user_config, dict):
+                    user_config = cast("dict[str, object]", raw_user_config)
+                    base["userConfig"] = user_config
+                    option_env: dict[str, str] = {}
+                    for option_key in user_config:
+                        option_env[f"PIPELEX_PLUGIN_{option_key.upper()}"] = f"${{user_config.{option_key}}}"
+                    base["mcpServers"] = {
+                        MCP_SERVER_NAME: {
+                            "type": "stdio",
+                            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
+                            "args": [],
+                            "env": option_env,
+                        }
                     }
-                }
+                else:
+                    base["mcpServers"] = {
+                        MCP_SERVER_NAME: {
+                            "type": "stdio",
+                            "command": command,
+                            "args": launcher_args,
+                        }
+                    }
             case Platform.CODEX:
                 codex_entry: dict[str, object] = {
                     "command": command,

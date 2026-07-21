@@ -42,6 +42,7 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/launch-pipelex-mcp.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
@@ -140,7 +141,9 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     targets_dir.mkdir()
     (targets_dir / "defaults.toml").write_text(
         '[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\n\n'
-        '[vars.mcp_server]\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\nenv_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]\n'
+        '[vars.mcp_server]\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\nenv_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]\n\n'
+        '[vars.mcp_server.user_config.api_key]\ntype = "string"\ntitle = "Pipelex API key"\ndescription = "Key."\nsensitive = true\n\n'
+        '[vars.mcp_server.user_config.base_url]\ntype = "string"\ntitle = "Pipelex API base URL"\ndescription = "URL."\n'
     )
     (targets_dir / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex/"\n')
     (targets_dir / "codex.toml").write_text(
@@ -476,13 +479,42 @@ class TestPluginManifests:
         assert "skills" not in plugin_json
         assert "interface" not in plugin_json
 
-    def test_claude_plugin_json_declares_mcp_server(self, tmp_path: Path) -> None:
-        """The Claude manifest declares the local workshop launcher as a stdio
-        command; no env_vars key — Claude Code passes the full shell env to the
-        spawned server (verified in live plugin-dir sessions)."""
+    def test_claude_plugin_json_declares_mcp_server_with_user_config(self, tmp_path: Path) -> None:
+        """With a user_config block, the Claude manifest declares userConfig
+        (prompted at enable time) and routes the MCP spawn through the
+        launch-pipelex-mcp.sh wrapper, injecting each option as
+        PIPELEX_PLUGIN_<KEY> via `${user_config.*}` substitution — the only
+        credential channel on GUI launches (Claude Desktop has no shell env)."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         plugin_json = make_plugin_json(tree, config)
+        assert plugin_json["userConfig"] == {
+            "api_key": {"type": "string", "title": "Pipelex API key", "description": "Key.", "sensitive": True},
+            "base_url": {"type": "string", "title": "Pipelex API base URL", "description": "URL."},
+        }
+        assert plugin_json["mcpServers"] == {
+            "pipelex": {
+                "type": "stdio",
+                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
+                "args": [],
+                "env": {
+                    "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
+                    "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}",
+                },
+            }
+        }
+
+    def test_claude_plugin_json_without_user_config_spawns_directly(self, tmp_path: Path) -> None:
+        """Without a user_config block, the Claude manifest spawns the workshop
+        command directly — Claude Code passes the full shell env to the spawned
+        server (verified in live plugin-dir sessions)."""
+        tree = _create_codex_tree(tmp_path)
+        config = load_target_config(tree / "targets", "prod")
+        mcp_server = config.template_vars["mcp_server"]
+        assert isinstance(mcp_server, dict)
+        mcp_server.pop("user_config")
+        plugin_json = make_plugin_json(tree, config)
+        assert "userConfig" not in plugin_json
         assert plugin_json["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
@@ -598,7 +630,7 @@ class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
 

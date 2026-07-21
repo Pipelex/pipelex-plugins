@@ -17,10 +17,17 @@ harness_name = "Claude Code"
 # are the plugin's audience, and the hosted console is a connector users add
 # in their host's own UI, never a plugin declaration (rationale:
 # ../pipelex-mcp/wip/plugin-reconciliation.md §8). The workshop authenticates
-# with PIPELEX_API_KEY from the session env — the same variable the hook
-# documents. `env_vars` names the variables Codex forwards into the spawn
-# (Codex whitelist-filters MCP spawn env; Claude Code passes the full shell
-# env on its own). Dev override: point command/args at a local checkout
+# with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
+# - Claude: the `user_config` tables below become the manifest's `userConfig`
+#   (Claude prompts for them when the plugin is enabled; sensitive values go
+#   to the OS keychain) and are injected into the spawn as PIPELEX_PLUGIN_*
+#   via `${user_config.*}` substitution. The launch-pipelex-mcp.sh wrapper
+#   promotes each one to its real PIPELEX_* name only when non-empty, so the
+#   session env still works as a fallback. This is required for GUI launches
+#   (Claude Desktop), which carry no shell environment at all.
+# - Codex: `env_vars` names the variables Codex forwards into the spawn
+#   (Codex whitelist-filters MCP spawn env; terminal sessions carry them).
+# Dev override: point command/args at a local checkout
 # (e.g. command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) +
 # `make build` on Claude; a same-named [mcp_servers.pipelex] entry in
 # ~/.codex/config.toml on Codex.
@@ -28,3 +35,17 @@ harness_name = "Claude Code"
 command = "npx"
 args = ["-y", "@pipelex/mcp@latest"]
 env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]
+
+# Claude plugin user configuration. Keys map onto env variables by convention:
+# option `foo` is injected as PIPELEX_PLUGIN_FOO and promoted to PIPELEX_FOO
+# (MCP launcher) / read from CLAUDE_PLUGIN_OPTION_FOO (hook wrapper).
+[vars.mcp_server.user_config.api_key]
+type = "string"
+title = "Pipelex API key"
+description = "API key for the hosted Pipelex API (bundle validation and runs). Get one at https://app.pipelex.com. Leave empty to work offline: local lint/format still run; validation and runs are skipped."
+sensitive = true
+
+[vars.mcp_server.user_config.base_url]
+type = "string"
+title = "Pipelex API base URL"
+description = "Origin of the Pipelex API, host-only (e.g. https://api.pipelex.com). Leave empty for the hosted default."
