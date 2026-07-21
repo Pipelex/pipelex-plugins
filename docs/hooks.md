@@ -16,7 +16,7 @@ Two layers ship in each target's `hooks/`:
 
 Note the bundle scope means a broken **sibling** `.mthds` file fails the verdict too — same as the plxt-era `-L` behavior; the block reason names the offending file via its `source` attribution.
 
-Per-platform input handling inside the bundle: Claude reads one file from `tool_input.file_path`; **Codex** parses the `apply_patch` envelope in `tool_input.command` (`*** Update File: / Add File: / Move to:` headers — one patch can touch several `.mthds` files; each runs the full pipeline and the outcomes merge, any block wins); **Vibe** reads the AfterToolInvocation payload (`tool_status: "success"` gate, path from `tool_output.file`/`.path` or `tool_input.file_path`/`.path`, resolved against `cwd`). Output dialects: Claude/Codex `{"decision":"block",…}` + `hookSpecificOutput.additionalContext`; Vibe `{"decision":"deny",…}` + `{"decision":"allow","hook_specific_output":{"additional_context":…}}`.
+Per-platform input handling inside the bundle: Claude reads one file from `tool_input.file_path`; **Codex** parses the `apply_patch` envelope in `tool_input.command` (`*** Update File: / Add File: / Move to:` headers — one patch can touch several `.mthds` files; each runs the full pipeline and the outcomes merge, any block wins); **Vibe** reads the `post_tool` payload (`tool_status: "success"` gate, path from `tool_output.file`/`.path` or `tool_input.file_path`/`.path`, resolved against `cwd`). Output dialects: Claude/Codex `{"decision":"block",…}` + `hookSpecificOutput.additionalContext`; Vibe `{"decision":"deny",…}` + `{"decision":"allow","hook_specific_output":{"additional_context":…}}`.
 
 ### Failure posture (fail-open)
 
@@ -58,7 +58,7 @@ make check         # freshness + packaging gates
 |---|---|---|---|
 | Claude Code | `hooks/hooks.json` (bundled, auto-loaded; 15 s timeout) | `hooks/check-mthds.sh` → `hooks/check.mjs` | `PostToolUse` over `Write\|Edit`, gated to `*.mthds` |
 | Codex | `hooks/codex-hooks.json`, referenced from the manifest `hooks` field (15 s timeout) | `hooks/check-mthds-codex.sh` → `hooks/check.mjs --platform=codex` | `PostToolUse` over `apply_patch` |
-| Mistral Vibe | `hooks/vibe-hooks.toml` (15 s timeout) | `hooks/check-mthds-vibe.sh` → `hooks/check.mjs --platform=vibe` | `after_tool` over `edit\|write_file` |
+| Mistral Vibe | `hooks/vibe-hooks.toml` (15 s timeout) | `hooks/check-mthds-vibe.sh` → `hooks/check.mjs --platform=vibe` | `post_tool` over `edit\|write_file` |
 
 The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — Codex's hook engine substitutes `${PLUGIN_ROOT}` (and honors `${CLAUDE_PLUGIN_ROOT}` for compatibility) with the installed plugin root before spawning; Codex 0.144+ also provides `${PLUGIN_DATA}` / `${CLAUDE_PLUGIN_DATA}` (per-plugin data dir), unused here. A Codex session may run network-sandboxed; the validate stage then reads as unavailable (its in-bundle 10 s ceiling keeps a blocked call from hanging the hook) while lint/format still gate locally.
 
@@ -72,6 +72,16 @@ Verified against **Codex 0.142.5**, re-verified — including **in live sessions
 
 Dev-machine note: if the CLI-era `mthds@mthds-plugins` plugin is also installed, both hooks fire on the same `.mthds` edit and Codex concatenates the block reasons — expected coexistence, not a bug.
 
+## The Vibe hook — payload verification
+
+Verified against **Mistral Vibe 2.21.0** (the release that shipped stable hooks): the payload contract was checked in the installed package source (`vibe/core/hooks/models.py`, `agent_loop/_loop.py`, builtin `edit.py` / `write_file.py`), and payloads serialized by Vibe's own `PostToolInvocation.model_dump_json()` were run end-to-end through the shipped `check-mthds-vibe.sh` — deny on lint errors, format write-back in place, silent pass on `tool_status: "failure"` and on valid files, relative paths resolved against the payload `cwd`. Findings, all matching what the bundle expects:
+
+- `hook_event_name` serializes as `"post_tool"`; a successful call sends `tool_status: "success"` (`ToolStatus` is `"success" | "failure" | "cancelled"` — a cancelled tool sends `"cancelled"`, which the extractor's success gate correctly skips).
+- Tool names are the snake_cased class names, so file edits are exactly `edit` and `write_file` — the `re:^(edit|write_file)$` matcher is right.
+- `tool_output` is the tool result's `model_dump()`: `edit` yields `{file, message, old_string, new_string}` with `file` the **resolved absolute path**; `write_file` yields `{file_path, bytes_written, content}` — `file_path` is *not* in the extractor's `tool_output` fallback chain, so writes resolve through `tool_input.file_path` (present and identical for both tools). Both routes land on the same file.
+- Hook commands run via `create_subprocess_shell` inheriting **Vibe's process cwd** (the project dir) — a relative `command` in `hooks.toml` resolves against the project, *not* the `hooks.toml` location. Hence the README instructs wiring the **absolute** script path when copying the generated `vibe-hooks.toml` into `~/.vibe/hooks.toml`.
+- Response handling (`hooks/_post_tool.py`): a deny **replaces** `tool_output_text` with our `reason` (plus `additional_context` if present); an allow with `additional_context` **appends** it — matching the dialect the bundle emits.
+
 ## Checks
 
-`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`after_tool`, matching `edit|write_file`, calling `check-mthds-vibe.sh`) and an executable `hooks/check-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts (`check.mjs` is a shared asset, allowed everywhere). The renderer marks all three wrapper scripts executable, and the freshness check fails if the exec bit is lost. Static hook assets (`check.mjs`) are declared per platform in `gen_skill_docs.py` (`STATIC_HOOK_ASSETS_BY_PLATFORM`); a missing asset fails the build, and a stale vendored copy in a target fails the freshness check.
+`scripts/check.py` enforces the Vibe hook artifacts (`check_vibe_target_artifacts`): a Mistral Vibe target must emit `hooks/vibe-hooks.toml` (`post_tool`, matching `edit|write_file`, calling `check-mthds-vibe.sh`) and an executable `hooks/check-mthds-vibe.sh`, carry no Claude/Codex plugin manifest, and contain no Claude/Codex hook artifacts (`check.mjs` is a shared asset, allowed everywhere). The renderer marks all three wrapper scripts executable, and the freshness check fails if the exec bit is lost. Static hook assets (`check.mjs`) are declared per platform in `gen_skill_docs.py` (`STATIC_HOOK_ASSETS_BY_PLATFORM`); a missing asset fails the build, and a stale vendored copy in a target fails the freshness check.

@@ -319,7 +319,7 @@ class TestVibeTargetArtifacts:
 
     def _write_valid_hooks(self, hooks_dir: Path) -> None:
         (hooks_dir / "vibe-hooks.toml").write_text(
-            '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
+            '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
         )
         hook_script = hooks_dir / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
@@ -336,14 +336,14 @@ class TestVibeTargetArtifacts:
         errors = check_vibe_target_artifacts(tmp_path)
         assert any(".claude-plugin" in error for error in errors)
 
-    def test_requires_after_tool_hook(self, tmp_path: Path) -> None:
+    def test_requires_post_tool_hook(self, tmp_path: Path) -> None:
         hooks_dir = self._vibe_targets(tmp_path)
-        (hooks_dir / "vibe-hooks.toml").write_text('[[hooks]]\ntype = "before_tool"\n')
+        (hooks_dir / "vibe-hooks.toml").write_text('[[hooks]]\ntype = "pre_tool"\n')
         hook_script = hooks_dir / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
         hook_script.chmod(0o755)
         errors = check_vibe_target_artifacts(tmp_path)
-        assert any('type = "after_tool"' in error for error in errors)
+        assert any('type = "post_tool"' in error for error in errors)
 
     def test_missing_hook_config(self, tmp_path: Path) -> None:
         hooks_dir = self._vibe_targets(tmp_path)
@@ -356,7 +356,7 @@ class TestVibeTargetArtifacts:
     def test_non_executable_script(self, tmp_path: Path) -> None:
         hooks_dir = self._vibe_targets(tmp_path)
         (hooks_dir / "vibe-hooks.toml").write_text(
-            '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
+            '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
         )
         (hooks_dir / "check-mthds-vibe.sh").write_text("#!/usr/bin/env bash\n")
         errors = check_vibe_target_artifacts(tmp_path)

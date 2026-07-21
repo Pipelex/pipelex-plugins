@@ -339,11 +339,36 @@ tags           = ["urgent"]    # literal list
 ```
 
 Each construct field is one of:
-- `{ from = "input.path" }` — variable reference.
+- `{ from = "input.path" }` — variable reference: a whole input variable or a dotted path into it.
 - `{ template = "..." }` — Jinja2 template string with shorthands.
 - A literal value (string, number, boolean, list).
 
 **Output** in construct mode MUST be a single concept (no `[]` or `[N]`).
+
+**Copying whole inputs into native fields:** `from` is not limited to dotted paths — it can name a whole input variable. When that input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) and the target field is native-typed (`text`, `number`, `boolean`, `date`, or a `list` of them), the composer converts the value automatically — for required and optional fields alike:
+
+```toml
+[concept.ScreeningReport]
+description = "The final screening report"
+
+[concept.ScreeningReport.structure]
+match_score         = { type = "number", description = "The match score", required = true }
+rejection_email     = { type = "text", description = "The rejection email, if any" }
+interview_questions = { type = "list", item_type = "text", description = "Questions to ask, if any" }
+
+[pipe.assemble_report]
+type        = "PipeCompose"
+description = "Assemble the screening report from previously generated pieces"
+inputs      = { score = "Number", email = "Text", questions = "Text[]" }
+output      = "ScreeningReport"
+
+[pipe.assemble_report.construct]
+match_score         = { from = "score" }      # whole Number stuff → required number field
+rejection_email     = { from = "email" }      # whole Text stuff → optional text field
+interview_questions = { from = "questions" }  # whole Text[] stuff → optional list of text
+```
+
+When the target field expects a content object (a concept-typed field), the object is kept as-is — the conversion fires only when the field expects the native type.
 
 ### PipeExtract — extract pages from a Document or Image
 

@@ -29,7 +29,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
        +---> pipelex-codex/hooks/codex-hooks.json      (codex target, bundled hook config)
        +---> pipelex-codex/.codex-plugin/plugin.json   (generated: plugin-base.json + target overrides)
        +---> pipelex-vibe/skills/*/SKILL.md            (Mistral Vibe target, output — manifestless)
-       +---> pipelex-vibe/hooks/{vibe-hooks.toml,check-mthds-vibe.sh}  (Vibe after_tool hook)
+       +---> pipelex-vibe/hooks/{vibe-hooks.toml,check-mthds-vibe.sh}  (Vibe post_tool hook)
        +---> .agents/plugins/marketplace.json          (verbatim copy of packaging/codex-marketplace.json)
 ```
 
@@ -78,7 +78,7 @@ The target platform is selected with `[vars].platform`:
 
 - `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
-- `mistral-vibe`: renders skills and the Vibe `after_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
+- `mistral-vibe`: renders skills and the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
 
 ### Variable resolution
 
@@ -177,4 +177,4 @@ All targets share the same version string in lockstep — `make check` fails on 
 
 The files in `templates/skills/shared/` listed in `SHARED_TEMPLATES` (`gen_skill_docs.py`) — the MTHDS language references — are rendered per target and written to `skills/shared/`. `frontmatter.md.j2` is a deliberate exception: it is an **include-only partial** ({% include %}-d by skill templates for their YAML frontmatter), so it is not listed in `SHARED_TEMPLATES` and is never rendered standalone.
 
-Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `after_tool` over `edit|write_file`. See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
+Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.

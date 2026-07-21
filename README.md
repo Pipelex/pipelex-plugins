@@ -9,7 +9,7 @@ This is the plugin generation that pairs with the hosted Pipelex API and the (cl
 ## What's inside
 
 - **Skills** — Pipelex skills for working with MTHDS bundles: `pipelex-explain` (read and explain a bundle), `pipelex-design` (design a method top-down by stepwise refinement, validated at every layer through the Pipelex MCP server), `pipelex-organize` (regroup a designed bundle's one-file-per-signature layout into coherent module files — or a single file when the method is simple — proven equivalent through the MCP validation verdict; auto-invoked at the end of `pipelex-design`), `pipelex-edit` (contract-preserving edits to an existing bundle — prompts, model references, mechanical renames — proven with a before/after MCP validation verdict; structural or contract changes route to `/pipelex-design`, which re-enters existing methods), `pipelex-inputs` (prepare an `inputs.json` for a method — placeholder template, synthetic data, user files, or a mix — from the input template the MCP server projects; when the finished inputs are hosted-runnable, it closes by offering to start the run through the MCP run tools).
-- **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `after_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
+- **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `post_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
 - **MCP server declaration** — the Claude plugin declares the `pipelex-mcp` server (streamable HTTP; tools `mthds_validate` for bundle validation, `mthds_inputs_template` for input templates, and the `mthds_run` family for durable runs), which the MCP-backed skills require. It connects automatically at session start; override the baked URL with `PIPELEX_MCP_URL` (e.g. a local dev server). Unlike the fail-open hook, the MCP-backed skills stop with a setup instruction when the server isn't reachable. See [docs/decisions.md](docs/decisions.md).
 - **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
 
@@ -61,16 +61,15 @@ url = "http://localhost:3000/mcp"   # e.g. a local pipelex-mcp dev server
 Vibe loads skills via `skill_paths` and hooks via `hooks.toml`. In `~/.vibe/config.toml`:
 
 ```toml
-enable_experimental_hooks = true
 skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]
 ```
 
-Then wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml` (or a trusted project's `.vibe/hooks.toml`). If the hook file is not next to the generated target, set its command to the absolute script path:
+Then wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml` (or a trusted project's `.vibe/hooks.toml` — a project-level entry overrides a user-level entry with the same `name`). If the hook file is not next to the generated target, set its command to the absolute script path:
 
 ```toml
 [[hooks]]
 name = "check-mthds"
-type = "after_tool"
+type = "post_tool"
 match = "re:^(edit|write_file)$"
 command = "/absolute/path/to/pipelex-vibe/hooks/check-mthds-vibe.sh"
 timeout = 15.0
@@ -78,7 +77,7 @@ strict = false
 description = "Validate .mthds files after Vibe file edits."
 ```
 
-Requires Mistral Vibe 2.15.0+ for `after_tool` hooks.
+Requires Mistral Vibe 2.21.0+ (stable hooks API — `post_tool`, no opt-in flag).
 
 **MCP server (manual, for the MCP-backed skills):** Vibe has no plugin-bundled MCP mechanism here — register the `pipelex-mcp` server (streamable HTTP) through Vibe's own MCP configuration if/where supported. The MCP-backed skills stop with a setup instruction when the tools are absent.
 

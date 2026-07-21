@@ -44,7 +44,7 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
+    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
     "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
 }
 
