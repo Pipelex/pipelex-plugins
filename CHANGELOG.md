@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0] - 2026-07-21
+
+### Changed
+
+- **Breaking: the plugin-declared MCP server is now the local workshop launcher.** On Claude Code and Codex the `pipelex` MCP entry spawns `npx -y @pipelex/mcp@latest` over stdio instead of pointing at a baked hosted URL; the baked URL is gone (the `mcp_server_url` build variable is replaced by the `[vars.mcp_server]` command block). The spawned workshop authenticates with `PIPELEX_API_KEY` from the session environment — the same variable the validation hook documents — and on Codex the manifest forwards `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` into the spawn by name (`env_vars`), since Codex whitelist-filters MCP spawn env. The hosted console remains available as a documented connector path in the host's own UI, never as a plugin declaration. The MCP-backed skills now state the workshop auth reality (the "no API key is needed on your side" line is retired) and their absent-tools guidance reflects the spawn model.
+
+- **Breaking (Mistral Vibe): migrated the Vibe hook to the stable hooks API.** The hook type is renamed `after_tool` → `post_tool` (Vibe 2.21.0+ stable hooks; the `enable_experimental_hooks` opt-in flag no longer exists). Vibe users must update their `hooks.toml` copy to the new `type` and drop the obsolete flag from `~/.vibe/config.toml`.
+
+- **`pipelex-design` writing-mthds reference: whole-stuff copies in PipeCompose construct.** The construct section now documents that `{ from = "..." }` accepts a whole input variable, not just a dotted path — a whole native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) converts automatically into a native-typed target field, required or optional — with a worked example. Matches the conversion fixes shipped in pipelex v0.39.2.
+
 ## [0.1.0] - 2026-07-17
 
 Initial release — Pipelex plugins (skills + hooks for working with `.mthds` bundles) for Claude Code, Codex, and Mistral Vibe, packaged through the `pipelex-plugins` marketplace. This is the hosted-API / MCP-era generation: no local-CLI dependency and none of the install/upgrade/env-check machinery of its `mthds-plugins` predecessor.

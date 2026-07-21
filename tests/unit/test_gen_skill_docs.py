@@ -44,7 +44,7 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "after_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
+    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
     "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
 }
 
@@ -139,7 +139,8 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
     (targets_dir / "defaults.toml").write_text(
-        '[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\nmcp_server_url = "https://mcp.test/mcp"\n'
+        '[vars]\nmarketplace_name = "pipelex-plugins"\nplatform = "claude"\n\n'
+        '[vars.mcp_server]\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\nenv_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]\n'
     )
     (targets_dir / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex/"\n')
     (targets_dir / "codex.toml").write_text(
@@ -476,25 +477,38 @@ class TestPluginManifests:
         assert "interface" not in plugin_json
 
     def test_claude_plugin_json_declares_mcp_server(self, tmp_path: Path) -> None:
-        """The Claude manifest carries the pipelex MCP server with a literal URL —
-        the Claude desktop app does no env expansion in plugin MCP config, so a
-        ${VAR:-default} wrapper would reach it verbatim and break the connection."""
+        """The Claude manifest declares the local workshop launcher as a stdio
+        command; no env_vars key — Claude Code passes the full shell env to the
+        spawned server (verified in live plugin-dir sessions)."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         plugin_json = make_plugin_json(tree, config)
-        assert plugin_json["mcpServers"] == {"pipelex": {"type": "http", "url": "https://mcp.test/mcp"}}
+        assert plugin_json["mcpServers"] == {
+            "pipelex": {
+                "type": "stdio",
+                "command": "npx",
+                "args": ["-y", "@pipelex/mcp@latest"],
+            }
+        }
 
-    def test_codex_plugin_json_declares_mcp_server_literal_url(self, tmp_path: Path) -> None:
-        """The Codex manifest carries the pipelex MCP server with a literal URL —
-        Codex does no env expansion in MCP config; the bare url selects the
-        streamable-HTTP transport structurally (verified against Codex 0.144.4)."""
+    def test_codex_plugin_json_declares_mcp_server_command(self, tmp_path: Path) -> None:
+        """The Codex manifest declares the launcher as a bare command (stdio is
+        picked structurally, no `type` key) and forwards the named env vars —
+        Codex spawns MCP servers with a whitelist env, so PIPELEX_API_KEY only
+        reaches the workshop through `env_vars` (verified against Codex 0.144.5)."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "codex")
         plugin_json = make_plugin_json(tree, config)
-        assert plugin_json["mcpServers"] == {"pipelex": {"url": "https://mcp.test/mcp"}}
+        assert plugin_json["mcpServers"] == {
+            "pipelex": {
+                "command": "npx",
+                "args": ["-y", "@pipelex/mcp@latest"],
+                "env_vars": ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"],
+            }
+        }
 
-    def test_claude_plugin_json_without_mcp_server_url_skips_entry(self, template_tree: Path) -> None:
-        """A tree that defines no mcp_server_url gets no mcpServers key."""
+    def test_claude_plugin_json_without_mcp_server_skips_entry(self, template_tree: Path) -> None:
+        """A tree that defines no mcp_server block gets no mcpServers key."""
         config = load_target_config(template_tree / "targets", "prod")
         plugin_json = make_plugin_json(template_tree, config)
         assert "mcpServers" not in plugin_json
@@ -546,6 +560,38 @@ class TestSkillFailureDiscipline:
     def test_edit_offers_restore_on_no_verdict(self) -> None:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
+
+    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs")
+
+    @pytest.mark.parametrize(
+        "target_name, manifest_spawns",
+        [
+            ("prod", True),
+            ("codex", True),
+            ("mistral-vibe", False),
+        ],
+    )
+    def test_absent_tools_stop_message_matches_platform(self, target_name: str, manifest_spawns: bool) -> None:
+        """The MCP-absent STOP guidance must quote the real launcher command and,
+        on Vibe (no plugin manifest, no auto-spawn), point at manual registration
+        instead of a manifest spawn. Renders the real templates with real target vars."""
+        repo_root = Path(__file__).parents[2]
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(
+            repo_root / "templates",
+            repo_root,
+            config.template_vars,
+            include_skills=list(self.MCP_SKILLS),
+            target_name=config.name,
+        )
+        for skill in self.MCP_SKILLS:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
+            if manifest_spawns:
+                assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
+            else:
+                assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
+                assert "register" in body, f"{target_name}/{skill}: Vibe STOP message must point at manual registration"
 
 
 class TestHookRendering:

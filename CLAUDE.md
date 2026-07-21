@@ -41,10 +41,10 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 └── hooks/
     ├── hooks.json.j2                # Claude PostToolUse hook config
     ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
-    ├── vibe-hooks.toml.j2           # Mistral Vibe after_tool hook config
+    ├── vibe-hooks.toml.j2           # Mistral Vibe post_tool hook config
     ├── check-mthds.sh.j2            # Claude wrapper (fail-open guard → check.mjs)
     ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
-    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (AfterToolInvocation → check.mjs)
+    ├── check-mthds-vibe.sh.j2       # Vibe wrapper (post_tool payload → check.mjs)
     └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
@@ -88,8 +88,9 @@ Variables are defined in `targets/defaults.toml`, overridable per-target in `tar
 - `marketplace_name` — `pipelex-plugins`
 - `platform` — Claude / Codex / Vibe
 - `harness_name` — display name of the harness
+- `mcp_server` — a table (`[vars.mcp_server]`: `command`, `args`, `env_vars`) describing the local workshop launcher the manifests bake; `env_vars` lists the variable *names* Codex forwards into the spawn (Claude passes the full shell env on its own)
 
-Deliberately **not** carried over from `mthds-plugins`: `min_mthds_version`, `env_check`, `can_run_methods`, `session_start_hook`, and all `*_install_cmd` / `*_upgrade_cmd` variables. Reintroduce a variable only when a skill or hook actually branches on it (e.g. an `mcp_server_url`-style variable arrives with MCP registration). Don't port dead switches.
+Deliberately **not** carried over from `mthds-plugins`: `min_mthds_version`, `env_check`, `can_run_methods`, `session_start_hook`, and all `*_install_cmd` / `*_upgrade_cmd` variables. Reintroduce a variable only when a skill or hook actually branches on it. Don't port dead switches.
 
 ### Version management
 
@@ -114,7 +115,7 @@ Session-only alternative that leaves global config untouched: `claude --plugin-d
 
 ## PostToolUse Hook — CLI-free wasm+API pipeline
 
-Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `after_tool`. Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
+Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `post_tool` (stable hooks API, Vibe 2.21.0+). Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
 
 ### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 
@@ -130,4 +131,4 @@ So there is nothing to enable — the bundled hook loads on its own (hooks are S
 
 ## Key dependency
 
-The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`, plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked MCP URL currently points at the `pipelex-mcp` Alpic dev tunnel (interim until the stable deploy). It is a literal URL on both platforms — the Claude desktop app does no env expansion in plugin MCP config, so there is no `${PIPELEX_MCP_URL:-…}` wrapper anymore. Dev override: edit `mcp_server_url` in `targets/defaults.toml` + `make build` on Claude; a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex.
+The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`, plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked declaration is the **local workshop launcher** — `npx -y @pipelex/mcp@latest` over stdio, from the `[vars.mcp_server]` block in `targets/defaults.toml` — never a hosted URL: the hosted console is a connector users add in their host's own UI (see the README's "One install, one server" section and `docs/decisions.md`). The spawned server authenticates with `PIPELEX_API_KEY` from the session env (the hook's variable); on Codex the manifest forwards `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` by name via `env_vars` because Codex whitelist-filters MCP spawn env. Dev override: point `command`/`args` at a local checkout in `targets/defaults.toml` + `make build` on Claude; a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex.

@@ -15,10 +15,10 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 
 This skill proves every edit with the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — never declare an edit done on the hook's silence alone: the hook's semantic-validation stage is fail-open (it is skipped without an API key), so the MCP verdict is the authoritative check.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — check the plugin's MCP connection; the plugin manifest must point at a running `pipelex-mcp` server."*
-- **If a call returns `status: "error"` with an error of class `config`** (server unreachable, upstream API misconfigured, auth), STOP the same way and surface the error's `hint`.
+- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."*
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim.
 - **`mthds_inputs_template`** is needed only for the inputs-refresh check (Step 6) — when the edit cannot have touched the input template, it goes unused.
-- No API key is needed on your side — the MCP server authenticates to the API itself.
+- The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
 

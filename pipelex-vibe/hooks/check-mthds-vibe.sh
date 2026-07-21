@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Mistral Vibe after_tool hook: lint, format, and validate .mthds files after
+# Mistral Vibe post_tool hook: lint, format, and validate .mthds files after
 # edit/write_file tool use.
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
 # pipelex-sdk-js — see docs/hooks.md), invoked with --platform=vibe so it
-# reads the AfterToolInvocation payload (tool_status gate, cwd-resolved path)
+# reads the post_tool payload (tool_status gate, cwd-resolved path)
 # and speaks Vibe's deny / hook_specific_output.additional_context dialect:
 #   1. local lint   (@pipelex/tools-wasm — offline, no credentials) → deny on errors
 #   2. local format (same engine) → write back in place when changed
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-# --- Read stdin (AfterToolInvocation JSON) once; re-fed to check.mjs below ---
+# --- Read stdin (post_tool JSON payload) once; re-fed to check.mjs below ---
 INPUT=$(cat)
 
 # Cheap pre-filter: ignore tool calls unrelated to .mthds files before

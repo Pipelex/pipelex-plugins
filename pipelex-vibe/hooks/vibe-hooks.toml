@@ -1,6 +1,6 @@
 [[hooks]]
 name = "check-mthds"
-type = "after_tool"
+type = "post_tool"
 match = "re:^(edit|write_file)$"
 command = "./hooks/check-mthds-vibe.sh"
 timeout = 15.0
