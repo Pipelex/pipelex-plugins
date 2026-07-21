@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex-inputs` targets registered catalog methods by id.** The MCP tools (`mthds_validate`, `mthds_inputs_template`, `mthds_run`) now accept a registered method's catalog id (`mt_…`) as `method_id` in place of submitted files, and the skill uses it: prepare inputs for — and offer to run — a catalog method with no local bundle. A by-id call operates on the method's current stored content and requires an API key (the catalog is org-scoped). The file-based skills stay submitted-files only, per the new decision entry in `docs/decisions.md`.
+
 ## [0.3.1] - 2026-07-21
 
 ### Changed
