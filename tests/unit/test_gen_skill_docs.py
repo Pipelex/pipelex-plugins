@@ -561,6 +561,38 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
+    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs")
+
+    @pytest.mark.parametrize(
+        "target_name, manifest_spawns",
+        [
+            ("prod", True),
+            ("codex", True),
+            ("mistral-vibe", False),
+        ],
+    )
+    def test_absent_tools_stop_message_matches_platform(self, target_name: str, manifest_spawns: bool) -> None:
+        """The MCP-absent STOP guidance must quote the real launcher command and,
+        on Vibe (no plugin manifest, no auto-spawn), point at manual registration
+        instead of a manifest spawn. Renders the real templates with real target vars."""
+        repo_root = Path(__file__).parents[2]
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(
+            repo_root / "templates",
+            repo_root,
+            config.template_vars,
+            include_skills=list(self.MCP_SKILLS),
+            target_name=config.name,
+        )
+        for skill in self.MCP_SKILLS:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
+            if manifest_spawns:
+                assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
+            else:
+                assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
+                assert "register" in body, f"{target_name}/{skill}: Vibe STOP message must point at manual registration"
+
 
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:

@@ -98,7 +98,7 @@ Requires Mistral Vibe 2.21.0+ (stable hooks API — `post_tool`, no opt-in flag)
 | claude.ai (web + mobile) | Hosted console | Connector (custom URL) |
 | ChatGPT (web) | Hosted console | Apps directory |
 
-To reach the hosted console as a connector today, append your key to the connector URL: `https://pipelex-mcp-a3c6a115.alpic.live/mcp?api_key=plx_sk_...` — the console holds no server-side key (bring-your-own-key). When console OAuth ships, this passage becomes "add the connector and sign in when prompted"; nothing else in this plugin changes.
+To reach the hosted console as a connector today, append your key to the connector URL: `https://pipelex-mcp-a3c6a115.alpic.live/mcp?api_key=plx_sk_...` — the console holds no server-side key (bring-your-own-key). **Treat that URL as a secret**: a key in a query string can end up in browser history, copied links, and proxy logs — on hosts that let you set request headers, send `Authorization: Bearer plx_sk_...` instead (the console accepts both; the `?api_key=` form is the fallback for connector UIs that only take a bare URL), and rotate the key if a URL leaks. When console OAuth ships, this passage becomes "add the connector and sign in when prompted", no key touches a URL, and nothing else in this plugin changes.
 
 **Claude Desktop caveat:** installing this plugin from the Desktop app is not the supported path for the MCP-backed skills — GUI apps don't inherit your shell environment (no `PIPELEX_API_KEY`) and may have no `node`/`npx` on PATH, so the spawned workshop can't produce verdicts there. Use the hosted-console connector on Desktop instead.
 

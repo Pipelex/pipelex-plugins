@@ -15,7 +15,7 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 
 This skill proves every edit with the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — never declare an edit done on the hook's silence alone: the hook's semantic-validation stage is fail-open (it is skipped without an API key), so the MCP verdict is the authoritative check.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx @pipelex/mcp`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."*
+- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."*
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim.
 - **`mthds_inputs_template`** is needed only for the inputs-refresh check (Step 6) — when the edit cannot have touched the input template, it goes unused.
 - The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
