@@ -79,7 +79,7 @@ Same whole-bundle `mthds_validate` call as Step 2. The bar is the **baseline ver
 
 ### Step 6: Inputs refresh check
 
-When the edit could have changed the input template — a renamed main-pipe input variable, a renamed boundary concept — re-project it: call `mthds_inputs_template` with the whole-bundle `files` submission (defaults only). If an `inputs.json` exists next to the bundle, compare its keys with the fresh template: pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. No `inputs.json`, or an edit that cannot touch the template → skip this step.
+When the edit could have changed the input template — a renamed main-pipe input variable, a renamed boundary concept — re-project it: call `mthds_inputs_template` with the whole-bundle `files` submission plus `explicit: false`, so the fresh template arrives in the same light shape `/pipelex-inputs` writes into `inputs.json` (the tool's own default is the ceremonial `{concept, content}` envelope). If an `inputs.json` exists next to the bundle, compare its keys with the fresh template: pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. No `inputs.json`, or an edit that cannot touch the template → skip this step.
 
 ### Step 7: Report
 

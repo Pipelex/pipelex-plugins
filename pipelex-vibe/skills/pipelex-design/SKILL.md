@@ -148,7 +148,7 @@ Once the runnable verdict holds:
 
 1. **Organize the bundle** — invoke `/pipelex-organize` on the bundle directory (automatic, no approval). It regroups the one-file-per-signature construction layout into a clear, browsable one — related pipes gathered into coherent module files (or a single `main.mthds` when the method is simple), satisfied signature headers dropped, declarations ordered for top-down reading — and proves via `mthds_validate` that the runnable verdict is preserved before swapping the layout.
 
-2. **Input schema** — Call `mthds_inputs_template` with the organized `files` submission (no other arguments — the defaults resolve the method's `main_pipe` and return the light template). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
+2. **Input schema** — Call `mthds_inputs_template` with the organized `files` submission plus `explicit: false`, for the compact light template (the tool's own default is the ceremonial `{concept, content}` envelope, which is noise for a read-only look; the remaining defaults resolve the method's `main_pipe`). Show the user the returned template so they can see what the method expects. **Do NOT save it to `inputs.json`** — input preparation is handled exclusively by `/pipelex-inputs`.
 
 3. **Method graph** — Where the host renders MCP views, an interactive method graph accompanied the valid verdicts; point the user to it. In terminal hosts, offer a text flow diagram of the final structure instead.
 
