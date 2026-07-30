@@ -10,13 +10,19 @@ Prepare input data for running MTHDS method bundles. This skill is the single en
 
 The target method comes in two forms, and every MCP call in this skill takes whichever one applies: a **local bundle** (a directory of `.mthds` files, submitted as `files`) or a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id` — no local files needed).
 
-## Requirements — the Pipelex MCP tool
+**Submitting a local bundle.** Each `files` item is either a path or inline contents, and for workspace files the path form is preferred:
+
+- `{path: <absolute path to the .mthds file>}` — **prefer this.** It keeps the real path as provenance in diagnostics, and it spares you copying entire bundles into the request. The workshop resolves a path against **its own** working directory — wherever the harness launched it, which is not necessarily your bundle — so pass an absolute path rather than trusting a relative one to line up. (Same rule as the file *inputs* further down; anything you hand the server as a path follows it.)
+- `{content: <file content>, uri: <path relative to the bundle dir>}` — the inline fallback. Use it when the server can't read the path, and note it is the **only** form the hosted console accepts, since that deployment has no filesystem.
+
+## Requirements — the Pipelex MCP tools
 
 This skill extracts the method's input template through the **`mthds_inputs_template`** tool, served by the plugin's `pipelex` MCP server. It is required — never hand-derive the template from the `.mthds` source.
 
 - **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."*
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently improvise a template.
 - The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+- **`mthds_prepare_inputs`** is also **required**, whenever the assembled inputs carry a file-ish value (Image, Document) that is not already an `http(s)` URL or a `pipelex-storage://` reference — a local path, a `data:` URL, or inline bytes. It uploads those assets to Pipelex storage and rewrites the values, which is what makes them runnable: see [Prepare the inputs for a run](#prepare-the-inputs-for-a-run). Same discipline as above — an absent tool or a `config`-class error stops the skill; never hand-fake a storage reference. When every file-ish value is already pass-through, the step has nothing to do and may be skipped.
 - The **run tools** (`mthds_run`, `mthds_run_status`, `mthds_run_results`) are optional — they only power the closing [offer to run](#offer-to-run). When they are absent from the session, finish without the offer; never stop for them.
 
 ## Mode Selection
@@ -93,7 +99,7 @@ The `/inputs` subdirectory is only created when there are actual data files to s
 
 ### Step 2: Get the Input Template
 
-Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content — never supply both, files would win and `method_id` would be ignored). Pass no other arguments — the defaults resolve the method's declared `main_pipe` and return the canonical **light** template. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
+Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, submitted as `files`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content — never supply both, files would win and `method_id` would be ignored). Pass **`explicit: false`** — the tool's own default is the ceremonial `{concept, content}` envelope, and this skill works in the **light** shape (bare example values) end to end. The remaining defaults resolve the method's declared `main_pipe`. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
 
 Branch on the structured verdict, never on transport:
 
@@ -101,7 +107,7 @@ Branch on the structured verdict, never on transport:
 - `status: "ok"`, `is_valid: false` → the method itself doesn't validate: report `validation_errors[]` (and the summary) to the user. For a local bundle, repair it first (e.g. via `/pipelex-design` resumption), then retry; for a registered method, the stored content is broken — it must be fixed where the method is edited (e.g. the webapp editor), not here.
 - `status: "error"` → no verdict: class `config` → stop per the Requirements above; class `input_domain` → the call is malformed (an unknown `pipe_ref`, or `main_pipe` unresolvable — pass an explicit `pipe_ref`; for a by-id call, an error located at `method_id` means the id is unknown to the key's organization — the catalog is org-scoped, so another org's method reads exactly like a miss — or the stored method has no MTHDS source yet); class `runtime` → report and retry once.
 
-**Example template** (light shape — the tool's default):
+**Example template** (the light shape `explicit: false` returns):
 
 ```json
 {
@@ -120,6 +126,8 @@ Based on the heuristics above and what the user has provided, follow the appropr
 - [Synthetic Strategy](#synthetic-strategy) — AI-generated realistic test data
 - [User Data Strategy](#user-data-strategy) — integrate user-provided files
 - [Mixed Strategy](#mixed-strategy) — user files + synthetic for the rest
+
+Every strategy that produces **real** values (Synthetic, User Data, Mixed) continues into [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) once `inputs.json` is assembled. The Template strategy is the exception — placeholders are not assets, so there is nothing to prepare.
 
 ---
 
@@ -181,6 +189,8 @@ When inputs require actual files (Image, Document), generate them — see [Docum
 ### Assemble and Save
 
 Fill the Step 2 template in place and save it to `<output_dir>/inputs.json`. Any generated data files go in `<output_dir>/inputs/`.
+
+Then continue with [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) — generated files are local paths, which a run cannot reach until they are uploaded.
 
 ---
 
@@ -252,12 +262,16 @@ For each matched file, set the input's light value:
 
 Fill all matched values into the Step 2 template and save it as `<output_dir>/inputs.json`.
 
-### Step G: Report
+### Step G: Prepare
+
+Continue with [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) — the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded.
+
+### Step H: Report
 
 Show the user:
 - Which files were matched to which inputs
 - Any unfilled inputs (offer synthetic or placeholder)
-- The final `inputs.json` content
+- The final `inputs.json` content (after preparation) and which files were uploaded
 - Path to the saved file
 
 ---
@@ -269,7 +283,8 @@ Combines user data with synthetic generation for any remaining gaps.
 1. Follow [User Data Strategy](#user-data-strategy) Steps A-F to match user files
 2. For each unfilled input, apply [Synthetic Strategy](#synthetic-strategy)
 3. Assemble the complete `inputs.json` combining both sources
-4. Report which inputs came from user data and which were synthesized
+4. Continue with [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) — one call covers both sources' files
+5. Report which inputs came from user data, which were synthesized, and which were uploaded
 
 ---
 
@@ -369,11 +384,44 @@ PYEOF
 
 ---
 
+## Prepare the inputs for a run
+
+A local file is not runnable as it stands: a run executes on the hosted Pipelex API, which cannot read your disk. The **`mthds_prepare_inputs`** tool closes that gap — it uploads every file-bearing value to Pipelex storage and rewrites it to a `pipelex-storage://` reference the run accepts. It is the step between assembly and execution: template → fill → **prepare** → run.
+
+Run it once `inputs.json` holds real values (Synthetic, User Data, Mixed). **Skip it** for the Template strategy — placeholders are not assets — and when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference, since there is then nothing to upload.
+
+1. **Call `mthds_prepare_inputs`** with:
+   - the **same target as Step 2** — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method;
+   - the same **`pipe_ref`**, if Step 2 passed one. The pipe's declared signature is what identifies which values are assets, so letting it fall back to `main_pipe` would inspect the wrong contract;
+   - `inputs` — the parsed content of the `inputs.json` you just saved, with one adjustment: **resolve every local file path to an absolute path first**. `inputs.json` stores paths relative to itself, but the MCP server resolves a local path against **its own working directory** — wherever the host launched it, which is not your bundle. Sent as-is, a relative `inputs/cv.pdf` fails with `Local file cannot be read: "inputs/cv.pdf" (ENOENT)`. Send `<output_dir>/inputs/cv.pdf` expanded to an absolute path instead. `http(s)` URLs and `pipelex-storage://` references need no adjustment, and `inputs.json` itself keeps its relative paths — only what you send changes. There is no `explicit` flag here; the light shape is accepted as-is.
+2. **Branch on the structured verdict.** Unlike `mthds_inputs_template`, this tool has **no produced-invalid arm** — it never returns a `validation_errors[]` list:
+   - `status: "ok"` → the run-ready inputs are in `inputs`, and `uploads[]` carries the `pipelex-storage://` uris created by this call (`[]` when everything passed through).
+   - `status: "error"`, class `input_domain` → **read the error's `location`** before reacting, because the two causes need opposite repairs:
+     - `location: "inputs"` → an asset is the problem: a local path that couldn't be read, or one storage refused as too large. The error's `message` names the offending file and its `hint` says what to do — surface both and fix *that value*. The method is not at fault, so don't revalidate it: `mthds_validate` and `mthds_inputs_template` only inspect the method definition and will keep answering "valid" while the same asset keeps failing. The usual cause is a path that didn't get resolved to absolute per step 1 — check that first.
+     - `location: "pipe_ref"` / `"method_id"` → the closure didn't resolve (invalid bundle, unknown `pipe_ref`, unresolvable `main_pipe`, or a method id with no stored source). This is the arm whose diagnostics the tool delegates: get the structured errors from `mthds_validate` / `mthds_inputs_template`, repair, then retry.
+   - `status: "error"`, class `config` → stop per the Requirements above and surface the `hint` verbatim.
+   - `status: "error"`, class `runtime` → report and retry once.
+3. **Rewrite `<output_dir>/inputs.json` with the returned `inputs`.** Leave the copies in `<output_dir>/inputs/` on disk — they are the user's own reference, and the uploaded bytes no longer depend on them. Only the values in `inputs.json` change, and file-ish values change **shape** as well as content: a bare path or URL string becomes the canonical content dict `{"url": "…"}`. That is the run-ready form; don't "simplify" it back to a bare string.
+
+   ```json
+   {
+     "invoice": {"url": "pipelex-storage://user/assets/1.pdf"},
+     "instructions": "Extract all line items, totals, and vendor information."
+   }
+   ```
+
+   Text, scalar, and structured values are untouched.
+4. **Report it in one line**, e.g. *"2 files uploaded to Pipelex storage; `inputs.json` now references them."*
+
+A prepared `inputs.json` stays runnable on later runs — `pipelex-storage://` references pass through both prepare and run unchanged.
+
+---
+
 ## Finish
 
 After assembling the inputs, confirm readiness:
 
-> Inputs are ready. `inputs.json` has been saved with real values — no placeholders remain.
+> Inputs are ready. `inputs.json` has been saved with real values — no placeholders remain, and every file value is run-ready.
 
 (Or, for the Template strategy: point out which placeholders the user still needs to fill.)
 
@@ -385,12 +433,12 @@ Offer only when all of these hold:
 
 - The `mthds_run` tool is present in the session (it is optional — when absent, just finish).
 - No placeholders remain (a Template-strategy result has nothing to run yet).
-- The inputs are **hosted-runnable**: every file-ish value (Image, Document) is a reachable `https` URL. The hosted API cannot read local disk, so a path — relative like `inputs/invoice.pdf` or absolute — does not reach it. When local paths are present, don't offer; instead state that the method can be run once those files are hosted at reachable URLs (text, scalar, and structured values are sent inline and are always fine).
+- The inputs are **run-ready**: [prepare](#prepare-the-inputs-for-a-run) succeeded on the final `inputs.json`, or was legitimately skipped because every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference. Local paths, `data:` URLs, and inline bytes are perfectly fine going *into* prepare — they just must not survive into the run. If prepare failed, don't offer: report the failure and what it would take to fix (text, scalar, and structured values are sent inline and are never the problem).
 
 On acceptance:
 
-1. For a **by-id** target: a run executes the method's **current stored content** (methods are not versioned — it does not pin what Step 2 projected), so re-call `mthds_inputs_template` with the same `method_id` — and the same `pipe_ref`, if Step 2 passed one, so the drift check compares against the pipe actually targeted rather than falling back to `main_pipe` — to catch drift since Step 2. If the returned keys no longer match `inputs.json`, the method changed underneath you — stop, report the drift, and send the user back to `/pipelex-inputs` to re-prepare before spending credit on a run that won't match. Same keys → proceed.
-2. Call `mthds_run` with the same target as Step 2 — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method — and `inputs` set to the parsed content of `inputs.json` — the light shape is exactly what the tool takes. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
+1. For a **by-id** target: a run executes the method's **current stored content** (methods are not versioned — it does not pin what Step 2 projected), so re-call `mthds_inputs_template` with the same `method_id`, the same `explicit: false`, and the same `pipe_ref`, if Step 2 passed one, so the drift check compares against the pipe actually targeted rather than falling back to `main_pipe` — to catch drift since Step 2. If the returned keys no longer match `inputs.json`, the method changed underneath you — stop, report the drift, and send the user back to `/pipelex-inputs` to re-prepare before spending credit on a run that won't match. Same keys → proceed.
+2. Call `mthds_run` with the same target as Step 2 — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method — and `inputs` set to the parsed content of the **prepared** `inputs.json`, verbatim. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
 3. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
 4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
 
@@ -398,7 +446,7 @@ On acceptance:
 
 ## Value shapes (light format)
 
-`inputs.json` uses the **light** shape — the same shape the `mthds_inputs_template` template arrives in. Scalars are bare values; structured concepts are their content dict, with **no** `{concept, content}` envelope:
+`inputs.json` is **filled** in the **light** shape — the same shape the Step 2 template arrives in when called with `explicit: false`. Scalars are bare values; structured concepts are their content dict, with **no** `{concept, content}` envelope:
 
 | Declared concept | Value in `inputs.json` |
 |------------------|------------------------|
@@ -412,6 +460,8 @@ On acceptance:
 | Any `Type[]` / `Type[N]` | a JSON list of the above |
 
 For composite natives (`Page`, `TextAndImages`, `JSON`) and any structured concept, keep exactly the field structure the template gives you and fill the values in place. See [Native Content Types](../shared/native-content-types.md) for what each native content's attributes mean.
+
+That is the shape you *write*. After [prepare](#prepare-the-inputs-for-a-run) the file-ish values come back as canonical content dicts — `{"url": "pipelex-storage://…"}` instead of a bare path or URL string — and that rewritten form is what `inputs.json` holds from then on. Everything else keeps the shape above.
 
 ---
 
@@ -445,6 +495,7 @@ Save it (with a placeholder or real theme) directly to `pipelex-wip/pipeline_01/
   "analysis_prompt": "Analyze this street scene. Count visible people and describe the atmosphere."
 }
 ```
+5. Prepare: `image` is a local path, so [prepare](#prepare-the-inputs-for-a-run) uploads it and rewrites `inputs.json` before the run is offered
 
 ### Example 3: User-provided invoice PDF
 
@@ -464,6 +515,14 @@ User says: "Use my file `~/documents/invoice_march.pdf`"
   "instructions": "Extract all line items, totals, and vendor information from this invoice."
 }
 ```
+7. Prepare: `invoice` is a local path, so call `mthds_prepare_inputs` with the same bundle `files` and these `inputs`. It uploads the PDF and returns the run-ready set, which is written back over `inputs.json`:
+```json
+{
+  "invoice": {"url": "pipelex-storage://user/assets/1.pdf"},
+  "instructions": "Extract all line items, totals, and vendor information from this invoice."
+}
+```
+   `uploads` lists that one new uri; `inputs/invoice.pdf` stays on disk untouched. The method is now runnable — offer it.
 
 ### Example 4: Folder of images for batch processing
 
@@ -480,6 +539,7 @@ User says: "Use the photos in `./product-photos/`"
   "images": ["inputs/shoe.jpg", "inputs/hat.png", "inputs/bag.jpg"]
 }
 ```
+5. Prepare: all three are local paths — one [prepare](#prepare-the-inputs-for-a-run) call uploads the whole list and rewrites it to `[{"url": "pipelex-storage://…"}, …]`
 
 ---
 

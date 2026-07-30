@@ -48,7 +48,7 @@ Locate the bundle directory and read **every** `.mthds` file in it (the root —
 
 ### Step 2: Baseline verdict
 
-Validate the whole bundle **before editing**: call `mthds_validate` with `files: [{content: <file content>, uri: <path relative to the bundle dir>}]` for every file, and branch on the structured verdict, never on transport.
+Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change. Surface the `validation_errors[]` and the Markdown summary, and offer to repair first — never edit on a broken baseline, or your regressions and the pre-existing errors become indistinguishable.
@@ -74,7 +74,7 @@ Same whole-bundle `mthds_validate` call as Step 2. The bar is the **baseline ver
 
 ### Step 6: Inputs refresh check
 
-When the edit could have changed the input template — a renamed main-pipe input variable, a renamed boundary concept — re-project it: call `mthds_inputs_template` with the whole-bundle `files` submission (defaults only). If an `inputs.json` exists next to the bundle, compare its keys with the fresh template: pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. No `inputs.json`, or an edit that cannot touch the template → skip this step.
+When the edit could have changed the input template — a renamed main-pipe input variable, a renamed boundary concept — re-project it: call `mthds_inputs_template` with the whole-bundle `files` submission plus `explicit: false`, so the fresh template arrives in the same light shape `/pipelex-inputs` writes into `inputs.json` (the tool's own default is the ceremonial `{concept, content}` envelope). If an `inputs.json` exists next to the bundle, compare its keys with the fresh template: pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. No `inputs.json`, or an edit that cannot touch the template → skip this step.
 
 ### Step 7: Report
 
