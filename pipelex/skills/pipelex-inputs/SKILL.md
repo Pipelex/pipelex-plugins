@@ -22,6 +22,11 @@ Prepare input data for running MTHDS method bundles. This skill is the single en
 
 The target method comes in two forms, and every MCP call in this skill takes whichever one applies: a **local bundle** (a directory of `.mthds` files, submitted as `files`) or a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id` — no local files needed).
 
+**Submitting a local bundle.** Each `files` item is either a path or inline contents, and for workspace files the path form is preferred:
+
+- `{path: <absolute path to the .mthds file>}` — **prefer this.** It keeps the real path as provenance in diagnostics, and it spares you copying entire bundles into the request. The workshop resolves a path against **its own** working directory — wherever the harness launched it, which is not necessarily your bundle — so pass an absolute path rather than trusting a relative one to line up. (Same rule as the file *inputs* further down; anything you hand the server as a path follows it.)
+- `{content: <file content>, uri: <path relative to the bundle dir>}` — the inline fallback. Use it when the server can't read the path, and note it is the **only** form the hosted console accepts, since that deployment has no filesystem.
+
 ## Requirements — the Pipelex MCP tools
 
 This skill extracts the method's input template through the **`mthds_inputs_template`** tool, served by the plugin's `pipelex` MCP server. It is required — never hand-derive the template from the `.mthds` source.
@@ -106,7 +111,7 @@ The `/inputs` subdirectory is only created when there are actual data files to s
 
 ### Step 2: Get the Input Template
 
-Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, as `files: [{content: <file content>, uri: <path relative to the bundle dir>}]`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content — never supply both, files would win and `method_id` would be ignored). Pass **`explicit: false`** — the tool's own default is the ceremonial `{concept, content}` envelope, and this skill works in the **light** shape (bare example values) end to end. The remaining defaults resolve the method's declared `main_pipe`. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
+Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, submitted as `files`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content — never supply both, files would win and `method_id` would be ignored). Pass **`explicit: false`** — the tool's own default is the ceremonial `{concept, content}` envelope, and this skill works in the **light** shape (bare example values) end to end. The remaining defaults resolve the method's declared `main_pipe`. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
 
 Branch on the structured verdict, never on transport:
 

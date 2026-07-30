@@ -44,7 +44,7 @@ Locate the bundle directory and read **every** `.mthds` file in it (the root —
 
 ### Step 2: Baseline verdict
 
-Validate the whole bundle **before editing**: call `mthds_validate` with `files: [{content: <file content>, uri: <path relative to the bundle dir>}]` for every file, and branch on the structured verdict, never on transport.
+Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change. Surface the `validation_errors[]` and the Markdown summary, and offer to repair first — never edit on a broken baseline, or your regressions and the pre-existing errors become indistinguishable.

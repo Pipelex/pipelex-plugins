@@ -52,7 +52,7 @@ This skill validates through the **`mthds_validate`** tool and projects input sc
 ### How to validate (used at every step below)
 
 1. Gather **all** `.mthds` files in the bundle directory (the whole library — a broken sibling fails the verdict too, and the report names it).
-2. Call `mthds_validate` with `files: [{content: <file content>, uri: <path relative to the bundle dir>}]` for every file.
+2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 3. Branch on the **structured verdict**, never on transport:
    - `status: "ok"`, `is_valid: true`, `pending_signatures` non-empty → valid design scaffold, not yet runnable. The Markdown summary's `## Pending signatures` section is the backlog.
    - `status: "ok"`, `is_valid: true`, `is_runnable: true`, `pending_signatures` empty → the method is complete and runnable.
