@@ -390,6 +390,12 @@ A local file is not runnable as it stands: a run executes on the hosted Pipelex 
 
 Run it once `inputs.json` holds real values (Synthetic, User Data, Mixed). **Skip it** for the Template strategy — placeholders are not assets — and when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference, since there is then nothing to upload.
 
+**Say what is about to leave the machine, before it does.** Preparation is the point where the user's own files go to remote storage, so name them and their destination *before* the call, not only in the report afterwards:
+
+> Preparing 2 files for the run — uploading `inputs/invoice.pdf` and `inputs/cv.pdf` to Pipelex storage (your organization, via your API key).
+
+In **interactive mode**, wait for the user to confirm. In **automatic mode**, state it and proceed — the user asked for run-ready inputs, and this is what makes them run-ready. Either way the user learns which files are involved while they can still say no, swap a file, or drop one. Name the files individually; for a folder batch too long to list, give the count and the folder. If the user declines, stop before the call and report that the inputs stay local and are not runnable as they are.
+
 1. **Call `mthds_prepare_inputs`** with:
    - the **same target as Step 2** — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method;
    - the same **`pipe_ref`**, if Step 2 passed one. The pipe's declared signature is what identifies which values are assets, so letting it fall back to `main_pipe` would inspect the wrong contract;
