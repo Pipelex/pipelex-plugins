@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex-inputs` now follows the specific asset error before applying its path fallback.** When `mthds_prepare_inputs` names a size limit, the skill addresses that limit instead of first suggesting that the path was not resolved to absolute.
+
 ## [0.4.0] - 2026-07-30
 
 ### Added
