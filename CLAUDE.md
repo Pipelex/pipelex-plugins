@@ -30,8 +30,8 @@ targets/
 templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 ├── skills/
 │   ├── pipelex-explain/SKILL.md.j2   # Read-and-explain a bundle (no MCP dependency)
-│   ├── pipelex-design/SKILL.md.j2    # Top-down design by stepwise refinement (MCP-backed)
-│   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle into a browsable module layout (MCP-backed; auto-run at end of pipelex-design)
+│   ├── pipelex-design/SKILL.md.j2    # Contract-first, complexity-adaptive top-down design (MCP-backed)
+│   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle when its layout needs it (MCP-backed; conditional after pipelex-design)
 │   ├── pipelex-edit/SKILL.md.j2      # Contract-preserving edits to an existing bundle; routes structural changes to pipelex-design (MCP-backed)
 │   ├── pipelex-inputs/SKILL.md.j2    # inputs.json preparation (MCP-backed)
 │   └── shared/

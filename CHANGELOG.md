@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0] - 2026-08-01
+
+### Added
+
+- **Behavioral unit tests**: Added `TestPipelexInputsSizeLimitDiscipline` and `TestAdaptiveDesignSkill` in `tests/unit/test_gen_skill_docs.py` to enforce file-fidelity and adaptive-design guardrails across all generated targets (Claude, Codex, Mistral Vibe).
+
+### Changed
+
+- **Complexity-adaptive `pipelex-design`**: Overhauled the design skill to build fully understood, shallow graphs directly into runnable bundles, reserving signature-driven stepwise refinement for deep, uncertain, or staged work. Method re-entry is likewise adaptive — direct edits for shallow regions, reopening to signatures only for nested, cross-module, or complex structural changes. (Breaking)
+- **Conditional `pipelex-organize`**: The organize skill now runs only when a construction-shaped layout genuinely needs regrouping, and skips execution when a direct design result is already coherent.
+- **Skill routing**: Updated `pipelex-edit` to route structural and contract changes to the adaptive `pipelex-design` flow.
+- **Documentation**: Updated `README.md`, `CLAUDE.md`, and `docs/decisions.md` to reflect the complexity-adaptive design architecture, conditional organization, and strict input file-fidelity rules.
+
+### Fixed
+
+- **`pipelex-inputs` stops on storage size-limit failures without altering or substituting the asset.** The skill prevents unauthorized workarounds (compressing, truncating, downsampling, or substituting synthetic data), reports the exact rejection, and leaves the original file, bundle copy, and local-path `inputs.json` unchanged — neither retrying with transformed content nor offering or submitting a run. Unreadable local paths retain their separate absolute-path-only recovery.
+
 ## [0.4.0] - 2026-07-30
 
 ### Added

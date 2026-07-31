@@ -631,6 +631,158 @@ class TestSkillFailureDiscipline:
                 assert "register" in body, f"{target_name}/{skill}: Vibe STOP message must point at manual registration"
 
 
+class TestPipelexInputsSizeLimitDiscipline:
+    """Pin the terminal oversized-asset branch and its propagation.
+
+    The skill is executable guidance, so these assertions protect the exact
+    behavioral boundary: size rejection stops, while an unreadable path may be
+    corrected without changing the selected asset.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-inputs" / "SKILL.md.j2"
+    SIZE_BRANCH = '`location: "inputs"` **and the response reports a storage size limit**'
+    NON_SIZE_BRANCH = '`location: "inputs"` **and the response is not a size-limit failure**'
+    GUARDRAILS = (
+        "A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset",
+        "Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it",
+        "Do not replace it with synthetic data, a public sample, another local file, or any derived file",
+        "Never retry preparation with altered or substitute content to evade a storage limit",
+        "this is a terminal branch for the current preparation attempt",
+        "the method will not be offered or submitted for a run",
+        "Do not transform or substitute the asset, do not retry `mthds_prepare_inputs` with altered content, and do not call `mthds_run`",
+    )
+
+    @property
+    def inputs_skill(self) -> str:
+        return self.TEMPLATE.read_text(encoding="utf-8")
+
+    def test_size_limit_is_terminal_without_asset_or_input_mutation(self) -> None:
+        body = self.inputs_skill
+        for guardrail in self.GUARDRAILS:
+            assert guardrail in body
+
+        size_branch = body.split(self.SIZE_BRANCH, maxsplit=1)[1].split(self.NON_SIZE_BRANCH, maxsplit=1)[0]
+        assert "quote the tool's exact `message` and `hint` verbatim" in size_branch
+        assert "actual file size and the allowed limit whenever the response provides them" in size_branch
+        assert "preparation failed, the inputs are not run-ready" in size_branch
+        assert "preserve the user's original file" in size_branch
+        assert "the local-path form of `<output_dir>/inputs.json` unchanged" in size_branch
+        assert "resolve its path to absolute" not in size_branch
+        assert "surface both and fix *that value*" not in body
+
+    def test_unreadable_path_recovery_preserves_the_asset(self) -> None:
+        non_size_branch = self.inputs_skill.split(self.NON_SIZE_BRANCH, maxsplit=1)[1]
+        assert "For an unreadable local file" in non_size_branch
+        assert "resolve its path to absolute per step 1" in non_size_branch
+        assert "retry preparation with the file bytes unchanged" in non_size_branch
+        assert "must not rewrite the local relative path in `inputs.json`" in non_size_branch
+        assert "retry only when the documented error policy explicitly permits" in non_size_branch
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_platform_renders_the_same_size_limit_guardrails(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-inputs"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
+        for guardrail in self.GUARDRAILS:
+            assert guardrail in body, f"{target_name}: missing oversized-asset guardrail: {guardrail}"
+        assert "For an unreadable local file" in body
+        assert "resolve its path to absolute per step 1" in body
+
+
+class TestAdaptiveDesignSkill:
+    """Pin the behavioral workflow in the canonical skill templates.
+
+    The skill is executable guidance rather than Python control flow, so these
+    tests guard the observable decisions and transition invariants that agents
+    must follow, plus their propagation to every rendered platform.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+
+    @property
+    def design(self) -> str:
+        return (self.SKILLS / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_direct_mode_covers_shallow_concrete_graphs(self) -> None:
+        body = self.design
+        assert "the graph is one concrete operator; or one top-level controller whose children are concrete leaf operators" in body
+        assert "every pipe can be concrete in the first coherent artifact" in body
+        assert "Include **no temporary `PipeSignature` declarations**" in body
+        assert "A direct result that is already coherent skips `/pipelex-organize`" in body
+
+    def test_controller_count_is_not_a_hard_threshold(self) -> None:
+        body = self.design
+        assert "One controller is a strong fast-path signal, not a rule" in body
+        assert "cross-branch concept dependencies, uncertain ownership, or unresolved child contracts" in body
+        assert "Pipe count is secondary" in body
+
+    def test_stepwise_mode_keeps_resumable_guarantees(self) -> None:
+        body = self.design
+        assert "nested controllers or multiple structural layers whose child contracts are not all fixed" in body
+        assert "explicit request for a scaffold, partial design, staged work, or a resumable intermediate result" in body
+        assert "Drain the signature backlog breadth-first" in body
+        assert "Every expansion adds exactly one new `<code>.mthds` definition file" in body
+        assert "Early stopping exists only in stepwise mode" in body
+
+    def test_direct_to_stepwise_transition_removes_the_abandoned_draft(self) -> None:
+        body = self.design
+        assert "removes abandoned direct-only intermediate concepts and concrete child definitions" in body
+        assert "Do **not** append signatures beside the abandoned concrete definitions" in body
+        assert "every pipe/concept code is declared only where the stepwise model permits it" in body
+        assert "Validate the root scaffold before adding definitions" in body
+
+    def test_existing_method_reentry_is_adaptive(self) -> None:
+        body = self.design
+        assert "Choose the re-entry mode from the affected graph, not the whole method's size" in body
+        assert "**Direct coherent edit:** when the affected region is shallow" in body
+        assert (
+            "**Signature-driven re-entry:** when the affected region is nested, uncertain, cross-module, cross-branch, or intentionally staged"
+            in body
+        )
+        assert "A pipe contract change includes every parent controller" in body
+        assert "A concept reshape includes its introducing declaration and every consumer that field-reads it" in body
+        assert "Keep or coherently edit the smallest unaffected concrete ancestor" in body
+        assert "remove their old concrete definitions before validating" in body
+        assert "each changed concept exactly once in the scaffold" in body
+        assert "Do not predeclare deeper descendants while their parent is only a signature" in body
+        assert "Never duplicate a concept already retained by a direct→stepwise transition or signature-driven re-entry" in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_platform_renders_the_adaptive_workflow(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-design"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-design/SKILL.md"))
+        assert "Design a MTHDS bundle top-down at the right depth" in body
+        assert "## Direct construction — complete shallow graph" in body
+        assert "## Signature-driven construction — validated stepwise refinement" in body
+        assert "## Editing an existing method (adaptive re-entry)" in body
+        assert "Never ask the user to choose the workflow" in body
+        assert "{%" not in body
+        assert "{{" not in body
+
+    def test_adjacent_skills_describe_organization_as_conditional(self) -> None:
+        organize = (self.SKILLS / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
+        edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "Direct designs are normally coherent already and skip this skill" in organize
+        assert "auto-invokes it after converged signature-driven construction or re-entry" in organize
+        assert "an already coherent direct result does not invoke it solely for process compliance" in organize
+        assert "re-enters existing methods adaptively" in edit
+
+
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""

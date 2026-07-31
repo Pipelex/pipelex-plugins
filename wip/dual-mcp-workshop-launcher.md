@@ -1,4 +1,6 @@
-# TODOS — Dual-MCP: bake the local workshop launcher
+# Archived tracker — Dual-MCP: bake the local workshop launcher
+
+> Completed 2026-07-21 (merged via PR #4, `release/v0.2.0`). Archived verbatim from `TODOS.md` on 2026-07-31; no new tracker takes its place, so nothing was carried forward. The Open questions section below (Cursor docs-only-vs-target, Vibe MCP registration mechanics, V-P3 Claude Desktop failure UX, the OAuth-cutover README swap) stayed unresolved but non-blocking per Checkpoint C — pick it up as a fresh tracker if any of it becomes active work.
 
 Tracker for flipping the plugin-declared `pipelex-mcp` server from the baked hosted URL to the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio), per the revised dual-deployment design. Branch: `feature/Dual-MCP`. Use the checkboxes; update the checkpoint notes at each phase boundary so a fresh session picks up cleanly. The previous tracker (Mistral Vibe stable-hooks migration, completed 2026-07-19) is archived at `wip/vibe-stable-hooks-migration.md`.
 

@@ -13,7 +13,7 @@ description: Edit an existing MTHDS method bundle (.mthds files). Use when the u
 Modify an existing MTHDS method bundle. There are two classes of change; this skill applies the first and routes the second:
 
 - **Contract-preserving edits** (this skill): prompt and instruction text, `description` and `system_prompt` wording, model references, operator settings, and mechanical renames of pipes, concepts, or input variables. The method's structure — which pipes exist, how they wire, what each one takes and produces — stays the same.
-- **Structural or contract changes** (route to `/pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These propagate — the parent wiring, concept shapes, and contracts all move together — so they are design work: tell the user which pipe(s) the change touches and that `/pipelex-design` re-enters existing methods (its "Editing an existing method" section), and stop. Never attempt a partial structural edit here.
+- **Structural or contract changes** (route to `/pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These propagate — the parent wiring, concept shapes, and contracts all move together — so they are design work: tell the user which pipe(s) the change touches and that `/pipelex-design` re-enters existing methods adaptively (a direct coherent edit for a fully understood shallow region, or signature-driven reopening for nested, uncertain, cross-module, or staged work), and stop. Never attempt a partial structural edit here.
 
 ## Requirements — the Pipelex MCP tools
 
