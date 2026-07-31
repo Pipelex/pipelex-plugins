@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **`pipelex-inputs` now follows the specific asset error before applying its path fallback.** When `mthds_prepare_inputs` names a size limit, the skill addresses that limit instead of first suggesting that the path was not resolved to absolute.
+- **`pipelex-inputs` stops on storage size-limit failures without altering or substituting the asset.** The skill reports the exact rejection, leaves the original file, bundle copy, and local-path `inputs.json` unchanged, and neither retries with transformed content nor offers or submits a run. Unreadable local paths retain their separate absolute-path-only recovery.
 
 ## [0.4.0] - 2026-07-30
 

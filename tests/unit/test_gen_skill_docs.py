@@ -631,6 +631,71 @@ class TestSkillFailureDiscipline:
                 assert "register" in body, f"{target_name}/{skill}: Vibe STOP message must point at manual registration"
 
 
+class TestPipelexInputsSizeLimitDiscipline:
+    """Pin the terminal oversized-asset branch and its propagation.
+
+    The skill is executable guidance, so these assertions protect the exact
+    behavioral boundary: size rejection stops, while an unreadable path may be
+    corrected without changing the selected asset.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-inputs" / "SKILL.md.j2"
+    SIZE_BRANCH = '`location: "inputs"` **and the response reports a storage size limit**'
+    NON_SIZE_BRANCH = '`location: "inputs"` **and the response is not a size-limit failure**'
+    GUARDRAILS = (
+        "A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset",
+        "Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it",
+        "Do not replace it with synthetic data, a public sample, another local file, or any derived file",
+        "Never retry preparation with altered or substitute content to evade a storage limit",
+        "this is a terminal branch for the current preparation attempt",
+        "the method will not be offered or submitted for a run",
+        "Do not transform or substitute the asset, do not retry `mthds_prepare_inputs` with altered content, and do not call `mthds_run`",
+    )
+
+    @property
+    def inputs_skill(self) -> str:
+        return self.TEMPLATE.read_text(encoding="utf-8")
+
+    def test_size_limit_is_terminal_without_asset_or_input_mutation(self) -> None:
+        body = self.inputs_skill
+        for guardrail in self.GUARDRAILS:
+            assert guardrail in body
+
+        size_branch = body.split(self.SIZE_BRANCH, maxsplit=1)[1].split(self.NON_SIZE_BRANCH, maxsplit=1)[0]
+        assert "quote the tool's exact `message` and `hint` verbatim" in size_branch
+        assert "actual file size and the allowed limit whenever the response provides them" in size_branch
+        assert "preparation failed, the inputs are not run-ready" in size_branch
+        assert "preserve the user's original file" in size_branch
+        assert "the local-path form of `<output_dir>/inputs.json` unchanged" in size_branch
+        assert "resolve its path to absolute" not in size_branch
+        assert "surface both and fix *that value*" not in body
+
+    def test_unreadable_path_recovery_preserves_the_asset(self) -> None:
+        non_size_branch = self.inputs_skill.split(self.NON_SIZE_BRANCH, maxsplit=1)[1]
+        assert "For an unreadable local file" in non_size_branch
+        assert "resolve its path to absolute per step 1" in non_size_branch
+        assert "retry preparation with the file bytes unchanged" in non_size_branch
+        assert "must not rewrite the local relative path in `inputs.json`" in non_size_branch
+        assert "retry only when the documented error policy explicitly permits" in non_size_branch
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_platform_renders_the_same_size_limit_guardrails(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-inputs"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
+        for guardrail in self.GUARDRAILS:
+            assert guardrail in body, f"{target_name}: missing oversized-asset guardrail: {guardrail}"
+        assert "For an unreadable local file" in body
+        assert "resolve its path to absolute per step 1" in body
+
+
 class TestAdaptiveDesignSkill:
     """Pin the behavioral workflow in the canonical skill templates.
 
