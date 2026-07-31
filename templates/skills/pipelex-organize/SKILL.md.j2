@@ -1,6 +1,6 @@
 ---
 name: pipelex-organize
-description: Reorganize a designed method bundle into a clear, browsable layout. Use when a top-down design left one .mthds file per refined signature and the library should be regrouped into coherent module files (or a single file, when the method is simple) — auto-invoked at the end of /pipelex-design once the runnable verdict holds, or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Pure reorganization — never changes what the method does.
+description: Reorganize a designed method bundle into a clear, browsable layout. Use when signature-driven construction left one .mthds file per refinement, when any existing layout needs regrouping into coherent modules (or one simple file), or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Automatically follows converged /pipelex-design runs only when their construction-shaped layout needs it. Pure reorganization — never changes what the method does.
 {% include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -9,7 +9,7 @@ description: Reorganize a designed method bundle into a clear, browsable layout.
 
 # Organize a designed MTHDS bundle
 
-Top-down design (`/pipelex-design`) is deliberately additive: every refinement **adds** a new `<code>.mthds` file, and satisfied `PipeSignature` headers linger in the files that declared them. The finished library is correct but shaped by construction history — one file per pipe, contracts duplicated as stale headers, no relationship between file layout and how the method reads.
+The signature-driven mode of `/pipelex-design` is deliberately additive: every refinement **adds** a new `<code>.mthds` file, and satisfied `PipeSignature` headers linger in the files that declared them. A converged library can therefore be correct but shaped by construction history — one file per pipe, contracts duplicated as stale headers, no relationship between file layout and how the method reads. Direct designs are normally coherent already and skip this skill; they may still use it later on explicit request or when their layout genuinely needs regrouping.
 
 This skill regroups that library into a layout organized for **comprehension** — the way source code is spread across files in any language: related pipes gathered into one file per coherent unit, so a reader (human or agent) can discover the method progressively — open the root to see the contract and the top-level flow, then descend into just the module they care about. **The layout scales with the method:** a simple method fits entirely in `main.mthds`; a complex method with many pipes gets one file per subtree or functional area. Consolidation into fewer files is the usual *effect*, but the goal is grouping, not a single file.
 
@@ -105,4 +105,4 @@ One short summary: the layout (which files, what each contains, one line per fil
 
 ## Autonomy
 
-This skill is **fully automatic** — no per-step approval, including the layout decision (announce it, don't ask). It is designed to be auto-invoked by `/pipelex-design` at delivery time, and it can be invoked directly on any designed bundle directory. The only stops are the ones above: missing/misconfigured MCP tool, a failing baseline verdict, or a candidate that cannot be proven equivalent. If the user has expressed a layout preference (single file, specific grouping), honor it — the equivalence proof works the same for any layout.
+This skill is **fully automatic once invoked** — no per-step approval, including the layout decision (announce it, don't ask). `/pipelex-design` auto-invokes it after converged signature-driven construction or re-entry when the layout still reflects construction history; an already coherent direct result does not invoke it solely for process compliance. It can also be invoked explicitly on any designed bundle directory. The only stops are the ones above: missing/misconfigured MCP tool, a failing baseline verdict, or a candidate that cannot be proven equivalent. If the user has expressed a layout preference (single file, specific grouping), honor it — the equivalence proof works the same for any layout.
