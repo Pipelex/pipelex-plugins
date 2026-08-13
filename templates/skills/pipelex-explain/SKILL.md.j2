@@ -31,7 +31,7 @@ Starting from the main pipe, trace the execution path:
 2. For **PipeBatch**: identify `batch_over` and `batch_as`, then the inner pipe
 3. For **PipeParallel**: list all branches
 4. For **PipeCondition**: map condition → pipe for each branch
-5. For **PipeLLM / PipeExtract / PipeImgGen / PipeSearch / PipeFunc**: these are leaf operations
+5. For **PipeLLM / PipeExtract / PipeImgGen / PipeSearch / PipeFunc**: these are leaf operations. A `PipeFunc`'s behavior is not in the `.mthds` at all — read the bundle's `.py` file defining the function named by `function_name` (a flat registration name, so grep for it rather than treating it as a path), and explain what that code does
 
 ### Step 4: Present Explanation
 
@@ -61,4 +61,5 @@ Adapt the format to the method structure (linear, branching, batched).
 ## Reference
 
 - [MTHDS Language Reference](../shared/mthds-reference.md) — read for concept definitions and syntax
+- [Writing PipeFuncs](../shared/writing-pipe-funcs.md) — read when explaining a bundle containing a `PipeFunc`, for how its Python is wired to the pipe and what it is allowed to do
 - [Native Content Types](../shared/native-content-types.md) — read when explaining what data flows through pipes (e.g., what attributes Page or Image content carries)

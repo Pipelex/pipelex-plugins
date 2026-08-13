@@ -121,7 +121,8 @@ pipelex/                       (prod target)
     │   └── SKILL.md           rendered with the target's variables
     └── shared/
         ├── mthds-reference.md         rendered per target
-        └── native-content-types.md    rendered per target
+        ├── native-content-types.md    rendered per target
+        └── writing-pipe-funcs.md      rendered per target
 ```
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.

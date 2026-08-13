@@ -429,18 +429,22 @@ Each referenced image is injected as an `[Image N]` token (reference image), bou
 
 **Aspect ratio:** the optional `aspect_ratio` field is model-dependent — see [PipeImgGen in the MTHDS Language Reference](../../shared/mthds-reference.md#pipeimggen---generate-images) for the value list and which models support which ratios.
 
-### PipeFunc — call a registered Python function
+### PipeFunc — run custom Python
 
 ```toml
-[pipe.capitalize_text]
+[pipe.rank_products]
 type          = "PipeFunc"
-description   = "Uppercase the input text"
-inputs        = { text = "Text" }
-output        = "Text"
-function_name = "my_package.text_utils.capitalize"
+description   = "Rank products by margin and keep the top ten"
+inputs        = { rows = "ProductRow[]" }
+output        = "ProductRanking"
+function_name = "rank_products"
 ```
 
-Only use this when the user has a registered function. Otherwise prefer PipeCompose or PipeLLM.
+Use this for deterministic work a model should not be guessing at — arithmetic, aggregation, table reshaping, sorting and ranking, date math, spreadsheet reading. Prefer `PipeCompose` for pure string assembly and `PipeLLM` for anything requiring judgment.
+
+`function_name` is a **flat registration name, not an import path** — never `my_package.module.fn`. The function is Python you ship in the same bundle, and writing the pipe entry commits you to writing it: decorated `@pipe_func()`, one `working_memory: WorkingMemory` parameter, returning the structure class of this pipe's `output` concept. The sandbox has only Python's standard library plus `pipelex`, `pandas`, and `openpyxl`, and no network.
+
+**Read [Writing PipeFuncs](../../shared/writing-pipe-funcs.md) before writing the Python.** Validation reads the `.mthds` only, so every one of those rules fails at run time rather than at validation.
 
 ### PipeSignature — a contract-only header (forward declaration)
 

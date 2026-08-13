@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **PipeFunc authoring guide**: New shared reference `skills/shared/writing-pipe-funcs.md`, rendered per target, covering the whole surface the skills previously left undocumented — the function contract (`@pipe_func()`, the single `working_memory` parameter, the required return annotation), structure classes as return types (`from structures import <ConceptCode>`, projected by codegen and shipped in the bundle, never hand-written), the working-memory accessors, how to split the Python across files, the libraries the sandbox actually has (standard library plus `pipelex`, `pandas`, `openpyxl`), the no-network rule, why validation cannot catch any of it, and why only a registered method can run its Python.
+- **Worked example** under `examples/support-digest/`: a weekly support digest built from three `PipeFunc`, two `PipeLLM`, and one `PipeSequence`, written to the new reference and then validated and executed against the `pipelex` runtime. It ships no `structures.py` — the runtime generates that module, and shipping one would override it — and its README documents the local bootstrap detour and what hosted validation will not catch.
+- **Codegen as the structures path**: the guide documents generating `structures.py` through `codegen types --target python-structures` — the `pipelex codegen` CLI, its `build structures` alias, or `POST /v1/codegen` — verified byte-identical across the CLI and the deployed API. It notes that the API route reads `.mthds` only, so it generates for a bundle that already declares PipeFuncs, while the local CLI in `direct` mode cannot.
+- **PipeFunc routing in the skills**: `pipelex-design` now treats a `PipeFunc` leaf as an incomplete pipe until its Python is written, `pipelex-edit` keeps the pipe entry and its function in step across renames and concept reshapes, and `pipelex-explain` reads the bundle's `.py` to explain what a `PipeFunc` step does.
+
+### Fixed
+
+- **Stale PipeFunc guidance**: the `PipeFunc` sections in the MTHDS language reference and in `writing-mthds.md` described the local-install registry model and gave `function_name` as a dotted import path; registration names are flat and unqualified, and the Python ships in the bundle. Both now state the real contract and link the new guide.
+
+### Changed
+
+- **Test fixtures derive from `SHARED_TEMPLATES`**: the template-tree and skill-tree fixtures built their shared-file sets by hand, so adding a shared reference broke unrelated tests. They now read the declared list.
+
 ## [0.5.0] - 2026-08-01
 
 ### Added

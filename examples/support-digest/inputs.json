@@ -1,0 +1,9 @@
+{
+  "tickets": [
+    { "ticket_id": "T-1", "category": "billing", "priority": "urgent", "resolution_hours": 9.0, "satisfaction": 2 },
+    { "ticket_id": "T-2", "category": "billing", "priority": "high", "resolution_hours": 6.0, "satisfaction": 4 },
+    { "ticket_id": "T-3", "category": "login", "priority": "high", "resolution_hours": 30.0, "satisfaction": 1 },
+    { "ticket_id": "T-4", "category": "login", "priority": "low", "resolution_hours": 20.0, "satisfaction": 0 },
+    { "ticket_id": "T-5", "category": "exports", "priority": "medium", "resolution_hours": 12.0, "satisfaction": 5 }
+  ]
+}

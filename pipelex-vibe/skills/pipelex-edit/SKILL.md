@@ -79,4 +79,5 @@ State what changed (files and constructs), give the verdict line from the summar
 ## Reference
 
 - [MTHDS Language Reference](../shared/mthds-reference.md) — read for concept definitions and syntax before editing constructs you haven't touched recently
+- [Writing PipeFuncs](../shared/writing-pipe-funcs.md) — read when a `PipeFunc` is in scope. Its Python lives in the bundle's `.py` files and validation never sees it, so keep the two halves in step: reshaping a concept changes the structure class the function returns, and renaming a pipe's `function_name` orphans it
 - [Native Content Types](../shared/native-content-types.md) — read when editing prompts or construct paths that field-read native concepts (`Image.url`, `Page.text_and_images`, ...)

@@ -73,6 +73,7 @@ CODEX_DISCOVERY_MARKETPLACE_DST = Path(".agents/plugins/marketplace.json")
 SHARED_TEMPLATES = [
     "skills/shared/mthds-reference.md.j2",
     "skills/shared/native-content-types.md.j2",
+    "skills/shared/writing-pipe-funcs.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
