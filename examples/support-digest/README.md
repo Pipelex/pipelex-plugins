@@ -48,31 +48,32 @@ async def compute_ticket_stats(working_memory: WorkingMemory) -> TicketStats:
 
 ## `structures.py` and `codegen.lock`
 
-Exactly what `POST /v1/codegen` returned for this bundle (`kind: types`, `target: python-structures`), stamp and lock included. The same bytes come out of `pipelex codegen types --target python-structures` locally — identical `crate_fingerprint` and `content_hash` — so the CLI and the hosted API are one engine reached two ways.
+Exactly what `POST /v1/codegen` returned for this bundle (`kind: types`, `target: python-structures`), stamp and lock included.
 
-The concepts are declared as one-liners in `[concept]` and their shapes live in these generated classes, which is what lets the pipe funcs import `TicketStats` and satisfy the return-type check. Never hand-edit the file: it is stamped, regeneration overwrites it, and `pipelex codegen check` reports drift. Subclass in a sibling module if you need custom validation or computed properties.
+The concepts are declared as one-liners in `[concept]` and their shapes live in these generated classes, which is what lets the pipe funcs import `TicketStats` and satisfy the return-type check. Never hand-edit the file: it carries a codegen stamp and is regenerated wholesale, so edits are overwritten. Subclass in a sibling module if you need custom validation or computed properties.
 
-## Running it locally
+## Regenerating `structures.py`
 
-`structures.py` is already here, so nothing to generate:
-
-```bash
-pipelex validate bundle .
-pipelex run bundle . --pipe compute_ticket_stats -i inputs.json
-```
-
-The two `PipeLLM` steps need inference configured; the `PipeFunc` steps do not.
-
-To regenerate after changing a concept, use the API — it reads `.mthds` only and never imports your Python, so it works on a bundle that already declares PipeFuncs:
+The plugin has no CLI and no codegen MCP tool, so regeneration is an HTTP call. It reads `.mthds` only and never imports the Python, so it works on this bundle exactly as it stands:
 
 ```bash
-curl -sX POST https://api-dev.pipelex.com/v1/codegen \
+curl -sX POST "$PIPELEX_BASE_URL/v1/codegen" \
   -H "Authorization: Bearer $PIPELEX_API_KEY" -H 'Content-Type: application/json' \
   -d "$(python3 -c 'import json;print(json.dumps({"kind":"types","target":"python-structures","files":[{"content":open("main.mthds").read(),"source":"main.mthds"}]}))')"
 ```
 
-Write `artifacts[0].content` to `structures.py` and `lock` to `codegen.lock`. The local `pipelex codegen types --target python-structures` emits the same bytes, but in `direct` mode it validates `function_name` against the registry at load, so it cannot run on a bundle whose PipeFuncs are already declared.
+Write `artifacts[0].content` to `structures.py` and `lock` to `codegen.lock`. Do this whenever a concept's shape changes — nothing in the validate path compares the two, so a stale module is invisible until a run fails.
+
+## How this example was verified
+
+Not a requirement for using it — this is what was run to confirm the reference is accurate, against a local `pipelex` checkout:
+
+- `pipelex validate bundle .` → successfully validated. Local `direct` mode runs the full PipeFunc checks (function found in the registry, return type matching the output concept) that the hosted API skips, so it is the strictest available check.
+- `pipelex run bundle . --pipe compute_ticket_stats -i inputs.json` → executed for real; the figures below came out of the actual functions.
+- `POST /v1/codegen` against the deployed API returned bytes identical to the local generator — same `crate_fingerprint`, same `content_hash`.
+
+Through the plugin the equivalents are `mthds_validate` and `mthds_run`, neither of which needs a local install.
 
 ## What validation will not tell you
 
-`pipelex validate bundle` here runs the full local checks — the functions are in this process, so their existence and return types are verified. **The hosted API skips both**, because the Python is not in the runner's process. On the API this bundle would validate clean even with a missing function, a wrong return type, or a forbidden import, and fail only at run time. Check the pipe funcs by hand before shipping.
+`mthds_validate` reads the `.mthds` only, and the hosted API skips the PipeFunc checks because the Python is not in the runner's process. So this bundle would come back `is_valid: true` even with a missing function, a wrong return type, or a forbidden import, and fail only at run time. The `.mthds`-on-edit hook is the same engine and equally blind. Read the pipe funcs by hand before shipping.

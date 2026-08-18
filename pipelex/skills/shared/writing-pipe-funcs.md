@@ -59,29 +59,27 @@ Class names are the concept codes verbatim: concept `TicketStats` becomes `class
 
 ### Generating it
 
-Two front doors onto one engine — same bytes, same `crate_fingerprint`, same `content_hash`:
-
-```bash
-pipelex codegen types --target python-structures -o . ./my_method/
-```
+There is no MCP tool for this yet, and this plugin ships no CLI — so generate over HTTP, with `PIPELEX_API_KEY`:
 
 ```jsonc
-POST /v1/codegen
+POST <PIPELEX_BASE_URL>/v1/codegen
 { "kind": "types", "target": "python-structures",
   "files": [{ "content": "<main.mthds contents>", "source": "main.mthds" }] }
 ```
 
-The response carries `artifacts[]` (`structures.py`) plus a `codegen.lock`; write both into the bundle. `pipelex build structures` is a thin alias of the same command, so it is the same output under an older name.
+A 200 carries `is_valid: true`, `artifacts[]` (one entry, `path: "structures.py"`), and a `lock`. Write `artifacts[0].content` to `structures.py` in the bundle and `lock` to `codegen.lock` beside it. A `is_valid: false` body means the `.mthds` itself did not resolve — fix that first, the same way you would a failed validate.
 
-The API route takes `.mthds` only and never imports your Python, so it generates for a bundle that already declares PipeFuncs. The local CLI does not: in `direct` mode it validates each `function_name` against the registry at load, which needs your `.py` imported, which needs the `structures` module you are trying to create. Generate through the API, or generate before the PipeFunc pipes exist.
+The route reads `.mthds` only and never imports your Python, so it generates for a bundle that already declares its PipeFuncs. That matters: it is what lets you write the pipes and the functions first and produce the structure classes afterwards.
+
+(If a `pipelex` install happens to be on the machine, `pipelex codegen types --target python-structures` is the same engine and emits byte-identical output — same `crate_fingerprint`, same `content_hash`. Do not depend on it: nothing about this plugin installs or requires it, and in its default `direct` mode it refuses a bundle whose PipeFuncs are already declared.)
 
 ### Living with it
 
 The generated classes are ordinary Pydantic models — construct them by keyword, read fields by attribute.
 
-**Never hand-edit `structures.py`.** It is stamped and regenerated; edits are overwritten, and `pipelex codegen check` reports the drift. To add validation or computed properties, subclass in a sibling module — subclasses survive regeneration.
+**Never hand-edit `structures.py`.** It carries a codegen stamp and is regenerated wholesale; edits are silently overwritten on the next generation. To add validation or computed properties, subclass it in a sibling module — subclasses survive regeneration.
 
-Regenerate whenever a concept's shape changes, and re-run the check so the module and the method cannot silently disagree.
+Regenerate whenever you change a concept's shape. Nothing in the plugin's validate path compares the module against the method, so a stale `structures.py` is invisible until a run fails on a field that moved.
 
 ## 4. Reading inputs from working memory
 
@@ -143,16 +141,18 @@ Sibling imports work: a file can `from _shared_math import ...` its neighbour, b
 
 ## 8. What validation does not catch
 
-Bundle validation reads the `.mthds` only. **The Python never reaches the validator**, and in hosted execution the PipeFunc checks that would otherwise run — that the function exists, that its return type matches the output concept — are skipped, because the function is not in that process.
+`mthds_validate` reads the `.mthds` only. **The Python never reaches it**, and on the hosted API the PipeFunc checks that would otherwise run — that the function exists, that its return type matches the output concept — are skipped, because the function is not in that process.
 
-So a bundle whose PipeFunc is missing, misnamed, undecorated, unannotated, importing a forbidden library, or returning the wrong class **validates completely clean** and fails at run time. Validation confirms the `.mthds` is well-formed; it says nothing about whether your Python will run.
+So a bundle whose PipeFunc is missing, misnamed, undecorated, unannotated, importing a forbidden library, or returning the wrong class comes back **`is_valid: true`** and fails at run time. A clean verdict means the `.mthds` is well-formed; it says nothing about whether your Python will run. The `.mthds`-on-edit hook is the same engine, so it is equally blind.
 
-Before shipping, check each PipeFunc by hand against the contract above: decorator present and called, one `working_memory` parameter, annotated return type imported from `structures` and matching the pipe's `output`, imports inside the allowed set, no network, no heavy module-level code.
+Nothing else will check this for you. Before offering a run, read each pipe func against the contract above: decorator present and called, one `working_memory` parameter, annotated return type imported from `structures` and matching the pipe's `output`, imports inside the allowed set, no network, no heavy module-level code.
 
 ## 9. Running a method that has PipeFuncs
 
-The Python travels with the method, not with the run request. A method **registered on the platform** stores its `.mthds` and its `.py` together, and the platform assembles them into a bundle server-side on every run — so a run by method id executes your Python.
+The Python travels with the **method**, not with the run request.
 
-Submitting file contents inline for a run sends the `.mthds` text only; the `.py` files do not cross that wire. A PipeFunc method run that way will start and then fail to find its function. Register the method to run it.
+`mthds_run` given inline `files` sends the `.mthds` text only — the `.py` does not cross that wire. A PipeFunc method run that way starts and then fails to find its function. So a PipeFunc method must be **registered on the platform**, where its `.mthds` and `.py` are stored together and the platform assembles them into a bundle server-side on every run; then `mthds_run` with `method_id` executes your Python.
 
-Custom Python also requires a sandbox-hosted deployment; a deployment without one refuses a bundle carrying `.py` outright rather than running it unsandboxed.
+The plugin has no tool that registers a method, so registration happens outside these skills — in the app or against the API directly. Say so plainly rather than offering a run you know will fail.
+
+Custom Python also requires a sandbox-hosted deployment; one without a sandbox refuses a bundle carrying `.py` outright rather than running it unsandboxed.
