@@ -1,0 +1,80 @@
+domain      = "support_digest"
+description = "Turn a week of support tickets into a reviewed digest"
+main_pipe   = "build_support_digest"
+
+[concept]
+TicketRow = "One support ticket from the week under review"
+CategoryStat = "Aggregated ticket figures for a single category"
+TicketStats = "Weekly ticket totals with a per-category breakdown"
+SlaBreach = "A ticket that resolved outside the service level allowed for its priority"
+ThemeSummary = "Recurring themes a reader should notice in the week's tickets"
+ActionPlan = "Recommended actions for the support team next week"
+SupportDigest = "The finished weekly digest, ready to paste into a team channel"
+
+[pipe.build_support_digest]
+type = "PipeSequence"
+description = "Compute the week's figures, read them for themes, then assemble the digest"
+inputs = { tickets = "TicketRow[]" }
+output = "SupportDigest"
+steps = [
+  { pipe = "compute_ticket_stats", result = "stats" },
+  { pipe = "detect_sla_breaches", result = "breaches" },
+  { pipe = "summarize_themes", result = "themes" },
+  { pipe = "recommend_actions", result = "actions" },
+  { pipe = "assemble_digest", result = "digest" },
+]
+
+[pipe.compute_ticket_stats]
+type          = "PipeFunc"
+description   = "Aggregate the week's tickets into totals and a per-category breakdown"
+inputs        = { tickets = "TicketRow[]" }
+output        = "TicketStats"
+function_name = "compute_ticket_stats"
+
+[pipe.detect_sla_breaches]
+type          = "PipeFunc"
+description   = "List the tickets that resolved outside the SLA allowed for their priority"
+inputs        = { tickets = "TicketRow[]" }
+output        = "SlaBreach[]"
+function_name = "detect_sla_breaches"
+
+[pipe.summarize_themes]
+type = "PipeLLM"
+description = "Read the tickets and their figures for recurring themes"
+inputs = { tickets = "TicketRow[]", stats = "TicketStats" }
+output = "ThemeSummary"
+prompt = """
+Here are the support tickets closed this week:
+
+@tickets
+
+Here are the aggregate figures for the same week:
+
+@stats
+
+Identify the recurring themes across these tickets. Ground every theme in what the tickets and figures actually show — do not speculate about causes the data does not support.
+"""
+
+[pipe.recommend_actions]
+type = "PipeLLM"
+description = "Turn the themes and the SLA breaches into actions for next week"
+inputs = { themes = "ThemeSummary", breaches = "SlaBreach[]" }
+output = "ActionPlan"
+prompt = """
+These are the themes from this week's support tickets:
+
+@themes
+
+These tickets resolved outside their SLA:
+
+@breaches
+
+Recommend what the support team should do next week. Prefer a small number of high-leverage actions over an exhaustive list, and tie each one to a theme or a breach above.
+"""
+
+[pipe.assemble_digest]
+type          = "PipeFunc"
+description   = "Render the figures, themes, and actions into the finished digest"
+inputs        = { stats = "TicketStats", breaches = "SlaBreach[]", themes = "ThemeSummary", actions = "ActionPlan" }
+output        = "SupportDigest"
+function_name = "assemble_digest"

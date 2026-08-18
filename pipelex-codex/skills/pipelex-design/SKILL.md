@@ -28,6 +28,8 @@ Design a `.mthds` method **contract-first**, then use the lightest construction 
 
 See [writing-mthds.md](references/writing-mthds.md) for the supported syntax, operator/controller rules, `PipeSignature`, `signature_for`, and all pipe-type fields. It is the syntax source of truth.
 
+- **A `PipeFunc` leaf makes the bundle two-part.** The pipe entry names a function; you must also write the Python that defines it, shipped in the same bundle. Validation reads the `.mthds` only and reports nothing about the Python, so the contract is yours to hold. Read [writing-pipe-funcs.md](../shared/writing-pipe-funcs.md) before writing it, and never leave a `PipeFunc` entry whose function you have not written.
+
 ---
 
 ## Requirements — the Pipelex MCP tools
@@ -156,7 +158,7 @@ Given pending signature `S` with frozen `inputs`, `output`, `description`, and `
 
 1. Decide operator or controller. A single cognitive/IO step is an operator; multiple steps, iteration, branching, or parallelism require a controller.
 2. Add `<code>.mthds`, using `S`'s **bare** pipe code. The verdict names signatures as `domain.code`, but a namespaced `[pipe.domain.code]` would define a different pipe and never satisfy the header. A non-root file carries only `domain = "<same_domain>"` for membership. If the code is literally `main`, use a non-colliding filename such as `main_pipe.mthds`; filenames do not define pipe identity.
-3. For a leaf, write the concrete operator (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`) with all type-specific fields. For a controller (`PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`), wire one structural level, declare only intermediate concepts not already owned by the assembled library, and forward-declare every not-yet-designed child as a new `PipeSignature` in the same file. During re-entry, a reshaped concept may already be retained in the scaffold/common owner so signatures can validate; reference it from the new definition instead of redeclaring it.
+3. For a leaf, write the concrete operator (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`) with all type-specific fields. A `PipeFunc` leaf is only complete once its Python is written too, per [writing-pipe-funcs.md](../shared/writing-pipe-funcs.md). For a controller (`PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`), wire one structural level, declare only intermediate concepts not already owned by the assembled library, and forward-declare every not-yet-designed child as a new `PipeSignature` in the same file. During re-entry, a reshaped concept may already be retained in the scaffold/common owner so signatures can validate; reference it from the new definition instead of redeclaring it.
 4. Repeat `S`'s explicit `inputs` and `output` on the concrete definition. Contracts reconcile by concept identity (bare/qualified spellings and native equivalents), not textual coincidence.
 5. Before introducing an intermediate concept, check its code across the assembled library. Derive a unique parent-based code if needed. Declare it once, in the controller that logically introduces it or in the re-entry scaffold that must freeze its changed contract, with a shape fixed from every wired consumer. If consumers in different branches field-read it, the common parent owns and structures it. Never duplicate a concept already retained by a direct→stepwise transition or signature-driven re-entry.
 
@@ -243,4 +245,5 @@ This skill is **automatic by default**.
 ## Reference
 
 - [Writing `.mthds` Directly](references/writing-mthds.md) — **read before writing**. The supported MTHDS subset, concrete operators/controllers, `PipeSignature`, and runnable gate.
+- [Writing PipeFuncs](../shared/writing-pipe-funcs.md) — **read before writing any `PipeFunc` Python**. The function contract, structure classes as return types, the allowed libraries, the no-network rule, and file organization.
 - [Native Content Types](../shared/native-content-types.md) — attributes of native concepts (`Image.url`, `Page.text_and_images`, ...) for `$var.field` references and construct `from` paths.

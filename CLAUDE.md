@@ -37,7 +37,8 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   └── shared/
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
-│       └── native-content-types.md.j2 # Native content-type documentation
+│       ├── native-content-types.md.j2 # Native content-type documentation
+│       └── writing-pipe-funcs.md.j2   # PipeFunc authoring guide (rendered per target)
 └── hooks/
     ├── hooks.json.j2                # Claude PostToolUse hook config
     ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
@@ -49,6 +50,8 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
 pipelex-vibe/                  # Mistral Vibe target (generated, checked in; loaded via skill_paths)
+examples/
+└── support-digest/            # Worked PipeFunc example (3 PipeFunc, 2 PipeLLM, 1 PipeSequence) — validated against the pipelex runtime; ships no structures.py by design
 scripts/
 ├── gen_skill_docs.py          # Template renderer (multi-target)
 └── check.py                   # Validation / freshness / packaging checks

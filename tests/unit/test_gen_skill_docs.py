@@ -34,6 +34,17 @@ FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
+def _write_shared_templates(shared: Path) -> None:
+    """Write a stub for every declared shared template.
+
+    Derived from SHARED_TEMPLATES rather than hardcoded, so adding a shared
+    reference does not silently break every fixture that builds a template tree.
+    """
+    for template_path in SHARED_TEMPLATES:
+        name = Path(template_path).name
+        (shared / name).write_text(f"# {name.removesuffix('.md.j2')} {{{{ marketplace_name }}}}\n")
+
+
 # Minimal hook templates for every platform. render_templates declares hooks
 # per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
 # Vibe: vibe-hooks.toml + check-mthds-vibe.sh), so any test tree that reaches
@@ -92,8 +103,7 @@ def template_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
-    (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
+    _write_shared_templates(shared)
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -118,8 +128,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("Ref.\n")
-    (shared / "native-content-types.md.j2").write_text("Types.\n")
+    _write_shared_templates(shared)
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -170,7 +179,8 @@ class TestRenderTemplates:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
         ref_output = template_tree / "skills" / "shared" / "mthds-reference.md"
         assert ref_output in results
-        assert "MTHDS Reference pipelex-plugins" in results[ref_output]
+        # Rendered, not copied: the marketplace_name variable is substituted.
+        assert "mthds-reference pipelex-plugins" in results[ref_output]
 
     def test_frontmatter_not_rendered_standalone(self, template_tree: Path) -> None:
         """frontmatter.md.j2 is an include-only partial — it must never be

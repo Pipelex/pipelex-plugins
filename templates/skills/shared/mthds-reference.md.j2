@@ -449,7 +449,11 @@ output = "ProcessedData"
 function_name = "my_registered_function"
 ```
 
-Function must be registered in `func_registry` and accept `working_memory: WorkingMemory`.
+`function_name` is a flat registration name, not an import path. The function itself is Python shipped in the same bundle: decorated `@pipe_func()`, taking exactly one `working_memory: WorkingMemory` parameter, and returning the structure class of the pipe's `output` concept — imported by concept code from the codegen'd `structures.py` (`from structures import ProcessedData`).
+
+The sandbox that runs it has only Python's standard library plus `pipelex`, `pandas`, and `openpyxl`, and no network access. Bundle validation never sees the Python, so none of this is caught before run time.
+
+See [Writing PipeFuncs](writing-pipe-funcs.md) for the full contract, the working-memory accessors, file organization, and the run path.
 
 ## Prompt Variable Syntax
 
