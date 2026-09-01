@@ -2,7 +2,7 @@
 
 Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --with reportlab python << 'PYEOF'` on the `uv` rung, `"$VENV/bin/python" << 'PYEOF'` on the venv rung), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
 
-`reportlab` is BSD-licensed and pure Python; these recipes are checked against reportlab 5 by the repository's recipe test.
+`reportlab` is BSD-licensed and pure Python; every recipe below was executed under reportlab 5.0.1 before it was committed.
 
 ## Which recipe for which brief
 
@@ -28,10 +28,13 @@ The raw canvas: place text and lines at coordinates. Origin is the bottom-left c
 
 ```bash
 uv run --quiet --with reportlab python << 'PYEOF'
+from pathlib import Path
+
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 OUT = "<output_dir>/inputs/test_document.pdf"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 # --- content -----------------------------------------------------------
 TITLE = "Acme Hardware Supply — Internal Memo"
@@ -71,11 +74,14 @@ Platypus flows a list of elements (`Paragraph`, `Spacer`, `PageBreak`, …) acro
 
 ```bash
 uv run --quiet --with reportlab python << 'PYEOF'
+from pathlib import Path
+
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 OUT = "<output_dir>/inputs/test_report.pdf"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 # --- content -----------------------------------------------------------
 TITLE = "Quarterly Operations Report — Q1 2026"
@@ -119,12 +125,15 @@ A titled table with a styled header row and a grid — the recipe for price list
 
 ```bash
 uv run --quiet --with reportlab python << 'PYEOF'
+from pathlib import Path
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 OUT = "<output_dir>/inputs/test_table.pdf"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 # --- content -----------------------------------------------------------
 TITLE = "Quarterly Sales by Product"
@@ -162,12 +171,15 @@ The two Platypus recipes together: a header block of paragraphs, a line-item tab
 
 ```bash
 uv run --quiet --with reportlab python << 'PYEOF'
+from pathlib import Path
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 OUT = "<output_dir>/inputs/test_invoice.pdf"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 # --- content -----------------------------------------------------------
 KIND = "INVOICE"
@@ -244,7 +256,7 @@ head -c 5 "<output_dir>/inputs/<name>.pdf"; echo; wc -c "<output_dir>/inputs/<na
 python3 -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<output_dir>/inputs/<name>.pdf"
 ```
 
-Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed run must leave no file: `[ -s "<target>" ] || rm -f "<target>"`.
+Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed run must leave no file: `rm -f "<target>"`, unconditionally — a partial render is non-empty, so testing the size first spares exactly the file that has to go.
 
 ## Last resort — a public test PDF
 

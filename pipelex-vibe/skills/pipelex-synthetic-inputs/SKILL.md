@@ -109,7 +109,7 @@ Open the reference for the format and take the recipe that matches the content â
 If the run fails, remove any partial output before doing anything else:
 
 ```bash
-[ -s "<target>" ] || rm -f "<target>"
+rm -f "<target>"
 ```
 
 then read the error. A recipe error is yours to fix and rerun; an environment error goes back to Step 2's table.

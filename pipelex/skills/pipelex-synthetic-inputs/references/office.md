@@ -16,9 +16,12 @@ Save to: <output_dir>/inputs/<filename>.docx
 
 ```bash
 uv run --quiet --with python-docx python << 'PYEOF'
+from pathlib import Path
+
 from docx import Document
 
 OUT = "<output_dir>/inputs/test_document.docx"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 doc = Document()
 doc.add_heading("Test Document", 0)
@@ -45,9 +48,12 @@ Save to: <output_dir>/inputs/<filename>.xlsx
 
 ```bash
 uv run --quiet --with openpyxl python << 'PYEOF'
+from pathlib import Path
+
 from openpyxl import Workbook
 
 OUT = "<output_dir>/inputs/test_spreadsheet.xlsx"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 
 wb = Workbook()
 ws = wb.active
