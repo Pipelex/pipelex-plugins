@@ -34,6 +34,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   ├── pipelex-organize/SKILL.md.j2  # Regroup a designed bundle when its layout needs it (MCP-backed; conditional after pipelex-design)
 │   ├── pipelex-edit/SKILL.md.j2      # Contract-preserving edits to an existing bundle; routes structural changes to pipelex-design (MCP-backed)
 │   ├── pipelex-inputs/SKILL.md.j2    # inputs.json preparation (MCP-backed)
+│   ├── pipelex-synthetic-inputs/SKILL.md.j2  # File factory: render PDFs/PNGs/Office files from code, no AI (no MCP dependency)
 │   └── shared/
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
@@ -46,6 +47,9 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
     ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
     ├── check-mthds-vibe.sh.j2       # Vibe wrapper (post_tool payload → check.mjs)
     └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
+skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets, copied verbatim into every target
+├── pipelex-design/references/writing-mthds.md          # MTHDS authoring reference
+└── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes
 pipelex/                       # Claude prod plugin (generated, checked in)
 pipelex-codex/                 # Codex plugin (generated, checked in)
 pipelex-vibe/                  # Mistral Vibe target (generated, checked in; loaded via skill_paths)
@@ -53,6 +57,7 @@ scripts/
 ├── gen_skill_docs.py          # Template renderer (multi-target)
 └── check.py                   # Validation / freshness / packaging checks
 tests/unit/                    # Unit tests for renderer + checks
+tests/recipes/                 # Opt-in: executes the synthetic-inputs recipes (`make test-recipes`)
 docs/                          # build-targets.md + decisions.md
 Makefile  pyproject.toml  uv.lock  README.md  CHANGELOG.md  LICENSE
 ```
@@ -71,6 +76,7 @@ make check-codex     # Codex packaging consistency checks
 make check           # Run all of the above
 make agent-check     # Full quality gate for agents (fix imports + format + lint + check)
 make test            # Run unit tests
+make test-recipes    # Execute the shipped synthetic-inputs recipes (opt-in; runs uv, downloads packages)
 make agent-test      # Run unit tests quietly (output only on failure) — prefer this
 make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 ```
@@ -132,3 +138,5 @@ So there is nothing to enable — the bundled hook loads on its own (hooks are S
 ## Key dependency
 
 The plugin imports nothing and requires no install. Validation rides on the vendored `check.mjs` bundle (wasm engine + `@pipelex/sdk` → hosted API) and, for the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`), on the plugin-declared `pipelex-mcp` server (tools `mthds_validate` / `mthds_inputs_template`; `mthds_prepare_inputs`, which uploads `pipelex-inputs`' file-bearing values to Pipelex storage and rewrites them to `pipelex-storage://` references so a run can reach them; plus the `mthds_run` family powering `pipelex-inputs`' closing offer to run; declared in the Claude and Codex manifests, manual registration on Vibe). The baked declaration is the **local workshop launcher** — `npx -y @pipelex/mcp@latest` over stdio, from the `[vars.mcp_server]` block in `targets/defaults.toml` — never a hosted URL: the hosted console is a connector users add in their host's own UI (see the README's "One install, one server" section and `docs/decisions.md`). Credential delivery: on Claude the manifest's `userConfig` prompts for the API key / base URL at enable time (keychain-stored) and the MCP entry spawns the `launch-pipelex-mcp.sh` wrapper, which receives them as `PIPELEX_PLUGIN_*` via `${user_config.*}` substitution and promotes each to `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` **only when non-empty** — the canonical credential channel (required for Claude Desktop, which carries no shell env), with the non-empty guard keeping an unfilled option from shadowing a shell-exported key; injecting `PIPELEX_*` directly instead makes an empty option surface as a config-class `Unauthorized` that hard-stops every MCP-backed skill; on Codex the manifest forwards `PIPELEX_API_KEY`/`PIPELEX_BASE_URL` by name via `env_vars` because Codex whitelist-filters MCP spawn env. Dev override: point `command`/`args` at a local checkout in `targets/defaults.toml` + `make build` on Claude; a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex.
+
+**`pipelex-synthetic-inputs` depends on none of that.** It is the second MCP-free skill after `pipelex-explain` — no tool, no key, no Pipelex service — and its only dependency is a Python it can reach: `uv` with ephemeral `--with` packages on the normal rung, and a venv it creates itself under `${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv` when `uv` is absent. Swapping the runner line is the *only* difference between the two rungs, and `tests/recipes` proves it by running real recipes through both. When neither rung is reachable the skill stops with the exact missing piece and, called from `pipelex-inputs`, returns no path so that one input is left unfilled rather than aborting the flow. Keep it out of the `MCP_SKILLS` tuple in `tests/unit/test_gen_skill_docs.py`.
