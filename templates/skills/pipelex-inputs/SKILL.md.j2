@@ -167,8 +167,8 @@ Parse the template to identify what synthetic data each input needs. The light v
 | `native.Number` | bare number | Generate appropriate numeric values |
 | `native.YesNo` | bare boolean | Generate a `true`/`false` answer |
 | `native.Date` | bare ISO 8601 date string | Generate date/time values; never use epoch numbers |
-| `native.Image` | bare URL-or-path string | Generate or source an image file (see [Document Generation](#document-generation) fallbacks) |
-| `native.Document` | bare URL-or-path string | Use document generation below |
+| `native.Image` | bare URL-or-path string | Delegate to `pipelex-synthetic-inputs` — see [Generate File Inputs](#generate-file-inputs) |
+| `native.Document` | bare URL-or-path string | Delegate to `pipelex-synthetic-inputs` — see [Generate File Inputs](#generate-file-inputs) |
 | `native.Page`, `native.TextAndImages`, `native.JSON` | content dict as given by the template | Fill the template's fields in place |
 | Custom structured | content dict (fields directly) | Fill each field according to its type and description |
 
@@ -191,7 +191,18 @@ Fill each field of the template's content dict according to its type and descrip
 
 ### Generate File Inputs
 
-When inputs require actual files (Image, Document), generate them — see [Document Generation](#document-generation) below — and reference each file by a path relative to `inputs.json` (files go in `<output_dir>/inputs/`).
+When an input needs an actual file — `native.Image`, `native.Document`, a Word or Excel file — this skill does not make it. **`pipelex-synthetic-inputs` is the file factory**: it renders PDFs and PNGs from code, no AI involved, and installs the Python packages it needs on its own.{% if platform == "claude" %} Invoke it with `/pipelex-synthetic-inputs`.{% else %} {{ harness_name }} has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.{% endif %} Hand it one request per file:
+
+| Field | What to pass |
+|---|---|
+| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `docx` / `xlsx` when the method asks for those |
+| `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
+| `target` | `<output_dir>/inputs/<input_variable>.<ext>` |
+| `constraints` | whatever the input's description pins: page count, pixel size, language |
+
+It writes the file, verifies it, and returns the path. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and [prepare](#prepare-the-inputs-for-a-run) uploads it later, unchanged.
+
+**When it cannot make the file** — no `uv`, no usable Python, or a brief it refuses (a photograph, handwriting) — it returns no path and says why. That is not a failure of this flow: **leave that one input unfilled, carry on with the others**, and put the reason and its ask (the user's own file for that input) in the final report. Do not fabricate a value, and do not abandon `inputs.json`.
 
 ### Assemble and Save
 
@@ -292,102 +303,6 @@ Combines user data with synthetic generation for any remaining gaps.
 3. Assemble the complete `inputs.json` combining both sources
 4. Continue with [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) — one call covers both sources' files
 5. Report which inputs came from user data, which were synthesized, and which were uploaded
-
----
-
-## Document Generation
-
-Generate test documents based on the document type needed. Nothing here assumes a Pipelex install — use whatever Python is available in the environment.
-
-### PDF Documents
-
-Use `reportlab` via an ephemeral environment (preferred):
-
-```bash
-uv run --with reportlab python << 'PYEOF'
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-
-c = canvas.Canvas("<output_dir>/inputs/test_document.pdf", pagesize=letter)
-width, height = letter
-
-# Add text
-c.drawString(100, height - 100, "Hello World!")
-c.drawString(100, height - 120, "This is a PDF created with reportlab")
-
-# Add a line
-c.line(100, height - 140, 400, height - 140)
-
-# Save
-c.save()
-PYEOF
-```
-
-If `uv` is not available, fall back to `python3` with `reportlab` installed (`python3 -m pip install reportlab` in a venv), with the same script.
-
-For multi-page documents or reports with tables, use reportlab's Platypus API (`SimpleDocTemplate`, `Paragraph`, `Table`, `TableStyle`) instead of the raw canvas — same invocation pattern.
-
-**Last resort** — use a public test PDF URL as the value directly:
-
-```json
-{
-  "document": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-word.pdf"
-}
-```
-
-### Word Documents (DOCX)
-
-**If a `docx` skill is available:**
-```
-Use the /docx skill to create a Word document with the following content:
-[Describe the document content, structure, and formatting]
-Save to: <output_dir>/inputs/<filename>.docx
-```
-
-**If not**, create using Python:
-```bash
-uv run --with python-docx python << 'PYEOF'
-from docx import Document
-
-doc = Document()
-doc.add_heading('Test Document', 0)
-doc.add_paragraph('This is synthetic test content for method testing.')
-# Add more content as needed
-doc.save('<output_dir>/inputs/test_document.docx')
-PYEOF
-```
-
-### Spreadsheets (XLSX)
-
-**If an `xlsx` skill is available:**
-```
-Use the /xlsx skill to create a spreadsheet with the following data:
-[Describe columns, rows, and sample data]
-Save to: <output_dir>/inputs/<filename>.xlsx
-```
-
-**If not**, create using Python:
-```bash
-uv run --with openpyxl python << 'PYEOF'
-from openpyxl import Workbook
-
-wb = Workbook()
-ws = wb.active
-ws['A1'] = 'Column1'
-ws['B1'] = 'Column2'
-ws['A2'] = 'Value1'
-ws['B2'] = 'Value2'
-wb.save('<output_dir>/inputs/test_spreadsheet.xlsx')
-PYEOF
-```
-
----
-
-**Fallback Strategy:**
-1. For PDFs: `uv run --with reportlab python`, or a plain `python3` with reportlab installed
-2. For DOCX/XLSX: use the `/docx` or `/xlsx` skill, or `uv run --with <package> python`
-3. For any format: use public test file URLs as fallback
-4. As last resort, ask user to provide test files
 
 ---
 
@@ -507,19 +422,21 @@ Save it (with a placeholder or real theme) directly to `pipelex-wip/pipeline_01/
 
 ### Example 2: Synthetic data for an image analysis pipeline
 
-**Method**: Image analyzer expecting `image: Image` and `analysis_prompt: Text`
+**Method**: Sales-chart reader expecting `chart: Image` and `analysis_prompt: Text`
 
-1. Get the template; identify needs: a test photograph + instruction text
-2. Source or generate a test image into `<output_dir>/inputs/`
+1. Get the template; identify needs: an image the method can read as a chart + instruction text
+2. `chart` is `native.Image`, so [delegate](#generate-file-inputs) — `format: png` with category `chart`, `brief: "a grouped bar chart of quarterly units shipped for three regions, with a legend and axis labels"`, `target: <output_dir>/inputs/chart.png`. It returns that path
 3. Write an analysis prompt matching the method context
 4. Assemble:
 ```json
 {
-  "image": "inputs/city_street.jpg",
-  "analysis_prompt": "Analyze this street scene. Count visible people and describe the atmosphere."
+  "chart": "inputs/chart.png",
+  "analysis_prompt": "Read this chart. Report the trend per region and name the strongest quarter."
 }
 ```
-5. Prepare: `image` is a local path, so [prepare](#prepare-the-inputs-for-a-run) uploads it and rewrites `inputs.json` before the run is offered
+5. Prepare: `chart` is a local path, so [prepare](#prepare-the-inputs-for-a-run) uploads it and rewrites `inputs.json` before the run is offered
+
+Had the method wanted a *photograph* of a street scene, the delegation would have come back with no path and an ask for a real file: code cannot render a photograph honestly. `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.
 
 ### Example 3: User-provided invoice PDF
 
@@ -571,3 +488,4 @@ User says: "Use the photos in `./product-photos/`"
 
 - [MTHDS Language Reference](../shared/mthds-reference.md) — read for concept definitions and syntax
 - [Native Content Types](../shared/native-content-types.md) — read for the full attribute reference of each native content type when filling composite or structured values
+- [`pipelex-synthetic-inputs`](../pipelex-synthetic-inputs/SKILL.md) — the file factory this skill delegates to for every generated PDF, PNG, Word or Excel input

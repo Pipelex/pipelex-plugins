@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -781,6 +782,111 @@ class TestAdaptiveDesignSkill:
         assert "auto-invokes it after converged signature-driven construction or re-entry" in organize
         assert "an already coherent direct result does not invoke it solely for process compliance" in organize
         assert "re-enters existing methods adaptively" in edit
+
+
+class TestSyntheticInputsSkill:
+    """Pin the file-factory skill and the delegation that replaced
+    `/pipelex-inputs`' inline Document Generation section.
+
+    The skill is executable guidance, so these tests guard the identity rules a
+    caller relies on (no AI, a fixed package allowlist, ask before installing a
+    tool), the delegation contract, and the fact that it needs no MCP tool.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+    OUTPUT_DIR_BY_TARGET: ClassVar[dict[str, str]] = {"prod": "pipelex", "codex": "pipelex-codex", "mistral-vibe": "pipelex-vibe"}
+    REFERENCES = ("pdf.md", "png.md", "office.md")
+
+    @property
+    def synthetic(self) -> str:
+        return (self.SKILLS / "pipelex-synthetic-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_identity_rules_are_stated(self) -> None:
+        body = self.synthetic
+        assert "**No AI in the loop.**" in body
+        assert "**Permissive packages only.**" in body
+        for package in ("reportlab", "Pillow", "matplotlib", "numpy", "python-docx", "openpyxl"):
+            assert package in body, f"missing allowlisted package: {package}"
+        assert "no PyMuPDF (AGPL)" in body
+        assert "Nothing installed into the project, nothing installed onto the machine without asking" in body
+        assert "Installing a *tool*" in body and "always asks first, in every mode" in body
+        assert "A failure leaves nothing behind" in body
+
+    def test_refused_categories_are_named_with_the_ask(self) -> None:
+        body = self.synthetic
+        assert "**Not covered, by design:** photographs and handwriting." in body
+        assert "ask the user for a real file for that input" in body
+        assert "Do not draw an approximation, and do not substitute a public image." in body
+
+    def test_environment_ladder_has_both_rungs_and_a_graceful_stop(self) -> None:
+        body = self.synthetic
+        assert "**Rung 1 — `uv` is on `PATH`**" in body
+        assert "**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.**" in body
+        assert "pipelex-plugins/synth-venv" in body
+        assert "the runner line becomes `\"$VENV/bin/python\" << 'PYEOF'`" in body
+        assert "that substitution is the only difference between the rungs" in body
+        assert "curl -LsSf https://astral.sh/uv/install.sh" in body
+        assert "return **no path** with the reason" in body
+
+    def test_declares_no_mcp_tool(self) -> None:
+        """The file factory is MCP-free: no allowed-tools entry, and it is
+        absent from the MCP-backed skill set the STOP-posture tests cover."""
+        body = self.synthetic
+        assert "mcp__" not in body
+        assert "pipelex-synthetic-inputs" not in TestSkillFailureDiscipline.MCP_SKILLS
+
+    def test_inputs_delegates_instead_of_generating(self) -> None:
+        inputs = (self.SKILLS / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "pipelex-synthetic-inputs" in inputs
+        assert "**`pipelex-synthetic-inputs` is the file factory**" in inputs
+        assert "leave that one input unfilled, carry on with the others" in inputs
+        # The inline recipes moved out wholesale — no second home for "make a file".
+        assert "### PDF Documents" not in inputs
+        assert "## Document Generation" not in inputs
+        assert "**Fallback Strategy:**" not in inputs
+        assert "reportlab" not in inputs
+        assert "openpyxl" not in inputs
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-synthetic-inputs"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-synthetic-inputs/SKILL.md"))
+        assert "# Generate synthetic input files" in body
+        assert "**No AI in the loop.**" in body
+        assert "{%" not in body
+        assert "{{" not in body
+
+        references_dir = self.REPO_ROOT / self.OUTPUT_DIR_BY_TARGET[target_name] / "skills" / "pipelex-synthetic-inputs" / "references"
+        for reference in self.REFERENCES:
+            assert (references_dir / reference).is_file(), f"{target_name}: missing references/{reference}"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_delegation_sentence_matches_the_platform(self, target_name: str) -> None:
+        """Only Claude Code can invoke a sibling skill; the others are told to
+        read it off disk, which the copied-whole plugin directory makes reachable."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-inputs"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
+        if target_name == "prod":
+            assert "Invoke it with `/pipelex-synthetic-inputs`." in body
+            assert "open `../pipelex-synthetic-inputs/SKILL.md`" not in body
+        else:
+            assert "open `../pipelex-synthetic-inputs/SKILL.md` and follow it." in body
+            assert "Invoke it with `/pipelex-synthetic-inputs`." not in body
 
 
 class TestHookRendering:
