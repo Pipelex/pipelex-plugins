@@ -58,7 +58,7 @@ scripts/
 └── check.py                   # Validation / freshness / packaging checks
 tests/unit/                    # Unit tests for renderer + checks
 tests/recipes/                 # Opt-in: executes the synthetic-inputs recipes (`make test-recipes`)
-docs/                          # build-targets.md + decisions.md
+docs/                          # repo documentation (build targets, decisions, hooks)
 Makefile  pyproject.toml  uv.lock  README.md  CHANGELOG.md  LICENSE
 ```
 

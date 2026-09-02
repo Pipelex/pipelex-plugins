@@ -28,8 +28,8 @@ This skill is the plugin's file factory. `/pipelex-inputs` calls it whenever its
 - **No AI in the loop.** Files come from reportlab, Pillow and matplotlib code. If a request cannot be met that way, the answer is the refusal above, not a model.
 - **Permissive packages only.** `reportlab` (BSD), `Pillow` (MIT-CMU), `matplotlib` (PSF-style), `numpy` (BSD), `python-docx` (MIT), `openpyxl` (MIT). Nothing else: no PyMuPDF (AGPL), nothing that needs a system binary (poppler, cairo, wkhtmltopdf, Ghostscript), nothing that reaches the network at runtime.
 - **Content first, then render.** The realism is in what the file says, not how it is drawn. Draft the content from the brief before opening a recipe (Step 3). Entities are obviously fictional — "Acme Hardware Supply", "Jane Example", `INV-2026-0042` — never real people, companies or brands.
-- **Deterministic.** Seed every source of randomness so a regenerated file is the same file.
-- **Modest sizes.** PNGs default to 1200×800; document-shaped PNGs to A4 at 150 dpi (1240×1754); PDFs to a few pages. This keeps files well inside the storage-size limit `/pipelex-inputs` meets at upload time.
+- **Deterministic where the format allows it.** Seed every source of randomness (`SEED` in each content block) so a regenerated file draws the same pixels, and pass `invariant=1` to reportlab so a PDF is byte-identical across runs. Word and Excel files embed a creation timestamp that neither library lets you fix, so two `docx`/`xlsx` renders of the same content differ byte for byte — the content is reproducible, the bytes are not.
+- **Modest sizes, with one exception to know about.** PNGs default to 1200×800; document-shaped PNGs to A4 at 150 dpi (1240×1754); PDFs to a few pages. PDFs come out in the low kilobytes and most PNGs in the tens of kilobytes, but `document_scan` is different in kind: `scannerize()` adds per-pixel grain, which does not compress, so an A4 page lands in the low megabytes. That is the one output that can meet the storage-size limit `/pipelex-inputs` reports at upload time, and that limit is a terminal branch there — so check the size in Step 5, and if it is the problem, render the page at 100 dpi (827×1169) or turn the grain down before reaching for anything else.
 - **Nothing installed into the project, nothing installed onto the machine without asking.** Packages are fetched into `uv`'s cache or into a venv this skill owns under the user's cache directory (Step 2). Installing a *tool* — `uv` itself, a system package — always asks first, in every mode.
 - **A failure leaves nothing behind.** A render that fails removes its partial output, so no `inputs.json` can ever point at a broken file.
 - **Report what was done.** Every file gets one line: path, format, dimensions or page count, and what it contains. A fallback of any kind is named as one.
@@ -62,25 +62,32 @@ Do this once per invocation, before any recipe. The outcome is the **runner line
 **Rung 1 — `uv` is on `PATH`** (the normal case). Preflight the format's set once:
 
 ```bash
-command -v uv >/dev/null && uv run --quiet --with reportlab python -c "import reportlab; print('pdf ready', reportlab.Version)"
+command -v uv >/dev/null && uv run --quiet --no-project --with reportlab python -c "import reportlab; print('pdf ready', reportlab.Version)"
 ```
 
 ```bash
-command -v uv >/dev/null && uv run --quiet --with pillow --with matplotlib --with numpy python -c "import PIL, matplotlib, numpy; print('png ready', PIL.__version__, matplotlib.__version__)"
+command -v uv >/dev/null && uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -c "import PIL, matplotlib, numpy; print('png ready', PIL.__version__, matplotlib.__version__)"
 ```
 
-On success the runner line is `uv run --quiet --with <set> python << 'PYEOF'` — exactly as the recipes are written. Packages land in `uv`'s cache; the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
+On success the runner line is `uv run --quiet --no-project --with <set> python << 'PYEOF'` — exactly as the recipes are written. Packages land in `uv`'s cache; the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
 
 **Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** Create a venv this skill owns, once, fill it with the whole allowlist, and reuse it on every later invocation:
 
 ```bash
 VENV="${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv"
-[ -x "$VENV/bin/python" ] || python3 -m venv "$VENV"
+# --clear empties the directory before building, so refuse anything that is not already
+# a venv: on a symlink it would empty the link's target, and this rung runs unattended.
+if [ -e "$VENV" ] && { [ -L "$VENV" ] || [ ! -f "$VENV/pyvenv.cfg" ]; }; then
+  echo "refusing to build a venv over $VENV — it exists and is not one; move it aside" >&2; exit 1
+fi
+# `-m venv` leaves bin/python behind even when ensurepip fails, so test for a working pip,
+# not for the file — and rebuild with --clear rather than trusting a half-made venv.
+"$VENV/bin/python" -m pip --version >/dev/null 2>&1 || python3 -m venv --clear "$VENV"
 "$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl" 2>/dev/null || "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check reportlab pillow matplotlib numpy python-docx openpyxl
-"$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl; print('venv ready:', '$VENV')"
+"$VENV/bin/python" -c "import sys, reportlab, PIL, matplotlib, numpy, docx, openpyxl; print('venv ready:', sys.argv[1])" "$VENV"
 ```
 
-On success the runner line becomes `"$VENV/bin/python" << 'PYEOF'` (with `VENV` set as above in the same shell call) — that substitution is the only difference between the rungs. This rung installs something durable, isolated from the project and from the system Python, so proceed in automatic mode and state it: the venv path and the packages installed into it.
+On success the runner line becomes `"$VENV/bin/python" << 'PYEOF'` — and **substitute the absolute path this command printed**, not the `$VENV` reference: each later command runs in a fresh shell where `VENV` is unset, and `"$VENV/bin/python"` would then expand to `/bin/python`, which exists on some Linux distributions and silently runs the wrong interpreter. That substitution is the only difference between the rungs. This rung installs something durable, isolated from the project and from the system Python, so proceed in automatic mode and state it: the venv path and the packages installed into it.
 
 **When a rung fails, say exactly what failed and what fixes it.** Quote the error, then:
 
@@ -89,7 +96,7 @@ On success the runner line becomes `"$VENV/bin/python" << 'PYEOF'` (with `VENV` 
 | `python3 -m venv` fails (typically `ensurepip` missing — Debian/Ubuntu without `python3-venv`) | give the platform cure (`sudo apt install python3-venv`) **and** the recommended one, the `uv` installer: `curl -LsSf https://astral.sh/uv/install.sh \| sh` (it also brings a managed Python where there is none). Both install a tool onto the machine: **ask before running either**, whatever the mode. Offer to continue once one has run |
 | no `python3` at all | the same offer: install `uv`, asked first |
 | a download fails on either rung (offline, proxy, registry down) | a warm `uv` cache still works — run the preflight anyway before concluding; if it fails too, say the machine needs network once, and stop |
-| everything above failed, or the user declined | **stop gracefully**: state what is missing and the one command that fixes it; offer the user's own file for this input; for `pdf` only, offer the documented public last-resort URL in `references/pdf.md`, named as a substitution. Never fabricate a file. When called from `/pipelex-inputs`, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues |
+| everything above failed, or the user declined | **stop gracefully**: state what is missing and the one command that fixes it; offer the user's own file for this input — for every format, including `pdf`: there is no public last resort. Never fabricate a file, and never substitute a document the brief did not ask for. When called from `/pipelex-inputs`, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues |
 
 ### Step 3: Draft the content
 
@@ -104,11 +111,17 @@ Fictional throughout. Match the length the method expects: a two-line memo and a
 
 ### Step 4: Render
 
-Open the reference for the format and take the recipe that matches the content — the reference's opening table says which. Copy the recipe, replace its content block with what Step 3 drafted, set the output path to `target`, keep the runner line from Step 2, and run it. Write to `target` directly; the file lands in `<output_dir>/inputs/` when the caller is `/pipelex-inputs`.
+Open the reference for the format and take the recipe that matches the content — the reference's opening table says which. Copy the recipe, replace its content block with what Step 3 drafted, set the output path to `target`, keep the runner line from Step 2, and run it. The file lands in `<output_dir>/inputs/` when the caller is `/pipelex-inputs`.
 
-If the run fails, remove any partial output before doing anything else:
+Two checks on `target` before the render, both cheap and both guarding against a silent success:
+
+- **The path must be fully substituted.** `<` and `>` are legal filename characters, so a recipe still carrying `<output_dir>` writes into a real directory of that name, prints success and exits 0. If `target` still contains `<` or `>`, stop and resolve it first.
+- **An existing file is the user's, not yours.** If something is already at `target`, say so and confirm before overwriting — every recipe truncates the path it opens.
+
+If the run fails, clean up what *this run* created, and nothing else:
 
 ```bash
+# Only when target did not exist before this render — never on a path you did not create.
 rm -f "<target>"
 ```
 
@@ -118,8 +131,8 @@ then read the error. A recipe error is yours to fix and rerun; an environment er
 
 Reopen the file and confirm it is what the brief asked for:
 
-- **PNG**: `uv run --quiet --with pillow python -c "from PIL import Image; im = Image.open('<target>'); print(im.format, im.size, im.mode)"` (or the venv's python) — expect `PNG`, the size the recipe declared, and `RGB` (`RGBA` from the matplotlib chart recipe, which is normal).{% if platform == "claude" %} Then view it with the `Read` tool and check it reads as its category: a chart with the series drafted, a diagram with the nodes, a page that looks scanned, a screen that looks like an app. Fix and rerun if it does not.{% else %} Open it if the harness can display images; otherwise trust the Pillow check and the recipe's declared layout.{% endif %}
-- **PDF**: `head -c 5 <target>` prints `%PDF-`, and `wc -c <target>` is not tiny. Page count, without extra packages: `python3 -c "import re, sys; print(len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" <target>`.
+- **PNG**: `uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<target>"` (or the venv's python) — expect `PNG`, the size the recipe declared, and `RGB` (`RGBA` from the matplotlib chart recipe, which is normal). Read the kilobytes too: a `document_scan` in the low megabytes is expected, any other category past a megabyte is not.{% if platform == "claude" %} Then view it with the `Read` tool and check it reads as its category: a chart with the series drafted, a diagram with the nodes, a page that looks scanned, a screen that looks like an app. Fix and rerun if it does not.{% else %} Open it if the harness can display images; otherwise trust the Pillow check and the recipe's declared layout.{% endif %}
+- **PDF**: `head -c 5 "<target>"` prints `%PDF-`, and `wc -c "<target>"` is not tiny. For the page count run the **Verify** block at the end of `references/pdf.md`, which uses the runner line Step 2 resolved — a bare `python3` is not available on a machine that reached rung 1 through the `uv` installer.
 - **DOCX / XLSX**: reopen with the same library that wrote it and print the headings or the sheet dimensions.
 
 ### Step 6: Report
@@ -131,7 +144,7 @@ One line per file: path, format, dimensions or page count, and a sentence on its
 
 ## Reference
 
-- [references/pdf.md](references/pdf.md) — reportlab: canvas letters, multi-page Platypus reports, tables, a composed line-item document, verification, the last-resort URL.
+- [references/pdf.md](references/pdf.md) — reportlab: canvas letters, multi-page Platypus reports, tables, a composed line-item document, verification, and why there is no last resort.
 - [references/png.md](references/png.md) — Pillow and matplotlib: the shared preamble and font helper, one recipe per category, the scanner post-process, verification.
 - [references/office.md](references/office.md) — Word and Excel through a host `docx`/`xlsx` skill when one is available, otherwise `python-docx` / `openpyxl`.
 - `/pipelex-inputs` — the flow that turns these files into a runnable `inputs.json`.

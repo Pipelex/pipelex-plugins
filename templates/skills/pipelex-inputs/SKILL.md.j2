@@ -368,6 +368,7 @@ Offer only when all of these hold:
 
 - The `mthds_run` tool is present in the session (it is optional — when absent, just finish).
 - No placeholders remain (a Template-strategy result has nothing to run yet).
+- **Every input the template asked for is filled.** A [file the factory could not make](#generate-file-inputs) leaves its input absent, which is neither a placeholder nor a prepare failure — so it passes the other checks here while guaranteeing the run fails on submission. Don't offer: report which input is waiting on the user, and why.
 - The inputs are **run-ready**: [prepare](#prepare-the-inputs-for-a-run) succeeded on the final `inputs.json`, or was legitimately skipped because every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference. Local paths, `data:` URLs, and inline bytes are perfectly fine going *into* prepare — they just must not survive into the run. If prepare failed, don't offer: report the failure and what it would take to fix (text, scalar, and structured values are sent inline and are never the problem).
 
 On acceptance:

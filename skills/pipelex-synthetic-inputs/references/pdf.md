@@ -1,6 +1,6 @@
 # PDF recipes — reportlab
 
-Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --with reportlab python << 'PYEOF'` on the `uv` rung, `"$VENV/bin/python" << 'PYEOF'` on the venv rung), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
+Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with reportlab python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
 
 `reportlab` is BSD-licensed and pure Python; every recipe below was executed under reportlab 5.0.1 before it was committed.
 
@@ -27,14 +27,18 @@ Page size: the recipes use `letter`; use `A4` from the same import when the meth
 The raw canvas: place text and lines at coordinates. Origin is the bottom-left corner, units are points (72 per inch).
 
 ```bash
-uv run --quiet --with reportlab python << 'PYEOF'
+uv run --quiet --no-project --with reportlab python << 'PYEOF'
+import os
 from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 OUT = "<output_dir>/inputs/test_document.pdf"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 TITLE = "Acme Hardware Supply — Internal Memo"
@@ -50,7 +54,7 @@ LINES = [
 ]
 # -----------------------------------------------------------------------
 
-c = canvas.Canvas(OUT, pagesize=letter)
+c = canvas.Canvas(PART, pagesize=letter, invariant=1)  # invariant: no timestamp, so reruns are byte-identical
 width, height = letter
 
 c.setFont("Helvetica-Bold", 16)
@@ -64,6 +68,7 @@ for line in LINES:
     y -= 16
 
 c.save()
+os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
@@ -73,7 +78,8 @@ PYEOF
 Platypus flows a list of elements (`Paragraph`, `Spacer`, `PageBreak`, …) across pages with margins and page breaks handled for you. This is the recipe for a report with sections.
 
 ```bash
-uv run --quiet --with reportlab python << 'PYEOF'
+uv run --quiet --no-project --with reportlab python << 'PYEOF'
+import os
 from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
@@ -81,7 +87,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 OUT = "<output_dir>/inputs/test_report.pdf"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 TITLE = "Quarterly Operations Report — Q1 2026"
@@ -101,7 +110,7 @@ SECTIONS = [
 # -----------------------------------------------------------------------
 
 styles = getSampleStyleSheet()
-doc = SimpleDocTemplate(OUT, pagesize=letter, title=TITLE)
+doc = SimpleDocTemplate(PART, pagesize=letter, title=TITLE, invariant=1)
 story = [Paragraph(TITLE, styles["Title"]), Spacer(1, 12)]
 
 for index, (heading, paragraphs) in enumerate(SECTIONS):
@@ -113,6 +122,7 @@ for index, (heading, paragraphs) in enumerate(SECTIONS):
         story.append(Spacer(1, 8))
 
 doc.build(story)
+os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
@@ -124,7 +134,8 @@ Long body text: `Paragraph("… " * 40, styles["Normal"])` wraps and paginates o
 A titled table with a styled header row and a grid — the recipe for price lists, schedules and results.
 
 ```bash
-uv run --quiet --with reportlab python << 'PYEOF'
+uv run --quiet --no-project --with reportlab python << 'PYEOF'
+import os
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -133,7 +144,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 OUT = "<output_dir>/inputs/test_table.pdf"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 TITLE = "Quarterly Sales by Product"
@@ -146,9 +160,17 @@ DATA = [
 # -----------------------------------------------------------------------
 
 styles = getSampleStyleSheet()
-doc = SimpleDocTemplate(OUT, pagesize=letter, title=TITLE)
+doc = SimpleDocTemplate(PART, pagesize=letter, title=TITLE, invariant=1)
 
-table = Table(DATA, hAlign="LEFT")
+# Letter minus reportlab's default 72pt margins leaves 468pt. Table() auto-sizes to
+# content when colWidths is omitted and draws the surplus straight off the paper, with
+# no error — SimpleDocTemplate only checks height. Size the columns, and if they cannot
+# fit 468pt, switch to `landscape(letter)` (648pt) rather than letting them overflow.
+COLUMN_WIDTHS = [148, 80, 80, 80, 80]
+assert sum(COLUMN_WIDTHS) <= 468, f"columns total {sum(COLUMN_WIDTHS)}pt — over the 468pt text width"
+assert len(COLUMN_WIDTHS) == len(DATA[0]), "one width per column"
+
+table = Table(DATA, colWidths=COLUMN_WIDTHS, hAlign="LEFT")
 table.setStyle(TableStyle([
     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f3e4e")),
     ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
@@ -161,6 +183,7 @@ table.setStyle(TableStyle([
 ]))
 
 doc.build([Paragraph(TITLE, styles["Title"]), Spacer(1, 12), table])
+os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
@@ -170,7 +193,8 @@ PYEOF
 The two Platypus recipes together: a header block of paragraphs, a line-item table, a totals block. This is the shape of an invoice, a statement, a purchase order or a receipt — the most common document brief. The totals are computed from the items so they always agree.
 
 ```bash
-uv run --quiet --with reportlab python << 'PYEOF'
+uv run --quiet --no-project --with reportlab python << 'PYEOF'
+import os
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -179,7 +203,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 OUT = "<output_dir>/inputs/test_invoice.pdf"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 KIND = "INVOICE"
@@ -199,7 +226,7 @@ CURRENCY = "EUR"
 # -----------------------------------------------------------------------
 
 styles = getSampleStyleSheet()
-doc = SimpleDocTemplate(OUT, pagesize=letter, title=f"{KIND} {NUMBER}")
+doc = SimpleDocTemplate(PART, pagesize=letter, title=f"{KIND} {NUMBER}", invariant=1)
 story = []
 
 story.append(Paragraph(f"{KIND} {NUMBER}", styles["Title"]))
@@ -219,7 +246,9 @@ subtotal = 0.0
 for description, quantity, unit_price in ITEMS:
     amount = quantity * unit_price
     subtotal += amount
-    rows.append([description, str(quantity), f"{unit_price:,.2f}", f"{amount:,.2f}"])
+    # A plain str cell does not wrap: a long description runs into the Qty column and
+    # destroys the number the method is there to read. Paragraph wraps inside colWidths.
+    rows.append([Paragraph(description, styles["Normal"]), str(quantity), f"{unit_price:,.2f}", f"{amount:,.2f}"])
 tax = round(subtotal * TAX_RATE, 2)
 total = round(subtotal + tax, 2)
 rows += [
@@ -243,29 +272,26 @@ story.append(Spacer(1, 24))
 story.append(Paragraph("Payment within 30 days by bank transfer. Thank you for your business.", styles["Normal"]))
 
 doc.build(story)
+os.replace(PART, OUT)
 print("wrote", OUT, "total", f"{total:.2f}")
 PYEOF
 ```
 
-Swap `KIND`, the party blocks and the closing line to turn it into a purchase order, a credit note or a receipt; the arithmetic stays.
+Swap `KIND`, the party blocks and the closing line to turn it into a purchase order, a credit note or a receipt; the arithmetic stays. Descriptions are wrapped as `Paragraph`s, so a full product name stays inside its column instead of overprinting the quantity — keep that wrapper if you widen the table.
 
 ## Verify
 
 ```bash
 head -c 5 "<output_dir>/inputs/<name>.pdf"; echo; wc -c "<output_dir>/inputs/<name>.pdf"
-python3 -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<output_dir>/inputs/<name>.pdf"
+uv run --quiet --no-project python -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<output_dir>/inputs/<name>.pdf"
 ```
 
-Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed run must leave no file: `rm -f "<target>"`, unconditionally — a partial render is non-empty, so testing the size first spares exactly the file that has to go.
+The page count needs no packages, so it runs under whichever interpreter Step 2 resolved — the `uv run` above on rung 1, the absolute venv interpreter path on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
 
-## Last resort — a public test PDF
+Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed render must leave nothing behind, but only what it created: remove `<target>` when this run is what put it there, and never on a path that already held a file (Step 4 makes you confirm before overwriting one).
 
-Only when the environment could not be resolved (the skill's Step 2 table, last row) and the user has no file to give: use a public PDF as the input value directly, and say in the report that this is a substitution, not a generated document.
+## No last resort — ask for a file
 
-```json
-{
-  "document": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-word.pdf"
-}
-```
+When the environment cannot be resolved (the skill's Step 2 table, last row), there is no fallback here: say what is missing, say the one command that fixes it, and ask the user for their own PDF for that input. `pdf` behaves exactly like `png` in this respect.
 
-It is a small table document; a method expecting an invoice will not find invoice fields in it, which is exactly why the substitution has to be named.
+An earlier version of this reference offered a public test PDF on `w3.org` as a substitution. It is gone for two reasons. It had already stopped resolving — the URL now answers `300 Multiple Choices` with an HTML error page, which `mthds_prepare_inputs` would pass through unchanged for the hosted API to fetch, handing the method an error page as its document. And it was the wrong shape regardless: it is offered precisely when the machine has just failed to reach a package registry, and a document that is not what the brief asked for lets a method run on the wrong input and report success — the same reasoning that keeps `photograph` out of `references/png.md`.

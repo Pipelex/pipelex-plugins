@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from pathlib import Path
-from typing import ClassVar
 
 import pytest
 
@@ -24,6 +24,9 @@ from scripts.gen_skill_docs import (
     make_plugin_json,
     render_codex_discovery_marketplace,
     render_templates,
+    resolve_output_dir,
+    setup_static_assets,
+    static_asset_mismatches,
 )
 
 DEFAULT_VARS: dict[str, str | bool] = {"marketplace_name": "pipelex-plugins", "plugin_name": "pipelex", "platform": "claude"}
@@ -795,7 +798,6 @@ class TestSyntheticInputsSkill:
 
     REPO_ROOT = Path(__file__).parents[2]
     SKILLS = REPO_ROOT / "templates" / "skills"
-    OUTPUT_DIR_BY_TARGET: ClassVar[dict[str, str]] = {"prod": "pipelex", "codex": "pipelex-codex", "mistral-vibe": "pipelex-vibe"}
     REFERENCES = ("pdf.md", "png.md", "office.md")
 
     @property
@@ -825,7 +827,8 @@ class TestSyntheticInputsSkill:
         assert "**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.**" in body
         assert "pipelex-plugins/synth-venv" in body
         assert "the runner line becomes `\"$VENV/bin/python\" << 'PYEOF'`" in body
-        assert "that substitution is the only difference between the rungs" in body
+        assert "That substitution is the only difference between the rungs" in body
+        assert "**substitute the absolute path this command printed**" in body, "the runner line must not be handed over as a $VENV reference"
         assert "curl -LsSf https://astral.sh/uv/install.sh" in body
         assert "return **no path** with the reason" in body
 
@@ -864,7 +867,7 @@ class TestSyntheticInputsSkill:
         assert "{%" not in body
         assert "{{" not in body
 
-        references_dir = self.REPO_ROOT / self.OUTPUT_DIR_BY_TARGET[target_name] / "skills" / "pipelex-synthetic-inputs" / "references"
+        references_dir = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-synthetic-inputs" / "references"
         for reference in self.REFERENCES:
             assert (references_dir / reference).is_file(), f"{target_name}: missing references/{reference}"
 
@@ -887,6 +890,94 @@ class TestSyntheticInputsSkill:
         else:
             assert "open `../pipelex-synthetic-inputs/SKILL.md` and follow it." in body
             assert "Invoke it with `/pipelex-synthetic-inputs`." not in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_build_copies_the_references_it_ships(self, target_name: str, tmp_path: Path) -> None:
+        """Exercise the copy step, not the committed tree.
+
+        `render_templates` does not copy static assets — `setup_static_assets`
+        does, and asserting on the checked-in output directories only proved
+        that three committed files were still committed. Dropping the skill from
+        the copy step would have left every test green.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        setup_static_assets(self.REPO_ROOT, tmp_path, self.REPO_ROOT / "templates", config.include_skills)
+
+        produced = tmp_path / "skills" / "pipelex-synthetic-inputs" / "references"
+        source = self.REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "references"
+        for reference in self.REFERENCES:
+            assert (produced / reference).is_file(), f"{target_name}: the build did not copy references/{reference}"
+            assert (produced / reference).read_bytes() == (source / reference).read_bytes(), (
+                f"{target_name}: references/{reference} was copied but does not match its source"
+            )
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_freshness_catches_a_stale_reference_copy(self, target_name: str, tmp_path: Path) -> None:
+        """A reference edited without `make build` must fail `make check`.
+
+        The copies are not rendered, so they never enter a BuildResult and the
+        freshness check used to skip them entirely — a shipped plugin could carry
+        recipes that differ from the ones the recipe suite ran.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        setup_static_assets(self.REPO_ROOT, tmp_path, self.REPO_ROOT / "templates", config.include_skills)
+        templates_dir = self.REPO_ROOT / "templates"
+        assert static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills) == []
+
+        stale = tmp_path / "skills" / "pipelex-synthetic-inputs" / "references" / "png.md"
+        stale.write_text(stale.read_text(encoding="utf-8") + "\ndrift\n", encoding="utf-8")
+        assert any("STALE" in problem for problem in static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills))
+
+        stale.unlink()
+        assert any("MISSING" in problem for problem in static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills))
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_orphan_copies_are_reported_and_the_build_clears_them(self, target_name: str, tmp_path: Path) -> None:
+        """Both ORPHAN branches, and the build's answer to them.
+
+        A copy with no source is the one mismatch a rebuild used to be unable to
+        fix, so `make check` failed pointing at `make build` — advice that did
+        nothing. The check reports it and the build now removes it.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        templates_dir = self.REPO_ROOT / "templates"
+        setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
+        references = tmp_path / "skills" / "pipelex-synthetic-inputs" / "references"
+
+        # A file in the copy with no matching source.
+        (references / "invented.md").write_text("no source file produced this\n", encoding="utf-8")
+        problems = static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
+        assert any("ORPHAN" in problem and "invented.md" in problem for problem in problems)
+
+        setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
+        assert not (references / "invented.md").exists(), "the rebuild left an orphaned file behind"
+        assert static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills) == []
+
+        # A whole references/ directory in the copy whose source no longer exists.
+        ghost = tmp_path / "skills" / "pipelex-explain" / "references"
+        ghost.mkdir(parents=True)
+        (ghost / "retired.md").write_text("a reference whose source was removed\n", encoding="utf-8")
+        problems = static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
+        assert any("ORPHAN" in problem and "pipelex-explain" in problem for problem in problems)
+
+        setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
+        assert not ghost.exists(), "the rebuild left a whole orphaned references/ directory behind"
+        assert static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills) == []
+
+    def test_check_freshness_fails_on_a_stale_reference_copy(self, tmp_path: Path) -> None:
+        """The comparison must be wired into `check_freshness`, not merely exist.
+
+        Testing the helper alone leaves the single call site uncovered: deleting
+        it keeps the whole unit suite green while restoring the exact bug it was
+        written to close.
+        """
+        tree = tmp_path / "repo"
+        shutil.copytree(self.REPO_ROOT, tree, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", "node_modules"))
+        assert check_freshness(tree, "prod") == 0, "the copied tree should start fresh"
+
+        shipped = tree / "pipelex" / "skills" / "pipelex-synthetic-inputs" / "references" / "png.md"
+        shipped.write_text(shipped.read_text(encoding="utf-8") + "\nedited without a rebuild\n", encoding="utf-8")
+        assert check_freshness(tree, "prod") == 1, "a stale reference copy must fail the freshness gate"
 
 
 class TestHookRendering:

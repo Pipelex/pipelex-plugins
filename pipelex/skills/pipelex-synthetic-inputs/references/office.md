@@ -1,6 +1,6 @@
 # Word and Excel recipes — python-docx, openpyxl
 
-Recipes for the `docx` and `xlsx` formats of `/pipelex-synthetic-inputs`, carried over from `/pipelex-inputs` as they were. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
+Recipes for the `docx` and `xlsx` formats of `/pipelex-synthetic-inputs`, carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner line, and a verify step. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
 
 ## Word documents (DOCX)
 
@@ -15,24 +15,29 @@ Save to: <output_dir>/inputs/<filename>.docx
 **If not**, create it with `python-docx` (MIT). Runner line per the skill's Step 2; the package set is `python-docx`:
 
 ```bash
-uv run --quiet --with python-docx python << 'PYEOF'
+uv run --quiet --no-project --with python-docx python << 'PYEOF'
+import os
 from pathlib import Path
 
 from docx import Document
 
 OUT = "<output_dir>/inputs/test_document.docx"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 doc = Document()
 doc.add_heading("Test Document", 0)
 doc.add_paragraph("This is synthetic test content for method testing.")
 # Add more content as needed: doc.add_heading("Section", 1), doc.add_paragraph("…"), doc.add_table(rows=2, cols=3)
-doc.save(OUT)
+doc.save(PART)
+os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --with python-docx python -c "from docx import Document; d = Document('<target>'); print([p.text for p in d.paragraphs][:5])"`.
+Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "from docx import Document; d = Document('<target>'); print([p.text for p in d.paragraphs][:5])"`.
 
 ## Spreadsheets (XLSX)
 
@@ -47,13 +52,17 @@ Save to: <output_dir>/inputs/<filename>.xlsx
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
 ```bash
-uv run --quiet --with openpyxl python << 'PYEOF'
+uv run --quiet --no-project --with openpyxl python << 'PYEOF'
+import os
 from pathlib import Path
 
 from openpyxl import Workbook
 
 OUT = "<output_dir>/inputs/test_spreadsheet.xlsx"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 wb = Workbook()
 ws = wb.active
@@ -61,9 +70,10 @@ ws.title = "Data"
 ws.append(["Column1", "Column2"])
 ws.append(["Value1", "Value2"])
 # Add more rows as needed: ws.append([...]); a second sheet: wb.create_sheet("Summary")
-wb.save(OUT)
+wb.save(PART)
+os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --with openpyxl python -c "from openpyxl import load_workbook; wb = load_workbook('<target>'); ws = wb.active; print(ws.title, ws.dimensions)"`.
+Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "from openpyxl import load_workbook; wb = load_workbook('<target>'); ws = wb.active; print(ws.title, ws.dimensions)"`.
