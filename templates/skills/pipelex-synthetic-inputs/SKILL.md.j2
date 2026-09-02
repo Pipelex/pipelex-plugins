@@ -118,7 +118,7 @@ then read the error. A recipe error is yours to fix and rerun; an environment er
 
 Reopen the file and confirm it is what the brief asked for:
 
-- **PNG**: `uv run --quiet --with pillow python -c "from PIL import Image; im = Image.open('<target>'); print(im.format, im.size, im.mode)"` (or the venv's python) — expect `PNG`, the size the recipe declared, `RGB`.{% if platform == "claude" %} Then view it with the `Read` tool and check it reads as its category: a chart with the series drafted, a diagram with the nodes, a page that looks scanned, a screen that looks like an app. Fix and rerun if it does not.{% else %} Open it if the harness can display images; otherwise trust the Pillow check and the recipe's declared layout.{% endif %}
+- **PNG**: `uv run --quiet --with pillow python -c "from PIL import Image; im = Image.open('<target>'); print(im.format, im.size, im.mode)"` (or the venv's python) — expect `PNG`, the size the recipe declared, and `RGB` (`RGBA` from the matplotlib chart recipe, which is normal).{% if platform == "claude" %} Then view it with the `Read` tool and check it reads as its category: a chart with the series drafted, a diagram with the nodes, a page that looks scanned, a screen that looks like an app. Fix and rerun if it does not.{% else %} Open it if the harness can display images; otherwise trust the Pillow check and the recipe's declared layout.{% endif %}
 - **PDF**: `head -c 5 <target>` prints `%PDF-`, and `wc -c <target>` is not tiny. Page count, without extra packages: `python3 -c "import re, sys; print(len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" <target>`.
 - **DOCX / XLSX**: reopen with the same library that wrote it and print the headings or the sheet dimensions.
 

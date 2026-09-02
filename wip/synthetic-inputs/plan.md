@@ -147,7 +147,20 @@ Settle D1–D8 (defaults: the recommendations, with D5 and D8 already ruled). Fi
 2. Run every recipe locally, view each output, and iterate until each reads as its category to a vision model — the practical test is to describe each generated image back and check the description matches the brief.
 3. `make build`, `make agent-check`.
 
-**Checkpoint A** — the skill exists and works standalone in every target. Update this document: which recipes landed and anything a category could not do well.
+**Phase 2 landed on 2026-09-02.** `references/png.md` carries all four categories of D5, each executed and looked at before the commit under Pillow 12.3.0, matplotlib 3.11.1 and numpy 2.5.2, and each rendered again from the block as extracted from the Markdown — which is how Phase 4 will run them. `make build`, `make agent-check` and `make agent-test` pass; the reference is copied into all three targets.
+
+- **`chart`** — one matplotlib script with `bar`, `line`, `pie` and `scatter` as branches of a `KIND` field, so the agent edits one line rather than choosing a recipe. `figsize=(WIDTH / DPI, HEIGHT / DPI)` plus `fig.tight_layout()` gives exactly the declared pixel size; `bbox_inches="tight"` would break that and the reference says so.
+- **`diagram`** — a node list with explicit grid positions and an edge list; the layout, the border-clipped arrows and the arrowheads are computed. Roles (`start`, `step`, `decision`, `end`) colour the boxes.
+- **`document_scan`** — an A4-at-150-dpi invoice whose totals are computed from the items, then `scannerize()`: seeded skew, paper tint, grain, soft vignette. The post-process is a plain function on an image, so any other recipe can end with it, and the reference gives dial settings for a clean office scan and for a bad phone photo.
+- **`screenshot`** — window chrome, sidebar, header with an action button, stat tiles, and a `LAYOUT` field choosing a status-badged table or a card grid. Both branches were rendered and viewed.
+
+Three things the work taught, all now written into the files rather than only here:
+
+- **Character-count wrapping overflows boxes.** `textwrap.wrap(label, width=18)` spilled every node label past its box edge; the recipes wrap on `draw.textlength` instead. The screenshot table is the one place that still lays out on fixed column shares rather than measurement — a deliberate simplification, called out in the reference with the cure (widen the share, do not shorten content the method must read).
+- **matplotlib writes `RGBA`, Pillow writes `RGB`.** The chart recipe's file is `RGBA` and there is no flag to change it, so `SKILL.md`'s Step 5 verify line and the reference both name both as correct. Converting in the recipe would have been code added only to satisfy a sentence.
+- **A collector rule for Phase 4.** The PNG "Verify" block starts with `uv run`, like every recipe, but it is a template carrying `<name>` rather than a runnable recipe — extracting it fails on a file that does not exist. The Phase 4 collector must take blocks whose first line starts with `uv run` **and** which contain no `<name>` placeholder. The equivalent block in `pdf.md` starts with `head -c 5` and so was never at risk; the rule makes both safe.
+
+**Checkpoint A** — the skill exists and works standalone in every target.
 
 ### Phase 3 — Wire `pipelex-inputs`
 
