@@ -23,6 +23,12 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+# The recipe suite executes the shipped synthetic-inputs recipes, which downloads
+# packages on a cold uv cache. Opt in with `make test-recipes` or `pytest -m recipes`.
+addopts = "-m 'not recipes'"
+markers = [
+  "recipes: executes the pipelex-synthetic-inputs recipe blocks (runs uv, downloads packages)",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
