@@ -191,6 +191,23 @@ def wrap(text, face, max_width):
     return lines + [current] if current else lines
 
 
+def fit_label(text, max_width, max_height, bold=False):
+    """The largest size at which the wrapped label fits the box, both ways.
+
+    Box height shrinks as the graph gains rows, so a two-line label that is
+    comfortable in a four-row diagram overflows a seven-row one. Measuring
+    beats guessing: step down until it fits, and keep the smallest size rather
+    than drawing outside the box.
+    """
+    for size in (19, 17, 15, 13, 11):
+        face = font(size, bold=bold)
+        lines = wrap(text, face, max_width)
+        line_h = face.getbbox("Ag")[3] + 6
+        if line_h * len(lines) <= max_height and all(draw.textlength(line, font=face) <= max_width for line in lines):
+            return face, lines, line_h
+    return face, lines, line_h
+
+
 def border_point(box, towards):
     """Where the segment from the box centre to `towards` leaves the box."""
     x0, y0, x1, y1 = box[:4]
@@ -249,9 +266,7 @@ for source, target, label in EDGES:
 for node_id, (x0, y0, x1, y1, role, label) in boxes.items():
     fill, outline = ROLE_COLORS.get(role, ROLE_COLORS["step"])
     draw.rounded_rectangle([x0, y0, x1, y1], radius=12, fill=fill, outline=outline, width=3)
-    face = font(19, bold=role in ("start", "end"))
-    lines = wrap(label, face, box_w - 28)
-    line_h = face.getbbox("Ag")[3] + 6
+    face, lines, line_h = fit_label(label, box_w - 28, box_h - 12, bold=role in ("start", "end"))
     cy = (y0 + y1) / 2 - line_h * (len(lines) - 1) / 2
     for index, line in enumerate(lines):
         draw.text(((x0 + x1) / 2, cy + line_h * index), line, font=face, fill="#20262e", anchor="mm")
@@ -260,6 +275,8 @@ image.save(OUT)
 print("wrote", OUT, image.size)
 PYEOF
 ```
+
+Labels are sized to fit: `fit_label()` steps the font down until the wrapped label fits its box in both directions, because box height shrinks as the graph gains rows and a two-line label comfortable in a four-row diagram will spill out of a seven-row one. Keep labels to a few words anyway — a diagram whose boxes are set in 11px is telling you the graph wants fewer nodes or shorter names.
 
 Columns are the reading direction and rows are the lanes, so a left-to-right flow numbers columns 0, 1, 2… and a top-to-bottom one numbers rows. Branches sit on different rows of the same column, as `pick` and `backord` do above. The grid is spaced from the largest column and row index, so leaving a gap in the numbering widens the drawing.
 
@@ -440,7 +457,7 @@ PYEOF
 
 Turn the dials in `scannerize()` down to `angle=0.2, grain=3, blur=0.4` for a clean office scan, and up to `angle=1.6, grain=14, blur=1.2` for a bad phone photo of a crumpled receipt. Leave them alone unless the method's difficulty is the point — a page nobody can read is not a better test.
 
-To render a letter or a form instead of an invoice, drop the item loop and the totals block and keep the header, the paragraph flow and the footer. To fill several pages, render each page and save them as separate files; a multi-page TIFF is not covered here.
+To render a letter or a form instead of an invoice, drop the item loop and the totals block and keep the header, the paragraph flow and the footer — nothing below them depends on either. `SELLER` and `BUYER` are then just the sender and the addressee; rename them if it helps you keep the content straight, since only the content block names them. To fill several pages, render each page and save them as separate files; a multi-page TIFF is not covered here.
 
 ## App screenshot (Pillow)
 

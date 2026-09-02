@@ -83,7 +83,7 @@ On success the runner line is `uv run --quiet --with <set> python << 'PYEOF'` â€
 ```bash
 VENV="${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv"
 [ -x "$VENV/bin/python" ] || python3 -m venv "$VENV"
-"$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl" 2>/dev/null || "$VENV/bin/python" -m pip install --quiet reportlab pillow matplotlib numpy python-docx openpyxl
+"$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl" 2>/dev/null || "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check reportlab pillow matplotlib numpy python-docx openpyxl
 "$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl; print('venv ready:', '$VENV')"
 ```
 
