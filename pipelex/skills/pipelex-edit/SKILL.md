@@ -85,7 +85,7 @@ When the edit could have changed the input template — a renamed main-pipe inpu
 
 State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs or run the method.
 
-**Generated types may now be stale.** Look for `sources.json` files carrying `"generator": "pipelex-integrate"` whose `sources` name a file this edit changed — a project keeps one beside each generated tree, typically under `src/generated/<method>/` or `<package>/generated/<method>/`. For each, say that the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it. This notice is the only drift guard a Python consumer has, so do not skip it.
+**Generated types may now be stale.** Search the **whole project** for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — and keep the ones whose `sources` name a file this edit changed. The sidecar sits beside the **generated tree**, never beside the bundle: `src/generated/<method>/` or `<package>/generated/<method>/`. Looking only next to the `.mthds` file finds nothing and reports a clean bill that is wrong. For each, say that the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it. This notice is the only drift guard a Python consumer has, so do not skip it.
 
 ## Reference
 
