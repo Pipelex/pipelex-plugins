@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **`pipelex-design` is model-invocable.** The skill shipped `disable-model-invocation: true` on Claude and Vibe, so it could only be reached by typing `/pipelex-design`. That made `pipelex-edit`'s routing a dead end — it classified a structural change, then had to hand the user a slash command to type and throw away the baseline verdict it had just produced. The flag is gone on every target, the skill's description now carries natural-language triggers ("design a method", "create a pipeline", "add a step", "rewire this pipeline") so the model can actually reach it, and `pipelex-edit` names the affected pipes and invokes `/pipelex-design` directly instead of stopping. The consent gate stays where it belongs: the design run still announces its captured contract in one line before writing anything.
 - **Tooling:** Pinned `ruff` to an exact `0.16.4`, replacing the `>=0.6.8` floor. The exact pin matches what the Ruff VS Code extension now bundles, which matters because Ruff 0.16 lints `pyproject.toml` itself: the extension syncs the config file to the language server, and a pre-0.16 binary parses it as Python source and paints phantom `invalid-syntax` diagnostics on lines like `requires-python`. A floor let the editor and the CLI resolve to different binaries; an exact pin cannot. This is a dev dependency, so nothing shipped changes, and the upgrade produced no lint findings and no reformatting.
 
 ## [0.5.0] - 2026-08-01

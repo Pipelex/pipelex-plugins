@@ -774,6 +774,34 @@ class TestAdaptiveDesignSkill:
         assert "{%" not in body
         assert "{{" not in body
 
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_design_is_model_invocable_on_every_platform(self, target_name: str) -> None:
+        """The design skill must stay reachable without a slash command.
+
+        It shipped ``disable-model-invocation: true`` through 0.5.0, which made
+        ``pipelex-edit``'s structural-change routing a dead end. Both halves of
+        the fix are pinned: the flag is gone, and the description carries the
+        natural-language triggers without which removing the flag is inert.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-design"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-design/SKILL.md"))
+        assert "disable-model-invocation" not in body
+        assert 'Use when the user says "design a method"' in body
+        assert '"add a step", "rewire this pipeline"' in body
+
+    def test_edit_hands_structural_changes_off_by_invoking_design(self) -> None:
+        edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "then invoke `/pipelex-design`" in edit
+        assert "hand off to `/pipelex-design` now, before any files change" in edit
+        assert "and stop. Never attempt a partial structural edit here." not in edit
+
     def test_adjacent_skills_describe_organization_as_conditional(self) -> None:
         organize = (self.SKILLS / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
         edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
