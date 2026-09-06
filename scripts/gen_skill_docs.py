@@ -467,6 +467,16 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     return base
 
 
+def _remove(path: Path) -> None:
+    """Delete whatever is at `path`, without following a symlink to its target."""
+    # is_symlink() must be checked before is_dir(): a symlink-to-dir is both, and
+    # rmtree would chase the link and delete its target.
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def _refresh_copy(src: Path, dst: Path) -> None:
     """Replace whatever exists at dst with a fresh copy of src's contents.
 
@@ -474,12 +484,7 @@ def _refresh_copy(src: Path, dst: Path) -> None:
     before copytree runs. Plain files/dirs are removed too so the build is
     idempotent.
     """
-    # is_symlink() must be checked before is_dir(): a symlink-to-dir is both,
-    # and rmtree would chase the link and delete its target.
-    if dst.is_symlink() or dst.is_file():
-        dst.unlink()
-    elif dst.is_dir():
-        shutil.rmtree(dst)
+    _remove(dst)
     shutil.copytree(src, dst)
 
 
@@ -512,6 +517,72 @@ def setup_static_assets(
         refs_dst = skill_output / "references"
         if refs_src.is_dir():
             _refresh_copy(refs_src, refs_dst)
+        elif refs_dst.is_dir() or refs_dst.is_symlink():
+            # A retired source directory must take its copies with it. Without this the
+            # build leaves stale references shipping in every target and `--check`
+            # reports an ORPHAN no rebuild can clear.
+            _remove(refs_dst)
+
+
+def static_asset_mismatches(
+    base_dir: Path,
+    output_dir: Path,
+    templates_dir: Path,
+    include_skills: list[str] | None,
+) -> list[str]:
+    """Compare the copied per-skill `references/` against their source.
+
+    `setup_static_assets` copies rather than renders, so these files never enter
+    a BuildResult and freshness checking used to skip them entirely — a source
+    reference edited without `make build` shipped stale while `--check` reported
+    everything fresh. The references are executable know-how, so a stale copy is
+    a plugin whose recipes differ from the ones the test suite ran.
+    """
+    if output_dir == base_dir:
+        return []  # root target: source and destination are the same tree
+
+    if include_skills is not None:
+        skill_names = include_skills
+    else:
+        skill_names = sorted(path.parent.name for path in templates_dir.glob("skills/*/SKILL.md.j2"))
+
+    def label(path: Path) -> str:
+        """Repo-relative when it can be, absolute otherwise — a caller may point
+        the comparison at a directory outside the repo."""
+        try:
+            return str(path.relative_to(base_dir))
+        except ValueError:
+            return str(path)
+
+    problems: list[str] = []
+    for skill_name in skill_names:
+        refs_src = base_dir / "skills" / skill_name / "references"
+        refs_dst = output_dir / "skills" / skill_name / "references"
+        if not refs_src.is_dir():
+            if refs_dst.is_dir():
+                problems.append(f"  ORPHAN: {label(refs_dst)} (no source in skills/{skill_name}/references)")
+            continue
+
+        expected: set[Path] = {path.relative_to(refs_src) for path in refs_src.rglob("*") if path.is_file()}
+        actual: set[Path] = set()
+        if refs_dst.is_dir():
+            actual = {path.relative_to(refs_dst) for path in refs_dst.rglob("*") if path.is_file()}
+
+        for rel in sorted(expected - actual):
+            problems.append(f"  MISSING: {label(refs_dst / rel)}")
+        for rel in sorted(actual - expected):
+            problems.append(f"  ORPHAN: {label(refs_dst / rel)} (no matching source file)")
+        for rel in sorted(expected & actual):
+            # An unreadable file is a finding, not a traceback: check_freshness runs
+            # under `make check`, where an OSError escaping here kills the whole gate.
+            try:
+                differs = (refs_src / rel).read_bytes() != (refs_dst / rel).read_bytes()
+            except OSError as exc:
+                problems.append(f"  UNREADABLE: {label(refs_dst / rel)} ({exc.strerror})")
+                continue
+            if differs:
+                problems.append(f"  STALE: {label(refs_dst / rel)}")
+    return problems
 
 
 def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False) -> BuildResult:
@@ -683,6 +754,10 @@ def check_freshness(base_dir: Path, target_name: str = "prod") -> int:
                 if skill_md.parent not in rendered_skill_parents:
                     rel = skill_md.relative_to(base_dir)
                     all_stale.append(f"  ORPHAN: {rel} (no corresponding .j2 template)")
+
+        # Copied static assets (per-skill references/) are not rendered, so they
+        # need their own comparison — see static_asset_mismatches.
+        all_stale.extend(static_asset_mismatches(base_dir, output_dir, base_dir / TEMPLATES_DIR_NAME, config.include_skills))
 
         # Detect leaked .j2 files in output directories (should only be in templates/)
         if output_skills_dir.is_dir():
