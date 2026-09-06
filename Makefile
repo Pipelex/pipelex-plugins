@@ -16,7 +16,7 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 	help env check-uv install lock li \
 	gen-skill-docs build vendor-hook check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
-	test agent-test gha-tests tp \
+	test agent-test test-recipes gha-tests tp \
 	cleanderived cleanenv cleanall reinstall ri \
 	codex-use-local codex-use-official codex-refresh codex-status
 
@@ -133,6 +133,9 @@ tp: install ## Run tests with prints (TEST=name to filter)
 	else \
 		$(VENV_PYTEST) tests/ -s -v; \
 	fi
+
+test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
+	@$(VENV_PYTEST) tests/recipes -m recipes -v
 
 gha-tests: install ## Run tests for GitHub Actions (exit on first failure, quiet)
 	@$(VENV_PYTEST) --exitfirst --quiet
