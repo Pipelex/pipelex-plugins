@@ -1,0 +1,158 @@
+---
+name: pipelex-scaffold
+description: Start a new project that will call MTHDS methods through Pipelex, in TypeScript or Python — from one of the Pipelex starter templates or from the ecosystem's own initializer — and hand it to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "set up a Pipelex project from scratch", "new Python CLI for this method", "which starter should I use", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user is standing in a freshly cloned pipelex-starter-js or pipelex-starter-python that has not been renamed yet — this skill runs the template's own bootstrap for them. Not for adding Pipelex to code that already exists: that is /pipelex-integrate.
+
+---
+
+# Scaffold a project for Pipelex methods
+
+Give a user who has no project yet a project that is ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
+
+- **One of the Pipelex starters** when the user wants the opinionated shape: `pipelex-starter-js` for a web app whose forms are rendered from the methods' own contracts, `pipelex-starter-python` for a CLI or service that runs methods in the three execution modes. You acquire the template, commit it once as it came, then run the clone's **own** `bootstrap` skill — the rename logic lives in the starters and is never reimplemented here.
+- **The ecosystem's own initializer** when the user wants their framework or a minimal project: `uv init --package`, `npm create next-app@latest`, `django-admin startproject`, whatever the framework documents. You run it; you never assemble a project by hand.
+
+Both branches end the same way: an env file that follows the starters' convention, one pristine commit that makes everything after it reviewable, and the hand-off — to `/pipelex-integrate` when a method exists, to `/pipelex-design` first when none does.
+
+**What this skill is not.** Not a template engine (no cookiecutter, no copier, no framework matrix of its own), not a bootstrap (the starters own theirs), not a runner or a dev-server launcher, not a deployer. It needs no MCP tool and no API key: git, the starters' scripts and the ecosystem's initializers are all it uses.
+
+## Choosing the branch
+
+A cheap, reliable signal decides; an inconclusive one asks one question; nothing is guessed twice.
+
+| Question | Signals, in order | When inconclusive |
+|---|---|---|
+| **Language** | the user's word; the language the method's consumer is written in; a framework the user named | ask |
+| **Which branch** | a **named framework** the starters do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"no demo code"**, **"just a project"** → the initializer; a **web app people use in a browser**, forms, an upload flow → the JS starter; a **CLI, script, batch job, worker or service** in Python → the Python starter | one question offering the matching starter first, saying what it brings (durable runs, forms or CLI modes, codegen wiring, CI, its own `release` skill) and what it costs (demos to keep as references or to strip) |
+| **Where** | the directory the user named; **"here"** when the working directory is empty; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty |
+| **GitHub or local** | the user asked for a GitHub repository → `gh repo create --template`, after confirmation; otherwise a local clone with fresh history | local |
+
+**The fresh-clone shortcut.** A starter clone already in the working directory that has not been bootstrapped — `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"` — is branch A entered at step 4: acquisition already happened, so go straight to running the clone's bootstrap. Do not clone again.
+
+[references/starters.md](references/starters.md) compares the two starters and carries every command below; [references/initializers.md](references/initializers.md) carries the initializers.
+
+## Mode
+
+Automatic by default, with the plugin's usual rules: an explicit user signal wins ("just do it" → automatic; "walk me through" → interactive); a genuinely ambiguous branch is one question, asked once; a request that gave every input up front proceeds without re-asking. Two things always confirm, in every mode: **`gh repo create`**, because it creates a repository on GitHub, and whatever the clone's bootstrap skill confirms on its own account. The pristine commit does not need confirmation — it is on a directory this skill just created, holding the template as it came, and no user content is at stake.
+
+## Branch A — one of the starters
+
+### Step 1: Prerequisites
+
+Check before touching anything, and **stop** on a missing piece with the exact thing missing and the starter README's own line about it. Never install a toolchain.
+
+- **JavaScript**: Node at or above the floor the starter's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the starter's e2e specs `require()` it), and `npm`.
+- **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
+- **Both**: `git`. The GitHub form also needs `gh` authenticated — `gh auth status`.
+
+### Step 2: Acquire the template
+
+**Local, the default.** Clone shallow, read the template's identity, then detach from it:
+
+```bash
+git clone --depth 1 https://github.com/Pipelex/<starter>.git <dir>
+git -C <dir> rev-parse HEAD                      # the template SHA, for the commit message
+# the template version: package.json "version" (JS) or pyproject.toml version (Python)
+rm -rf <dir>/.git && git -C <dir> init -b main
+```
+
+The clone's `.git` is removed on purpose: it is the template's history and remote, and leaving it would make `git status` and a future `git push` belong to Pipelex's template rather than to the user's project. This is exactly what GitHub's "Use this template" button produces — a copy with no history and no remote — and it is why the starters' READMEs tell humans not to clone directly. Fresh history is how you honour that.
+
+**GitHub, on request.** When the user asked for a repository on GitHub:
+
+```bash
+gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone
+```
+
+Visibility is the user's call: ask, default `--private`. Creating a repository on GitHub is outward-facing, so **state the exact command and confirm before running it**, in every mode. GitHub writes the initial commit itself — skip step 3 and continue at step 4. If `gh` is absent or not authenticated, fall back to the local clone and say the repository can be created later with `gh repo create --source .`.
+
+Both forms take the template's default-branch head. Do not offer a release tag unless the user asks for one.
+
+### Step 3: Commit the pristine template — exactly once
+
+```bash
+git -C <dir> add -A && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)"
+```
+
+This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came.
+
+### Step 4: Run the clone's own bootstrap
+
+Read `<dir>/.claude/skills/bootstrap/SKILL.md` and follow it as written. The project's skills are not loaded in this session — it began elsewhere — so read the file; do not look for a `/bootstrap` command. Run every command it gives from inside the project directory (`cd <dir> && …`, or `-C <dir>`), because that skill assumes it is standing in the repo root.
+
+Feed it what the conversation already holds — the project name, title, description, author, repository URL, license — so that it asks once, consolidated, for whatever is left, exactly as its own Step 2 says. It dry-runs, previews, runs, re-syncs the lock file, runs the project's own checks (`make all` on JS; `make agent-check` and `make agent-test` on Python), and removes itself. Its rules stand unchanged: it never commits, its edits stay uncommitted for the user's review (the Python renames are staged by `git mv`, which its skill explains), and a red check is fixed, never skipped. **Add nothing to that procedure and reimplement none of it.** If the clone carries no bootstrap skill — a future template dropped it — follow the README's "manual equivalent" list and say that the template changed.
+
+### Step 5: The env file
+
+```bash
+cp <dir>/.env.example <dir>/.env.local      # JS: Next.js reads .env.local
+cp <dir>/.env.example <dir>/.env            # Python: python-dotenv reads .env
+```
+
+Fill `PIPELEX_API_KEY` **from the shell environment when it is set there**, and leave it empty otherwise, telling the user where a key comes from (`app.pipelex.com`) and that this file is where it goes. **Never print a key, and never ask for one in the conversation.** `PIPELEX_BASE_URL` stays as the example ships it. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
+
+### Step 6: Verify and hand off
+
+The bootstrap's own checks are the verification; do not start `make dev`. Write the report (below), then hand the user's method to `/pipelex-integrate`, which recognizes the starter's codegen harness (`npm run codegen`, `make codegen`, `make add-method`) and defers to it rather than writing a second one.
+
+## Branch B — the ecosystem's initializer
+
+### Step 1: Prerequisites
+
+As in branch A, for the language chosen.
+
+### Step 2: Run the initializer — never assemble by hand
+
+- **A named framework** uses its documented initializer with its non-interactive flags: `npm create next-app@latest <dir> --ts --app --src-dir --eslint --use-npm --yes`; `uv init --package <dir>` then `uv add "fastapi[standard]"`; and so on — [references/initializers.md](references/initializers.md) carries the common ones. An initializer that only runs interactively is handed to the user to run, and you resume when it is done.
+- **No framework named** takes the language's own minimal initializer: Python → `uv init --package <dir>`, which gives the import package `/pipelex-integrate` wants and a console-script entry; TypeScript → `npm init -y`, then `npm install --save-dev typescript @types/node` and `npx tsc --init` with strict mode, ES modules and a `src/` root.
+
+Nothing beyond what the initializer writes is authored by this skill: no example code, no folder layout of its own, no opinion the framework did not ship.
+
+### Step 3: Version control and the pristine commit
+
+If the initializer did not `git init` on its own (some do — `uv init` and `create-next-app` among them), run `git init -b main` in the directory. Then the one commit, for the same reason as branch A:
+
+```bash
+git -C <dir> add -A && git -C <dir> commit -m "Scaffold <framework or language> project"
+```
+
+### Step 4: The env file
+
+Write `.env.example` with the two lines the starters share, make sure `.env` is gitignored, and copy the example to `.env` under the same key rule as branch A:
+
+```
+PIPELEX_BASE_URL=https://api.pipelex.com
+PIPELEX_API_KEY=
+```
+
+### Step 5: Hand off
+
+Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipelex-integrate` adds `@pipelex/sdk` or `pipelex-sdk` when it writes the first call site, and creates `methods/<name>/` when it places the first bundle. A project with nothing to integrate yet has nothing Pipelex-shaped in it beyond the env convention, and that is correct.
+
+## The report
+
+Say, in this order: what was created and where; which template or initializer it came from, at which version and SHA; that this skill made exactly one commit and what it holds; what the bootstrap changed and that those changes are uncommitted for review, in the bootstrap's own words (branch A); which env file was written and whether the key was filled from the environment or left for the user; the demos the starter still carries and where the README's removal checklist is (branch A); and the hand-off.
+
+Two lines are easy to forget and matter:
+
+- **The project's own instructions and skills load in a session started inside it.** Its `CLAUDE.md` / `AGENTS.md` and its `release` and `bump-*` skills are not in the current session; `cd <dir>`, then starting Codex there, is how they arrive.
+- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. Hand the method to it by opening `../pipelex-integrate/SKILL.md` and following it; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first.
+
+## When something goes wrong
+
+| Condition | Do this |
+|---|---|
+| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain |
+| The target directory exists and is not empty | STOP, ask for another; never delete or write into it |
+| `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory |
+| `gh` is absent or not authenticated | fall back to the local clone; say the GitHub repository can be created later with `gh repo create --source .` |
+| The clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
+| The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
+| An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
+| `PIPELEX_API_KEY` is not in the shell environment | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation |
+| The working directory is the template's own checkout (its `origin` remote points at `Pipelex/pipelex-starter-…`) | STOP: this is the template, not a copy of it — acquire a copy in another directory |
+
+## Reference
+
+- [references/starters.md](references/starters.md) — the two starters side by side: what each brings, its prerequisite floors, the acquisition commands, its env file, its bootstrap, its demos and their removal checklist, and the codegen harness `/pipelex-integrate` will find.
+- [references/initializers.md](references/initializers.md) — per language, the minimal default and the common frameworks' non-interactive initializers, whether each runs `git init`, and where the import package or `src/` root lands.
+- `/pipelex-integrate` — the skill this one hands every project to.

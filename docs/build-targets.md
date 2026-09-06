@@ -37,7 +37,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
 
 **`templates/`** holds all `.j2` source files. Never edit files in `pipelex/`, `pipelex-codex/`, or `pipelex-vibe/` directly — they are generated output.
 
-**`skills/`** at the repo root (if present) holds only static per-skill assets (`references/` subdirectories) that are copied into every target. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
+**`skills/`** at the repo root (if present) holds only static per-skill assets (`references/` subdirectories) that are copied into every target. Several skills use it — `pipelex-design`, `pipelex-synthetic-inputs`, `pipelex-integrate`, `pipelex-scaffold` — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs`, a script the skill copies verbatim into TypeScript projects, so a reference edit is followed by `make build` and, for a script, by running it (`node --check` at the least). **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
 
 ## Target configuration
 

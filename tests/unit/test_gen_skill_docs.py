@@ -602,7 +602,7 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
-    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs")
+    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
 
     @pytest.mark.parametrize(
         "target_name, manifest_spawns",

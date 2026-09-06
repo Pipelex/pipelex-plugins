@@ -5,17 +5,17 @@ item: L-260830-344594
 
 # Plan — `pipelex-integrate`: the implementation tracker
 
-**Written 2026-08-30** as the execution tracker for [`design.md`](design.md). It schedules; it does not re-argue — when this file and the design disagree, the design wins unless the disagreement is logged under "Deviations" below. Section references (`§N`) are to the design. Ledger item `L-260830-344594`; the phases name the follow-up items they wait on or file.
+**Written 2026-08-30** as the execution tracker for [`design.md`](design.md); **amended 2026-09-06** to carry the campaign's second skill, `pipelex-scaffold`, whose design is [`scaffold-design.md`](scaffold-design.md). It schedules; it does not re-argue — when this file and a design disagree, the design wins unless the disagreement is logged under "Deviations" below. Section references (`§N`) are to `design.md`; `S§N` is `scaffold-design.md`. Ledger items `L-260830-344594` (integrate) and `L-260906-8ac105` (scaffold); the phases name the follow-up items they wait on or file.
 
-**Status: active** since 2026-08-30, when the ten decision boxes of `design.md` were ratified as written (Phase 0). Work proceeds from Phase 1.
+**Status: active** since 2026-08-30, when the ten decision boxes of `design.md` were ratified as written (Phase 0). The 2026-09-06 amendments to `design.md` (boxes 3, 8 and 10 reworded, box 11 added) and `scaffold-design.md`'s boxes A–I were ratified in that session (Phase 0b); Phases 1 and 1b are both open.
 
 ## How to work a phase
 
 - `ledger claim L-260830-344594` before touching code; renew the claim once you are on the working branch.
-- The working branch is `feature/Codegen` (already created for this item); the PR targets `dev` and its body carries `Closes L-260830-344594`. A merged PR is landed with `/ledger-land`.
-- **This checkout is shared with other sessions.** Stage the files you touched explicitly (`git add <path>`), never `git add -A`; the branch already carries uncommitted work on `pipelex-design` / `pipelex-edit` from another piece of work, and a phase here must not sweep it into its commit. Never run a formatter over files you did not author.
-- Templates are the source of truth: edit `templates/skills/…/*.j2` and `skills/pipelex-integrate/references/*`, then `make build`; never edit `pipelex*/` outputs. Before pushing: `make agent-check` and `make agent-test`.
-- `mthds_codegen` is **unreleased in `@pipelex/mcp`** at writing. Development and dogfood run against the local `../pipelex-mcp` checkout through the repo skill `/pipelex-mcp-source`; **switch back to `@latest` before any commit** and let that skill confirm no dev switch leaked into `targets/defaults.toml`.
+- The working branch is `feature/Codegen`, in the worktree `_pipelex-plugins--codegen`; both skills ship on it. The PR targets `dev` and its body carries `Closes L-260830-344594` and `Closes L-260906-8ac105`. A merged PR is landed with `/ledger-land`.
+- **This checkout may be shared with other sessions.** Stage the files you touched explicitly (`git add <path>`), never `git add -A`, so a phase never sweeps another session's work into its commit. Never run a formatter over files you did not author.
+- Templates are the source of truth: edit `templates/skills/…/*.j2`, `skills/pipelex-integrate/references/*` and `skills/pipelex-scaffold/references/*`, then `make build`; never edit `pipelex*/` outputs. Before pushing: `make agent-check` and `make agent-test`.
+- `mthds_codegen` shipped in `@pipelex/mcp` 0.13.0, but the validate verdict's `main_pipe` signature is still unreleased there at the 2026-09-06 pause. Development and dogfood run against the local `../pipelex-mcp` checkout through the repo skill `/pipelex-mcp-source`; **switch back to `@latest` before any commit** and let that skill confirm no dev switch leaked into `targets/defaults.toml`.
 - Version discipline: everything accumulates under `[Unreleased]` in `CHANGELOG.md`; the release phase cuts the heading and bumps the version through `/release`.
 - At each checkpoint: tick the boxes, record the SHAs and versions outcomes landed in (never live git state), reconcile deviations into the later phases, and leave this file cold-start ready.
 
@@ -23,7 +23,7 @@ item: L-260830-344594
 
 - **The write arm is the only arm the skill uses** (§4.4). If a dogfood run ever tempts a "just write the bytes from the response" fallback, that is a bug in the run, not a feature to add.
 - **The generated tree is never opened for editing, formatted, or linted** — by the skill, and by the session working this plan. A dogfood run that reformats a generated file has invalidated its own verdict; regenerate and start the scenario again.
-- **Two upstream items can land during this work and each deletes a piece of it.** `L-260820-ee327d` (ts-zod `.nullish()`) deletes the wire-output helper (§4.8); `L-260830-4e43cd` (Python offline check) deletes the Python asymmetry paragraph (§4.5). Phases 1 and 4 each carry a box to re-check both before proceeding, and a landed item is recorded under "Decisions taken along the way" with what was removed.
+- **Two upstream items can land during this work and each deletes a piece of it.** `L-260820-ee327d` (ts-zod `.nullish()`) deletes the wire-output helper (§4.8) — its fix merged to `pipelex` `dev` as `pipelex#1177` on 2026-09-01, so the question is now whether a `pipelex` release carrying it is deployed to the hosted codegen route; `L-260830-4e43cd` (Python offline check) deletes the Python asymmetry paragraph (§4.5). Phases 1 and 4 each carry a box to re-check both before proceeding, and a landed item is recorded under "Decisions taken along the way" with what was removed. A third, `L-260830-e8b2e0` (the main-pipe signature in the validate verdict), already landed before Phase 1 began: the §4.3 heuristic is never written, and `L-260831-b67e18` closes with the first release.
 - **Ledger ids never appear in user-facing skill text or reports.** They belong in this tracker, the design, and `docs/decisions.md`; the skill's report to a user says "the Python SDK has no offline drift check yet", never the item that tracks it.
 
 ## Phase 0 — ratify, file, link
@@ -38,60 +38,104 @@ No code. Owner: the session that reads the design with Louis.
 - [x] `ledger ref L-260830-344594` attached `plan:pipelex-plugins/wip/pipelex-integrate/design.md` and `plan:pipelex-plugins/wip/pipelex-integrate/plan.md` beside the existing brief ref — done 2026-08-30.
 - [x] `ledger validate`, then `ledger commit` — done 2026-08-30 for the filing above; re-validated after the ratification edits (the ratification changed only these two documents, not the ledger).
 
+## Phase 0b — the second design session (2026-09-06)
+
+No code. Owner: the session that widened the campaign with Louis.
+
+- [x] Research the SDKs, the starters and the codegen contract as they stand, and the workspace's scaffolding and personas documents — done 2026-09-06; the findings are in the decisions log below.
+- [x] Decide the shape with Louis: two skills rather than one; a from-scratch project comes from a starter or the ecosystem's initializer, never from a cookiecutter or copier template; `pipelex-integrate` defers to a project-owned codegen harness; the greenfield skill is `pipelex-scaffold` — done 2026-09-06, all four as recommended.
+- [x] Amend `design.md`: §3 steps 3, 4 and 6; §4.3 (signature from `main_pipe`, heuristic never written); §4.8 (status of the emitter fix); §4.9 (`explicit: true` confined to the fallback); new §4.12 (harness deference); §5 (two rows); §7 (scaffold fork); §8 (new follow-ups); boxes 3, 8, 10 reworded, box 11 added — done 2026-09-06.
+- [x] File the items: `L-260906-8ac105` (the scaffold skill, this repo), `L-260906-a2cd5b` and `L-260906-aa5083` (Python starter parity), `L-260906-84bb41` (the `create-pipelex-app` decision) — done 2026-09-06.
+- [x] Write `scaffold-design.md` as a draft with its own decision boxes — done 2026-09-06.
+- [x] Walk `scaffold-design.md`'s boxes A–I with Louis; record each ruling in its "Ratified?" column with the date; flip the document to `status: active` in the same change — done 2026-09-06: all nine ratified as written, no amendments.
+
 ## Phase 1 — the skill template and its references
 
 Owner: `pipelex-plugins`. Everything in this phase renders into all three targets; nothing in it is platform-specific except the `allowed-tools` frontmatter and the MCP-absent message, which the shared patterns already handle.
 
 **Pre-flight**
 
-- [ ] Re-check `L-260820-ee327d` and `L-260830-4e43cd` (`ledger show`). If either has closed and shipped in the hosted engine / the Python SDK, strike the corresponding piece below before writing it and log the deviation.
-- [ ] Confirm the static-asset mechanism works end to end before relying on it: `scripts/gen_skill_docs.py` → `setup_static_assets` copies `skills/<name>/references/` into every target; `scripts/check.py` → `check_stale_references` resolves `references/…` links from a rendered `SKILL.md`; `check_no_templates_in_output` tolerates `.mjs` / `.ts` files under `skills/`. This is the **first skill in the repo to ship references**, so a root `skills/` directory does not exist yet; create it and note in `docs/build-targets.md` (Phase 2) that the mechanism is now in use.
+- [x] Re-check `L-260820-ee327d` and `L-260830-4e43cd` (`ledger show`). For the first, the fix is merged to `pipelex` `dev` (`pipelex#1177`): the check is whether a release carrying it is deployed to the hosted codegen route — if so, strike `wire-output.ts` below and never write the helper (it is lossy once the emitter is fixed, §4.8). For the second, if the Python SDK ships the offline check, strike the asymmetry sentence. Log either as a deviation.
+- [x] Confirm the static-asset mechanism works end to end before relying on it: `scripts/gen_skill_docs.py` → `setup_static_assets` copies `skills/<name>/references/` into every target; `scripts/check.py` → `check_stale_references` resolves `references/…` links from a rendered `SKILL.md`; `check_no_templates_in_output` tolerates `.mjs` / `.ts` files under `skills/`. This is the **first skill in the repo to ship references**, so a root `skills/` directory does not exist yet; create it and note in `docs/build-targets.md` (Phase 2) that the mechanism is now in use.
 
 **The template — `templates/skills/pipelex-integrate/SKILL.md.j2`**
 
-- [ ] Frontmatter: `name`, the description from §4.11 (codebase-phrasing triggers, silent on authoring phrasings), the shared `frontmatter.md.j2` include, and on Claude the `allowed-tools` entries for `mthds_codegen`, `mthds_inputs_template`, `mthds_validate`, `mthds_list_methods`. No `disable-model-invocation`.
-- [ ] "Requirements — the Pipelex MCP tools": `mthds_codegen`, `mthds_inputs_template` and `mthds_validate` required with the plugin's standard MCP-absent STOP message (copy the exact conditional block from `pipelex-inputs`, so `TestSkillFailureDiscipline.test_absent_tools_stop_message_matches_platform` passes on every target); `mthds_list_methods` soft. The `config`-class stop, with the **403 feature-gate wording** from §6 (a 403 is not a key problem).
-- [ ] Mode selection: automatic default; the interactive signals; the one-question rule from §5.
-- [ ] The procedure of §3, as numbered steps, each naming its MCP call, its arguments (`explicit: true` on the template call — with the sentence saying this is the deliberate exception to the plugin's light-template pin), and its verdict branches.
-- [ ] The `output_dir` rule of §4.4 spelled out for the model: compute it relative to the session's initial working directory; never absolute; never ride content; the relaunch instruction on a containment escape.
-- [ ] The exclusions-before-generation ordering (§3 step 5), stated as a rule with its reason.
-- [ ] The orphan rule of §4.7 in the tool's own wording; never delete.
-- [ ] The sidecar section: the exact `sources.json` shape of §4.6, how hashes are computed (`shasum -a 256` / `sha256sum` / `hashlib`, raw bytes), paths relative to the project root.
-- [ ] The call-site section (§4.1): what one module contains, the two shared helpers, the input-type mapping table from concept ref to language type (Text → `string`/`str`, Number → `number`/`float | int`, YesNo → `boolean`/`bool`, Date → ISO string, Image/Document → `{ url }`, structured → the generated type, `[]` → arrays, `?` → optional), the `main_stuff` narrowing, the `prepareInputs` pointer for file-bearing callers, the sync-wrapper rule for synchronous Python projects. Language detail is delegated to the two reference files.
-- [ ] Refresh mode as its own section (§4.10): the taken / re-derived / left-alone table, the fingerprint comparison and the restamp-only case, the "call site edited only if it no longer type-checks or the `pipe` record moved" rule.
-- [ ] The verification step (§3 step 11) and the report (§3 step 12), including the Python asymmetry sentence.
-- [ ] A failure table condensed from §6.
-- [ ] `## Reference`: links to `references/typescript.md`, `references/python.md`, and the two shared language references.
+- [x] Frontmatter: `name`, the description from §4.11 (codebase-phrasing triggers, silent on authoring phrasings), the shared `frontmatter.md.j2` include, and on Claude the `allowed-tools` entries for `mthds_codegen`, `mthds_inputs_template`, `mthds_validate`, `mthds_list_methods`. No `disable-model-invocation`.
+- [x] "Requirements — the Pipelex MCP tools": `mthds_codegen`, `mthds_inputs_template` and `mthds_validate` required with the plugin's standard MCP-absent STOP message (copy the exact conditional block from `pipelex-inputs`, so `TestSkillFailureDiscipline.test_absent_tools_stop_message_matches_platform` passes on every target); `mthds_list_methods` soft. The `config`-class stop, with the **403 feature-gate wording** from §6 (a 403 is not a key problem).
+- [x] Mode selection: automatic default; the interactive signals; the one-question rule from §5.
+- [x] The procedure of §3, as numbered steps, each naming its MCP call, its arguments and its verdict branches: the signature is read from the validate verdict's `structuredContent.main_pipe` (§4.3); `mthds_inputs_template` with `explicit: true` appears only on the no-main-pipe fallback, with the sentence naming it as the deliberate exception to the plugin's light-template pin (§4.9); the generator choice — the project's harness or the write arm — is stated in the one-line announcement (§3 step 4).
+- [x] The harness-deference section (§4.12): the detection signals and which of them decide; what a harness project skips (exclusions, sidecar, dependencies, gate) and what it follows instead (the project's `codegen` script, `add-method`, its docs, its aggregate gate); the write-arm-into-the-harness's-layout fallback when the harness's generator cannot run; refresh mode on a harness project; the rule that no second layout is ever written beside the first.
+- [x] The `output_dir` rule of §4.4 spelled out for the model: compute it relative to the session's initial working directory; never absolute; never ride content; the relaunch instruction on a containment escape.
+- [x] The exclusions-before-generation ordering (§3 step 5), stated as a rule with its reason.
+- [x] The orphan rule of §4.7 in the tool's own wording; never delete.
+- [x] The sidecar section: the exact `sources.json` shape of §4.6, how hashes are computed (`shasum -a 256` / `sha256sum` / `hashlib`, raw bytes), paths relative to the project root.
+- [x] The call-site section (§4.1): what one module contains, the two shared helpers, the input-type mapping table from concept ref to language type (Text → `string`/`str`, Number → `number`/`float | int`, YesNo → `boolean`/`bool`, Date → ISO string, Image/Document → `{ url }`, structured → the generated type, `[]` → arrays, `?` → optional), the `main_stuff` narrowing, the `prepareInputs` pointer for file-bearing callers, the sync-wrapper rule for synchronous Python projects. Language detail is delegated to the two reference files.
+- [x] Refresh mode as its own section (§4.10): the taken / re-derived / left-alone table, the fingerprint comparison and the restamp-only case, the "call site edited only if it no longer type-checks or the `pipe` record moved" rule.
+- [x] The verification step (§3 step 11) and the report (§3 step 12), including the Python asymmetry sentence.
+- [x] A failure table condensed from §6.
+- [x] `## Reference`: links to `references/typescript.md`, `references/python.md`, and the two shared language references.
 
 **The references — `skills/pipelex-integrate/references/`**
 
-- [ ] `typescript.md`: the detection signals of §5 for a TypeScript project (project root, TS-capable build, package manager, generated root, Prettier / ESLint flat and legacy / Biome exclusion edits with the exact config keys, `tsconfig` coverage, aggregate gate, call-site location, `.gitignore`); the call-site module template with the `getPipelexClient` helper and the `wireOutput` import; the `codegen:check` npm script and how to append it to `check` / a Makefile / a workflow step.
-- [ ] `python.md`: the same for Python (import package discovery, `python-pydantic` vs `python-structures` per §5, uv / poetry / pipenv / pip, `[tool.ruff]` `exclude` and `extend-exclude`, Black, isort, pyright / mypy coverage, `__init__.py` creation for the generated package and each method subpackage, setuptools `packages` / `package-data` when the project is packaged, the async call-site template plus the sync wrapper, the `pipelex codegen check` wiring for the `python-structures` audience only, the asymmetry sentence for everyone else).
-- [ ] `codegen-check.mjs` (§4.5): plain ESM, Node builtins + `@pipelex/sdk` only; takes generated directories as arguments; per directory reads `codegen.lock` from disk, walks recursively (pruning `node_modules`, `.git`, `dist`, `build`, `.next`), filters with `isStampableArtifactPath`, decodes strictly, runs `runCodegenCheck`, prints drifts by category; then reads `sources.json` and compares each `sources` hash against the file on disk, reporting `stale-source` with the "run `/pipelex-integrate` to refresh" remedy; exit `0` / `1` / `2` with the precedence no-verdict > drift > current; output through `process.stdout` / `process.stderr`. Header comment names what it is and that `@pipelex/sdk` upstreaming retires it.
-- [ ] `wire-output.ts` (§4.8, **skip if `L-260820-ee327d` has landed**): `wireOutput(results, schema)` and the schema-guided `dropWireNulls`, trimmed from `pipelex-starter-js/src/lib/wireOutput.ts` — objects, arrays, `z.lazy`, optional-without-default only; opaque schemas passed through; a depth cap; no `server-only` import, no Next-specific error types. Header comment states it is a workaround with an expiry and what deletes it.
+- [x] `typescript.md`: the detection signals of §5 for a TypeScript project (project root, TS-capable build, package manager, generated root, Prettier / ESLint flat and legacy / Biome exclusion edits with the exact config keys, `tsconfig` coverage, aggregate gate, call-site location, `.gitignore`); the call-site module template with the `getPipelexClient` helper and the `wireOutput` import; the `codegen:check` npm script and how to append it to `check` / a Makefile / a workflow step.
+- [x] `python.md`: the same for Python (import package discovery, `python-pydantic` vs `python-structures` per §5, uv / poetry / pipenv / pip, `[tool.ruff]` `exclude` and `extend-exclude`, Black, isort, pyright / mypy coverage, `__init__.py` creation for the generated package and each method subpackage, setuptools `packages` / `package-data` when the project is packaged, the async call-site template plus the sync wrapper, the `pipelex codegen check` wiring for the `python-structures` audience only, the asymmetry sentence for everyone else).
+- [x] Both language references gain a "the project owns a codegen harness" section (§4.12): the starter's scripts and Makefile targets by name, the docs to read before writing the fan-out (`docs/codegen.md`, `docs/add-method.md`, the README's "swap in your own pipeline"), where a starter keeps its methods and its manifest form for a remote method, and — Python — the honest sentence about the `pipelex` CLI prerequisite of `make codegen` with the write-arm fallback into `<package>/generated/<name>/`.
+- [x] `codegen-check.mjs` (§4.5): plain ESM, Node builtins + `@pipelex/sdk` only; takes generated directories as arguments; per directory reads `codegen.lock` from disk, walks recursively (pruning `node_modules`, `.git`, `dist`, `build`, `.next`), filters with `isStampableArtifactPath`, decodes strictly, runs `runCodegenCheck`, prints drifts by category; then reads `sources.json` and compares each `sources` hash against the file on disk, reporting `stale-source` with the "run `/pipelex-integrate` to refresh" remedy; exit `0` / `1` / `2` with the precedence no-verdict > drift > current; output through `process.stdout` / `process.stderr`. Header comment names what it is and that `@pipelex/sdk` upstreaming retires it.
+- [x] `wire-output.ts` (§4.8, **skip if `L-260820-ee327d` has landed**): `wireOutput(results, schema)` and the schema-guided `dropWireNulls`, trimmed from `pipelex-starter-js/src/lib/wireOutput.ts` — objects, arrays, `z.lazy`, optional-without-default only; opaque schemas passed through; a depth cap; no `server-only` import, no Next-specific error types. Header comment states it is a workaround with an expiry and what deletes it.
 
 **Build and tests**
 
-- [ ] `make build`; confirm `pipelex/`, `pipelex-codex/`, `pipelex-vibe/` each carry `skills/pipelex-integrate/SKILL.md` and the `references/` directory verbatim.
-- [ ] `tests/unit/test_gen_skill_docs.py`: add `"pipelex-integrate"` to `TestSkillFailureDiscipline.MCP_SKILLS`.
-- [ ] New `TestPipelexIntegrateDiscipline` pinning the load-bearing sentences in the real template, rendered on all three targets: `output_dir` is always passed; content is never ridden; orphans are never deleted; one directory per method; generated files are never edited or formatted; exclusions precede generation; `explicit: true` on the template call; the `method_id` warning; refresh mode leaves the call site alone unless the types moved; the 403 wording. Plus one test that the references land in every target's output.
-- [ ] `make agent-check`, `make agent-test`.
+- [x] `make build`; confirm `pipelex/`, `pipelex-codex/`, `pipelex-vibe/` each carry `skills/pipelex-integrate/SKILL.md` and the `references/` directory verbatim.
+- [x] `tests/unit/test_gen_skill_docs.py`: add `"pipelex-integrate"` to `TestSkillFailureDiscipline.MCP_SKILLS`.
+- [x] New `TestPipelexIntegrateDiscipline` pinning the load-bearing sentences in the real template, rendered on all three targets: `output_dir` is always passed; content is never ridden; orphans are never deleted; one directory per method; generated files are never edited or formatted; exclusions precede generation; the signature is read from `main_pipe` and `explicit: true` appears only on the fallback; a harness project keeps its harness and no second layout is written; the `method_id` warning; refresh mode leaves the call site alone unless the types moved; the 403 wording. Plus one test that the references land in every target's output.
+- [x] `make agent-check`, `make agent-test`.
 
 **CHECKPOINT 1** — the template and references render on every target and the tests pin their rules. Record here: the commit SHA, what was struck because an upstream item landed, and anything the template could not express without a reference file.
+
+**Reached 2026-09-06 (uncommitted at the session pause — the SHA is recorded when the work is committed).** Struck: `wire-output.ts` (the emitter fix shipped in pipelex v0.56.0, see the pre-flight entry below). The pre-flight note above calling this "the first skill in the repo to ship references" was stale when ticked — `pipelex-design` and `pipelex-synthetic-inputs` already did; the mechanism (`setup_static_assets`, `static_asset_mismatches`) was confirmed to copy non-Markdown files too, which is what `codegen-check.mjs` needs. The discipline tests live in their own modules, `tests/unit/test_pipelex_integrate_skill.py` and `tests/unit/test_pipelex_scaffold_skill.py` (one class each), rather than in `test_gen_skill_docs.py`, which only gained `pipelex-integrate` in `MCP_SKILLS`.
+
+## Phase 1b — the `pipelex-scaffold` template and its references
+
+Owner: `pipelex-plugins`. **Gate:** `scaffold-design.md`'s boxes ratified (Phase 0b). MCP-free: no `allowed-tools` MCP entries, no MCP-absent message, and the skill stays out of `MCP_SKILLS`; the template to model is `templates/skills/pipelex-synthetic-inputs/SKILL.md.j2` (MCP-free, references-bearing, a stop posture on a missing toolchain).
+
+**The template — `templates/skills/pipelex-scaffold/SKILL.md.j2`**
+
+- [x] Frontmatter: `name`, the description from S§8 (greenfield phrasings, silent on the integrate phrasings, the fresh-clone shortcut named), the shared `frontmatter.md.j2` include. No `disable-model-invocation`.
+- [x] The branch table of S§2, including "here" for an empty working directory and the un-bootstrapped-clone shortcut.
+- [x] Branch A as numbered steps (S§3): the prerequisites and the stop posture; the two acquisition forms with the exact commands, the fresh-history rationale and the `gh` confirmation; the one pristine commit and why (`git mv`, reviewable diff); the delegation to the clone's own `bootstrap` SKILL.md with the inputs passed through and every command run from inside the project; the env file and the key rule; the hand-off to `/pipelex-integrate` with the harness note.
+- [x] Branch B as numbered steps (S§4): initializer first, non-interactive flags, the hand-the-command-to-the-user fallback, the language defaults, git init when the initializer did not, the pristine commit, the two-line `.env.example`, nothing else Pipelex-shaped.
+- [x] The report (S§5) with the session note as its own line.
+- [x] Mode (S§6) and a failure table condensed from S§7, including the "this is the template's own checkout" stop.
+- [x] `## Reference`: links to `references/starters.md` and `references/initializers.md`.
+
+**The references — `skills/pipelex-scaffold/references/`**
+
+- [x] `starters.md`: the two starters side by side — what each brings and what it costs; the prerequisite floors and where each starter states them (`package.json` `engines`, `pyproject.toml` `requires-python`); the clone and `gh` commands; the env file name per starter; where the bootstrap skill lives and what it will ask; the demos and where each README's removal checklist is; the JS starter's `make add-method` and the Python starter's `make codegen` prerequisite (`L-260906-a2cd5b`), stated as the project's own, for the integrate hand-off.
+- [x] `initializers.md`: per language, the minimal default and the common frameworks with their non-interactive invocations, whether each runs `git init` itself, and where the import package or `src/` root lands — the facts `pipelex-integrate`'s detection will read next.
+
+**Build and tests**
+
+- [x] `make build`; confirm every target carries `skills/pipelex-scaffold/SKILL.md` and the references.
+- [x] New `TestPipelexScaffoldDiscipline` pinning, on all three targets: never writes into a non-empty directory; exactly one commit and it is the pristine template; the bootstrap is delegated (the template names `.claude/skills/bootstrap/SKILL.md` and reimplements no rename); the key is never printed or asked for; `gh repo create` is confirmed; no dev server is started; no SDK dependency is added. Plus the assertion that `pipelex-scaffold` is **not** in `MCP_SKILLS` and renders no MCP-absent message.
+- [x] `make agent-check`, `make agent-test`.
+
+**CHECKPOINT 1b** — the scaffold template and references render on every target and the tests pin their rules. Record here: the commit SHA and anything the design had to give up because a starter's bootstrap behaves differently from what S§3 assumed.
+
+**Reached 2026-09-06 (uncommitted at the session pause).** Nothing given up; the design was written against the two bootstrap skills as they stand. Phase 2 (family wiring and docs) was completed in the same session; `make build`, `make agent-check` and `make agent-test` are green on all three targets.
 
 ## Phase 2 — family wiring and documentation
 
 Owner: `pipelex-plugins`. Small, deliberate edits; each one is one sentence or one step (§7).
 
-- [ ] `templates/skills/pipelex-edit/SKILL.md.j2` Step 7: the `sources.json` staleness notice and the `/pipelex-integrate` offer.
-- [ ] `templates/skills/pipelex-design/SKILL.md.j2`: the same notice in the re-entry delivery; the one-line hand-off in "Common runnable gate and delivery" step 4 (when a `package.json` / `pyproject.toml` is in the workspace).
-- [ ] `templates/skills/pipelex-inputs/SKILL.md.j2`: the one-line hand-off in the closing report.
-- [ ] `docs/decisions.md`: a dated entry — the skill's scope line (§4.1), the name ruling over `pipelex-codegen` (§4.11), the `explicit: true` exception appended to the light-template decision (§4.9), the write-arm-only and never-ride-content rule (§4.4), the sidecar (§4.6), the wire-null helper with its expiry (§4.8), the gate asymmetry (§4.5), and that this is the first skill to ship `references/`.
-- [ ] `CLAUDE.md` "Key dependency": add `mthds_codegen` (the write arm, `output_dir`) beside the other tools; the structure block gains the `pipelex-integrate` template and the root `skills/` directory.
-- [ ] `README.md`: the skill in "What's inside" and `mthds_codegen` in the MCP server bullet; the Claude and Codex sections' skill lists.
-- [ ] `docs/build-targets.md`: the `skills/<name>/references/` mechanism is now in use, with `pipelex-integrate` as the example.
-- [ ] `CHANGELOG.md` `[Unreleased]` → "Added": the skill, in the changelog's existing voice (what it does, the write arm, the sidecar, the gate asymmetry, the wire-null helper and its expiry, `explicit: true`); "Changed": the three family one-liners.
-- [ ] `make build`, `make check`, `make agent-test`.
+- [x] `templates/skills/pipelex-edit/SKILL.md.j2` Step 7: the `sources.json` staleness notice and the `/pipelex-integrate` offer.
+- [x] `templates/skills/pipelex-design/SKILL.md.j2`: the same notice in the re-entry delivery; the fork in "Common runnable gate and delivery" step 4 — a `package.json` / `pyproject.toml` in the workspace → `/pipelex-integrate`, none → `/pipelex-scaffold` (§7, S§8).
+- [x] `templates/skills/pipelex-inputs/SKILL.md.j2`: the one-line hand-off in the closing report.
+- [x] `docs/decisions.md`: a dated entry for each skill — integrate: the scope line (§4.1), the name ruling over `pipelex-codegen` (§4.11), the `explicit: true` exception confined to the fallback, appended to the light-template decision (§4.9), the write-arm-only and never-ride-content rule (§4.4), the sidecar (§4.6), the wire-null helper with its expiry (§4.8), the gate asymmetry (§4.5), harness deference (§4.12), and that this is the first skill to ship `references/`; scaffold: two skills rather than one, starter-or-initializer and why not cookiecutter, the one pristine commit, bootstrap delegated to the starters, MCP-free (S§1, S§3, S§4).
+- [x] `CLAUDE.md` "Key dependency": add `mthds_codegen` (the write arm, `output_dir`) beside the other tools; the structure block gains both templates and the root `skills/` directory; the MCP-free paragraph names `pipelex-scaffold` as the third MCP-free skill.
+- [x] `README.md`: both skills in "What's inside" and `mthds_codegen` in the MCP server bullet; the Claude and Codex sections' skill lists.
+- [x] `docs/build-targets.md`: the `skills/<name>/references/` mechanism is now in use, with `pipelex-integrate` as the example.
+- [x] `CHANGELOG.md` `[Unreleased]` → "Added": both skills, in the changelog's existing voice (integrate: what it does, the write arm, the sidecar, the gate asymmetry, harness deference, the wire-null helper and its expiry if still shipped; scaffold: the two branches, the delegation to the starters' bootstrap, MCP-free); "Changed": the family one-liners.
+- [x] `make build`, `make check`, `make agent-test`.
 
 ## Phase 3 — dogfood against the local workshop
 
@@ -112,20 +156,41 @@ Two scratch projects, each created from scratch by the session so the skill meet
 - [ ] **PY-1 fresh integration, pydantic audience.** No `pipelex` dependency → `python-pydantic` chosen without a question; `<package>/generated/__init__.py` and the subpackage `__init__.py` created; `[tool.ruff] exclude` gains the tree; pyright still covers it; `pydantic` and `pipelex-sdk` added with uv; the async call site plus a sync wrapper if the project is synchronous; the report states the gate asymmetry; `uv run pyright` passes.
 - [ ] **PY-2 structures audience.** Add `pipelex` as a dependency and a `@pipe_func` file: `python-structures` is chosen (or offered first when only the dependency is present); `pipelex codegen check <dir>` is wired into the existing gate.
 - [ ] **PY-3 refresh after a bundle edit**, as TS-3, including the `/pipelex-edit` staleness notice.
+
+Harness scenarios (§4.12) — each on a fresh scratch copy of a starter, never on the starter checkout itself:
+
+- [ ] **TS-11 harness project, local method.** A scratch copy of `pipelex-starter-js` plus a new `methods/<name>/main.mthds`: the skill detects the harness, runs `npm run codegen`, writes the call site the way `docs/codegen.md` and the existing actions do, writes no sidecar of its own and no `src/generated/` tree of the plugin's shape, and `make check` is green. Refresh is reported as `npm run codegen`.
+- [ ] **TS-12 harness project, remote method.** The same copy with a `method_ref` at a tag: `make add-method METHOD=…` is what runs; nothing else is written by the skill.
+- [ ] **PY-4 harness project without a `pipelex` CLI.** A scratch copy of `pipelex-starter-python` plus a new method, with no `pipelex` on the PATH: the write arm writes into `<package>/generated/<name>/` — the harness's layout — the report names `make codegen`'s prerequisite as the project's own and points at `L-260906-a2cd5b`'s subject in plain words, and no second layout exists.
+
+Scaffold scenarios (S§3–S§7) — scratch directories in the session scratchpad; the network is needed for the clones and installs:
+
+- [ ] **SC-1 JS starter, local clone, named directory, inputs up front.** Prerequisites checked and reported; the clone lands with fresh history; exactly one commit, its message carrying the template version and SHA; the clone's own `bootstrap` SKILL.md is followed from inside the project without re-asking what was given; `.env.local` is written with the key from the environment; `make all` is green; the bootstrap has removed itself; the report carries the session note and the hand-off.
+- [ ] **SC-2 Python starter, local clone.** As SC-1; `git mv` of the package directory succeeds because of the pristine commit; `make agent-check` and `make agent-test` are green.
+- [ ] **SC-3 "here".** An empty working directory: the clone lands in place and everything else is as SC-1.
+- [ ] **SC-4 non-empty target.** The refusal, the question, nothing written.
+- [ ] **SC-5 un-bootstrapped clone in the working directory.** Branch A enters at the bootstrap step and nothing is cloned.
+- [ ] **SC-6 ecosystem, Python.** `uv init --package` in a fresh directory, the pristine commit, `.env.example` + `.env` (ignored), no SDK dependency, no `methods/`; then `/pipelex-integrate` from the same session lands the PY-1 shape.
+- [ ] **SC-7 ecosystem, TypeScript, named framework.** `npm create next-app@latest … --yes`, the initializer's own `git init` respected, the pristine commit on top, the env pair; then `/pipelex-integrate` lands the TS-1 shape.
+- [ ] **SC-8 missing toolchain.** A PATH without `node`: the stop message names Node and the starter README's floor; nothing is cloned.
+- [ ] **SC-9 `gh repo create --template`.** Run only on Louis's explicit say-so, against a throwaway private repository he deletes afterwards: the confirmation appears before the command, visibility is asked, the GitHub-made initial commit is respected and no second pristine commit is made.
+- [ ] **SC-10 no key in the environment.** The env file is written with an empty key, the report says where a key comes from, and nothing asks for it in the conversation.
 - [ ] **Vibe render sanity.** Read `pipelex-vibe/skills/pipelex-integrate/SKILL.md` once for the manual-registration wording of the MCP-absent message and the absence of Claude-only frontmatter.
 - [ ] Reconcile every finding into the template and references; re-run the affected scenarios; `make build`, `make agent-check`, `make agent-test`.
 - [ ] `/pipelex-mcp-source` back to `@latest`; confirm the diff carries no launcher change.
 
-**CHECKPOINT 2** — every scenario above has been run at least once against the local workshop and its finding reconciled. Record here: the `pipelex-mcp` SHA the dogfood ran against, the scenarios that exposed a template change (and the change), any scenario that could not be run and why, and the exact wording the §4.3 heuristic produced in TS-5.
+**CHECKPOINT 2** — every scenario above has been run at least once against the local workshop and its finding reconciled. Record here: the `pipelex-mcp` SHA the dogfood ran against, the starter SHAs the harness and scaffold scenarios cloned, the scenarios that exposed a template change (and the change), and any scenario that could not be run and why.
 
 ## Phase 4 — release
 
 Owner: `pipelex-plugins`. **Gate, hard:** a published `@pipelex/mcp` version that carries `mthds_codegen` with the write arm — name the version here before starting; an open `pipelex-mcp` release item is not a gate. The plugin's launcher is `@latest`, so nothing in this repo moves for it, but a plugin released before the tool is a skill that stops at "tool absent" for every user.
 
-- [ ] Published `@pipelex/mcp` version carrying `mthds_codegen`: `__________` (fill in).
+- [ ] Published `@pipelex/mcp` version carrying `mthds_codegen`: **0.13.0** (published 2026-08-30; the plugin's `@latest` already resolves to it).
+- [ ] Published `@pipelex/mcp` version carrying **`main_pipe` on the validate verdict**: `__________` (fill in — it sits under `[Unreleased]` in `pipelex-mcp/CHANGELOG.md` at writing). The skill's ordinary path reads the signature from there; on an older workshop it takes the fallback of §4.3 (template for the inputs, the bundle for the output) and says the workshop predates the signature. Ship after this release so users never meet the fallback by default.
 - [ ] Re-check `L-260820-ee327d` and `L-260830-4e43cd` one last time; strike or keep the helper and the asymmetry paragraph accordingly, and log it.
 - [ ] One live run of TS-1 and PY-1 against the **published** `@pipelex/mcp@latest` (not the local checkout), on the prod plugin output.
-- [ ] Open the PR against `dev` with `Closes L-260830-344594` in the body; work the review rounds per the workspace's tightening-bar rule; land with `/ledger-land`.
+- [ ] Open the PR against `dev` with `Closes L-260830-344594` and `Closes L-260906-8ac105` in the body; work the review rounds per the workspace's tightening-bar rule; land with `/ledger-land`. `L-260831-b67e18` closes in the same landing, with the release as evidence that the heuristic never shipped.
+- [ ] File the starter-README pointer items (S§9, "to file at release"): both starters' "Use this template" sections name `/pipelex-scaffold` beside the button and `/bootstrap`.
 - [ ] `/release` → the next minor (`0.6.0`), which cuts the changelog heading, bumps every target TOML and the Claude marketplace, and opens the release PR against `main`.
 - [ ] After the release merges: `/ledger-land` on the release PR, and this file's `status` flips to `landed` when the tooling performs it.
 
@@ -137,11 +202,19 @@ Carried in the design's §9 and §8; repeated here only where a phase might be t
 - The by-ref / by-id output-concept heuristic (§4.3) ships as designed; the exact answer arrives with the `pipelex-mcp` follow-up and is not worked around here.
 - The Python offline gate waits on `L-260830-4e43cd`; the TypeScript script is retired by `L-260820-2ba0f4`; the wire-null helper by `L-260820-ee327d`. None of the three is worked from this repo.
 - The call site uses `pipe_code` (bare) until the SDKs take `pipe_ref` (`L-260829-563e9e`); the sidecar already records the qualified ref so the switch is a one-line edit per call site when it comes.
+- No cookiecutter or copier conversion of the starters, and no `create-pipelex-app` from this repo: the former was rejected on 2026-09-06 (the starters are living apps with CI and end-to-end tests a Jinja-ified template could not keep, and the rename is already a deterministic script with a dry run); the latter is the decision `L-260906-84bb41`.
+- No change to either starter from here, including the Python starter's harness asymmetry (`L-260906-a2cd5b`, `L-260906-aa5083`): `pipelex-integrate` defers to the harness as it stands and the report says so.
 
 ## Decisions taken along the way
 
 - **2026-08-30 — Phase 0 ratification.** Louis walked the ten decision boxes of `design.md` one at a time, each presented against its alternatives (a narrower or wider call-site scope; refusing `method_id` or accepting a floating `method_ref`; blocking by-ref / by-id on the `pipelex-mcp` follow-up or keeping a contracts artifact; a content fallback or consented pre-clearing on the write arm; a hash-only Python gate or no gates at all; dropping the sidecar's `pipe` record or LF-normalizing its hashes; fixing the emitter first or a blind null-strip; lifting the light-template pin plugin-wide or reading concepts from the bundle; `pipelex-codegen` or a user-invocable-only skill; a staleness notice alone or an auto-refresh from `pipelex-edit`). Every box was ratified as written; the design's sections stand unamended and both documents flipped to `active` in this change.
 - **2026-08-30 — upstream dependencies reviewed (Louis).** None of the items the design leans on (`L-260820-ee327d`, `L-260820-2ba0f4`, `L-260830-4e43cd`, `L-260830-e8b2e0`, `L-260829-563e9e`) is a member of the build-retirement epic `L-260829-848001` or appears in its plan; they sit on the codegen trust-chain axis, not the descriptor-route axis. Two decisions: `L-260830-e8b2e0` is linked *related* to that epic (not a member), to be sequenced after `L-260829-dfaed4` once the workshop holds the input-form descriptor; and `L-260820-ee327d` is prioritized ahead of Phase 3, so the Phase 1 pre-flight re-check may strike `wire-output.ts` before it is written. The summary is `upstream-dependencies.md` beside this file.
+
+- **2026-09-06 — the second design session (Louis).** The question was how to organize the skills that plug Pipelex methods into a development project, existing or new, across Python and TypeScript, and whether the starters should become cookiecutter-style templates. Research first: the SDKs (`@pipelex/sdk` has `codegen()`, `runCodegenCheck`, `prepareInputs`, `startAndWaitForResult`, a barrel; `pipelex-sdk` has `codegen()` and `prepare_inputs` but no offline check, no inputs template since `build_inputs` was removed, and deliberately no barrel), the starters (both are GitHub templates with script-driven `bootstrap` and `release` skills; the JS one also has `bump-sdk`, `bump-mthds-form`, `make add-method`, `AGENTS.md` and `docs/adopt-in-an-existing-project.md`; the Python one regenerates through a `pipelex` CLI it does not depend on), the codegen contract (`docs/specs/pipelex-codegen.md`; two axes, three targets; `pipelex-mcp`'s write arm; the lock and stamps), and the workspace documents (`wip/devx/scaffolding.md`'s unbuilt Proposals 2 and 4; `codegen-personas-and-trust-chain.md`'s mechanism-versus-policy split). Two upstream changes since 2026-08-30 were found: the validate verdict now carries `main_pipe` (`L-260830-e8b2e0` landed, `L-260831-b67e18` filed to delete the heuristic), and the ts-zod null fix merged to `pipelex` `dev` (`pipelex#1177`). Four rulings, each as recommended: **two skills** (`pipelex-integrate` as ratified plus a thin greenfield skill) over one skill with a preamble or integrate alone; **a starter or the ecosystem's initializer, no cookiecutter or copier**; **harness deference** in `pipelex-integrate` over always using the write arm; **`pipelex-scaffold`** over `pipelex-new-project` and `pipelex-bootstrap`. `design.md` was amended accordingly (boxes 3, 8, 10 reworded, 11 added), `scaffold-design.md` was written as a draft with boxes A–I, and the items `L-260906-8ac105`, `L-260906-a2cd5b`, `L-260906-aa5083` and `L-260906-84bb41` were filed.
+
+- **2026-09-06 — Phase 1 pre-flight.** `L-260820-ee327d` is **closed**: the ts-zod `.nullish()` fix (`pipelex#1177`) is in `pipelex` **v0.56.0**, and `pipelex-api` pins `pipelex==0.56.0`, so the hosted codegen route carries it as soon as that api is deployed. Under §4.8 the helper is now lossy rather than protective: **`wire-output.ts` is struck** and is never written into a project; the TypeScript call site parses `main_stuff` through the generated binder directly. `L-260830-4e43cd` is still open: the Python asymmetry sentence stays. The published `@pipelex/mcp` is 0.13.0, which carries `mthds_codegen` with the write arm but **not yet `main_pipe`** on the validate verdict (that entry is under `[Unreleased]`); the skill therefore keeps an honest fallback for an older workshop — inputs from `mthds_inputs_template` with `explicit: true`, output from the bundle for a files source, a stop for a by-ref or by-id source with the advice to refresh the workshop — and Phase 4 gains the release that carries the signature as a gate.
+
+- **2026-09-06 — session paused after Phases 1, 1b and 2, before Phase 3.** Everything is in the worktree `_pipelex-plugins--codegen` on `feature/Codegen`, **uncommitted**: the two templates, their references, the two test modules, the family-wiring edits to `pipelex-design` / `pipelex-edit` / `pipelex-inputs`, `docs/decisions.md`, `CLAUDE.md`, `README.md`, `docs/build-targets.md`, `CHANGELOG.md`, the regenerated `pipelex*/` outputs, and the amended `design.md`, `plan.md` and new `scaffold-design.md`. **Cold start:** `ledger claim L-260830-344594 --renew` from the worktree, read this file's Phase 3, review the diff (`git status`, `git diff`), commit with explicit `git add <path>` per the rules above, then run Phase 3 against the local `../pipelex-mcp` checkout (`/pipelex-mcp-source`) — the published `@pipelex/mcp` 0.13.0 lacks `main_pipe`, so the ordinary signature path only exercises on the local build. Two small follow-ups noticed and not done: the Phase 4 `create-pipelex-app` decision is `L-260906-84bb41`; the synthetic-inputs campaign's `plan.md` still says `active` after its item closed (doctor `doc-active-after-close`, unrelated to this campaign).
 
 ## Deviations from the design
 
@@ -149,10 +222,12 @@ Carried in the design's §9 and §8; repeated here only where a phase might be t
 
 ## Where everything is
 
-- Brief: `wip/pipelex-integrate/brief.md`. Design: `wip/pipelex-integrate/design.md`. This tracker: `wip/pipelex-integrate/plan.md`.
+- Brief: `wip/pipelex-integrate/brief.md`. Designs: `wip/pipelex-integrate/design.md` (integrate) and `wip/pipelex-integrate/scaffold-design.md` (scaffold). Upstream reading companion: `upstream-dependencies.md`. This tracker: `wip/pipelex-integrate/plan.md`.
+- The starters the scaffold skill acquires and the harness rule defers to: `../pipelex-starter-js/.claude/skills/bootstrap/SKILL.md` (+ `scripts/bootstrap.mjs`), `../pipelex-starter-python/.claude/skills/bootstrap/SKILL.md` (+ `scripts/bootstrap.py`); their harnesses: `../pipelex-starter-js/package.json` scripts `codegen` / `codegen:check` / `codegen:verify` / `add-method` and `Makefile`, `../pipelex-starter-python/Makefile` (`codegen`, `codegen-check`).
+- The MCP-free template to model for scaffold: `templates/skills/pipelex-synthetic-inputs/SKILL.md.j2`.
 - The tool contract: `../pipelex-mcp/SPEC.md` → "Codegen Scope (`mthds_codegen`)" and "The write arm (`output_dir`) — local workshop only". The writer: `../pipelex-mcp/src/capabilities/codegen-writer.ts`; containment: `workspace-boundary.ts`.
 - Reference integrations (read, never changed): `../pipelex-starter-js/docs/codegen.md`, `src/generated/<method>/`, `src/lib/wireOutput.ts`, `scripts/codegen-check.mts`; `../pipelex-starter-python/Makefile` (`codegen`, `codegen-check`), `docs/codegen.md`, `piper/generated/`.
 - The offline check the TypeScript gate wraps: `../pipelex-sdk-js/src/codegen-check.ts` (`runCodegenCheck`, `isStampableArtifactPath`), documented in `docs/crate-routes.md` → "The offline check".
 - The sibling skill to model: `templates/skills/pipelex-inputs/SKILL.md.j2`; the tests to extend: `tests/unit/test_gen_skill_docs.py` (`TestSkillFailureDiscipline`, `TestPipelexInputsSizeLimitDiscipline` as the pattern).
 - The static-asset mechanism: `scripts/gen_skill_docs.py` → `setup_static_assets`; documented in `docs/build-targets.md` → "Template vs output directories".
-- Ledger: this item `L-260830-344594`; discovered `L-260830-4e43cd`; related `L-260820-ee327d`, `L-260820-2ba0f4`, `L-260829-563e9e`; the `pipelex-mcp` follow-up filed in Phase 0: `L-260830-e8b2e0`.
+- Ledger: the integrate item `L-260830-344594` and the scaffold item `L-260906-8ac105`; discovered `L-260830-4e43cd`, `L-260906-a2cd5b`, `L-260906-aa5083`; related `L-260820-ee327d`, `L-260820-2ba0f4`, `L-260829-563e9e`, `L-260906-84bb41`; the `pipelex-mcp` follow-up filed in Phase 0, `L-260830-e8b2e0`, and its consequence for this repo, `L-260831-b67e18`.

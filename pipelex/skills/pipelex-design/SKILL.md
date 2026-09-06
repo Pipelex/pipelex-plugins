@@ -191,7 +191,7 @@ After the gate:
 1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`. A converged stepwise result normally invokes it automatically because one-definition-per-file construction history and satisfied headers need regrouping. A naturally coherent result in either mode does not take an organization round trip solely for process compliance.
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
-4. **Hand off inputs.** Suggest preparing real inputs with `/pipelex-inputs`.
+4. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one and hands it to `/pipelex-integrate`.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
@@ -216,7 +216,7 @@ Structural changes to an existing method — adding, removing, or rewiring steps
    - Do not predeclare deeper descendants while their parent is only a signature. Introduce those child signatures when that parent receives its concrete controller definition, keeping every pending signature reachable.
    - Validate the atomic scaffold, then drain its structured backlog with Step S2.
 5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
-6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`.
+6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. If a `sources.json` carrying `"generator": "pipelex-integrate"` names a bundle file this re-entry changed, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them.
 
 ---
 
