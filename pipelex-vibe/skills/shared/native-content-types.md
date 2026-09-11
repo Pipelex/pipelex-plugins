@@ -17,7 +17,7 @@ Each native concept maps to a content class with specific attributes. Understand
 | `Document` | DocumentContent | `url`, `public_url`, `filename`, `mime_type`, `title`, `snippet` |
 | `Html` | HtmlContent | `inner_html`, `css_class` |
 | `TextAndImages` | TextAndImagesContent | `text` (TextContent), `images` (list of ImageContent), `raw_html` (str) |
-| `Page` | PageContent | `text_and_images` (TextAndImagesContent), `page_view` (ImageContent, only with `page_views = true`) |
+| `Page` | PageContent | `text_and_images` (TextAndImagesContent), `page_view` (ImageContent, only with `page_views = true` on a PDF) |
 | `JSON` | JSONContent | `json_obj` |
 | `SearchResult` | SearchResultContent | `answer`, `sources` (list of DocumentContent) |
 | `Anything` | *(any content)* | depends on actual content |
@@ -108,7 +108,7 @@ Represents a single page extracted from a document. Produced by PipeExtract when
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `text_and_images` | `TextAndImagesContent` | yes | The text and images extracted from the page |
-| `page_view` | `ImageContent \| None` | no | An image of the whole page — set only when the `PipeExtract` that produced the page has `page_views = true` |
+| `page_view` | `ImageContent \| None` | no | An image of the whole page — set only when the `PipeExtract` that produced the page has `page_views = true`, which works on PDFs only |
 
 **Access**: When `@page` is used in a PipeLLM prompt, the text content is auto-rendered and images are sent as visual inputs. `$page.text_and_images.text.text` drills to the raw text.
 
@@ -209,7 +209,7 @@ ListContent supports iteration (`for item in list_content`), indexing (`list_con
 
 ### PipeExtract output chain
 
-PipeExtract produces `Page[]` — a list of pages. Each page contains `text_and_images` (text + images from OCR/extraction) and, when the `PipeExtract` sets `page_views = true`, a `page_view` (an image of the whole page). To use extracted content in an LLM prompt:
+PipeExtract produces `Page[]` — a list of pages. Each page contains `text_and_images` (text + images from OCR/extraction) and, when the `PipeExtract` sets `page_views = true` on a PDF, a `page_view` (an image of the whole page). To use extracted content in an LLM prompt:
 
 ```toml
 # Extract pages from a document
