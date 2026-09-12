@@ -3,6 +3,12 @@
 #   - PR → release/vX.Y.Z:   the version must equal X.Y.Z.
 #   - PR from release/vX.Y.Z: the version must equal X.Y.Z.
 #
+# Those three are read under the trigger below, which fires on two bases only:
+# `main` and `release/vX.Y.Z`. So the third rule reaches a release branch on its
+# way into `main`, and a pull request *out of* a release branch into anything
+# else — `dev`, or a branch below it in a stack — runs no job and is checked
+# against nothing.
+#
 # The version of record is `targets/prod.toml`'s `[plugin].version`, which the
 # repo's CLAUDE.md names the source of truth; `make check` is what holds every
 # other target and the Claude marketplace to it, so this workflow checks the one
@@ -52,9 +58,11 @@ jobs:
         id: pr_version
         run: |
           VERSION=$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("targets/prod.toml").read_text())["plugin"]["version"])')
-          # The version comes out of a file on the pull request's head, so it is
-          # validated before it becomes a step output: a multi-line TOML string
-          # would otherwise write extra keys into $GITHUB_OUTPUT, and anything
+          # No `ref:` is passed to the checkout above, so what this reads is the
+          # pull request's merge commit — the tree that would land — and not its
+          # head. Either way the value is somebody else's file, so it is validated
+          # before it becomes a step output: a multi-line TOML string would
+          # otherwise write extra keys into $GITHUB_OUTPUT, and anything
           # non-numeric would reach the comparison below as a shell error.
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::targets/prod.toml [plugin].version is not an X.Y.Z version: $VERSION"
