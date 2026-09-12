@@ -1,0 +1,44 @@
+# The Pipelex local workshop MCP server, for {{ harness_name }}.
+#
+# {{ harness_name }} has no plugin manifest to declare an MCP server in, so this
+# target ships the declaration as a config fragment. To install it in
+# ~/.vibe/config.toml ($VIBE_HOME/config.toml when VIBE_HOME is set):
+#
+# 1. Delete the `mcp_servers = []` line that {{ harness_name }} writes into a new
+#    config. TOML cannot add a [[mcp_servers]] table to an array already written
+#    inline, so {{ harness_name }} would refuse to start.
+# 2. Delete any `pipelex` server you registered by hand. {{ harness_name }} refuses
+#    to start with two servers of the same name.
+# 3. Append everything below to the end of the file, after every top-level
+#    setting such as skill_paths. Pasted above a top-level setting, the
+#    [mcp_servers.env] header would claim that setting as an environment
+#    variable of the server.
+# 4. Write your API key into the env table.
+#
+# The key has to be written here. {{ harness_name }} spawns stdio MCP servers with
+# a minimal environment (HOME, LOGNAME, PATH, SHELL, TERM, USER, plus this entry's
+# env table) and expands no variables in its config, so a key exported in your
+# shell never reaches the server. The plugin's validation hook does read your
+# shell, so keep exporting the key there too. Add any other variable npx needs
+# to the same table, such as HTTPS_PROXY behind a proxy. An empty value counts
+# as unset: leave PIPELEX_BASE_URL empty for the hosted API. Get a key at
+# https://app.pipelex.com.
+#
+# {{ harness_name }} also records its whole configuration, this env table included,
+# in every session log under ~/.vibe/logs/session/, so the key is copied there
+# too. Redact it before you share a session log.
+#
+# startup_timeout_sec is raised above {{ harness_name }}'s 10-second default because
+# the very first npx spawn fills the npm cache and takes longer than that.
+
+[[mcp_servers]]
+name = "pipelex"
+transport = "stdio"
+command = {{ mcp_server.command | tojson }}
+args = {{ mcp_server.args | tojson }}
+startup_timeout_sec = 60.0
+
+[mcp_servers.env]
+{% for name in mcp_server.env_vars | default([]) -%}
+{{ name }} = ""
+{% endfor -%}

@@ -10,7 +10,8 @@ This is the **CLI-free** plugin generation. Unlike the `mthds-plugins` predecess
 templates/                      source of truth (all .j2 files)
 ├── skills/*/SKILL.md.j2        skill templates
 ├── skills/shared/*.md.j2       shared language references (+ the include-only frontmatter partial)
-└── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
+├── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
+└── mcp/vibe-mcp.toml.j2         the workshop launcher as a Vibe [[mcp_servers]] fragment
        |
        v
 targets/defaults.toml          common variable defaults
@@ -30,6 +31,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
        +---> pipelex-codex/.codex-plugin/plugin.json   (generated: plugin-base.json + target overrides)
        +---> pipelex-vibe/skills/*/SKILL.md            (Mistral Vibe target, output — manifestless)
        +---> pipelex-vibe/hooks/{vibe-hooks.toml,check-mthds-vibe.sh}  (Vibe post_tool hook)
+       +---> pipelex-vibe/mcp/vibe-mcp.toml            (Vibe [[mcp_servers]] fragment — the workshop launcher)
        +---> .agents/plugins/marketplace.json          (verbatim copy of packaging/codex-marketplace.json)
 ```
 
@@ -68,7 +70,7 @@ title = "Pipelex API base URL"
 description = "..."
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
@@ -93,7 +95,7 @@ The target platform is selected with `[vars].platform`:
 
 - `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
-- `mistral-vibe`: renders skills and the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
+- `mistral-vibe`: renders skills, the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`) and the workshop launcher as the `mcp/vibe-mcp.toml` config fragment, with no Claude/Codex plugin manifest.
 
 ### Variable resolution
 
@@ -126,7 +128,7 @@ pipelex/                       (prod target)
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.
 
-The Mistral Vibe target is manifestless: it emits skills plus the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
+The Mistral Vibe target is manifestless: it emits skills, the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and the MCP fragment (`mcp/vibe-mcp.toml`), and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]`, a `hooks.toml` entry, and the fragment's `[[mcp_servers]]` entry appended to the end of `~/.vibe/config.toml`, once the `mcp_servers = []` line a new Vibe config carries is deleted, with the API key written into its `env` table (Vibe forwards no shell environment into a stdio spawn — see [decisions.md](decisions.md) "Vibe target bakes the launcher as a config fragment").
 
 ## Codex marketplace discovery
 
@@ -185,7 +187,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
-| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex |
+| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex. `mcp/vibe-mcp.toml.j2` renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
 
 ### Shared template files

@@ -317,6 +317,8 @@ class TestVibeTargetArtifacts:
         hooks_dir.mkdir(parents=True)
         return hooks_dir
 
+    VALID_MCP_FRAGMENT = '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\n'
+
     def _write_valid_hooks(self, hooks_dir: Path) -> None:
         (hooks_dir / "vibe-hooks.toml").write_text(
             '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
@@ -324,6 +326,12 @@ class TestVibeTargetArtifacts:
         hook_script = hooks_dir / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
         hook_script.chmod(0o755)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT)
+
+    def _write_mcp_fragment(self, hooks_dir: Path, body: str) -> None:
+        mcp_dir = hooks_dir.parent / "mcp"
+        mcp_dir.mkdir(parents=True, exist_ok=True)
+        (mcp_dir / "vibe-mcp.toml").write_text(body)
 
     def test_matching(self, tmp_path: Path) -> None:
         self._write_valid_hooks(self._vibe_targets(tmp_path))
@@ -368,6 +376,42 @@ class TestVibeTargetArtifacts:
         (hooks_dir / "check-mthds.sh").write_text("#!/usr/bin/env bash\n")
         errors = check_vibe_target_artifacts(tmp_path)
         assert any("not a Vibe artifact" in error for error in errors)
+
+    def test_missing_mcp_fragment(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        (hooks_dir.parent / "mcp" / "vibe-mcp.toml").unlink()
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("mcp/vibe-mcp.toml missing" in error for error in errors)
+
+    def test_mcp_fragment_must_be_stdio(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, '[[mcp_servers]]\nname = "pipelex"\ntransport = "streamable-http"\nurl = "https://example.com/mcp"\n')
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any('transport = "stdio"' in error for error in errors)
+        assert any("must set a command" in error for error in errors)
+
+    def test_mcp_fragment_keeps_the_server_name(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT.replace('"pipelex"', '"pipelex-local"'))
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any('must name the server "pipelex"' in error for error in errors)
+
+    def test_mcp_fragment_declares_exactly_one_server(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT * 2)
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("exactly one [[mcp_servers]] entry" in error for error in errors)
+
+    def test_mcp_fragment_must_parse(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, "[[mcp_servers]\nname = \n")
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("not valid TOML" in error for error in errors)
 
 
 class TestResolveTargetVar:

@@ -25,6 +25,7 @@ Controls which `pipelex-mcp` build this plugin's declared MCP server spawns, and
 `targets/defaults.toml` `[vars.mcp_server]` is the **single source of truth**. `make build` fans it out to every generated artifact:
 
 - `pipelex/.claude-plugin/plugin.json` and `pipelex-codex/.codex-plugin/plugin.json` — the `mcpServers.pipelex` entry the harness spawns
+- `pipelex-vibe/mcp/vibe-mcp.toml` — the `[[mcp_servers]]` fragment Vibe users copy into `~/.vibe/config.toml`, since Vibe has no manifest
 - every MCP-backed `SKILL.md` across all three targets — their "server isn't connected" line renders `{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`, so the quoted launcher tracks the config automatically
 
 That fan-out is why a switch is never a one-file edit, and why it shows up as a wide diff. Prose docs (`README.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`) quote the launcher too, but they describe **what ships** — see "Changing the shipped default" for the only case where they move.
@@ -61,7 +62,7 @@ Present it as a short table, not prose. The useful signal is usually a *mismatch
 2. For `local`, verify `dist/local/main.js` exists and is not stale; run `make build-local` in `../pipelex-mcp` if it is. Use an **absolute** path — the server spawns with the *host's* working directory, not the plugin's, so a relative path resolves somewhere unintended.
 3. Edit only `command` and `args` in `targets/defaults.toml` `[vars.mcp_server]`. Leave `env_vars` and every `user_config` table alone — credential delivery is orthogonal to which build gets spawned, and the local workshop needs the same key.
 4. Run `make build`, then `make check`.
-5. Tell the user to `/reload-plugins` (Claude Code). On Codex add `make codex-refresh` — installed plugins run from a cache copy, so a rebuild alone does not reach the running harness. Vibe registers its server manually, so a switch there is a change the user makes in Vibe's own MCP config; `make build` only updates the launcher string quoted in Vibe's skill prose.
+5. Tell the user to `/reload-plugins` (Claude Code). On Codex add `make codex-refresh` — installed plugins run from a cache copy, so a rebuild alone does not reach the running harness. Vibe has no manifest: `make build` regenerates `pipelex-vibe/mcp/vibe-mcp.toml` and the launcher quoted in Vibe's skill prose, but a running Vibe keeps whatever entry the user copied into `~/.vibe/config.toml` until they replace that entry with the new one. Adding the new entry beside the old one stops Vibe from starting, because Vibe refuses two servers of the same name.
 6. **Close with the revert reminder** and name the dirtied paths. This is the step that keeps a dev switch from shipping.
 
 ## Restoring the shipped default
@@ -84,7 +85,7 @@ Do the switch steps above, then propagate to the docs that quote the launcher as
 
 ## The hosted console
 
-The console at `https://pipelex-mcp-a3c6a115.alpic.live/mcp` is **read-only from this skill**. It is never baked into the plugin: a plugin manifest is a shared literal artifact with no channel for a per-user key, and the console is bring-your-own-key since `@pipelex/mcp` 0.5.0, so a baked URL produces verdicts for no one. `docs/decisions.md` records this; the renderer has no url shape to emit.
+The console at `https://pipelex-mcp-a3c6a115.alpic.live/mcp` is **read-only from this skill**. It is never baked into the plugin: the plugin's audience is builders editing local files, which only the workshop can read, and the console authenticates each caller by OAuth sign-in that the host drives through its own connector UI (bring-your-own-key was removed in `@pipelex/mcp` 0.12.0), which no shared plugin artifact can carry. `docs/decisions.md` records this; the renderer has no url shape to emit.
 
 What this skill does for the console: probe it, report the version it serves, and compare against npm `latest`. If it lags, the fix lives in `../pipelex-mcp` (`make deploy`, from a clean `main`) — say so and hand off rather than deploying from here.
 
@@ -114,7 +115,7 @@ curl -s -X POST "https://pipelex-mcp-a3c6a115.alpic.live/mcp" \
   | head -c 300
 ```
 
-Both need no API key — the handshake precedes auth. A first-ever `npx` spawn can take ~10s while the cache populates; warm spawns are ~1s, so allow a generous timeout before calling it broken.
+The local probe needs no API key, because the workshop's handshake precedes auth. **The console probe no longer answers keyless**: since console OAuth became its only auth posture, an unauthenticated `initialize` gets `401` with a `www-authenticate: Bearer … resource_metadata="…/.well-known/oauth-protected-resource"` header. That response still proves the console is up and signing callers in, but it carries no `serverInfo.version`; read the console's version from a signed-in connector session instead. A first-ever `npx` spawn can take ~10s while the cache populates; warm spawns are ~1s, so allow a generous timeout before calling it broken.
 
 The session's own connected server is a separate question from either probe: it was spawned at session start, so it reflects the config as of *then*. After a switch, the running server is still the old one until the harness reloads — which is why the reload step is not optional.
 

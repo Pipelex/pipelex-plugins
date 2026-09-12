@@ -15,8 +15,9 @@ harness_name = "Claude Code"
 # The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
 # (stdio) — definitive, not a BYOK workaround: builders authoring local files
 # are the plugin's audience, and the hosted console is a connector users add
-# in their host's own UI, never a plugin declaration (rationale:
-# ../pipelex-mcp/wip/plugin-reconciliation.md §8). The workshop authenticates
+# in their host's own UI, never a plugin declaration (rationale: the Pipelex
+# workspace's wip/history/mcp-dual-deployment/pipelex-mcp-plugin-reconciliation.md
+# §8). The workshop authenticates
 # with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
 # - Claude: the `user_config` tables below become the manifest's `userConfig`
 #   (Claude prompts for them when the plugin is enabled; sensitive values go
@@ -31,6 +32,10 @@ harness_name = "Claude Code"
 #   MCP-backed skill (regressed in 0.3.1 — see docs/decisions.md).
 # - Codex: `env_vars` names the variables Codex forwards into the spawn
 #   (Codex whitelist-filters MCP spawn env; terminal sessions carry them).
+# - Mistral Vibe: no manifest. mcp/vibe-mcp.toml renders command/args as a
+#   [[mcp_servers]] stdio entry the user copies into ~/.vibe/config.toml, and
+#   each env_vars name becomes an empty `env` key they fill in, because Vibe
+#   forwards no shell env into the spawn and expands no variables.
 # Dev override: point command/args at a local checkout
 # (e.g. command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) +
 # `make build` on Claude; a same-named [mcp_servers.pipelex] entry in
