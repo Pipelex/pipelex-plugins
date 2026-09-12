@@ -617,7 +617,7 @@ class TestSkillFailureDiscipline:
     )
     def test_absent_tools_stop_message_matches_platform(self, target_name: str, manifest_spawns: bool) -> None:
         """The MCP-absent STOP guidance must quote the real launcher command and,
-        on Vibe (no plugin manifest, no auto-spawn), point at manual registration
+        on Vibe (no plugin manifest, no auto-spawn), point at the shipped fragment
         instead of a manifest spawn. Renders the real templates with real target vars."""
         repo_root = Path(__file__).parents[2]
         config = load_target_config(repo_root / "targets", target_name)
@@ -633,10 +633,14 @@ class TestSkillFailureDiscipline:
             assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
             if manifest_spawns:
                 assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
+                assert "from the session environment —" in body, f"{target_name}/{skill}: the manifest-spawned server reads the session environment"
             else:
                 assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
                 assert "`mcp/vibe-mcp.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must point at the shipped MCP fragment"
                 assert "`env` table" in body, f"{target_name}/{skill}: Vibe STOP message must say where the key goes"
+                assert "to the end of `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must say to append the entry"
+                assert "`mcp_servers = []`" in body, f"{target_name}/{skill}: Vibe STOP message must say to delete the inline empty array"
+                assert "from the session environment —" not in body, f"{target_name}/{skill}: Vibe passes no shell env to the server"
 
 
 class TestVibeMcpFragment:
@@ -688,6 +692,27 @@ class TestVibeMcpFragment:
         """Vibe's default startup timeout is 10 s and a first-ever npx spawn takes longer."""
         body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
         assert tomllib.loads(body)["mcp_servers"][0]["startup_timeout_sec"] > 10
+
+    # The shape Vibe's first run writes: bare keys first, an inline empty
+    # `mcp_servers`, then tables (tomli_w.dump(VibeConfig.create_default())).
+    VIBE_DEFAULT_CONFIG = 'active_model = "devstral-2"\nmcp_servers = []\nskill_paths = []\n\n[session_logging]\nenabled = true\n'
+
+    def test_fragment_installs_into_a_default_vibe_config_only_after_deleting_the_inline_array(self) -> None:
+        """Appended to a fresh Vibe config as is, the fragment is invalid TOML and
+        Vibe cannot start; with the `mcp_servers = []` line deleted it loads, and
+        every top-level setting stays top-level. The fragment has to carry that
+        step, the paste position, and the session-log warning."""
+        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        with pytest.raises(tomllib.TOMLDecodeError):
+            tomllib.loads(self.VIBE_DEFAULT_CONFIG + "\n" + body)
+        installed = tomllib.loads(self.VIBE_DEFAULT_CONFIG.replace("mcp_servers = []\n", "") + "\n" + body)
+        assert installed["active_model"] == "devstral-2"
+        assert installed["skill_paths"] == []
+        assert [server["name"] for server in installed["mcp_servers"]] == ["pipelex"]
+        assert "Delete the `mcp_servers = []` line" in body
+        assert "two servers of the same name" in body
+        assert "Append everything below to the end of the file" in body
+        assert "~/.vibe/logs/session/" in body
 
     @pytest.mark.parametrize("target_name", ["prod", "codex"])
     def test_plugin_targets_do_not_ship_the_fragment(self, target_name: str) -> None:
