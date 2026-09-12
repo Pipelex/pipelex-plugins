@@ -50,7 +50,11 @@ class TestPipelexIntegrateSkill:
         assert "candidate output concepts" not in body
         assert "minus the input concepts minus natives" not in body
         # A by-ref / by-id source with no signature stops instead of guessing.
-        assert "STOP and say the workshop is too old to type this integration exactly, rather than guessing" in body
+        assert "STOP and say the verdict carries no signature to type this integration exactly" in body
+        # The entry pipe is the verdict's, which follows a package manifest; its absence has three causes, not one.
+        assert "`main_pipe.pipe_ref` is the pipe a run with no pipe selector executes" in body
+        assert "the method settles **no entry pipe**" in body
+        assert "the workshop **predates the signature**" in body
 
     def test_the_wire_null_helper_is_never_installed(self) -> None:
         body = self.integrate
