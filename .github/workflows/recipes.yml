@@ -1,0 +1,62 @@
+# The shipped synthetic-inputs recipes, executed.
+#
+# `make test-recipes` runs every runnable block the pipelex-synthetic-inputs
+# references ship, through both rungs of the environment ladder, and it is the
+# only thing that would catch a reference recipe rotting. It needs network and
+# downloads packages on a cold uv cache, so it is kept off every pull request
+# and runs on three triggers instead:
+#
+#   - nightly, which is the backstop against a recipe that rots because a
+#     dependency moved rather than because anybody edited it;
+#   - on demand, for when a recipe is being worked on;
+#   - on a pull request that touches the recipe sources, the recipe suite, or
+#     this workflow — the moment a recipe can be broken by an edit, and the one
+#     case where waiting minutes for an answer is worth it.
+#
+# A `schedule` and a `workflow_dispatch` are read from the default branch, so
+# both stay inert until this file has reached `main` with a release.
+#
+# The job shape follows ../mthds-plugins/.github/workflows/tests.yml, with the
+# cached uv install from pipelex/.github/workflows/lint-check.yml.
+name: Recipes
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "skills/pipelex-synthetic-inputs/references/**"
+      - "templates/skills/pipelex-synthetic-inputs/**"
+      - "tests/recipes/**"
+      - ".github/workflows/recipes.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recipes:
+    name: Recipes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Execute the shipped recipes
+        run: make test-recipes

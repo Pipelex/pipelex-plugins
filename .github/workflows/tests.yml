@@ -1,0 +1,42 @@
+# The unit suite on every pull request.
+#
+# Follows ../mthds-plugins/.github/workflows/tests.yml, which calls that repo's
+# `make gha-tests`. This repo has no such target — it was removed so CI would
+# call `make agent-test` instead, which is quiet unless something fails and so
+# keeps a green run to a few lines.
+#
+# `pyproject.toml`'s `addopts = "-m 'not recipes'"` deselects the recipe suite,
+# which downloads packages on a cold uv cache; `recipes.yml` runs that one.
+name: Tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Run tests
+        run: make agent-test

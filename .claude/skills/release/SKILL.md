@@ -21,7 +21,7 @@ The procedure is the workspace release play, [`docs/releasing.md`](../../../../d
 
 **Nothing is published to a registry: the repository itself is the artifact.** On Claude and Codex, install is a marketplace add against the GitHub repo — the README's Install section gives `claude plugin marketplace add Pipelex/pipelex-plugins` and `codex plugin marketplace add Pipelex/pipelex-plugins`, neither carrying a ref, so what is served is the repo's default branch, which is `main` (`origin/HEAD` points at `origin/main`). So the merge to `main` *is* the publish: when it lands, an install or a marketplace refresh hands users the `pipelex/` and `pipelex-codex/` trees exactly as the release branch left them, each carrying the new version in its own generated `plugin.json`. Mistral Vibe is served by no marketplace — the README has the user point `skill_paths` at a local checkout of `pipelex-vibe/` — so a Vibe user takes the release by pulling `main` themselves, and the tree they get names no version at all (see **Particulars**).
 
-Nothing automated happens on the merge, because the repo has no workflows at all (see **CI on the release pull request**), and no tag is created: `git tag --list` is empty and this repo has never carried one. Say so when handing the merge to `/ledger-land`, so it does not go looking for a workflow run, a registry answer or a tag that do not exist. What it verifies instead is that `main` now carries the release:
+Nothing automated happens on the merge: the repo's workflows all run on a pull request (see **CI on the release pull request**), none of them publishes anything, and no tag is created — `git tag --list` is empty and this repo has never carried one. Say so when handing the merge to `/ledger-land`, so it does not go looking for a post-merge workflow run, a registry answer or a tag that do not exist. What it verifies instead is that `main` now carries the release:
 
 ```bash
 git -C <main> fetch --prune origin
@@ -54,7 +54,14 @@ Every `targets/*.toml` the enumeration turned up — `prod.toml`, `codex.toml` a
 
 ## CI on the release pull request
 
-**There is none.** This repo has no `.github/` directory at all — `ls .github` finds nothing and `git ls-files .github` returns nothing — so no workflow runs on a pull request, on a push to `main`, or on a merge. Nothing outside this skill checks that the version in the files matches the version in the branch name, that the changelog carries an entry for it, that the generated manifests were rebuilt, or that the suite is green. The local gates above are the entire gate, and a release pull request that opens with no checks at all is the expected state here rather than a CI outage to wait out.
+**Five checks report, and none of them blocks.** `docs/ci.md` is the full account; what a release run needs to know is this:
+
+- `Checks` (`make check`) and `Unit tests` (`make agent-test`) run on every pull request, so the second pass of the local gates is repeated on the release branch — a tree pushed before `make build` caught up with the version bump fails `Checks` on the pull request as well as locally.
+- `Version check` reads `targets/prod.toml`'s `[plugin].version` and requires it to equal the `X.Y.Z` in the `release/vX.Y.Z` branch name, and to be strictly greater than the version `main` carries.
+- `Changelog entry` requires `CHANGELOG.md` to carry a `## [X.Y.Z] - …` heading for that same version — the heading shape this repo uses, with no `v`.
+- `Gate main` refuses a pull request into `main` from anything but a `release/vX.Y.Z` branch of this repository. It runs on `pull_request_target`, so what executes is the copy of the workflow on `main` rather than the one on the release branch.
+
+What is still *only* this skill's job: nothing checks that the vendored hook bundle is current, and no ruleset requires any of the checks above, so a red one refuses no merge. Read them and stop on a failure rather than relying on GitHub to hold the line. `make test-recipes` does not run on this pull request either — `Recipes` is nightly, on demand, and on a pull request touching the recipe sources — which matches the gates above, where it is not a release gate.
 
 ## Particulars
 

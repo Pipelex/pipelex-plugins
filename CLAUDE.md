@@ -60,7 +60,8 @@ scripts/
 └── check.py                   # Validation / freshness / packaging checks
 tests/unit/                    # Unit tests for renderer + checks
 tests/recipes/                 # Opt-in: executes the synthetic-inputs recipes (`make test-recipes`)
-docs/                          # repo documentation (build targets, decisions, hooks)
+.github/workflows/             # CI — see docs/ci.md
+docs/                          # repo documentation (build targets, decisions, hooks, CI)
 Makefile  pyproject.toml  uv.lock  README.md  CHANGELOG.md  LICENSE
 ```
 
@@ -88,6 +89,8 @@ make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 1. Edit `.j2` files in `templates/` (never edit generated `pipelex*/` outputs directly — they're regenerated).
 2. Run `make build` to regenerate all targets.
 3. Run `make check` (or `make agent-check`) to validate.
+
+CI repeats the read-only half of that loop on every pull request — `make check` and `make agent-test`, plus the branch-flow guard and the release-only version and changelog gates. `docs/ci.md` says which workflow runs when and what each check means.
 
 ### Template variables (trimmed set)
 
