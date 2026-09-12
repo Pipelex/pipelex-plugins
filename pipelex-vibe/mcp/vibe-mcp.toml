@@ -1,0 +1,25 @@
+# The Pipelex local workshop MCP server, for Mistral Vibe.
+#
+# Mistral Vibe has no plugin manifest to declare an MCP server in, so this
+# target ships the declaration as a config fragment. Copy everything below into
+# ~/.vibe/config.toml, then write your API key into the env table.
+#
+# The key has to be written here. Mistral Vibe spawns stdio MCP servers with
+# a minimal environment (HOME, LOGNAME, PATH, SHELL, TERM, USER, plus this entry's
+# env table) and expands no variables in its config, so a key exported in your
+# shell never reaches the server. An empty value counts as unset: leave
+# PIPELEX_BASE_URL empty for the hosted API. Get a key at https://app.pipelex.com.
+#
+# startup_timeout_sec is raised above Mistral Vibe's 10-second default because
+# the very first npx spawn fills the npm cache and takes longer than that.
+
+[[mcp_servers]]
+name = "pipelex"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@pipelex/mcp@latest"]
+startup_timeout_sec = 60.0
+
+[mcp_servers.env]
+PIPELEX_API_KEY = ""
+PIPELEX_BASE_URL = ""

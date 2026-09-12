@@ -12,7 +12,7 @@ This is the plugin generation that pairs with the hosted Pipelex API and the (cl
   `pipelex-synthetic-inputs` is the plugin's second MCP-free skill after `pipelex-explain`: it needs no API key and no Pipelex service. It renders files from code — no image-generation model, no hosted method — using only packages whose licences are compatible with MIT, and it installs them itself, through `uv`'s ephemeral environments or an isolated venv under your cache directory when `uv` is absent. Nothing is installed into your project, and installing a *tool* always asks first. Photographs and handwriting are deliberately out of scope: code cannot render either convincingly, and the skill asks for your own file rather than handing a method an imitation.
 
 - **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `post_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
-- **MCP server declaration** — on Claude Code and Codex the plugin declares the `pipelex-mcp` server as the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio; tools `mthds_validate` for bundle validation, `mthds_inputs_template` for input templates, `mthds_prepare_inputs` to upload a filled template's file values to Pipelex storage so a run can reach them, and the `mthds_run` family for durable runs — each takes submitted file contents or a registered method's catalog id (`mt_…`) as `method_id`, operating on the method's current stored content; by-id calls require an API key since the catalog is org-scoped), which the MCP-backed skills require. The harness spawns it automatically at session start, and it authenticates to the Pipelex API with the key from the plugin configuration (prompted at enable time on Claude Code) or, as a fallback, `PIPELEX_API_KEY` from your session environment — the same credential the hook uses. Unlike the fail-open hook, the MCP-backed skills stop with a setup instruction when the tools are absent. The hosted console is never baked into the plugin — see [One install, one server](#one-install-one-server--workshop-vs-console) and [docs/decisions.md](docs/decisions.md).
+- **MCP server declaration** — on Claude Code and Codex the plugin declares the `pipelex-mcp` server as the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio; tools `mthds_validate` for bundle validation, `mthds_inputs_template` for input templates, `mthds_prepare_inputs` to upload a filled template's file values to Pipelex storage so a run can reach them, and the `mthds_run` family for durable runs — each takes submitted file contents or a registered method's catalog id (`mt_…`) as `method_id`, operating on the method's current stored content; by-id calls require an API key since the catalog is org-scoped), which the MCP-backed skills require. On Mistral Vibe, which has no plugin manifest, the target ships the same launcher as a config fragment you copy into `~/.vibe/config.toml` (see [Mistral Vibe](#mistral-vibe)). The harness spawns it automatically at session start, and it authenticates to the Pipelex API with the key from the plugin configuration (prompted at enable time on Claude Code) or, as a fallback, `PIPELEX_API_KEY` from your session environment — the same credential the hook uses. Unlike the fail-open hook, the MCP-backed skills stop with a setup instruction when the tools are absent. The hosted console is never baked into the plugin — see [One install, one server](#one-install-one-server--workshop-vs-console) and [docs/decisions.md](docs/decisions.md).
 - **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
 
 ## Install
@@ -87,7 +87,22 @@ description = "Validate .mthds files after Vibe file edits."
 
 Requires Mistral Vibe 2.21.0+ (stable hooks API — `post_tool`, no opt-in flag).
 
-**MCP server (manual, for the MCP-backed skills):** Vibe has no plugin-bundled MCP mechanism here — register the local workshop launcher (`npx -y @pipelex/mcp@latest`, stdio, with `PIPELEX_API_KEY` in its environment) through Vibe's own MCP configuration if/where supported. The MCP-backed skills stop with a setup instruction when the tools are absent.
+**MCP server (for the MCP-backed skills):** Vibe has no plugin manifest, so the target bakes the local workshop launcher (`npx -y @pipelex/mcp@latest`, stdio) into a config fragment instead: `pipelex-vibe/mcp/vibe-mcp.toml`. Copy its `[[mcp_servers]]` entry into `~/.vibe/config.toml` and write your key into the entry's `env` table:
+
+```toml
+[[mcp_servers]]
+name = "pipelex"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@pipelex/mcp@latest"]
+startup_timeout_sec = 60.0
+
+[mcp_servers.env]
+PIPELEX_API_KEY = "plx_sk_..."
+PIPELEX_BASE_URL = ""                # optional — empty means the hosted API
+```
+
+The key has to be written there: Vibe spawns stdio MCP servers with a minimal environment and expands no variables in its config, so a `PIPELEX_API_KEY` exported in your shell never reaches the server. The raised `startup_timeout_sec` covers the first-ever `npx` spawn, which fills the npm cache and outlasts Vibe's 10-second default. Keep the name `pipelex` so the tools reach the model as `pipelex_mthds_validate`, `pipelex_mthds_inputs_template` and so on. The MCP-backed skills stop with a setup instruction when the tools are absent.
 
 ## One install, one server — workshop vs console
 
@@ -97,14 +112,24 @@ Requires Mistral Vibe 2.21.0+ (stable hooks API — `post_tool`, no opt-in flag)
 |---|---|---|
 | Claude Code | Local workshop | this plugin (spawned automatically) |
 | ChatGPT desktop (Codex mode) | Local workshop | this plugin (spawned automatically) |
-| Mistral Vibe (TUI) | Local workshop | manual registration (see above) |
+| Mistral Vibe (TUI) | Local workshop | this plugin's `mcp/vibe-mcp.toml`, copied into `~/.vibe/config.toml` (see above) |
+| Cursor | Local workshop | `~/.cursor/mcp.json` — no plugin target; the snippet is in the `pipelex-mcp` README |
+| Claude Desktop (Cowork mode) | **Dual** — console for consumers, workshop for builders | Connector, or this plugin |
 | Claude Desktop (chat mode) | Hosted console | Connector in the app UI |
 | claude.ai (web + mobile) | Hosted console | Connector (custom URL) |
 | ChatGPT (web) | Hosted console | Apps directory |
 
-To reach the hosted console as a connector today, append your key to the connector URL: `https://pipelex-mcp-a3c6a115.alpic.live/mcp?api_key=plx_sk_...` — the console holds no server-side key (bring-your-own-key). **Treat that URL as a secret**: a key in a query string can end up in browser history, copied links, and proxy logs — on hosts that let you set request headers, send `Authorization: Bearer plx_sk_...` instead (the console accepts both; the `?api_key=` form is the fallback for connector UIs that only take a bare URL), and rotate the key if a URL leaks. When console OAuth ships, this passage becomes "add the connector and sign in when prompted", no key touches a URL, and nothing else in this plugin changes.
+To reach the hosted console, add it as a custom connector by its plain URL, then sign in with your Pipelex account when the host prompts you. There is no key to paste:
 
-**Claude Desktop note:** GUI apps don't inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches Desktop sessions — set the key through the **plugin configuration** dialog instead (prompted when you enable the plugin); it flows to both the spawned workshop and the validation hook. The hosted-console connector remains an alternative if `node`/`npx` is unavailable on your PATH.
+```
+https://pipelex-mcp-a3c6a115.alpic.live/mcp
+```
+
+Sign-in is OAuth, and the host drives the handshake itself — ChatGPT, claude.ai, Claude Desktop, Cowork and Cursor all do — including picking the organization you work in. The console holds no server-side key and has no keyless mode: every call runs on your signed-in session, so the catalog you see and the runs you spend are your own. When a session expires or is revoked, calls come back as a `config` no-verdict telling you to reconnect the connector and sign in again.
+
+> **Upgrading from a `?api_key=` connector.** Bring-your-own-key was removed from the console in `@pipelex/mcp` 0.12.0. A connector still registered with `?api_key=plx_sk_...`, or with an `Authorization: Bearer plx_sk_...` header, no longer connects at all: remove it and re-add it by the plain URL above. ChatGPT caches a connector's configuration when it is added, so re-adding is the only way through there.
+
+**Claude Desktop note:** GUI apps don't inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches Desktop sessions — set the key through the **plugin configuration** dialog instead (prompted when you enable the plugin); it flows to both the spawned workshop and the validation hook. The hosted-console connector remains the alternative when `node`/`npx` is unavailable on your PATH: add it and sign in as described above.
 
 **Connect each host to exactly one Pipelex server.** Both deployments register identical tool names, so a host connected to both gets ambiguous routing and contradictory schemas under the same names (the workshop accepts `{ path }`, the console rejects it). The trap to know about: **a claude.ai Pipelex connector syncs into Claude Code automatically** — if you run this plugin (workshop) in Claude Code and also added a Pipelex connector on claude.ai, disable the connector for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers` in `.claude/settings.json`, or global `disableClaudeAiConnectors: true`).
 

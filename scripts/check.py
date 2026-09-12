@@ -11,7 +11,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
-from scripts.gen_skill_docs import SHARED_TEMPLATES, Platform
+from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
@@ -425,12 +425,43 @@ def check_codex_no_claude_artifacts(base_dir: Path) -> list[str]:
     return errors
 
 
-def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
-    """Check that Mistral Vibe targets emit Vibe-only hook artifacts.
+def _vibe_mcp_fragment_errors(target_name: str, fragment: Path) -> list[str]:
+    """Check that the Vibe MCP fragment declares the workshop launcher Vibe can load.
 
-    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths
-    and hooks from hooks.toml. The generated target must therefore not carry a
-    plugin manifest, and it must render the post_tool hook config/script pair.
+    The fragment must parse as TOML and hold exactly one `[[mcp_servers]]` entry:
+    the `pipelex` server over stdio with a command, which is the only shape that
+    keeps tool names stable (`pipelex_mthds_validate` on Vibe) and spawns locally.
+    """
+    rel = "mcp/vibe-mcp.toml"
+    try:
+        data = tomllib.loads(fragment.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        return [f"[{target_name}] {rel} is not valid TOML: {exc}"]
+    servers: object = data.get("mcp_servers")
+    if not isinstance(servers, list) or len(cast("list[object]", servers)) != 1:
+        return [f"[{target_name}] {rel} must declare exactly one [[mcp_servers]] entry"]
+    server: object = cast("list[object]", servers)[0]
+    if not isinstance(server, dict):
+        return [f"[{target_name}] {rel} [[mcp_servers]] entry is not a table"]
+    entry = cast("dict[str, object]", server)
+    errors: list[str] = []
+    if entry.get("name") != MCP_SERVER_NAME:
+        errors.append(f'[{target_name}] {rel} must name the server "{MCP_SERVER_NAME}"')
+    if entry.get("transport") != "stdio":
+        errors.append(f'[{target_name}] {rel} must use transport = "stdio"')
+    if not entry.get("command"):
+        errors.append(f"[{target_name}] {rel} must set a command")
+    return errors
+
+
+def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
+    """Check that Mistral Vibe targets emit Vibe-only hook and MCP artifacts.
+
+    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths,
+    hooks from hooks.toml, and MCP servers from config.toml. The generated target
+    must therefore not carry a plugin manifest, it must render the post_tool hook
+    config/script pair, and it must render the workshop launcher as the
+    `mcp/vibe-mcp.toml` config fragment.
     """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
@@ -462,6 +493,12 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh missing")
         elif not hook_script.stat().st_mode & 0o111:
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh is not executable")
+
+        mcp_fragment = output_dir / "mcp" / "vibe-mcp.toml"
+        if not mcp_fragment.is_file():
+            errors.append(f"[{target_name}] mcp/vibe-mcp.toml missing")
+        else:
+            errors.extend(_vibe_mcp_fragment_errors(target_name, mcp_fragment))
 
         for filename in ("hooks.json", "codex-hooks.json", "check-mthds.sh", "check-mthds-codex.sh"):
             if (output_dir / "hooks" / filename).exists():
