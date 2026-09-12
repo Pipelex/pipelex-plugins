@@ -38,7 +38,7 @@ Automatic by default, with the plugin's usual rules: an explicit user signal win
 
 ### Step 1: Prerequisites
 
-Check before touching anything, and **stop** on a missing piece with the exact thing missing and the starter README's own line about it. Never install a toolchain.
+Check before touching anything, and **stop** on a missing piece with the exact thing missing and the starter README's own line about it. Never install a toolchain — but a runtime the machine already has and only the `PATH` is missing is not a missing piece: when `node` or `uv` is absent while a version manager on the machine carries one (`nvm`, `fnm`, `volta`, `asdf`, `mise`), activate it for this work and say in the report which one you used and that the user's own shell may not have it. Stop only when no usable runtime can be reached that way.
 
 - **JavaScript**: Node at or above the floor the starter's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the starter's e2e specs `require()` it), and `npm`.
 - **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
@@ -141,7 +141,7 @@ Two lines are easy to forget and matter:
 
 | Condition | Do this |
 |---|---|
-| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain |
+| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain — first check a version manager the machine already has (`nvm`, `fnm`, `volta`, `asdf`, `mise`) and use its runtime, saying so |
 | The target directory exists and is not empty | STOP, ask for another; never delete, move or write into it, and never offer to |
 | `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory |
 | `gh` is absent or not authenticated | fall back to the local clone; say the GitHub repository can be created later with `gh repo create --source .` |

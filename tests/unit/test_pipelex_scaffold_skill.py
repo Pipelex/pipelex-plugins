@@ -34,6 +34,7 @@ class TestPipelexScaffoldSkill:
         "do not start `make dev`",
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
         "Nothing beyond what the initializer writes is authored by this skill",
+        "a runtime the machine already has and only the `PATH` is missing is not a missing piece",
     )
 
     @property
