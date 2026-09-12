@@ -119,12 +119,21 @@ async function checkSources(dir) {
     return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — unreadable (${error.message}), so staleness cannot be ruled out`] };
   }
 
+  // The same hazard one level up, and it is why the line below is not `sidecar?.sources`. A file
+  // whose whole content is `null`, `[]`, `"x"`, `42` or `true` is valid JSON and is not an object,
+  // and optional chaining turns every one of them into `undefined` — the legitimate absent case —
+  // so the gate would print "a by-ref or by-id integration" and exit 0 over a sidecar that says
+  // nothing of the kind. On the sidecar, `?.` does exactly what `??` would do on `sources`.
+  if (typeof sidecar !== "object" || sidecar === null || Array.isArray(sidecar)) {
+    return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — not a JSON object, so staleness cannot be ruled out`] };
+  }
+
   // A present-but-wrong-shaped `sources` must fail the way an unreadable sidecar does. Coerced to
   // {} it would check nothing, print nothing and exit 0 — the one input that is both silent and
   // green. An array is the shape to beware (`typeof [] === "object"`, and `method.files` beside it
   // in the sidecar really is an array), and `null` is why this does not use `??`, which would
   // quietly turn an explicit null into the legitimate absent case.
-  const sources = sidecar?.sources;
+  const sources = sidecar.sources;
   if (sources === undefined) {
     return { code: EXIT_CURRENT, lines: [`  ${SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply`] };
   }

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir, setup_static_assets
+from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
 
 
 class TestPipelexIntegrateSkill:
@@ -82,6 +84,20 @@ class TestPipelexIntegrateSkill:
         for reference in self.REFERENCES:
             assert "dropWireNulls" not in (self.REFERENCES_DIR / reference).read_text(encoding="utf-8")
 
+    def test_the_helper_budget_is_one_and_does_not_license_a_second(self) -> None:
+        """The budget was two while the wire-output helper was the second. That helper was struck for
+        being lossy and is forbidden outright below, so a surviving "at most two" is not merely a
+        stale count — it is written permission to create the one thing the campaign removed, in a
+        sentence that then says "and nothing else" about a list of one.
+        """
+        body = self.integrate
+        assert "**Exactly one shared helper, created once per project" in body
+        assert "one callable module per method plus one shared helper" in body
+        assert "two shared helpers" not in body
+        assert "at most two" not in body
+        decisions = (self.REPO_ROOT / "docs" / "decisions.md").read_text(encoding="utf-8")
+        assert "two shared helpers" not in decisions
+
     def test_failure_posture_pins_the_403_and_the_orphans(self) -> None:
         body = self.integrate
         assert "a **403** on `mthds_codegen` is a feature gate, not a key problem" in body
@@ -131,9 +147,16 @@ class TestPipelexIntegrateSkill:
         `process.exit` does not guarantee.
         """
         gate = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
-        # No `??` here: it would turn an explicit null into the legitimate absent case.
-        assert "const sources = sidecar?.sources;" in gate
+        # Neither `??` nor `?.` on the way to `sources`: both turn a hostile value into the
+        # legitimate absent case. `?.` is the subtler of the two — a sidecar whose whole content is
+        # `null`, `[]`, `"x"` or `42` is valid JSON and not an object, and `sidecar?.sources` makes
+        # every one of them `undefined`, so the gate claims "a by-ref or by-id integration" and
+        # exits 0 over a file that says nothing of the kind. Guard the sidecar, then its `sources`.
+        assert "const sources = sidecar.sources;" in gate
+        assert "const sources = sidecar?.sources" not in gate
         assert "?? {}" not in gate
+        assert 'if (typeof sidecar !== "object" || sidecar === null || Array.isArray(sidecar)) {' in gate
+        assert "not a JSON object, so staleness cannot be ruled out" in gate
         assert 'if (typeof sources !== "object" || sources === null || Array.isArray(sources)) {' in gate
         assert "is not an object, so staleness cannot be ruled out" in gate
         # No branch is both silent and green: absent and empty both announce themselves.
@@ -142,6 +165,79 @@ class TestPipelexIntegrateSkill:
         # The default decoder strips a BOM, which would hash a BOM'd artifact as current.
         assert 'new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })' in gate
         assert "process.exit(await main" not in gate
+
+    @pytest.mark.parametrize(
+        ("sidecar", "expected_exit"),
+        [
+            ("null", 1),
+            ("[]", 1),
+            ('"a string"', 1),
+            ("42", 1),
+            ("true", 1),
+            ('{"method": {"id": "mt_x"}}', 0),
+            ('{"sources": {}}', 0),
+            ('{"sources": null}', 1),
+            ('{"sources": []}', 1),
+        ],
+    )
+    def test_the_gate_runs_and_refuses_a_non_object_sidecar(self, sidecar: str, expected_exit: int, tmp_path: Path) -> None:
+        """Run the gate, do not read it. Every case here was found by executing it, and the
+        non-object-sidecar ones reported `current` with exit 0 before the guard went in — the
+        failure the file's own header calls its one job to avoid.
+
+        The lock check is made to yield no verdict (no `codegen.lock`), which the script reports on
+        its own and which suppresses the sidecar check — so the cases are driven through a tree that
+        reaches `checkSources`, i.e. one with a lock. Skipped when no `node` is on the PATH.
+        """
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on the PATH")
+        gate = tmp_path / "codegen-check.mjs"
+        gate.write_bytes((self.REFERENCES_DIR / "codegen-check.mjs").read_bytes())
+        # A lock the SDK cannot even be asked about would short-circuit the sidecar check, so stub
+        # the one import and let the tree report itself current.
+        stub = tmp_path / "node_modules" / "@pipelex" / "sdk"
+        stub.mkdir(parents=True)
+        (stub / "package.json").write_text(
+            '{"name":"@pipelex/sdk","version":"0.0.0-stub","type":"module","main":"index.js","exports":{".":"./index.js"}}',
+            encoding="utf-8",
+        )
+        (stub / "index.js").write_text(
+            "export class CodegenLockError extends Error {}\n"
+            "export const isStampableArtifactPath = (p) => p.endsWith('.ts') || p.endsWith('.py');\n"
+            "export const runCodegenCheck = async () => ({ isCurrent: true, drifts: [], "
+            "crateFingerprint: 'stubfingerprint', engineVersion: '0.0.0' });\n",
+            encoding="utf-8",
+        )
+        tree = tmp_path / "generated" / "m"
+        tree.mkdir(parents=True)
+        (tree / "codegen.lock").write_text("lock_version = 1\n", encoding="utf-8")
+        (tree / "types.ts").write_text("export const x = 1;\n", encoding="utf-8")
+        (tree / "sources.json").write_text(sidecar, encoding="utf-8")
+        result = subprocess.run(
+            [node, str(gate), "generated/m"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == expected_exit, (
+            f"sidecar {sidecar!r}: expected exit {expected_exit}, got {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        if expected_exit == 0:
+            assert "codegen-check: current" in result.stdout
+        else:
+            assert "codegen-check: drift" in result.stdout
+
+    def test_the_python_call_site_refuses_an_empty_bundle(self) -> None:
+        """`Path.rglob` on a missing or empty directory returns nothing and raises nothing, so a
+        wrong `BUNDLE_DIR` would submit `mthds_contents=[]` and fail server-side against the pipe
+        instead of locally against the path. The TypeScript twin gets this free from `readdir`'s
+        ENOENT; the Python one has to ask.
+        """
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "if not contents:" in python
+        assert 'raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")' in python
 
     def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
         body = self.integrate
@@ -197,11 +293,16 @@ class TestPipelexIntegrateSkill:
             assert (references_dir / reference).is_file(), f"{target_name}: missing references/{reference}"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
-    def test_the_build_copies_the_references_byte_for_byte(self, target_name: str, tmp_path: Path) -> None:
-        """The check script is executable know-how: a stale or re-encoded copy is a broken gate."""
+    def test_the_committed_references_match_the_source_byte_for_byte(self, target_name: str) -> None:
+        """The references are executable know-how, and the committed target copies are the ones a
+        user installs — so compare against those, not against a fresh `copytree` into a tmp dir,
+        which only ever asserts that `shutil` copies bytes. A stale committed copy is the whole
+        failure mode, and it is invisible to any assertion that rebuilds its own expected side.
+        """
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
-        setup_static_assets(self.REPO_ROOT, tmp_path, self.REPO_ROOT / "templates", config.include_skills)
-        produced = tmp_path / "skills" / "pipelex-integrate" / "references"
+        installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "references"
         for reference in self.REFERENCES:
-            assert (produced / reference).is_file(), f"{target_name}: the build did not copy references/{reference}"
-            assert (produced / reference).read_bytes() == (self.REFERENCES_DIR / reference).read_bytes()
+            assert (installed / reference).is_file(), f"{target_name}: missing references/{reference}"
+            assert (installed / reference).read_bytes() == (self.REFERENCES_DIR / reference).read_bytes(), (
+                f"{target_name}: references/{reference} is stale — run `make build`"
+            )

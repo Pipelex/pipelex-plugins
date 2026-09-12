@@ -64,7 +64,14 @@ def _read_bundle() -> list[str]:
     """Every `.mthds` file of the bundle, sorted. A bundle is one closure: a main file that
     imports a sibling needs that sibling submitted with it, or the run fails to load what the
     generated models were projected from."""
-    return [path.read_text(encoding="utf-8") for path in sorted(BUNDLE_DIR.rglob("*.mthds"))]
+    contents = [path.read_text(encoding="utf-8") for path in sorted(BUNDLE_DIR.rglob("*.mthds"))]
+    if not contents:
+        # `rglob` on a missing or empty directory returns nothing and raises nothing, so without
+        # this the run goes out with `mthds_contents=[]` and fails server-side, naming the pipe
+        # rather than the path that is actually wrong. The TypeScript twin gets this for free:
+        # `readdir` throws ENOENT.
+        raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")
+    return contents
 
 
 async def summarize_pdf(*, document: dict[str, Any], context: str | None = None) -> DocumentSummary:

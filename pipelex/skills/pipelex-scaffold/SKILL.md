@@ -83,7 +83,7 @@ Both forms take the template's default-branch head. Do not offer a release tag u
 ### Step 3: Commit the pristine template — exactly once
 
 ```bash
-git -C <dir> add -A && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)"
+git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)"
 ```
 
 This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came.
@@ -122,17 +122,21 @@ As in branch A, for the language chosen.
 ### Step 2: Run the initializer — never assemble by hand
 
 - **A named framework** uses its documented initializer with its non-interactive flags: `npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes`, where the `--` is what passes the flags to the initializer instead of to npm and without it `create-next-app` prompts; `uv init --package <dir>` then `uv add "fastapi[standard]"` **from inside `<dir>`**, because `uv add` writes to whatever project its working directory resolves to and from the parent that is the user's, not the new one; and so on — [references/initializers.md](references/initializers.md) carries the common ones. An initializer that only runs interactively is handed to the user to run (typing `! <command>` in the prompt runs it inside this session), and you resume when it is done.
-- **No framework named** takes the language's own minimal initializer: Python → `uv init --package <dir>`, which gives the import package `/pipelex-integrate` wants and a console-script entry; TypeScript → `npm init -y`, then `npm install --save-dev typescript @types/node` and `npx tsc --init` with strict mode, ES modules and a `src/` root.
+- **No framework named** takes the language's own minimal initializer: Python → `uv init --package --no-workspace <dir>`, which gives the import package `/pipelex-integrate` wants and a console-script entry; TypeScript → `npm init -y`, then `npm install --save-dev typescript @types/node` and `npx tsc --init` with strict mode, ES modules and a `src/` root. **Read [references/initializers.md](references/initializers.md) before running either**, and not only for the flags: it is where the two costs of the TypeScript default are written down — it is the resolution that meets the emitter's extensionless-import defect, and `tsc --init` switches off the `@types/node` the line before it installed — and both are the kind of thing the integration, not the scaffold, gets blamed for.
 
 Nothing beyond what the initializer writes is authored by this skill: no example code, no folder layout of its own, no opinion the framework did not ship.
 
 ### Step 3: Version control and the pristine commit
 
-If the initializer did not `git init` on its own (some do — `uv init` and `create-next-app` among them), run `git init -b main` in the directory. **Confirm there is a `.gitignore` covering the dependency tree and the build output before you stage anything**: `npm init -y` and `tsc --init` write none, so the minimal TypeScript recipe — and the Express and library recipes built on it — reach this step with a populated `node_modules/` and nothing excluding it, and `git add -A` would commit the whole dependency tree into the one commit that is supposed to be a readable baseline. Write `node_modules/`, `dist/` and `.env` into a `.gitignore` first where the initializer left none, and read back what is staged (`git -C <dir> diff --cached --stat | tail -1`) before committing. Then the one commit, for the same reason as branch A:
+**Test whether `<dir>` is its own repository; never infer it from which initializer ran.** `git -C <dir> rev-parse --show-toplevel` must print `<dir>` itself, and when it does not, run `git init -b main` in the directory before staging anything. The list of initializers that `git init` on their own is not a substitute for that test, because membership in it is conditional: `uv init` initializes a repository when it creates a standalone project and **does not** when the parent directory already holds one, where it makes `<dir>` a workspace member of the enclosing project instead. A `<dir>` with no `.git` of its own is governed by whatever repository encloses it — the user's — and `git -C <dir>` sets git's working directory without scoping anything, so the staging below would sweep that whole worktree: the user's unrelated untracked files, wherever they sit, committed into their repository under this skill's message. That is the one outcome this step exists to prevent, and the read-back catches it only if you read the paths and not just the count.
+
+**Then confirm there is a `.gitignore` covering the dependency tree and the build output**: `npm init -y` and `tsc --init` write none, so the minimal TypeScript recipe — and the Express and library recipes built on it — reach this step with a populated `node_modules/` and nothing excluding it, and the staging below would commit the whole dependency tree into the one commit that is supposed to be a readable baseline. Write `node_modules/`, `dist/` and `.env` into a `.gitignore` first where the initializer left none, and read back what is staged — `git -C <dir> diff --cached --name-only` over the paths themselves, not a `--stat | tail -1` whose count cannot tell a correct scaffold from a swept-up worktree — before committing. Then the one commit, for the same reason as branch A:
 
 ```bash
-git -C <dir> add -A && git -C <dir> commit -m "Scaffold <framework or language> project"
+git -C <dir> add -A -- . && git -C <dir> commit -m "Scaffold <framework or language> project"
 ```
+
+The `-- .` pathspec is the second half of the guard: it holds the staging to `<dir>` and below even when the repository turns out to be an enclosing one, so the failure mode degrades from committing the user's work to committing into the wrong repository.
 
 **An initializer that commits as well as `git init`s has already made this commit.** `create-next-app` is one: it runs `git init`, stages everything and commits, so the tree is clean and the command above stops with `nothing to commit` — which is the initializer having done the job, not a failure of it. Take that commit as the pristine one, exactly as branch A takes GitHub's, and name it and its message in the report. Never force a second empty commit on top of it.
 

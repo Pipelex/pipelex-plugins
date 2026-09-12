@@ -24,14 +24,16 @@ Both are GitHub **template repositories** under the `Pipelex` organization. Each
 Local clone with fresh history (the default — it produces what GitHub's "Use this template" button produces, a copy with no history and no remote):
 
 ```bash
-git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git <dir>
-git clone --depth 1 https://github.com/Pipelex/pipelex-starter-python.git <dir>
+git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git <dir> || exit
+git clone --depth 1 https://github.com/Pipelex/pipelex-starter-python.git <dir> || exit
 git -C <dir> rev-parse HEAD
 rm -rf <dir>/.git && git -C <dir> init -b main
-git -C <dir> add -A && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)"
+git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)"
 ```
 
 The version comes from `package.json` (`"version"`) on JS and from `pyproject.toml` (`version =`) on Python, read before the commit.
+
+**The `|| exit` on the clone is load-bearing and is not decoration**, for the reason `/pipelex-scaffold`'s Step 2 gives in full: the line below it deletes a `.git` directory, and a clone that never ran — a network failure, or `<dir>` already existing — leaves that `rm -rf` to find whatever `.git` is actually at that path, destroying a repository of the user's irrecoverably. The guard only holds inside one shell, so when the two lines go out as separate commands, check the clone's exit status yourself before typing the `rm -rf`, and never type it on a path you have not just created.
 
 GitHub repository, on request and after confirmation (visibility asked, default private; GitHub makes the initial commit, so no pristine commit of your own):
 

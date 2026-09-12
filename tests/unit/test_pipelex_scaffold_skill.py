@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir, setup_static_assets
+from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
 
 
 class TestPipelexScaffoldSkill:
@@ -53,8 +53,12 @@ class TestPipelexScaffoldSkill:
         "**from inside `<dir>`**",
         # An initializer that commits has already made the pristine commit.
         "**An initializer that commits as well as `git init`s has already made this commit.**",
-        # npm init -y and tsc --init write no .gitignore, so git add -A would commit node_modules.
-        "**Confirm there is a `.gitignore` covering the dependency tree and the build output before you stage anything**",
+        # The default TS branch is prescribed in the skill; both its costs live in the reference.
+        "**Read [references/initializers.md](references/initializers.md) before running either**",
+        # npm init -y and tsc --init write no .gitignore, so the staging would commit node_modules.
+        "**Then confirm there is a `.gitignore` covering the dependency tree and the build output**",
+        # <dir> with no .git of its own is governed by the repo enclosing it — the user's.
+        "**Test whether `<dir>` is its own repository; never infer it from which initializer ran.**",
     )
 
     @property
@@ -87,11 +91,16 @@ class TestPipelexScaffoldSkill:
     def test_references_describe_both_starters_and_the_initializers(self) -> None:
         starters = (self.REFERENCES_DIR / "starters.md").read_text(encoding="utf-8")
         assert "pipelex-starter-js" in starters and "pipelex-starter-python" in starters
-        assert "git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git" in starters
+        # The `|| exit` is the guard on the `rm -rf <dir>/.git` below it: a clone that never ran
+        # leaves that line to delete whatever `.git` is at that path — a user's history, if <dir>
+        # was theirs. The SKILL.md carries it; so must the reference the skill names as the source
+        # of every command, or the guard exists only in the copy nobody executes from.
+        assert "git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git <dir> || exit" in starters
+        assert "git clone --depth 1 https://github.com/Pipelex/pipelex-starter-python.git <dir> || exit" in starters
+        assert "The `|| exit` on the clone is load-bearing" in starters
         assert "gh repo create <owner>/<name> --template Pipelex/pipelex-starter-python" in starters
         assert "shell out to a `pipelex` CLI the starter does not depend on" in starters
         initializers = (self.REFERENCES_DIR / "initializers.md").read_text(encoding="utf-8")
-        assert "uv init --package <dir>" in initializers
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
         # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
@@ -102,8 +111,43 @@ class TestPipelexScaffoldSkill:
             "(cd <dir> && uv add django && uv run django-admin startproject config .)",
         ):
             assert recipe in initializers, f"uv add not scoped to the project: {recipe}"
+        # Every `uv init` carries --no-workspace. Without it, run inside a directory that already
+        # holds a pyproject.toml, uv appends a [tool.uv.workspace] table to the USER'S file and puts
+        # the lock at the parent root, so the new project does not resolve standalone. Same hazard
+        # class as the `uv add` parentheses above, one command earlier.
+        assert "uv init --package --no-workspace <dir>" in initializers
+        assert "uv init --app --no-workspace <dir>" in initializers
+        assert "`--no-workspace` is on every `uv init` above" in initializers
+        assert "| `uv init --package <dir>`" not in initializers, "a bare uv init absorbs <dir> into the parent workspace"
+        assert "uv init --package <dir> &&" not in initializers, "a bare uv init absorbs <dir> into the parent workspace"
+        # npm resolves the project it writes to upward exactly as uv does, and unlike uv it finds the
+        # parent and silently succeeds, so every follow-on install is scoped too.
+        for recipe in ("(cd <dir> && npm install)", "(cd <dir> && npm install express && npm install --save-dev @types/express)"):
+            assert recipe in initializers, f"npm install not scoped to the project: {recipe}"
+        assert "**Every follow-on `npm install` above is parenthesised" in initializers
         # The minimal TS default is the very resolution the emitter defect breaks.
         assert "is exactly the shape that meets the ts-zod emitter's extensionless-import defect" in initializers
+        # `tsc --init` writes an active `"types": []`, which switches off the @types/node the line
+        # before it installed — the integrate call site then fails TS2591 on node:path and process.
+        assert '`tsc --init` writes `"types": []` as an active key' in initializers
+        assert 'set `"types": ["node"]` as part of the recipe' in initializers
+
+    def test_the_pristine_commit_cannot_reach_an_enclosing_repository(self) -> None:
+        """`git -C <dir>` sets git's working directory and scopes nothing. With no `.git` of its own,
+        <dir> is governed by whatever repo encloses it — the user's — and a pathspec-less `add -A`
+        stages that whole worktree, committing the user's unrelated files under this skill's message.
+        `uv init` is on the list of initializers that `git init`, but only when it creates a
+        standalone project; inside an existing one it makes <dir> a workspace member and no repo.
+        """
+        body = self.TEMPLATE.read_text(encoding="utf-8")
+        assert "git -C <dir> rev-parse --show-toplevel` must print `<dir>` itself" in body
+        assert "never infer it from which initializer ran" in body
+        # Both pristine commits carry the pathspec, so the staging cannot escape <dir>.
+        assert body.count("git -C <dir> add -A -- .") == 2
+        assert "git -C <dir> add -A &&" not in body
+        # The read-back must name paths; a --stat count cannot tell a scaffold from a swept worktree.
+        assert "git -C <dir> diff --cached --name-only" in body
+        assert "git -C <dir> diff --cached --stat | tail -1" not in body
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
@@ -134,10 +178,16 @@ class TestPipelexScaffoldSkill:
             assert (references_dir / reference).is_file(), f"{target_name}: missing references/{reference}"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
-    def test_the_build_copies_the_references_byte_for_byte(self, target_name: str, tmp_path: Path) -> None:
+    def test_the_committed_references_match_the_source_byte_for_byte(self, target_name: str) -> None:
+        """The references are executable know-how, and the committed target copies are the ones a
+        user installs — so compare against those, not against a fresh `copytree` into a tmp dir,
+        which only ever asserts that `shutil` copies bytes. A stale committed copy is the whole
+        failure mode, and it is invisible to any assertion that rebuilds its own expected side.
+        """
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
-        setup_static_assets(self.REPO_ROOT, tmp_path, self.REPO_ROOT / "templates", config.include_skills)
-        produced = tmp_path / "skills" / "pipelex-scaffold" / "references"
+        installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-scaffold" / "references"
         for reference in self.REFERENCES:
-            assert (produced / reference).is_file(), f"{target_name}: the build did not copy references/{reference}"
-            assert (produced / reference).read_bytes() == (self.REFERENCES_DIR / reference).read_bytes()
+            assert (installed / reference).is_file(), f"{target_name}: missing references/{reference}"
+            assert (installed / reference).read_bytes() == (self.REFERENCES_DIR / reference).read_bytes(), (
+                f"{target_name}: references/{reference} is stale — run `make build`"
+            )
