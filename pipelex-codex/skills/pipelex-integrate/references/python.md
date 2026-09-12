@@ -57,7 +57,14 @@ from pipelex_sdk.client import PipelexAPIClient
 from <package>.generated.summarize_pdf.models import DocumentSummary
 
 PIPE_CODE = "summarize_pdf"
-BUNDLE_PATH = Path(__file__).resolve().parent.parent / "methods" / "summarize_pdf" / "main.mthds"
+BUNDLE_DIR = Path(__file__).resolve().parent.parent / "methods" / "summarize_pdf"
+
+
+def _read_bundle() -> list[str]:
+    """Every `.mthds` file of the bundle, sorted. A bundle is one closure: a main file that
+    imports a sibling needs that sibling submitted with it, or the run fails to load what the
+    generated models were projected from."""
+    return [path.read_text(encoding="utf-8") for path in sorted(BUNDLE_DIR.rglob("*.mthds"))]
 
 
 async def summarize_pdf(*, document: dict[str, Any], context: str | None = None) -> DocumentSummary:
@@ -67,7 +74,7 @@ async def summarize_pdf(*, document: dict[str, Any], context: str | None = None)
     async with PipelexAPIClient() as client:
         results = await client.start_and_wait(
             pipe_code=PIPE_CODE,
-            mthds_contents=[BUNDLE_PATH.read_text(encoding="utf-8")],
+            mthds_contents=_read_bundle(),
             inputs=inputs,
         )
     return DocumentSummary.model_validate(results.main_stuff)
@@ -78,7 +85,7 @@ def summarize_pdf_sync(*, document: dict[str, Any], context: str | None = None) 
     return asyncio.run(summarize_pdf(document=document, context=context))
 ```
 
-Variants by selector, replacing the `mthds_contents=` argument and dropping the bundle path:
+Variants by selector, replacing the `mthds_contents=` argument and dropping `BUNDLE_DIR` and `_read_bundle`:
 
 - **`method_ref`** at a tag: `method_ref="github.com/<owner>/<repo>[/<selector>]@<tag>"`, with `pipe_code=PIPE_CODE` or omitted to run the package's declared pipe.
 - **`method_id`**: `method_id="mt_…"`; the module docstring says the catalog is unversioned.

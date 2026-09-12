@@ -32,7 +32,10 @@ const LOCK_FILENAME = "codegen.lock";
 const SIDECAR_FILENAME = "sources.json";
 const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next"]);
 
-const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
+// `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
+// artifact given a BOM would hash as its un-BOM'd self, match the lock, and report current while
+// the bytes on disk are hand-edited — the gate's one job is to not say that.
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const out = (line) => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -116,9 +119,25 @@ async function checkSources(dir) {
     return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — unreadable (${error.message}), so staleness cannot be ruled out`] };
   }
 
-  const sources = sidecar && typeof sidecar.sources === "object" && sidecar.sources !== null ? sidecar.sources : {};
+  // A present-but-wrong-shaped `sources` must fail the way an unreadable sidecar does. Coerced to
+  // {} it would check nothing, print nothing and exit 0 — the one input that is both silent and
+  // green. An array is the shape to beware (`typeof [] === "object"`, and `method.files` beside it
+  // in the sidecar really is an array), and `null` is why this does not use `??`, which would
+  // quietly turn an explicit null into the legitimate absent case.
+  const sources = sidecar?.sources;
+  if (sources === undefined) {
+    return { code: EXIT_CURRENT, lines: [`  ${SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply`] };
+  }
+  if (typeof sources !== "object" || sources === null || Array.isArray(sources)) {
+    return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — \`sources\` is not an object, so staleness cannot be ruled out`] };
+  }
+  const recordedSources = Object.entries(sources).sort();
+  if (recordedSources.length === 0) {
+    return { code: EXIT_CURRENT, lines: [`  ${SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply`] };
+  }
+
   const lines = [];
-  for (const [source, recorded] of Object.entries(sources).sort()) {
+  for (const [source, recorded] of recordedSources) {
     let onDisk;
     try {
       onDisk = sha256(await readFile(path.resolve(process.cwd(), source)));
@@ -163,4 +182,7 @@ async function main(argv) {
   return exitCode;
 }
 
-process.exit(await main(process.argv));
+// `process.exitCode` rather than `process.exit`: stdout is a pipe under `npm run`, `make` and every
+// CI runner, where writes are asynchronous and `process.exit` drops the ones still pending. The code
+// would survive either way; the drift lines explaining it are what gets truncated.
+process.exitCode = await main(process.argv);

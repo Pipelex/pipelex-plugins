@@ -15,7 +15,7 @@ Companion to `/pipelex-integrate` for a project that has a `package.json`. Every
 | **Aggregate gate** | `package.json` `scripts.check` / `ci` / `validate` / `verify`; a Makefile `check` target; a `.github/workflows/*.yml` job with a lint or test step; `.pre-commit-config.yaml` | none: the `codegen:check` script alone, and a sentence in the report saying where to call it |
 | **Call-site location** | the project's existing service / action / client layer (`src/actions/`, `src/services/`, `src/lib/`, `src/server/`) → beside it | `src/pipelex/` |
 | **Not gitignored** | the generated root and `sources.json` must be committable | a `.gitignore` pattern that swallows them is reported and un-ignored on confirmation |
-| **Owns a codegen harness** | `scripts.codegen` in `package.json`; `sources.json` with a `derived` map; `docs/codegen.md`; `make add-method` | either of the first two → the harness section below |
+| **Owns a codegen harness** | `scripts.codegen` in `package.json`; `sources.json` with a `derived` map; `docs/codegen.md`; `make add-method` | either of the first two → the harness section below, but **read the script before believing it**: `"codegen": "graphql-codegen"` or a protobuf generator satisfies the name and generates no MTHDS types, and deferring to it would skip the dependencies, the exclusions, the sidecar and the gate while generating nothing. Pipelex-specific evidence — it calls `mthds_codegen`, a `pipelex` CLI, or reads `methods/` — is what makes it this method's harness; without that, integrate normally and leave the unrelated harness alone |
 
 Why the exclusions are not optional: the ts-zod emitter prints at Prettier's defaults (80 columns). A project that prints at another width, or a linter with an autofix, rewrites the bytes, breaks every stamp, and makes the offline check report the whole tree as hand-edited. The type checker, by contrast, must keep covering the tree — that is the check that catches a call site drifting from its types.
 
@@ -37,7 +37,7 @@ One module per method. `summarize-pdf` with a `document: native.Document` input,
 
 ```ts
 // src/pipelex/summarizePdf.ts
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunResults } from "@pipelex/sdk";
 import { parseDocumentSummary } from "../generated/summarize-pdf/binder";
@@ -45,30 +45,42 @@ import type { DocumentSummary } from "../generated/summarize-pdf/types";
 import { getPipelexClient } from "./client";
 
 const PIPE_CODE = "summarize_pdf";
-const BUNDLE_PATH = path.join(process.cwd(), "methods", "summarize-pdf", "main.mthds");
+const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");
 
-export interface SummarizePdfInputs {
+/** Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`. A bundle is one
+ *  closure: a main file that imports a sibling needs that sibling submitted with it, or the
+ *  run fails to load what the generated types were projected from. `recursive` needs Node
+ *  >= 20.1 (or >= 18.17); below that, walk the directory yourself. */
+async function readBundle(): Promise<string[]> {
+  const names = (await readdir(BUNDLE_DIR, { recursive: true })).filter((name) => name.endsWith(".mthds")).sort();
+  return Promise.all(names.map((name) => readFile(path.join(BUNDLE_DIR, name), "utf8")));
+}
+
+export type SummarizePdfInputs = {
   /** An http(s) URL or a pipelex-storage:// reference. For a local file or bytes,
-   *  run `getPipelexClient().prepareInputs({ files: [{ content: bundle }], inputs })` first —
+   *  run `getPipelexClient().prepareInputs({ files: (await readBundle()).map((c) => ({ content: c })), inputs })` first —
    *  it uploads and rewrites the value. Note: prepareInputs treats any string it does not
    *  recognise as data:, http(s):// or pipelex-storage:// as a LOCAL FILE PATH it reads and
    *  uploads, so a public endpoint must gate schemes before handing values to it. */
   document: { url: string };
   context?: string;
-}
+};
 
 export async function summarizePdf(inputs: SummarizePdfInputs): Promise<DocumentSummary> {
-  const bundle = await readFile(BUNDLE_PATH, "utf8");
   const results: RunResults = await getPipelexClient().startAndWaitForResult({
     pipe_code: PIPE_CODE,
-    mthds_contents: [bundle],
+    mthds_contents: await readBundle(),
     inputs,
   });
   return parseDocumentSummary(results.main_stuff);
 }
 ```
 
-Variants by selector, replacing the `mthds_contents` line and dropping the bundle read:
+**`SummarizePdfInputs` is a `type`, not an `interface`, and that is load-bearing.** The SDK takes `inputs: Record<string, unknown>`, and TypeScript gives a type alias of an object type an implicit index signature while an `interface` gets none — so an interface here fails with `TS2322: Index signature for type 'string' is missing`. It fails on every resolution, bundler included, and it is the first thing a `tsc --noEmit` would have caught. Keep it a `type`.
+
+**The three relative imports above are extensionless, which is correct only on a bundler resolution.** On the plain Node ESM shape that meets the emitter's `TS2835` defect (`"type": "module"` with `moduleResolution` `nodenext` or `node16`) this module needs `.js` on each of them — `"../generated/summarize-pdf/binder.js"`, `"../generated/summarize-pdf/types.js"`, `"./client.js"`. That is your own module and so your own fix, unlike the stamped `binder.ts`: write the extensions when the project's resolution demands them, and do not report your own module's `TS2835` as the emitter's defect.
+
+Variants by selector, replacing the `mthds_contents` line and dropping `BUNDLE_DIR` and `readBundle`:
 
 - **`method_ref`** at a tag: `{ method_ref: "github.com/<owner>/<repo>[/<selector>]@<tag>", pipe_code: PIPE_CODE, inputs }` — omit `pipe_code` to run the package's declared pipe.
 - **`method_id`**: `{ method_id: "mt_…", inputs }` — the catalog resolves the stored method; the module's header says the catalog is unversioned.

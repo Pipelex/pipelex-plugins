@@ -10,12 +10,14 @@ After the initializer: `git init -b main` only if it did not initialize a reposi
 |---|---|---|---|
 | **Minimal (the default when no framework is named)** | `uv init --package <dir>` | yes (`--vcs none` to skip) | `src/<package>/` with `__init__.py` and a console-script entry in `pyproject.toml` |
 | A script-style app rather than a package | `uv init --app <dir>` | yes | `main.py` at the root — no import package; `/pipelex-integrate` will put the generated tree under `generated/` at the root |
-| FastAPI service | `uv init --package <dir> && uv add "fastapi[standard]"` | yes | as minimal |
-| Django project | `uv init --package <dir> && uv add django && (cd <dir> && uv run django-admin startproject config .)` | yes (from `uv init`) | the Django project package `config/` plus `src/<package>/`; ask which one owns the Pipelex call sites |
-| Typer CLI (the Python starter's shape, without the starter) | `uv init --package <dir> && uv add typer` | yes | as minimal |
+| FastAPI service | `uv init --package <dir> && (cd <dir> && uv add "fastapi[standard]")` | yes | as minimal |
+| Django project | `uv init --package <dir> && (cd <dir> && uv add django && uv run django-admin startproject config .)` | yes (from `uv init`) | the Django project package `config/` plus `src/<package>/`; ask which one owns the Pipelex call sites |
+| Typer CLI (the Python starter's shape, without the starter) | `uv init --package <dir> && (cd <dir> && uv add typer)` | yes | as minimal |
 | An existing `pyproject.toml` layout the user prefers (poetry, pdm, hatch) | the tool the user names: `poetry new <dir>`, `pdm init --non-interactive`, `hatch new <name>` | poetry: no; pdm: no; hatch: no | per tool — `poetry new` and `hatch new` make `<package>/` or `src/<package>/` |
 
 `uv init` refuses a directory that already holds a project; on an empty "here" directory use `uv init --package .` — it names the package after the directory.
+
+**Every `uv add` above runs inside `<dir>`, and the parentheses are why.** `uv add` resolves the project from its *working* directory upwards, so run from the parent it writes the dependency into whatever project it finds there — the user's own `pyproject.toml` and lockfile, when the scaffold is being made inside an existing workspace — or fails outright when it finds none. Neither is the new project. `uv add --directory <dir>` is equivalent if you prefer a flag to a subshell.
 
 ## TypeScript / JavaScript
 
@@ -30,6 +32,8 @@ After the initializer: `git init -b main` only if it did not initialize a reposi
 | pnpm / yarn / bun instead of npm | replace `npm create` with `pnpm create` / `yarn create` / `bun create`, and the install command accordingly; `/pipelex-integrate` reads the lockfile to pick the package manager for what it adds | — | — |
 
 `npm create <x>@latest <dir> -- <flags>`: the `--` is what passes the flags to the initializer rather than to npm. The Next.js `--yes` accepts the initializer's defaults for every prompt not covered by a flag.
+
+**The minimal recipe's `--module nodenext` plus `"type": "module"` is exactly the shape that meets the ts-zod emitter's extensionless-import defect** (`pipelex-integrate`'s `references/typescript.md`, "Known defect"): the generated `binder.ts` fails the type check with `TS2835` and will not load at runtime. So say so when you hand a minimal TypeScript project to `/pipelex-integrate`, and when the user has no reason to prefer Node's own resolution, prefer a bundler-backed setup (Vite, Next.js) or `--module esnext --moduleResolution bundler`, which the defect does not touch. The two recipes also need `node_modules/` and `dist/` in a `.gitignore` before the pristine commit — neither `npm init -y` nor `tsc --init` writes one.
 
 ## What every branch-B project shares afterwards
 
