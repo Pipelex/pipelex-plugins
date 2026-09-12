@@ -91,7 +91,7 @@ Add the generated directory to the formatter's and linter's ignore lists per the
 
 ### Step 6: Generate
 
-Call **`mthds_codegen`** with the selector, `target`, and **`output_dir`** — the generated directory's path **relative to the workshop's working directory**, which is the directory the harness was launched in (the launcher does not `cd`); never absolute. A project outside that directory cannot be written to: STOP with the instruction to relaunch the harness from the project root (or register the workshop with that working directory) — do not ride content instead.
+Call **`mthds_codegen`** with the selector, `target`, and **`output_dir`** — the generated directory's path **relative to the workshop's working directory**, which is the directory the harness was launched in (the launcher does not `cd`); never absolute. **Check containment before the call rather than waiting for an error**, because a wrong `output_dir` can be perfectly legal: the workshop's working directory is the directory this session started in, so the project is reachable only when its root is that directory or below it. Take the path from the workshop's working directory to the generated directory and read it — one that has to climb out (`../`) means the project is not under the workshop, and a project root elsewhere on disk means the same thing even when some path inside the workshop would be accepted. Then STOP with the instruction to relaunch the harness from the project root (or register the workshop with that working directory) — do not ride content instead, do not pass a climbing path, and **never write the tree into the workshop's own directory and move it across afterwards**: the bytes would survive the move, but every later refresh meets the same mismatch and the sidecar's project-relative paths describe a project the workshop cannot see.
 
 Branch on the structured result:
 
@@ -192,6 +192,7 @@ The harness owns the layout and the check; its generator is preferred, not manda
 | `is_valid: false` | route `validation_errors[]` to `/pipelex-design` or `/pipelex-edit` |
 | not runnable, or `pending_signatures` non-empty | STOP: finish the method with `/pipelex-design`; nothing generated |
 | `input_domain` at `output_dir`, containment escape | STOP: relaunch the harness from the project root; never ride content |
+| the project root is not the workshop's working directory or below it (the harness was launched elsewhere) | STOP **before** generating, with the same relaunch instruction — the tool cannot catch this, because a path inside the workshop is legal wherever it points; never write beside the wrong project and move the tree over |
 | `input_domain` at `output_dir`, a file this tool does not own | not a dedicated generated directory — choose another or ask; never delete, move or clear the named file, and never offer to |
 | `input_domain` at `method_ref` / `method_id` | report the selector failure in the tool's words |
 | `runtime`, `retryable: true` after a partial write | call again once with the same `output_dir`; then report what landed |

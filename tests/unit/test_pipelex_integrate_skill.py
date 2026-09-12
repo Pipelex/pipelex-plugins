@@ -31,6 +31,8 @@ class TestPipelexIntegrateSkill:
         "**A project that owns a codegen harness keeps it.** Never write a second generated layout",
         "**No `dropWireNulls` / `wireOutput` helper.**",
         "Do this **before** step 6",
+        "**Check containment before the call rather than waiting for an error**",
+        "never write the tree into the workshop's own directory and move it across afterwards",
     )
 
     @property
