@@ -25,6 +25,7 @@ class TestPipelexScaffoldSkill:
         "exactly two branches and carries no templates of its own",
         "no cookiecutter, no copier, no framework matrix of its own",
         "never write into a directory that exists and is not empty",
+        "never offer to move, delete or merge what it holds to make room",
         "This is the **one commit this skill makes**",
         "Read `<dir>/.claude/skills/bootstrap/SKILL.md` and follow it as written",
         "**Add nothing to that procedure and reimplement none of it.**",

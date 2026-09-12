@@ -30,7 +30,7 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 |---|---|---|
 | **Language** | the user's word; the language the method's consumer is written in; a framework the user named | ask |
 | **Which branch** | a **named framework** the starters do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"no demo code"**, **"just a project"** → the initializer; a **web app people use in a browser**, forms, an upload flow → the JS starter; a **CLI, script, batch job, worker or service** in Python → the Python starter | one question offering the matching starter first, saying what it brings (durable runs, forms or CLI modes, codegen wiring, CI, its own `release` skill) and what it costs (demos to keep as references or to strip) |
-| **Where** | the directory the user named; **"here"** when the working directory is empty; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty |
+| **Where** | the directory the user named; **"here"** when the working directory is empty; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory |
 | **GitHub or local** | the user asked for a GitHub repository → `gh repo create --template`, after confirmation; otherwise a local clone with fresh history | local |
 
 **The fresh-clone shortcut.** A starter clone already in the working directory that has not been bootstrapped — `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"` — is branch A entered at step 4: acquisition already happened, so go straight to running the clone's bootstrap. Do not clone again.
@@ -149,7 +149,7 @@ Two lines are easy to forget and matter:
 | Condition | Do this |
 |---|---|
 | A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain |
-| The target directory exists and is not empty | STOP, ask for another; never delete or write into it |
+| The target directory exists and is not empty | STOP, ask for another; never delete, move or write into it, and never offer to |
 | `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory |
 | `gh` is absent or not authenticated | fall back to the local clone; say the GitHub repository can be created later with `gh repo create --source .` |
 | The clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
