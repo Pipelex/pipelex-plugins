@@ -1,0 +1,26 @@
+---
+status: active
+item: L-260830-344594
+---
+
+# Upstream dependencies of `pipelex-integrate` — what matters
+
+A reading companion to `design.md` §8. The design ships the skill on today's surfaces and carries a stopgap for each of the items below; this file says what each item is, why it matters to the skill, what the stopgap costs, and what was decided about it on 2026-08-30. None of these items is a member of the build-retirement epic (`L-260829-848001`) or appears in its plan: that program is about the input-form descriptor route and retiring `/v1/build/*`, while these all sit on the codegen trust-chain axis. The two campaigns touch at exactly one point, noted under the `pipelex-mcp` item.
+
+## The items
+
+- **The ts-zod wire-`null` defect — `L-260820-ee327d`, owner `pipelex`, P1.** The only real bug in the set. The TypeScript emitter projects an optional field as `.optional()`, which accepts an *absent* value but rejects `null`; the runtime serializes an unset optional as an explicit `null` (`model_dump` with no `exclude_none`). So a generated TypeScript binder fails on the runtime's own output the moment a method leaves an optional field empty. Python is unaffected (`str | None = None`). The fix is a one-line emitter change to `.nullish()`. **Stopgap:** the schema-guided `wireOutput` helper the skill copies once into each TypeScript project (design §4.8) — a file the plugin owns living in user repos, deleted when the fix ships. **Decision 2026-08-30:** Louis prioritizes this fix ahead of the skill's Phase 3 dogfood; the plan's Phase 1 pre-flight re-check strikes `wire-output.ts` before it is written if the fix has shipped in the hosted engine.
+
+- **No offline check CLI in `@pipelex/sdk` — `L-260820-2ba0f4`, owner `pipelex-sdk-js`, P3.** The SDK exports the drift check as a pure function (`runCodegenCheck`) and ships no command, so the skill copies a small `codegen-check.mjs` into each TypeScript project and wires it into the project's existing aggregate gate. It works; it is ergonomics. When the SDK gains the CLI, the gate becomes one line and the reference script stops being copied (design §4.5). Low urgency.
+
+- **No offline check at all in `pipelex-sdk` — `L-260830-4e43cd`, owner `pipelex-sdk-python`.** The Python SDK has no equivalent of even the pure function. The only check that exists, `pipelex codegen check`, lives in the `pipelex` runtime, which a `python-pydantic` consumer deliberately does not install — and the skill will not add the runtime as a dependency to get a gate (design §4.5). So Python integrations get **no CI gate**: nothing in CI proves the generated tree matches the bundle. **Stopgap:** the `sources.json` hashes plus the staleness notice in `pipelex-edit` / `pipelex-design` (design §7), and the report says the asymmetry plainly. This is the largest user-visible gap and it is a porting job, not a design question. The `python-structures` audience is the exception: its project already depends on `pipelex` and gets `pipelex codegen check` wired in.
+
+- **The main-pipe signature is invisible to the model — `L-260830-e8b2e0`, owner `pipelex-mcp`.** When the method comes from a `method_ref` or `method_id` rather than local files, nothing the workshop returns names the output concept: `mthds_validate` carries `main_pipe_ref` and `pipe_io_contracts` on the view-only `_meta` channel, which never reaches the model. **Stopgap:** the heuristic of design §4.3 (candidate outputs are the generated types minus the input concepts minus natives; one candidate is taken as a stated assumption, several become one question). Files-based integrations, the recommended shape, are unaffected. **The one touch point with build-retirement:** that program moves the workshop onto `POST /v1/input-form` (member `L-260829-dfaed4`), and the descriptor it fetches already carries `main_pipe_ref` and the inputs' concept refs — but **not** the output concept and its multiplicity, which is the half the heuristic guesses. **Decision 2026-08-30:** linked *related* to the epic, not as a member, and best sequenced right after `L-260829-dfaed4`, when exposing the signature in `structuredContent` is nearly free.
+
+- **The pipe selector — `L-260829-563e9e`, owner `workspace`.** Not a gap in the skill, only a dependency to know about: the run routes do not yet accept `pipe_ref`, so the call site sends `pipe_code` today, and its one selector line changes when the campaign lands. Already ratified (`L-260830-a67fff`) and gating build-retirement's Wave A2; nothing to do from here.
+
+## What this means for the skill
+
+- The skill does not wait on any of these. Each stopgap names the item that deletes it, so the design's shape holds whether an item lands before or after the skill ships.
+- The order that matters is the one Louis set: `L-260820-ee327d` first (it removes a file from every TypeScript user's codebase), then `L-260830-e8b2e0` once the workshop holds the descriptor, with the two SDK check items behind them.
+- The Python gate gap (`L-260830-4e43cd`) is the one users will notice. Until it lands, the editing skills' staleness notice is the only forgetting-guard Python has, which is why that notice is part of the skill's family wiring rather than an optional nicety.

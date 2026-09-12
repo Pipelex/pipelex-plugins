@@ -353,6 +353,8 @@ After assembling the inputs, confirm readiness:
 
 (Or, for the Template strategy: point out which placeholders the user still needs to fill.)
 
+When the workspace holds a codebase (a `package.json` or a `pyproject.toml`) and the method is not yet wired into it, add one line: `/pipelex-integrate` generates the method's types into the project and writes a typed call site that runs it.
+
 ### Offer to run
 
 When the inputs are complete, close by offering to run the method. Offer — never start unprompted: a run executes on the hosted Pipelex API and **spends inference credit**.

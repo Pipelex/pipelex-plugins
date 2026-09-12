@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tomllib
 from pathlib import Path
@@ -605,7 +606,7 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
-    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs")
+    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
 
     @pytest.mark.parametrize(
         "target_name, manifest_spawns",
@@ -862,6 +863,34 @@ class TestAdaptiveDesignSkill:
         assert "Never ask the user to choose the workflow" in body
         assert "{%" not in body
         assert "{{" not in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_design_is_model_invocable_on_every_platform(self, target_name: str) -> None:
+        """The design skill must stay reachable without a slash command.
+
+        It shipped ``disable-model-invocation: true`` through 0.5.0, which made
+        ``pipelex-edit``'s structural-change routing a dead end. Both halves of
+        the fix are pinned: the flag is gone, and the description carries the
+        natural-language triggers without which removing the flag is inert.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-design"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-design/SKILL.md"))
+        assert "disable-model-invocation" not in body
+        assert 'Use when the user says "design a method"' in body
+        assert '"add a step", "rewire this pipeline"' in body
+
+    def test_edit_hands_structural_changes_off_by_invoking_design(self) -> None:
+        edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "then invoke `/pipelex-design`" in edit
+        assert "hand off to `/pipelex-design` now, before any files change" in edit
+        assert "and stop. Never attempt a partial structural edit here." not in edit
 
     def test_adjacent_skills_describe_organization_as_conditional(self) -> None:
         organize = (self.SKILLS / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -1143,3 +1172,42 @@ class TestHookRendering:
             results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": platform})
             output_names = {path.name for path in results}
             assert "check.mjs" in output_names
+
+
+class TestNoShippedSkillNamesAnAbsentSkill:
+    """A skill that points the user at a sibling skill the target does not contain is a dead end
+    the user meets and we never do: on Claude the slash command resolves to nothing, and on Codex
+    and Vibe the relative `../<skill>/SKILL.md` the body tells the agent to open is not there.
+
+    `test_pipelex_integrate_skill.py` pins the one name a cut actually removed
+    (`assert "pipelex-scaffold" not in body`), which catches that spelling and no other — a
+    forward reference reintroduced under any different name passes it. This resolves every
+    cross-skill reference in every shipped body against the skills the target really ships, so
+    the next rename or cut cannot leave a dangling one behind under a name nobody thought to
+    grep for. It reads the committed target trees, because those are what a user installs.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TARGETS = ("prod", "codex", "mistral-vibe")
+
+    # A backticked slash command (`/pipelex-design`) and a relative sibling path
+    # (`../pipelex-design/SKILL.md`) are the only two ways a body names another skill. The
+    # leading backtick matters: without it, a cache path like `.../pipelex-plugins/synth-venv`
+    # would be read as a reference to a skill named `pipelex-plugins`.
+    SLASH_REFERENCE = re.compile(r"`/(pipelex-[a-z0-9-]+)`")
+    SIBLING_REFERENCE = re.compile(r"\.\./([a-z0-9-]+)/SKILL\.md")
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_every_cross_skill_reference_resolves_in_the_shipped_tree(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        skills_dir = resolve_output_dir(self.REPO_ROOT, config.source) / "skills"
+        shipped = {path.name for path in skills_dir.iterdir() if path.is_dir()}
+        assert shipped, f"{target_name}: no skills found under {skills_dir}"
+
+        unresolved: list[str] = []
+        for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+            body = skill_md.read_text(encoding="utf-8")
+            named = set(self.SLASH_REFERENCE.findall(body)) | set(self.SIBLING_REFERENCE.findall(body))
+            unresolved += [f"{skill_md.parent.name} names {name}, which this target does not ship" for name in sorted(named - shipped)]
+
+        assert not unresolved, f"{target_name}: dangling cross-skill references: " + "; ".join(unresolved)
