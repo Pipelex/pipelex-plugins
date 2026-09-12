@@ -283,10 +283,12 @@ class TestPipelexIntegrateSkill:
             assert rule in body, f"{target_name}: missing rule: {rule}"
         if target_name == "prod":
             assert "mcp__plugin_pipelex_pipelex__mthds_codegen" in body
-            assert "offer `/pipelex-scaffold`" in body
         else:
             assert "mcp__" not in body
-            assert "open `../pipelex-scaffold/SKILL.md`" in body
+        # No project at all is a stop, not an offer: the greenfield front door is not in the
+        # published plugin, so naming a skill here would send the user to something absent.
+        assert "this is not an integration yet: say so and stop" in body
+        assert "pipelex-scaffold" not in body
 
         references_dir = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "references"
         for reference in self.REFERENCES:

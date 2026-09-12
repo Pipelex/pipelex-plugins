@@ -191,7 +191,7 @@ After the gate:
 1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`. A converged stepwise result normally invokes it automatically because one-definition-per-file construction history and satisfied headers need regrouping. A naturally coherent result in either mode does not take an organization round trip solely for process compliance.
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
-4. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one and hands it to `/pipelex-integrate`.
+4. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
