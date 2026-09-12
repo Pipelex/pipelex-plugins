@@ -23,7 +23,7 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 |---|---|---|
 | **Language** | the user's word; the language the method's consumer is written in; a framework the user named | ask |
 | **Which branch** | a **named framework** the starters do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"no demo code"**, **"just a project"** → the initializer; a **web app people use in a browser**, forms, an upload flow → the JS starter; a **CLI, script, batch job, worker or service** in Python → the Python starter | one question offering the matching starter first, saying what it brings (durable runs, forms or CLI modes, codegen wiring, CI, its own `release` skill) and what it costs (demos to keep as references or to strip) |
-| **Where** | the directory the user named; **"here"** when the working directory is empty; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory |
+| **Where** | the directory the user named; **"here"** when the working directory is empty; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory. The rule is about **a directory you are creating a project in**, which is why the fresh-clone shortcut below is not an exception to it: there the project is already there and you are finishing it, not writing over someone's work |
 | **GitHub or local** | the user asked for a GitHub repository → `gh repo create --template`, after confirmation; otherwise a local clone with fresh history | local |
 
 **The fresh-clone shortcut.** A starter clone already in the working directory that has not been bootstrapped — `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"` — is branch A entered at step 4: acquisition already happened, so go straight to running the clone's bootstrap. Do not clone again.
@@ -40,6 +40,10 @@ Automatic by default, with the plugin's usual rules: an explicit user signal win
 
 Check before touching anything, and **stop** on a missing piece with the exact thing missing and the starter README's own line about it. Never install a toolchain — but a runtime the machine already has and only the `PATH` is missing is not a missing piece: when `node` or `uv` is absent while a version manager on the machine carries one (`nvm`, `fnm`, `volta`, `asdf`, `mise`), activate it for this work and say in the report which one you used and that the user's own shell may not have it. Stop only when no usable runtime can be reached that way.
 
+**Activating it means resolving it to an absolute path, not sourcing a shell.** Your shell state does not survive from one command to the next — each one starts again from the user's profile, which is the profile that did not have the runtime — so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next. Resolve the binary once (`ls "$NVM_DIR"/versions/node/*/bin/node`, `volta which node`, `mise which node`, `asdf which node`, `fnm exec --using=<v> -- which node`), keep that directory, and prefix **every** later command with it — `PATH="<that dir>:$PATH" …` — the clone's bootstrap and its `make all` / `make agent-check` included, because those are separate commands too. Verify the runtime answers under that prefix **before** step 2, so a machine you cannot actually reach stops while nothing has been created; discovering it at step 4 has already spent the pristine commit.
+
+Three things this clause does not license. **A shim is not a runtime**: `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set", so the test is that `node --version` *answers*, not that the binary resolves — and that case is a stop, not a manager to activate. **The floor still applies**: a manager holding Node 18 does not satisfy the starter's `engines` floor, and "a runtime the machine already has" never means a version below it. And **`volta` and `mise` install on first use** — `volta run`, `mise x` and `mise use` will fetch a version they do not have — which is the toolchain install this step forbids: use only a version the manager already holds, and stop rather than let it download one. Note too that `nvm`, `fnm` and `volta` manage Node alone and can never supply `uv`.
+
 - **JavaScript**: Node at or above the floor the starter's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the starter's e2e specs `require()` it), and `npm`.
 - **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
 - **Both**: `git`. The GitHub form also needs `gh` authenticated — `gh auth status`.
@@ -49,11 +53,13 @@ Check before touching anything, and **stop** on a missing piece with the exact t
 **Local, the default.** Clone shallow, read the template's identity, then detach from it:
 
 ```bash
-git clone --depth 1 https://github.com/Pipelex/<starter>.git <dir>
+git clone --depth 1 https://github.com/Pipelex/<starter>.git <dir> || exit
 git -C <dir> rev-parse HEAD                      # the template SHA, for the commit message
 # the template version: package.json "version" (JS) or pyproject.toml version (Python)
 rm -rf <dir>/.git && git -C <dir> init -b main
 ```
+
+The `|| exit` on the clone is not decoration: the line below it deletes a `.git` directory, and if the clone never ran — a network failure, or `<dir>` already existing — that `rm -rf` finds whatever `.git` is actually at that path. On a directory the skill just created it destroys nothing; on a repository of the user's it destroys their history irrecoverably. Run the destructive line only behind a clone that succeeded, and never type it on a path you have not just created.
 
 The clone's `.git` is removed on purpose: it is the template's history and remote, and leaving it would make `git status` and a future `git push` belong to Pipelex's template rather than to the user's project. This is exactly what GitHub's "Use this template" button produces — a copy with no history and no remote — and it is why the starters' READMEs tell humans not to clone directly. Fresh history is how you honour that.
 
@@ -84,11 +90,17 @@ Feed it what the conversation already holds — the project name, title, descrip
 ### Step 5: The env file
 
 ```bash
-cp <dir>/.env.example <dir>/.env.local      # JS: Next.js reads .env.local
-cp <dir>/.env.example <dir>/.env            # Python: python-dotenv reads .env
+cp -n <dir>/.env.example <dir>/.env.local   # JS: Next.js reads .env.local
+cp -n <dir>/.env.example <dir>/.env         # Python: python-dotenv reads .env
 ```
 
-Fill `PIPELEX_API_KEY` **from the shell environment when it is set there**, and leave it empty otherwise, telling the user where a key comes from (`app.pipelex.com`) and that this file is where it goes. **Never print a key, and never ask for one in the conversation.** Test for it without printing it — `[ -n "${PIPELEX_API_KEY:-}" ] && echo set || echo unset` — and write it with a redirection or an in-place edit that never echoes the value; `env | grep PIPELEX`, `echo $PIPELEX_API_KEY` and a command substitution in a message all put the key in the transcript, which is not yours to spend. `PIPELEX_BASE_URL` stays as the example ships it. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
+`-n` because this is the one step that can destroy something of the user's. On the fresh-clone shortcut the directory is one they were already working in, and a plain `cp` would overwrite an `.env.local` they had filled with their own key — the skill's whole posture is that nothing of the user's is ever cleared, and an env file is the most expensive thing in the tree to lose. An existing env file is left exactly as it is; read whether it already carries a key with the file-side test below, and say in the report that you kept theirs.
+
+Fill `PIPELEX_API_KEY` **from the shell environment when it is set there**, and leave it empty otherwise, telling the user where a key comes from (`app.pipelex.com`) and that this file is where it goes. **Never print a key, and never ask for one in the conversation.** Test for it without printing it — `[ -n "${PIPELEX_API_KEY:-}" ] && echo set || echo unset`.
+
+**The value moves only through a shell that expands the variable itself, and never through you.** A redirection is safe precisely because the shell does the expanding and only the variable's *name* is transcribed: `printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY" >> <dir>/.env.local`. A file-editing tool is the one form that cannot be made safe, whatever it is called — it takes a **literal** string, so you would have to know the value to pass it, and a tool call's parameters are the transcript. So: no file-editing tool on a line carrying the key, no `env | grep PIPELEX`, no `echo $PIPELEX_API_KEY`, no command substitution in a message, and **no reading the env file back** once written — `cat .env.local`, a `grep` over it, or opening it to check your work is the reflex after writing and the first move when a later step fails, and it puts the key in the transcript just as surely. To confirm the write landed, test the file the same way you tested the environment: `grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local && echo filled || echo empty`. A key in the transcript is a key to rotate, and it is not yours to spend.
+
+A value that passed the test is copied verbatim and never inspected, so say in the report that it was taken from the environment **and not validated** — a placeholder someone exported once passes a presence test and fails the first run, and this skill never calls the API, so it cannot tell the difference. `PIPELEX_BASE_URL` stays as the example ships it. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
 
 ### Step 6: Verify and hand off
 
@@ -102,18 +114,20 @@ As in branch A, for the language chosen.
 
 ### Step 2: Run the initializer — never assemble by hand
 
-- **A named framework** uses its documented initializer with its non-interactive flags: `npm create next-app@latest <dir> --ts --app --src-dir --eslint --use-npm --yes`; `uv init --package <dir>` then `uv add "fastapi[standard]"`; and so on — [references/initializers.md](references/initializers.md) carries the common ones. An initializer that only runs interactively is handed to the user to run, and you resume when it is done.
+- **A named framework** uses its documented initializer with its non-interactive flags: `npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes`, where the `--` is what passes the flags to the initializer instead of to npm and without it `create-next-app` prompts; `uv init --package <dir>` then `uv add "fastapi[standard]"` **from inside `<dir>`**, because `uv add` writes to whatever project its working directory resolves to and from the parent that is the user's, not the new one; and so on — [references/initializers.md](references/initializers.md) carries the common ones. An initializer that only runs interactively is handed to the user to run, and you resume when it is done.
 - **No framework named** takes the language's own minimal initializer: Python → `uv init --package <dir>`, which gives the import package `/pipelex-integrate` wants and a console-script entry; TypeScript → `npm init -y`, then `npm install --save-dev typescript @types/node` and `npx tsc --init` with strict mode, ES modules and a `src/` root.
 
 Nothing beyond what the initializer writes is authored by this skill: no example code, no folder layout of its own, no opinion the framework did not ship.
 
 ### Step 3: Version control and the pristine commit
 
-If the initializer did not `git init` on its own (some do — `uv init` and `create-next-app` among them), run `git init -b main` in the directory. Then the one commit, for the same reason as branch A:
+If the initializer did not `git init` on its own (some do — `uv init` and `create-next-app` among them), run `git init -b main` in the directory. **Confirm there is a `.gitignore` covering the dependency tree and the build output before you stage anything**: `npm init -y` and `tsc --init` write none, so the minimal TypeScript recipe — and the Express and library recipes built on it — reach this step with a populated `node_modules/` and nothing excluding it, and `git add -A` would commit the whole dependency tree into the one commit that is supposed to be a readable baseline. Write `node_modules/`, `dist/` and `.env` into a `.gitignore` first where the initializer left none, and read back what is staged (`git -C <dir> diff --cached --stat | tail -1`) before committing. Then the one commit, for the same reason as branch A:
 
 ```bash
 git -C <dir> add -A && git -C <dir> commit -m "Scaffold <framework or language> project"
 ```
+
+**An initializer that commits as well as `git init`s has already made this commit.** `create-next-app` is one: it runs `git init`, stages everything and commits, so the tree is clean and the command above stops with `nothing to commit` — which is the initializer having done the job, not a failure of it. Take that commit as the pristine one, exactly as branch A takes GitHub's, and name it and its message in the report. Never force a second empty commit on top of it.
 
 ### Step 4: The env file
 
@@ -135,7 +149,7 @@ Say, in this order: what was created and where; which template or initializer it
 Two lines are easy to forget and matter:
 
 - **The project's own instructions and skills load in a session started inside it.** Its `CLAUDE.md` / `AGENTS.md` and its `release` and `bump-*` skills are not in the current session; `cd <dir>`, then starting Codex there, is how they arrive.
-- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. Hand the method to it by opening `../pipelex-integrate/SKILL.md` and following it; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first.
+- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. One exception, and it is the version-manager machine of step 1: the workshop is spawned with `npx` on the **harness's** own `PATH`, which no activation of yours reaches, so a `node` only reachable through `nvm` or `fnm` means no workshop at all. Say so there instead — the hand-off needs the harness restarted from a shell where the runtime is active. Hand the method to it by opening `../pipelex-integrate/SKILL.md` and following it; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first.
 
 ## When something goes wrong
 
@@ -149,7 +163,7 @@ Two lines are easy to forget and matter:
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `PIPELEX_API_KEY` is not in the shell environment | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation |
-| you need to know whether a key is set | test it without printing it (`[ -n "${PIPELEX_API_KEY:-}" ] && echo set`); never `env | grep PIPELEX`, never echo the value — a key in the transcript is a key to rotate |
+| you need to know whether a key is set | test it without printing it (`[ -n "${PIPELEX_API_KEY:-}" ] && echo set`); never `env \| grep PIPELEX`, never echo the value, never move it with a file-editing tool, never read the env file back — a key in the transcript is a key to rotate |
 | The working directory is the template's own checkout (its `origin` remote points at `Pipelex/pipelex-starter-…`) | STOP: this is the template, not a copy of it — acquire a copy in another directory |
 
 ## Reference

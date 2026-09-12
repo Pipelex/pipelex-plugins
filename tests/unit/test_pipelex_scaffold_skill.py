@@ -36,6 +36,25 @@ class TestPipelexScaffoldSkill:
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
         "Nothing beyond what the initializer writes is authored by this skill",
         "a runtime the machine already has and only the `PATH` is missing is not a missing piece",
+        # A sourced shell does not survive the next command, so the runtime is resolved to a path.
+        "**Activating it means resolving it to an absolute path, not sourcing a shell.**",
+        "**A shim is not a runtime**",
+        # A file-editing tool needs the literal value in its parameters, which is the transcript.
+        "**The value moves only through a shell that expands the variable itself, and never through you.**",
+        "**no reading the env file back**",
+        "and not validated",
+        # The destructive line runs only behind a clone that succeeded.
+        "git clone --depth 1 https://github.com/Pipelex/<starter>.git <dir> || exit",
+        # cp -n: an env file the user already filled is the most expensive thing in the tree to lose.
+        "cp -n <dir>/.env.example <dir>/.env.local",
+        # npm eats the flags without the separator and create-next-app then prompts.
+        "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes",
+        # uv add resolves the project from its working directory, which from the parent is the user's.
+        "**from inside `<dir>`**",
+        # An initializer that commits has already made the pristine commit.
+        "**An initializer that commits as well as `git init`s has already made this commit.**",
+        # npm init -y and tsc --init write no .gitignore, so git add -A would commit node_modules.
+        "**Confirm there is a `.gitignore` covering the dependency tree and the build output before you stage anything**",
     )
 
     @property
@@ -75,6 +94,16 @@ class TestPipelexScaffoldSkill:
         assert "uv init --package <dir>" in initializers
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
+        # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
+        assert "**Every `uv add` above runs inside `<dir>`, and the parentheses are why.**" in initializers
+        for recipe in (
+            '(cd <dir> && uv add "fastapi[standard]")',
+            "(cd <dir> && uv add typer)",
+            "(cd <dir> && uv add django && uv run django-admin startproject config .)",
+        ):
+            assert recipe in initializers, f"uv add not scoped to the project: {recipe}"
+        # The minimal TS default is the very resolution the emitter defect breaks.
+        assert "is exactly the shape that meets the ts-zod emitter's extensionless-import defect" in initializers
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:

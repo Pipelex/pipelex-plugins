@@ -33,6 +33,19 @@ class TestPipelexIntegrateSkill:
         "Do this **before** step 6",
         "**Check containment before the call rather than waiting for an error**",
         "never write the tree into the workshop's own directory and move it across afterwards",
+        # The run route takes the bare pipe code; the verdict and the sidecar carry the namespaced ref.
+        "**`pipe_ref` and the run's `pipe_code` are not the same string**",
+        # A bundle is one closure: the call site submits every file, not just main.mthds.
+        "It loads **every `.mthds` file of the committed bundle** at call time",
+        # The containment reading is lexically wrong in both directions without resolving.
+        "**Resolve both sides before comparing them**",
+        "**Both inputs are known as soon as step 1 names the project, so do this reading there**",
+        # A lock with no sidecar is also what this method's own interrupted run leaves.
+        "**One lock-without-sidecar is this method's own, and relocating is the wrong answer for it**",
+        # The harness keeps no sidecar by design, so step 4's rule cannot govern its layout.
+        "**This is the one destination step 4's sidecar rule does not govern**",
+        # A list output arrives as an array and a single-object parser rejects it.
+        "**Narrow according to the output's `multiplicity`, which step 3 recorded**",
     )
 
     @property
@@ -57,6 +70,10 @@ class TestPipelexIntegrateSkill:
         assert "`main_pipe.pipe_ref` is the pipe a run with no pipe selector executes" in body
         assert "the method settles **no entry pipe**" in body
         assert "the workshop **predates the signature**" in body
+        # The third cause was stated in step 3 but dropped from the failure table, whose remedy differs by cause.
+        assert "the entry pipe's contract did not come back whole, which comes from the runner" in body
+        # The same signature rides the text summary, so a host that drops structured content is not a dead end.
+        assert "the **same fact on a second channel, not a fourth cause**" in body
 
     def test_the_wire_null_helper_is_never_installed(self) -> None:
         body = self.integrate
@@ -80,6 +97,51 @@ class TestPipelexIntegrateSkill:
         # The emitter's extensionless import is a known defect: named, never patched in the stamped tree.
         assert 'a known defect of the ts-zod emitter, which writes `from "./types"`' in body
         assert "Changing the project's `moduleResolution` is the user's call to make, not yours" in body
+
+    def test_the_call_sites_submit_the_whole_bundle_not_just_main(self) -> None:
+        """Generation takes every `.mthds` file of the bundle, so the run must too.
+
+        A call site that submits `main.mthds` alone type-checks, passes the offline gate, and then
+        fails at load time on exactly the multi-file methods codegen handled correctly.
+        """
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        assert "mthds_contents: await readBundle()," in typescript
+        # An interface has no implicit index signature, so it is not assignable to Record<string, unknown>.
+        assert "export type SummarizePdfInputs = {" in typescript
+        assert "export interface SummarizePdfInputs" not in typescript
+        assert "**`SummarizePdfInputs` is a `type`, not an `interface`, and that is load-bearing.**" in typescript
+        # A script merely named `codegen` is not evidence of a Pipelex harness.
+        assert "read the script before believing it" in typescript
+        assert 'name.endsWith(".mthds")' in typescript
+        assert "mthds_contents: [bundle]" not in typescript
+        # Its own relative imports need extensions on the resolution that meets the emitter defect.
+        assert "**The three relative imports above are extensionless, which is correct only on a bundler resolution.**" in typescript
+
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "mthds_contents=_read_bundle()," in python
+        assert 'sorted(BUNDLE_DIR.rglob("*.mthds"))' in python
+        assert "BUNDLE_PATH" not in python
+
+    def test_the_gate_fails_closed_on_a_malformed_sources_and_does_not_truncate(self) -> None:
+        """The offline gate is the one executable artifact here, so two properties are pinned.
+
+        A sidecar whose `sources` is present but not an object must fail the way an unreadable one
+        does: coerced to `{}` it would check nothing, print nothing and exit 0 — the single input
+        that is both silent and green. And the verdict's explanation must survive a pipe, which
+        `process.exit` does not guarantee.
+        """
+        gate = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
+        # No `??` here: it would turn an explicit null into the legitimate absent case.
+        assert "const sources = sidecar?.sources;" in gate
+        assert "?? {}" not in gate
+        assert 'if (typeof sources !== "object" || sources === null || Array.isArray(sources)) {' in gate
+        assert "is not an object, so staleness cannot be ruled out" in gate
+        # No branch is both silent and green: absent and empty both announce themselves.
+        assert "records no sources — a by-ref or by-id integration; source staleness does not apply" in gate
+        assert "process.exitCode = await main(process.argv);" in gate
+        # The default decoder strips a BOM, which would hash a BOM'd artifact as current.
+        assert 'new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })' in gate
+        assert "process.exit(await main" not in gate
 
     def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
         body = self.integrate
