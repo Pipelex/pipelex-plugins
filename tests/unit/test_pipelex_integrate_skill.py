@@ -70,6 +70,10 @@ class TestPipelexIntegrateSkill:
         assert '`kind: "paywall"`' in body
         assert "report by name, never delete" in body
         assert "never delete, move or clear the named file" in body
+        assert "and never offer to" in body
+        # A lock is not this method's without a sidecar naming it: same file names mean a silent overwrite, not an orphan.
+        assert "is this method's only when a `sources.json` beside it names this method" in body
+        assert "would silently overwrite the other method's stamped files rather than report an orphan" in body
         assert "report `drifts[]` verbatim and stop" in body
 
     def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
