@@ -75,6 +75,9 @@ class TestPipelexIntegrateSkill:
         assert "is this method's only when a `sources.json` beside it names this method" in body
         assert "would silently overwrite the other method's stamped files rather than report an orphan" in body
         assert "report `drifts[]` verbatim and stop" in body
+        # The emitter's extensionless import is a known defect: named, never patched in the stamped tree.
+        assert 'a known defect of the ts-zod emitter, which writes `from "./types"`' in body
+        assert "Changing the project's `moduleResolution` is the user's call to make, not yours" in body
 
     def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
         body = self.integrate

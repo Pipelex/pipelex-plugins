@@ -25,6 +25,8 @@ Why the exclusions are not optional: the ts-zod emitter prints at Prettier's def
 
 - `types.ts` — stamped; `import { z } from "zod"`; one `export const XSchema = z.object({...})` and `export type X = z.infer<typeof XSchema>` per concept, natives included; non-required fields are `.nullish()`, so the schema parses the runtime's explicit `null`s directly.
 - `binder.ts` — stamped; `export function parseX(wire: unknown): X` and `export function serializeX(value: X): X` per concept, over the pure schemas. Field keys are wire-native snake_case.
+
+  **Known defect:** `binder.ts` imports its sibling as `from "./types"`, with no extension. On a plain Node ESM project (`"type": "module"` with `moduleResolution` `nodenext` or `node16`) that fails the type check with `TS2835` and the compiled code with `ERR_MODULE_NOT_FOUND`; a bundler resolution (`bundler`, `node10`) is unaffected, which is why the JS starter never meets it. The fix belongs to the emitter. Say so plainly and leave the file alone: it is stamped and hashed, so a patch breaks the trust chain and the next regeneration drops it. Whether to move the project to a bundler resolution meanwhile is the user's decision.
 - `codegen.lock` — TOML: `lock_version`, `crate_fingerprint`, `engine_version`, one `[[artifacts]]` entry per stamped file with its `content_hash`.
 
 Beside them the skill writes `sources.json`, unstamped; it is never an artifact and never an orphan. Everything stamped is read-only and formatter-free. A consumer imports the type from `types.ts` and the parser from `binder.ts`; anything it wants to add goes in its own module, never in the generated one.

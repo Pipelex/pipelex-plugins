@@ -199,6 +199,7 @@ The harness owns the layout and the check; its generator is preferred, not manda
 | success with `is_current: false` | report `drifts[]` verbatim and stop; do not commit a tree the check rejects |
 | `main_pipe` absent on a by-ref / by-id source | STOP: the verdict carries no signature — the workshop predates it (refresh `@pipelex/mcp` and retry) or the method settles no entry pipe; never guess the output concept |
 | the project's type check fails after the call site is written | your code — fix and re-run; a failure inside the generated tree is reported, not patched |
+| `TS2835` in the generated `binder.ts`: a relative import needs a file extension | a known defect of the ts-zod emitter, which writes `from "./types"`. It bites a plain Node ESM project (`"type": "module"` with `moduleResolution` `nodenext` or `node16`) and not a bundler one. Report it — the fix is upstream; never patch the stamped file (a regeneration loses the patch and the stamp is hashed) and never drop the tree from the type checker. Changing the project's `moduleResolution` is the user's call to make, not yours |
 | `mthds_list_methods` absent | integrate by id, address or files; never stop for it |
 
 ## Reference
