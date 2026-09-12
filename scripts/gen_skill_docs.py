@@ -92,13 +92,16 @@ HOOK_TEMPLATES = [
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
+# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper, plus
+#   mcp/vibe-mcp.toml, the workshop launcher as a [[mcp_servers]] config
+#   fragment: Vibe has no plugin manifest to declare the server in, so the user
+#   copies the fragment into ~/.vibe/config.toml, as with vibe-hooks.toml.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
     Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
-    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
+    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2", "mcp/vibe-mcp.toml.j2"],
 }
 
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
@@ -418,9 +421,10 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) in
     # targets/defaults.toml + `make build` on Claude; a same-named
     # [mcp_servers.pipelex] entry in ~/.codex/config.toml outranks the plugin
-    # tier on Codex. Vibe gets no entry (no manifest; docs point at manual
-    # launcher registration). Skipped when the target defines no mcp_server
-    # block.
+    # tier on Codex. Vibe gets no manifest entry because it has no manifest:
+    # its target renders the same launcher as the mcp/vibe-mcp.toml config
+    # fragment instead (see HOOK_TEMPLATES_BY_PLATFORM). Skipped when the
+    # target defines no mcp_server block.
     mcp_server = config.template_vars.get("mcp_server")
     if isinstance(mcp_server, dict):
         raw_command = mcp_server.get("command", "")

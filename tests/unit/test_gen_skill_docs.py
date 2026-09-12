@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tomllib
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -40,9 +42,9 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 # Minimal hook templates for every platform. render_templates declares hooks
 # per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
-# Vibe: vibe-hooks.toml + check-mthds-vibe.sh), so any test tree that reaches
-# skill/hook rendering must provide them or render fails with "hook template not
-# found".
+# Vibe: vibe-hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml launcher
+# fragment), so any test tree that reaches skill/hook rendering must provide them
+# or render fails with "hook template not found".
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
@@ -51,6 +53,7 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
     "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "mcp/vibe-mcp.toml.j2": '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = "npx"\n',
 }
 
 # Static hook assets are copied verbatim — the fixture body stands in for the
@@ -614,7 +617,7 @@ class TestSkillFailureDiscipline:
     )
     def test_absent_tools_stop_message_matches_platform(self, target_name: str, manifest_spawns: bool) -> None:
         """The MCP-absent STOP guidance must quote the real launcher command and,
-        on Vibe (no plugin manifest, no auto-spawn), point at manual registration
+        on Vibe (no plugin manifest, no auto-spawn), point at the shipped fragment
         instead of a manifest spawn. Renders the real templates with real target vars."""
         repo_root = Path(__file__).parents[2]
         config = load_target_config(repo_root / "targets", target_name)
@@ -630,9 +633,91 @@ class TestSkillFailureDiscipline:
             assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
             if manifest_spawns:
                 assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
+                assert "from the session environment —" in body, f"{target_name}/{skill}: the manifest-spawned server reads the session environment"
             else:
                 assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
-                assert "register" in body, f"{target_name}/{skill}: Vibe STOP message must point at manual registration"
+                assert "`mcp/vibe-mcp.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must point at the shipped MCP fragment"
+                assert "`env` table" in body, f"{target_name}/{skill}: Vibe STOP message must say where the key goes"
+                assert "to the end of `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must say to append the entry"
+                assert "`mcp_servers = []`" in body, f"{target_name}/{skill}: Vibe STOP message must say to delete the inline empty array"
+                assert "from the session environment —" not in body, f"{target_name}/{skill}: Vibe passes no shell env to the server"
+
+
+class TestVibeMcpFragment:
+    """The Vibe target bakes the workshop launcher as a `[[mcp_servers]]` fragment.
+
+    Vibe has no plugin manifest, so this fragment is its MCP declaration. These
+    tests render the real template with the real target variables and read the
+    result the way Vibe does: as TOML holding one stdio server entry.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+
+    def _render(self, target_name: str) -> dict[Path, str]:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        return render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, config.template_vars, include_skills=[], target_name=config.name)
+
+    def test_fragment_declares_the_launcher_from_defaults(self) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", "mistral-vibe")
+        mcp_server = config.template_vars["mcp_server"]
+        assert isinstance(mcp_server, dict)
+        rendered = self._render("mistral-vibe")
+        body = rendered[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        servers = tomllib.loads(body)["mcp_servers"]
+        assert len(servers) == 1
+        server = servers[0]
+        assert server["name"] == "pipelex"
+        assert server["transport"] == "stdio"
+        assert server["command"] == mcp_server["command"]
+        assert server["args"] == mcp_server["args"]
+        assert "npx -y @pipelex/mcp@latest" == " ".join([server["command"], *server["args"]])
+
+    def test_fragment_env_names_every_forwarded_variable_unset(self) -> None:
+        """Vibe forwards no shell env into a stdio spawn, so each variable Codex
+        forwards by name must appear here as a key the user fills in. Empty
+        values count as unset in the workshop, so an unfilled fragment is keyless
+        rather than carrying a bogus key."""
+        config = load_target_config(self.REPO_ROOT / "targets", "mistral-vibe")
+        mcp_server = config.template_vars["mcp_server"]
+        assert isinstance(mcp_server, dict)
+        env_vars = mcp_server["env_vars"]
+        assert isinstance(env_vars, list)
+        expected_env = {str(name): "" for name in cast("list[object]", env_vars)}
+        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        server = tomllib.loads(body)["mcp_servers"][0]
+        assert expected_env
+        assert server["env"] == expected_env
+
+    def test_fragment_outlasts_the_cold_npx_spawn(self) -> None:
+        """Vibe's default startup timeout is 10 s and a first-ever npx spawn takes longer."""
+        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        assert tomllib.loads(body)["mcp_servers"][0]["startup_timeout_sec"] > 10
+
+    # The shape Vibe's first run writes: bare keys first, an inline empty
+    # `mcp_servers`, then tables (tomli_w.dump(VibeConfig.create_default())).
+    VIBE_DEFAULT_CONFIG = 'active_model = "devstral-2"\nmcp_servers = []\nskill_paths = []\n\n[session_logging]\nenabled = true\n'
+
+    def test_fragment_installs_into_a_default_vibe_config_only_after_deleting_the_inline_array(self) -> None:
+        """Appended to a fresh Vibe config as is, the fragment is invalid TOML and
+        Vibe cannot start; with the `mcp_servers = []` line deleted it loads, and
+        every top-level setting stays top-level. The fragment has to carry that
+        step, the paste position, and the session-log warning."""
+        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        with pytest.raises(tomllib.TOMLDecodeError):
+            tomllib.loads(self.VIBE_DEFAULT_CONFIG + "\n" + body)
+        installed = tomllib.loads(self.VIBE_DEFAULT_CONFIG.replace("mcp_servers = []\n", "") + "\n" + body)
+        assert installed["active_model"] == "devstral-2"
+        assert installed["skill_paths"] == []
+        assert [server["name"] for server in installed["mcp_servers"]] == ["pipelex"]
+        assert "Delete the `mcp_servers = []` line" in body
+        assert "two servers of the same name" in body
+        assert "Append everything below to the end of the file" in body
+        assert "~/.vibe/logs/session/" in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex"])
+    def test_plugin_targets_do_not_ship_the_fragment(self, target_name: str) -> None:
+        rendered = self._render(target_name)
+        assert not any(path.name == "vibe-mcp.toml" for path in rendered)
 
 
 class TestPipelexInputsSizeLimitDiscipline:
@@ -986,7 +1071,11 @@ class TestHookRendering:
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == [
+            "hooks/vibe-hooks.toml.j2",
+            "hooks/check-mthds-vibe.sh.j2",
+            "mcp/vibe-mcp.toml.j2",
+        ]
 
     def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
@@ -1003,6 +1092,7 @@ class TestHookRendering:
         assert "check-mthds-codex.sh" in output_names
         assert "hooks.json" not in output_names
         assert "check-mthds.sh" not in output_names
+        assert "vibe-mcp.toml" not in output_names
 
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
@@ -1010,6 +1100,7 @@ class TestHookRendering:
         output_names = {path.name for path in results}
         assert "vibe-hooks.toml" in output_names
         assert "check-mthds-vibe.sh" in output_names
+        assert tree / "mcp" / "vibe-mcp.toml" in results
 
     def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
