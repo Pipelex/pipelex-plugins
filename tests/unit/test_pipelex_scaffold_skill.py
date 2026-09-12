@@ -30,6 +30,7 @@ class TestPipelexScaffoldSkill:
         "Read `<dir>/.claude/skills/bootstrap/SKILL.md` and follow it as written",
         "**Add nothing to that procedure and reimplement none of it.**",
         "**Never print a key, and never ask for one in the conversation.**",
+        "a key in the transcript is a key to rotate",
         "**state the exact command and confirm before running it**",
         "do not start `make dev`",
         "Add **no** SDK dependency and create **no** empty `methods/` directory",

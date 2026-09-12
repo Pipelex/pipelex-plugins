@@ -95,7 +95,7 @@ cp <dir>/.env.example <dir>/.env.local      # JS: Next.js reads .env.local
 cp <dir>/.env.example <dir>/.env            # Python: python-dotenv reads .env
 ```
 
-Fill `PIPELEX_API_KEY` **from the shell environment when it is set there**, and leave it empty otherwise, telling the user where a key comes from (`app.pipelex.com`) and that this file is where it goes. **Never print a key, and never ask for one in the conversation.** `PIPELEX_BASE_URL` stays as the example ships it. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
+Fill `PIPELEX_API_KEY` **from the shell environment when it is set there**, and leave it empty otherwise, telling the user where a key comes from (`app.pipelex.com`) and that this file is where it goes. **Never print a key, and never ask for one in the conversation.** Test for it without printing it — `[ -n "${PIPELEX_API_KEY:-}" ] && echo set || echo unset` — and write it with a redirection or an in-place edit that never echoes the value; `env | grep PIPELEX`, `echo $PIPELEX_API_KEY` and a command substitution in a message all put the key in the transcript, which is not yours to spend. `PIPELEX_BASE_URL` stays as the example ships it. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
 
 ### Step 6: Verify and hand off
 
@@ -156,6 +156,7 @@ Two lines are easy to forget and matter:
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `PIPELEX_API_KEY` is not in the shell environment | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation |
+| you need to know whether a key is set | test it without printing it (`[ -n "${PIPELEX_API_KEY:-}" ] && echo set`); never `env | grep PIPELEX`, never echo the value — a key in the transcript is a key to rotate |
 | The working directory is the template's own checkout (its `origin` remote points at `Pipelex/pipelex-starter-…`) | STOP: this is the template, not a copy of it — acquire a copy in another directory |
 
 ## Reference
