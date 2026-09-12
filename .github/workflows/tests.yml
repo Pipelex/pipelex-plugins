@@ -16,17 +16,24 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      # `uv sync` re-locks when pyproject.toml has moved, which would have CI
+      # test a dependency set the committed uv.lock does not describe. Assert
+      # instead: a pull request that edits dependencies must carry the lock.
+      UV_LOCKED: "1"
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:

@@ -17,24 +17,35 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened]
+    # `edited` is what a retarget emits — see version-check.yml.
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check-changelog:
     name: Changelog entry
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Check Changelog Version
         run: |
           VERSION=$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("targets/prod.toml").read_text())["plugin"]["version"])')
           echo "Version from targets/prod.toml: $VERSION"
 
-          if ! grep -q "## \[$VERSION\] -" CHANGELOG.md; then
+          # Anchored, and the version's dots escaped: unanchored `0.5.0` would
+          # match `0x5x0` in the middle of a paragraph and pass a release with
+          # no heading at all.
+          if ! grep -qE "^## \[${VERSION//./\\.}\] - " CHANGELOG.md; then
             echo "::error::No changelog entry found for version $VERSION"
             echo ""
             echo "The following versions are in the changelog:"

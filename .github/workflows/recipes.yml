@@ -3,8 +3,8 @@
 # `make test-recipes` runs every runnable block the pipelex-synthetic-inputs
 # references ship, through both rungs of the environment ladder, and it is the
 # only thing that would catch a reference recipe rotting. It needs network and
-# downloads packages on a cold uv cache, so it is kept off every pull request
-# and runs on three triggers instead:
+# downloads packages on a cold uv cache, so it is kept off the ordinary pull
+# request and runs on three triggers instead:
 #
 #   - nightly, which is the backstop against a recipe that rots because a
 #     dependency moved rather than because anybody edited it;
@@ -30,12 +30,17 @@ on:
       - "templates/skills/pipelex-synthetic-inputs/**"
       - "tests/recipes/**"
       - ".github/workflows/recipes.yml"
+      # The harness the suite runs through: renaming the `recipes` marker or
+      # editing the target breaks it just as surely as editing a recipe.
+      - "Makefile"
+      - "pyproject.toml"
+      - "uv.lock"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -45,8 +50,14 @@ jobs:
     timeout-minutes: 30
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      # `uv sync` re-locks when pyproject.toml has moved, which would have CI
+      # test a dependency set the committed uv.lock does not describe. Assert
+      # instead: a pull request that edits dependencies must carry the lock.
+      UV_LOCKED: "1"
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:

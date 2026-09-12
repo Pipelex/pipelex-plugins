@@ -14,10 +14,13 @@
 # refactor, chore, docs, ci-cd, changelog, codex. `feat/` is deliberately absent:
 # the convention spells the word out.
 #
-# `pull_request_target` runs the copy of this file on the BASE branch, not the
-# one on the pull request's head — which is what keeps a fork from editing its
-# own gate, and also means a change to this file only takes effect once it has
-# landed on the branch being protected.
+# `pull_request_target` runs the copy of this file on the repository's DEFAULT
+# branch — `main` here — whatever branch the pull request targets. It read the
+# base branch's copy until GitHub changed that on 2025-12-08. Either way a fork
+# cannot edit its own gate, which is the point; the consequence is that these
+# gates report nothing at all — not a pass, not a skip — until this file has
+# reached `main`, which happens only when a release merges, and a later edit to
+# it is likewise inert until the next release carries it across.
 name: Guard branch flow
 
 on:

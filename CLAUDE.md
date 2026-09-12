@@ -90,7 +90,7 @@ make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 2. Run `make build` to regenerate all targets.
 3. Run `make check` (or `make agent-check`) to validate.
 
-CI repeats the read-only half of that loop on every pull request — `make check` and `make agent-test`, plus the branch-flow guard and the release-only version and changelog gates. `docs/ci.md` says which workflow runs when and what each check means.
+CI repeats the read-only half of that loop on every pull request — `make check` and `make agent-test` — with the branch-flow guard and the release-only version and changelog gates beside them. `docs/ci.md` says which workflow runs when, what each check means, and which of them is not reporting yet.
 
 ### Template variables (trimmed set)
 

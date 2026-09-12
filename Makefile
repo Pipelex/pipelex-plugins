@@ -106,6 +106,10 @@ check-shared: install ## Verify shared refs + target versions + template freshne
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all --check
 	@$(VENV_RUFF) format --check .
 	@$(VENV_RUFF) check .
+# `ignore = ["F401"]` in pyproject hides unused imports from the line above;
+# `--select` on the command line overrides it. Reported here, never fixed,
+# because `agent-check` is the target that repairs and this one only reports.
+	@$(VENV_RUFF) check --select=F401 --no-fix .
 	@$(MAKE) --no-print-directory pyright mypy
 
 check-claude: install ## Verify Claude marketplace packaging consistency
