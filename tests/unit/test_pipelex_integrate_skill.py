@@ -725,6 +725,11 @@ class TestPipelexIntegrateSkill:
         assert "write the `method.json` yourself, holding the selector and nothing else" in harness
         assert "Never generate a tree beside the manifest by hand." in harness
         assert "when `make codegen` stops because no `PIPELEX_API_KEY` reaches the project" in harness
+        # The generated directory is the method directory's name with dashes turned into underscores, so
+        # every generated path, output_dir and import in the section spells `<module>`, never `<name>`.
+        assert "where `<module>` is `<name>` with its dashes turned into underscores" in harness
+        assert "generated/<name>" not in harness and "generated.<name>" not in harness
+        assert "with its entry file named `main.mthds`, which the starter's tests open" in harness
         for struck in ("both shelling out to a `pipelex` CLI", "when a `pipelex` CLI is reachable", "`PIPELEX=` points at an install"):
             assert struck not in python, f"python.md still branches on a pipelex CLI: {struck!r}"
         body = self.TEMPLATE.read_text(encoding="utf-8")
