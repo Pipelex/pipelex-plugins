@@ -26,10 +26,13 @@ STARTER_URL = "https://github.com/Pipelex/<starter>.git"
 NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the acquisition recipes are git")
 
 # The env-file write, as the skill ships it. The marker names the one bash block that fills the
-# file; the two fragments are what make it one decision: the key's guard opens the braces, and the
-# base URL's append sits inside them rather than following as a second command.
+# file; the fragments are what make it one decision: the guard on the file's key (and on the shell
+# setting anything at all) opens the braces, and the comment and both appends sit inside them.
 ENV_FILE_MARKER = r"""printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL" >> <dir>/.env.local"""
-ENV_FILE_KEY_GUARD = r"""[ -z "${PIPELEX_API_KEY:-}" ] || grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local || {"""
+ENV_FILE_GUARD = r"""grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local || [ -z "${PIPELEX_API_KEY:-}${PIPELEX_BASE_URL:-}" ] || {"""
+ENV_FILE_COMMENT_LINE = "# Copied from the shell environment; a later line overrides an earlier one."
+ENV_FILE_COMMENT = r"""printf '\n""" + ENV_FILE_COMMENT_LINE + r"""\n' >> <dir>/.env.local &&"""
+ENV_FILE_KEY_APPEND = r"""{ [ -z "${PIPELEX_API_KEY:-}" ] || printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY" >> <dir>/.env.local; }"""
 ENV_FILE_URL_APPEND = r"""{ [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL" >> <dir>/.env.local; }"""
 # The file-side confirmations and the plane test, which print a verdict and never a value.
 ENV_FILE_KEY_CONFIRMATION = r"""grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local && echo filled || echo empty"""
@@ -205,7 +208,7 @@ class TestPipelexScaffoldSkill:
             assert "uv init --package <dir>" not in body, "a bare uv init absorbs <dir> into the parent workspace"
             # The append is gated: on the fresh-clone shortcut the env file may be one the user
             # filled, and a second assignment after theirs is the one dotenv resolves to.
-            assert "grep -q '^PIPELEX_API_KEY=.\\+' <dir>/.env.local || {" in body
+            assert "grep -q '^PIPELEX_API_KEY=.\\+' <dir>/.env.local || [ -z" in body
             assert ">> <dir>/.env.local`.\n" not in body, "an ungated append shadows a key the user already filled"
 
     def test_fresh_clone_shortcut_and_template_checkout_stop(self) -> None:
@@ -371,24 +374,29 @@ class TestPipelexScaffoldSkill:
         assert "**On Python, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**" in reference
         assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
 
-    def test_the_base_url_moves_with_the_key_in_every_copy_a_user_installs(self) -> None:
+    def test_the_base_url_comes_from_the_shell_in_every_copy_a_user_installs(self) -> None:
         """`L-260913-15af9f`: the key was copied from the shell and the base URL left at production.
 
         A key is refused by every plane but the one that issued it, so a shell exporting a dev or
         staging pair got an env file pairing that plane's key with production's URL — invisible to
         the session, which reads the process environment, and broken the first time anything read
-        the file. The URL now moves with the key, inside the one command whose test on the key
-        decides both lines: the example ships its URL line non-empty, so the URL can carry no
-        presence guard of its own, and the key's guard repeated after the key is written would
-        never move it. Asserted on the template, on the three in-memory renders and on the three
-        committed trees, because the executed tests below run the command out of one of them.
+        the file. A first fix moved the URL only beside a key; the developer then ruled on
+        2026-09-13 that an exported base URL is the user's declared plane and is copied with a key
+        or without one, because the keyless self-hosted runner the Python starter's example
+        documents is exactly the project the narrower rule pointed at production. One guard on the
+        file's key decides whether anything is written: the example ships its URL line non-empty,
+        so the URL can carry no presence guard of its own. Asserted on the template, on the three
+        in-memory renders and on the three committed trees, because the executed tests below run
+        the command out of one of them.
         """
         template = self.scaffold
         recipe = _recipe(template, ENV_FILE_MARKER)
-        assert ENV_FILE_KEY_GUARD in recipe
-        assert ENV_FILE_URL_APPEND in recipe
-        # Inside the braces the key's guard opens, so decided by the same test and never on its own.
-        assert recipe.index(ENV_FILE_KEY_GUARD) < recipe.index(ENV_FILE_URL_APPEND)
+        # Inside the braces the guard opens, in this order, so decided by the same test and never on
+        # their own: the comment once, then whichever of the two lines the shell supplies.
+        fragments = (ENV_FILE_GUARD, ENV_FILE_COMMENT, ENV_FILE_KEY_APPEND, ENV_FILE_URL_APPEND)
+        positions = [recipe.index(fragment) for fragment in fragments]
+        assert positions == sorted(positions), "the guard, the comment and the two appends are out of order"
+        assert recipe.count(ENV_FILE_COMMENT_LINE) == 1
         assert recipe.rstrip().endswith("}")
 
         bodies = [template]
@@ -398,13 +406,17 @@ class TestPipelexScaffoldSkill:
             bodies.extend([self.render(target_name), installed.read_text(encoding="utf-8")])
         for body in bodies:
             assert _recipe(body, ENV_FILE_MARKER) == recipe, "a copy ships a different env-file command than the one executed here"
-            assert "**`PIPELEX_BASE_URL` moves with the key.**" in body
+            assert "**`PIPELEX_BASE_URL` comes from the shell too, with a key or without one.**" in body
+            assert "because a base URL the shell exports is the plane the user has declared" in body
+            assert "is not copied" not in body, "the rule that pointed a keyless self-hosted project at production is back"
+            assert "**The one test on the file's key decides whether anything is written" in body
+            assert "the leading newline and the comment are written once, whichever of the two lines follows them" in body
+            assert "**The report names the plane the file points at, without printing the URL**" in body
+            # A URL copied without a key and not production's: the key app.pipelex.com issues is refused there.
             assert (
-                "**A base URL set in the shell with no key beside it is not copied**, because the key the user then fetches from "
-                "`app.pipelex.com` is production's, which the example's URL already names." in body
+                "say the file points at another plane, and warn that a key from `app.pipelex.com` is production's and will be refused there" in body
             )
-            assert "**The one test on the key decides both lines, which is why the URL's append sits inside the key's braces" in body
-            assert "**The report names the plane the file points at, without printing the URL.**" in body
+            assert "| `PIPELEX_BASE_URL` is set in the shell | copy it, with the key or without one," in body
             assert ENV_FILE_KEY_CONFIRMATION in body
             assert ENV_FILE_URL_CONFIRMATION in body
             assert PLANE_TEST in body
@@ -412,11 +424,13 @@ class TestPipelexScaffoldSkill:
 
         starters = STARTERS_REFERENCE.read_text(encoding="utf-8")
         initializers = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
-        assert "**The env file's two Pipelex lines are one credential.**" in starters
-        assert "`PIPELEX_BASE_URL` filled from it too when the shell sets one beside the key" in initializers
-        assert "filled by the skill's one env-file command" in initializers
+        assert "**The env file's two Pipelex lines name one plane.**" in starters
+        assert "copies a base URL the shell sets whether or not the shell also sets a key" in starters
+        assert "`PIPELEX_BASE_URL` filled from it whenever the shell sets one, with a key or without" in initializers
+        assert "the base URL whenever the shell sets one, with or without a key" in initializers
         for reference in (starters, initializers):
             assert "stays as the example ships it" not in reference
+            assert "is not copied" not in reference
 
     def _run_env_file_command(
         self, *, shell: list[str], command: str, project: Path, credentials: dict[str, str]
@@ -466,7 +480,7 @@ class TestPipelexScaffoldSkill:
             pytest.param({"PIPELEX_API_KEY": FAKE_KEY}, FAKE_KEY, PRODUCTION_URL, None, id="key-only"),
             pytest.param({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": ""}, FAKE_KEY, PRODUCTION_URL, None, id="key-beside-an-empty-base-url"),
             pytest.param({}, "", PRODUCTION_URL, None, id="neither"),
-            pytest.param({"PIPELEX_BASE_URL": FAKE_URL}, "", PRODUCTION_URL, None, id="base-url-without-a-key"),
+            pytest.param({"PIPELEX_BASE_URL": FAKE_URL}, "", FAKE_URL, "other", id="base-url-without-a-key"),
         ],
     )
     def test_the_env_file_command_writes_the_pair_the_shell_holds(
@@ -482,8 +496,8 @@ class TestPipelexScaffoldSkill:
 
         The claim is about what a dotenv reader resolves, not about which lines were written, so
         every case is read back through a last-assignment-wins reading — and through Node's own
-        `util.parseEnv` where this machine has it. A base URL the shell sets with no key beside it
-        is not copied, and a shell with no key leaves the example byte for byte as it came. The
+        `util.parseEnv` where this machine has it. A base URL the shell sets is copied with a key or
+        without one, and a shell that sets neither leaves the example byte for byte as it came. The
         command runs in every POSIX shell on the machine, because the harness that runs it for a
         user may be any of them, and the confirmations and the plane test the skill prescribes are
         run too: they are commands an agent types, so they are held to the same standard.
@@ -512,8 +526,16 @@ class TestPipelexScaffoldSkill:
             # Nothing else the example carries changed meaning.
             untouched = {name: value for name, value in _dotenv_reading(example).items() if not name.startswith("PIPELEX_")}
             assert {name: value for name, value in reading.items() if not name.startswith("PIPELEX_")} == untouched
-            if not expected_key:
-                assert written == example, f"{shell[0]}: a shell with no key still changed the file"
+            # Whatever was appended is the comment once, then the lines the shell supplied, and
+            # nothing at all when it supplied neither.
+            appended = [line for line in written.splitlines()[len(example.splitlines()) :] if line]
+            supplied = [f"{name}={credentials[name]}" for name in ("PIPELEX_API_KEY", "PIPELEX_BASE_URL") if credentials.get(name)]
+            if supplied:
+                assert appended == [ENV_FILE_COMMENT_LINE, *supplied], (
+                    f"{shell[0]}: the appended lines are not the comment once and the supplied lines"
+                )
+            else:
+                assert written == example, f"{shell[0]}: a shell that sets neither variable still changed the file"
             node_reading = self._node_reading(env_file)
             if node_reading is not None:
                 assert node_reading["PIPELEX_API_KEY"] == expected_key, f"{shell[0]}: Node reads a different key"
