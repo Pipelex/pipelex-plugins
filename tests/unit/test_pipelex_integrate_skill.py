@@ -711,6 +711,31 @@ class TestPipelexIntegrateSkill:
             for struck in self.STRUCK_NO_PYTHON_GATE:
                 assert struck not in text, f"{path.relative_to(self.REPO_ROOT)} still says a Python consumer has no gate: {struck!r}"
 
+    def test_the_python_starter_harness_regenerates_without_the_runtime(self) -> None:
+        """The Python starter's `make codegen` posts to the hosted `/v1/codegen` through `pipelex-sdk`,
+        and a method directory may hold a `method.json` instead of a bundle. The skill used to branch
+        its workshop fallback on a `pipelex` CLI being reachable, so on a starter-derived project it
+        bypassed a generator that would have worked, and it had no path for a manifest at all.
+        """
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        _, harness = python.split("## A project that owns a codegen harness", 1)
+        assert "needs `PIPELEX_API_KEY` from `.env` or the shell and no `pipelex` install" in harness
+        assert "`make codegen-check`, the offline drift check, is the one target still shelling out to a `pipelex` CLI" in harness
+        assert "a `method.json` holding exactly one of `method_id` / `method_ref`" in harness
+        assert "write the `method.json` yourself, holding the selector and nothing else" in harness
+        assert "Never generate a tree beside the manifest by hand." in harness
+        assert "when `make codegen` stops because no `PIPELEX_API_KEY` reaches the project" in harness
+        # The generated directory is the method directory's name with dashes turned into underscores, so
+        # every generated path, output_dir and import in the section spells `<module>`, never `<name>`.
+        assert "where `<module>` is `<name>` with its dashes turned into underscores" in harness
+        assert "generated/<name>" not in harness and "generated.<name>" not in harness
+        assert "with its entry file named `main.mthds`, which the starter's tests open" in harness
+        for struck in ("both shelling out to a `pipelex` CLI", "when a `pipelex` CLI is reachable", "`PIPELEX=` points at an install"):
+            assert struck not in python, f"python.md still branches on a pipelex CLI: {struck!r}"
+        body = self.TEMPLATE.read_text(encoding="utf-8")
+        assert "the Python starter's `make codegen` stops when no `PIPELEX_API_KEY` reaches the project" in body
+        assert "`make codegen` shells out to a `pipelex` CLI" not in body
+
     @classmethod
     def stamped(cls, body: str) -> tuple[str, str]:
         """A Python artifact in the stamp grammar `pipelex-sdk` reads, and the body hash its lock records."""
