@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -668,6 +669,10 @@ class TestPipelexIntegrateSkill:
         assert "never add `pipelex` as a dependency to get a gate" in python_branch
         assert "exits `0` current / `1` drift or stale source / `2` no verdict" in python_branch
         assert "A project with no aggregate gate gets the script and one sentence in the report saying where to call it." in python_branch
+        assert "an interpreter without the SDK, or a check that raises, exits `2` and says why" in python_branch
+        # The failure row for a check that did not reach a verdict covers the Python gate's message too.
+        raised = self.the_line(body, "exits `2` with `no verdict: the lock check failed` or `the source check failed` |")
+        assert raised.startswith("| the TypeScript or the Python gate exits `2`"), raised
         assert "pipelex codegen check <dir>" in body
         # The gate runs the SDK's check, which the project's pin has to reach.
         assert "at least `pipelex-sdk` 0.10.0 for a `python-pydantic` consumer" in body
@@ -899,6 +904,106 @@ class TestPipelexIntegrateSkill:
         assert "pipelex-sdk 0.10.0 or later is not importable" in result.stderr
         assert "uv run python scripts/codegen_check.py" in result.stderr
 
+    def test_the_python_gate_has_no_verdict_when_the_lock_check_raises(self, tmp_path: Path) -> None:
+        """Whatever the lock check raises beyond the states it turns into outcomes is no verdict for that
+        directory, and the run goes on to check the rest. A lock holding an integer longer than Python's
+        integer-string limit is the clean trigger: `tomllib` raises a `ValueError` the SDK does not wrap,
+        and before the guard it ended the whole run with exit 1 — drift — leaving later directories unread."""
+        huge = self.write_python_project(tmp_path, "huge")
+        (huge / "codegen.lock").write_text("lock_version = " + "9" * 5000 + "\n", encoding="utf-8")
+        drifted = self.write_python_project(tmp_path, "drift")
+        (drifted / "models.py").write_text((drifted / "models.py").read_text(encoding="utf-8") + "# a hand edit\n", encoding="utf-8")
+        self.write_python_project(tmp_path, "current")
+
+        alone = self.run_python_gate(tmp_path, "generated/huge")
+        assert alone.returncode == 2, self.explain(alone)
+        assert "  no verdict: the lock check failed — ValueError: Exceeds the limit" in alone.stderr
+        assert "Traceback" not in alone.stderr
+        assert alone.stdout.endswith("codegen-check: no verdict\n")
+
+        # The directories after the one that raised are still checked, and the worst verdict wins.
+        everything = self.run_python_gate(tmp_path, "generated/huge", "generated/drift", "generated/current")
+        assert everything.returncode == 2, self.explain(everything)
+        assert "hand-edited: models.py" in everything.stderr
+        assert "generated/current\n  tree current (crate" in everything.stdout
+        assert self.run_python_gate(tmp_path, "generated/drift", "generated/current").returncode == 1
+
+    def test_the_python_gate_has_no_verdict_behind_a_directory_it_cannot_search(self, tmp_path: Path) -> None:
+        """A lock behind a directory the process cannot search is not a missing lock. Depending on the Python
+        version the SDK either raises a `PermissionError` or, through `is_file()`, reports no lock at all; the
+        gate names the permission error either way, rather than saying `codegen.lock — not found`."""
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root searches every directory")
+        tree = self.write_python_project(tmp_path)
+        tree.parent.chmod(0o000)
+        try:
+            result = self.run_python_gate(tmp_path, "generated/summarize")
+        finally:
+            tree.parent.chmod(0o755)
+        assert result.returncode == 2, self.explain(result)
+        assert "  no verdict: the lock check failed — PermissionError: " in result.stderr
+        assert "not found" not in result.stderr
+
+    def test_the_python_gate_has_no_verdict_when_the_source_check_raises(self, tmp_path: Path) -> None:
+        """The source check reads each recorded source relative to the working directory, and a process whose
+        working directory was deleted under it cannot resolve that directory at all. That is no verdict for the
+        directory, not the drift an uncaught `FileNotFoundError` would have exited with."""
+        sh = shutil.which("sh")
+        if sh is None:
+            pytest.skip("no sh on the PATH")
+        tree = self.write_python_project(tmp_path / "project")
+        gate = tmp_path / "codegen_check.py"
+        gate.write_bytes((self.REFERENCES_DIR / "codegen_check.py").read_bytes())
+        doomed = tmp_path / "doomed"
+        doomed.mkdir()
+        result = subprocess.run(
+            [sh, "-c", 'cd "$1" && rmdir "$1" && exec "$2" "$3" "$4"', "sh", str(doomed), sys.executable, str(gate), str(tree)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 2, self.explain(result)
+        assert "  tree current (crate" in result.stderr
+        assert "  no verdict: the source check failed — FileNotFoundError: " in result.stderr
+        assert result.stdout.endswith("codegen-check: no verdict\n")
+
+    def test_the_python_gate_never_fails_on_a_line_it_prints(self, tmp_path: Path) -> None:
+        """A current by-ref tree prints `sources.json records no sources — …`, and under a Latin-1 locale
+        with stdout redirected that em dash raised `UnicodeEncodeError`: exit 1 on a tree with nothing wrong.
+        The locale is also pinned through `PYTHONIOENCODING`, because a runner that lacks the locale would
+        otherwise fall back to UTF-8 and pass without exercising anything. A directory argument holding a
+        byte the filesystem encoding cannot decode crashed the same write under UTF-8."""
+        tree = self.write_python_project(tmp_path)
+        (tree / "sources.json").write_text('{"method": {"method_ref": "github.com/acme/methods@v1"}, "sources": {}}', encoding="utf-8")
+        gate = tmp_path / "scripts" / "codegen_check.py"
+        gate.parent.mkdir(parents=True)
+        gate.write_bytes((self.REFERENCES_DIR / "codegen_check.py").read_bytes())
+        environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONUTF8", "PYTHONIOENCODING"}}
+
+        latin = subprocess.run(
+            [sys.executable, str(gate), "generated/summarize"],
+            cwd=tmp_path,
+            env={**environment, "LC_ALL": "en_US.ISO8859-1", "LANG": "en_US.ISO8859-1", "PYTHONIOENCODING": "iso-8859-1"},
+            capture_output=True,
+            check=False,
+        )
+        stdout = latin.stdout.decode("iso-8859-1")
+        stderr = latin.stderr.decode("iso-8859-1")
+        assert latin.returncode == 0, f"exit {latin.returncode}\nstdout: {stdout}\nstderr: {stderr}"
+        assert "  sources.json records no sources \\u2014 a by-ref or by-id integration" in stdout
+        assert stdout.endswith("codegen-check: current\n")
+
+        undecodable = subprocess.run(
+            [sys.executable, str(gate), b"generated/\xff"],
+            cwd=tmp_path,
+            env={**environment, "PYTHONIOENCODING": "utf-8"},
+            capture_output=True,
+            check=False,
+        )
+        assert undecodable.returncode == 2, undecodable.stderr.decode("utf-8", errors="replace")
+        assert undecodable.stdout.decode("utf-8").startswith("generated/\\udcff\n")
+        assert b"Traceback" not in undecodable.stderr
+
     def test_the_python_gate_imports_only_the_standard_library_and_the_sdk(self) -> None:
         """What a consumer's project already has is all the script may need, and it keeps the two
         decoding choices that make it refuse what the TypeScript gate refuses."""
@@ -920,6 +1025,11 @@ class TestPipelexIntegrateSkill:
         assert '.read_bytes().decode("utf-8")' in script
         assert '.decode("utf-8-sig")' not in script
         assert "json.loads(text, parse_constant=_reject_json_constant)" in script
+        # One broad catch, inside `settle`, around each check; and a stream that escapes what it cannot encode.
+        assert script.count("except Exception") == 1
+        assert 'settle(name="lock", check=partial(check_tree, directory=directory))' in script
+        assert 'settle(name="source", check=partial(check_sources, directory=directory))' in script
+        assert 'stream.reconfigure(errors="backslashreplace")' in script
 
     def test_the_check_script_imports_only_node_builtins_and_the_sdk(self) -> None:
         script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")

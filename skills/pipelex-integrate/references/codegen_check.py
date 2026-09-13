@@ -11,8 +11,8 @@ compares the SHA-256 recorded for each .mthds source in `sources.json` against t
 bundle edited without a regeneration is caught as `stale-source`.
 
 Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, a malformed or unreadable lock
-or tree, a symlink at the generated directory or on an artifact's path, `pipelex-sdk` not importable).
-Precedence across directories: 2 > 1 > 0.
+or tree, a symlink at the generated directory or on an artifact's path, a check that raises, `pipelex-sdk`
+not importable). Precedence across directories: 2 > 1 > 0.
 
 It is the twin of `codegen-check.mjs`, which does the same for a TypeScript project over `@pipelex/sdk`,
 and the two fail closed on the same malformed sidecars. It imports only the standard library and
@@ -23,8 +23,11 @@ stays quiet. When `pipelex-sdk` ships this check as a command, replace this file
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import sys
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import NamedTuple, NoReturn, cast
 
@@ -68,6 +71,10 @@ def _err(line: str) -> None:
     sys.stderr.flush()
 
 
+def _describe(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
 def _reject_json_constant(value: str) -> NoReturn:
     # Python's `json` accepts `NaN`, `Infinity` and `-Infinity`; JSON does not, and neither does the
     # TypeScript twin's `JSON.parse`. A sidecar only this reader could parse is an unreadable sidecar.
@@ -82,6 +89,13 @@ def check_tree(*, directory: Path) -> Outcome:
     except CodegenLockError as exc:
         return Outcome(code=EXIT_NO_VERDICT, lines=(f"  no verdict: {exc}",))
     if not report.lock_found:
+        # The SDK asks `is_file()`, which on recent Pythons answers `False` for a lock behind a directory the
+        # process cannot search as well as for one that is absent. Only an absent lock is "not found"; asking
+        # again with `lstat` raises anything else, and `settle` reports it for what it is.
+        try:
+            (directory / LOCK_FILENAME).lstat()
+        except (FileNotFoundError, NotADirectoryError):
+            pass
         return Outcome(code=EXIT_NO_VERDICT, lines=(f"  no verdict: {LOCK_FILENAME} — not found",))
     if report.is_current:
         fingerprint = (report.crate_fingerprint or "")[:12]
@@ -151,6 +165,21 @@ def _compare_sources(*, recorded_sources: list[tuple[str, object]]) -> Outcome:
     return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines))
 
 
+def settle(*, name: str, check: Callable[[], Outcome]) -> Outcome:
+    """Run one check over one directory, turning anything it raises into no verdict for that directory.
+
+    Each check already turns every state of the tree it knows into an outcome. Whatever else escapes — a lock
+    `tomllib` refuses with a `ValueError`, nesting deep enough for a `RecursionError`, a `PermissionError` the
+    SDK does not wrap — says nothing about the tree. Uncaught, it would end the whole run with exit 1, which
+    reads as drift, and every directory after it would go unchecked; here, the precedence decides the exit code.
+    """
+    try:
+        return check()
+    except Exception as exc:
+        # The root of the command for one directory, around an SDK check whose exception surface is open-ended.
+        return Outcome(code=EXIT_NO_VERDICT, lines=(f"  no verdict: the {name} check failed — {_describe(exc)}",))
+
+
 def worse(first: int, second: int) -> int:
     """Precedence: no verdict > drift > current."""
     if EXIT_NO_VERDICT in (first, second):
@@ -162,6 +191,12 @@ def worse(first: int, second: int) -> int:
 
 def main(argv: list[str]) -> int:
     """Check every generated directory named on the command line and return the worst exit code."""
+    # A line this script writes must never be what fails it. Under a locale whose encoding lacks a character
+    # it prints (the em dash, or a directory name holding an undecodable byte), a strict stream raises
+    # `UnicodeEncodeError` and a current tree exits 1; escaping the character keeps the verdict.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(errors="backslashreplace")
     arguments = argv[1:]
     if not arguments:
         _err("usage: python scripts/codegen_check.py <generated-dir> [<generated-dir> ...]")
@@ -171,8 +206,11 @@ def main(argv: list[str]) -> int:
     for argument in arguments:
         _out(argument)
         directory = Path(argument)
-        tree = check_tree(directory=directory)
-        sources = Outcome(code=EXIT_CURRENT, lines=()) if tree.code == EXIT_NO_VERDICT else check_sources(directory=directory)
+        tree = settle(name="lock", check=partial(check_tree, directory=directory))
+        if tree.code == EXIT_NO_VERDICT:
+            sources = Outcome(code=EXIT_CURRENT, lines=())
+        else:
+            sources = settle(name="source", check=partial(check_sources, directory=directory))
         code = worse(tree.code, sources.code)
         write = _out if code == EXIT_CURRENT else _err
         for line in (*tree.lines, *sources.lines):
