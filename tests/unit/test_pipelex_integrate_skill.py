@@ -961,7 +961,10 @@ class TestPipelexIntegrateSkill:
             assert set(self.VERSION.findall(text)) == {self.TYPESCRIPT_SDK_FLOOR}, f"{where} names {self.VERSION.findall(text)}"
 
         # Refresh mode names no number: it defers to step 8, so it cannot fall behind a bump.
-        assert "the dependencies (except an `@pipelex/sdk` pinned below step 8's floor, raised as step 8 raises it" in body
+        assert (
+            "the dependencies (except an `@pipelex/sdk`, or a `python-pydantic` project's `pipelex-sdk`, pinned below step 8's floor, raised as step 8 raises it"
+            in body
+        )
 
         gate = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
         assert f'const SDK_MINIMUM = "{self.TYPESCRIPT_SDK_FLOOR}";' in gate
