@@ -65,6 +65,23 @@ class TestPipelexScaffoldSkill:
     def scaffold(self) -> str:
         return self.TEMPLATE.read_text(encoding="utf-8")
 
+    def render(self, target_name: str) -> str:
+        """The skill as one target's users read it, rendered from `templates/` in memory.
+
+        A rule asserted on the template alone is a rule that may never reach a user: the platform
+        conditionals are resolved here, and the committed trees under `pipelex*/` are built from
+        exactly this call.
+        """
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-scaffold"],
+            target_name=config.name,
+        )
+        return next(content for path, content in rendered.items() if path.match("skills/pipelex-scaffold/SKILL.md"))
+
     def test_the_rules_are_stated(self) -> None:
         body = self.scaffold
         for rule in self.RULES:
@@ -75,6 +92,41 @@ class TestPipelexScaffoldSkill:
         assert "**The fresh-clone shortcut.**" in body
         assert "Do not clone again." in body
         assert "this is the template, not a copy of it" in body
+
+    def test_only_a_lone_git_reads_as_empty_and_no_cruft_list_joins_it(self) -> None:
+        """`L-260912-724b71`, ruled 2026-09-13: a directory holding nothing but `.git` is empty.
+
+        The refusal it narrows is the right one — the agent has no business deciding which of a
+        user's files matter — and the exception exists because `mkdir my-app && cd my-app && git
+        init` is an ordinary opening move and branch B runs `git init -b main` in the directory it
+        is working in one step later, so without it the skill refuses a state it produces itself.
+
+        The cruft list was deliberately declined in the same ruling: `.DS_Store`, `.idea/`,
+        `.vscode/` and `Thumbs.db` keep refusing until a real report names one, because a list that
+        grows by guesswork is how this rule drifts back into the judgement it forbids. So this test
+        pins the exception as an entry named `.git` rather than as a predicate over ignorable
+        files, and pins the four declined names as still-refusing — adding any of them to the
+        exception means rewording a sentence asserted here, which is the point.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            # The exception, at both sites, each stated as one named entry and not as a category.
+            assert "**and a directory whose only entry is `.git` is empty for this rule**" in body
+            assert "**A directory holding nothing but `.git` is empty here and is written into**" in body
+            assert "branch B runs `git init -b main` in the directory it is working in one step later" in body
+            # And the refusal everything else still meets, with the declined names spelled out.
+            assert (
+                "**A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else**"
+                in body
+            )
+            assert "not a class of files you may decide to overlook" in body
+            assert "Every other entry still refuses, `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` included" in body
+            assert "that exception is the one directory entry by name and not a class" in body
+            assert "`.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse" in body
+            # Untouched by the ruling: a directory read as empty is never cleared, so the skill
+            # still never offers to make room. Narrowing what counts as occupied is not permission
+            # to empty what is.
+            assert "never offer to move, delete or merge what it holds to make room" in body
+            assert "never delete, move or write into it, and never offer to" in body
 
     def test_declares_no_mcp_tool(self) -> None:
         """The scaffold skill is MCP-free: no allowed-tools entry, no MCP-absent STOP message."""
