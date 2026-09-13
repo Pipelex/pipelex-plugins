@@ -614,7 +614,16 @@ class TestPipelexScaffoldSkill:
         assert "**the test, never the inference from which initializer ran**" in initializers
         assert "`git init -b main` only if `git -C <dir> rev-parse --show-toplevel` does not print `<dir>` itself" in initializers
         assert "gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone" in starters
-        assert "shell out to a `pipelex` CLI the starter does not depend on" in starters
+        # The Python starter regenerates through the hosted API with pipelex-sdk: only its offline
+        # check still wants a `pipelex` CLI. Describing `make codegen` as needing one sent an agent
+        # down the workshop fallback on a project whose own generator would have worked.
+        assert "`make codegen` (keyed: `PIPELEX_API_KEY` from `.env` or the shell" in starters
+        assert "`make codegen-check` (offline) is the one target still shelling out to a `pipelex` CLI" in starters
+        assert "both shell out to a `pipelex` CLI" not in starters
+        # The second source kind, and the agent-facing files and docs the parity pass added.
+        assert "`<package>/methods/<name>/method.json` naming exactly one of `method_id` / `method_ref`" in starters
+        assert "| `CLAUDE.md`, `AGENTS.md`; skills `bootstrap`, `release` |" in starters
+        assert "`docs/codegen.md`, `docs/add-method.md`, `docs/cli-architecture.md`" in starters
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
         # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
