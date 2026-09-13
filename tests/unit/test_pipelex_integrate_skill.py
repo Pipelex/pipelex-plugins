@@ -133,6 +133,13 @@ class TestPipelexIntegrateSkill:
         # Python's `json` accepts `NaN` where `JSON.parse` refuses it, so without its guard this one is
         # green in the Python gate and red in the TypeScript one.
         (b'{"sources": {}, "retries": NaN}', 1),
+        # A sidecar recording sources has to say where the call site loads the bundle from, or a file added
+        # there cannot be ruled out; and a `bundle_dir` is a non-empty string beside a `sources` object.
+        (b'{"sources": {"methods/m/main.mthds": "0"}}', 1),
+        (b'{"bundle_dir": "methods/m"}', 1),
+        (b'{"sources": {}, "bundle_dir": null}', 1),
+        (b'{"sources": {}, "bundle_dir": ""}', 1),
+        (b'{"sources": {}, "bundle_dir": ["methods/m"]}', 1),
         (None, 0),
     )
 
@@ -739,10 +746,22 @@ class TestPipelexIntegrateSkill:
             "generator": "pipelex-integrate",
             "method": {"files": [source]},
             "target": "python-pydantic",
+            "bundle_dir": f"methods/{method}",
             "sources": {source: hashlib.sha256(bundle.read_bytes()).hexdigest()},
         }
         (tree / "sources.json").write_text(json.dumps(sidecar), encoding="utf-8")
         return tree
+
+    @staticmethod
+    def record_in_sidecar(tree: Path, **fields: object) -> None:
+        """Set top-level fields of the tree's `sources.json`, removing each one given as `None`."""
+        sidecar = json.loads((tree / "sources.json").read_text(encoding="utf-8"))
+        for key, value in fields.items():
+            if value is None:
+                sidecar.pop(key, None)
+            else:
+                sidecar[key] = value
+        (tree / "sources.json").write_text(json.dumps(sidecar), encoding="utf-8")
 
     def run_python_gate(self, root: Path, *arguments: str, without_site_packages: bool = False) -> subprocess.CompletedProcess[str]:
         """Copy the shipped script where step 10 puts it and run it from the project root, as a gate does.
@@ -819,6 +838,145 @@ class TestPipelexIntegrateSkill:
         assert expected_line in result.stderr, self.explain(result)
         assert "Run /pipelex-integrate to refresh the generated types." in result.stderr
         assert result.stdout.endswith("codegen-check: drift\n")
+
+    @pytest.mark.parametrize(
+        ("change", "expected_lines"),
+        [
+            pytest.param(
+                "add a file beside the recorded one",
+                ("stale-source: methods/summarize/extra.mthds — added to the bundle since the types were generated",),
+                id="added-beside",
+            ),
+            pytest.param(
+                "add a file two directories down",
+                ("stale-source: methods/summarize/nested/deeper/extra.mthds — added to the bundle since the types were generated",),
+                id="added-nested",
+            ),
+            pytest.param(
+                "drop the bundle directory from the sidecar",
+                ("stale-source: sources.json — records sources but no `bundle_dir`, so a .mthds file added to the bundle cannot be ruled out",),
+                id="no-bundle-dir",
+            ),
+            pytest.param(
+                "narrow the recorded bundle directory",
+                (
+                    "stale-source: methods/summarize/main.mthds — recorded as a source but not under methods/summarize/nested, "
+                    "so the call site does not load it",
+                    "stale-source: methods/summarize/nested/other.mthds — added to the bundle since the types were generated",
+                ),
+                id="source-outside-bundle",
+            ),
+            pytest.param(
+                "empty the bundle directory",
+                (
+                    "stale-source: methods/summarize — holds no .mthds file, so the call site has no bundle to load",
+                    "stale-source: methods/summarize/main.mthds — recorded as a source but no longer on disk",
+                ),
+                id="bundle-empty",
+            ),
+            pytest.param(
+                "remove the bundle directory",
+                (
+                    "stale-source: methods/summarize — recorded as the bundle directory but no longer on disk",
+                    "stale-source: methods/summarize/main.mthds — recorded as a source but no longer on disk",
+                ),
+                id="bundle-gone",
+            ),
+            pytest.param(
+                "replace the bundle directory with a file",
+                ("stale-source: methods/summarize — recorded as the bundle directory but not a directory",),
+                id="bundle-not-a-directory",
+            ),
+            pytest.param("record a nested file with the main one", (), id="current-nested"),
+            pytest.param("add a file that is not a .mthds file", (), id="current-other-file"),
+        ],
+    )
+    def test_both_gates_catch_a_file_added_to_the_bundle(self, change: str, expected_lines: tuple[str, ...], tmp_path: Path) -> None:
+        """The call site loads every `.mthds` file under its bundle directory, so a file added there changes what
+        runs while every recorded hash still matches, and both gates once stayed green over it: they hashed the
+        files `sources.json` recorded and nothing else. They now list the sidecar's `bundle_dir` the way their
+        language's call site lists it, and both report each change with the same lines, on one project."""
+        python_script = (self.REFERENCES_DIR / "codegen_check.py").read_text(encoding="utf-8")
+        typescript_script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
+        assert 'root.rglob("*.mthds")' in python_script, "the Python gate no longer lists the bundle as the Python call site does"
+        assert "readdir(root, { recursive: true })" in typescript_script, "the TypeScript gate no longer lists the bundle as its call site does"
+        assert '.filter((entry) => entry.endsWith(".mthds"))' in typescript_script
+
+        tree = self.write_python_project(tmp_path)
+        bundle = tmp_path / "methods" / "summarize"
+        match change:
+            case "add a file beside the recorded one":
+                (bundle / "extra.mthds").write_text('domain = "extra"\n', encoding="utf-8")
+            case "add a file two directories down":
+                (bundle / "nested" / "deeper").mkdir(parents=True)
+                (bundle / "nested" / "deeper" / "extra.mthds").write_text('domain = "extra"\n', encoding="utf-8")
+            case "drop the bundle directory from the sidecar":
+                self.record_in_sidecar(tree, bundle_dir=None)
+            case "narrow the recorded bundle directory":
+                (bundle / "nested").mkdir()
+                (bundle / "nested" / "other.mthds").write_text('domain = "other"\n', encoding="utf-8")
+                self.record_in_sidecar(tree, bundle_dir="methods/summarize/nested")
+            case "empty the bundle directory":
+                (bundle / "main.mthds").unlink()
+            case "remove the bundle directory":
+                shutil.rmtree(bundle)
+            case "replace the bundle directory with a file":
+                shutil.rmtree(bundle)
+                bundle.write_text("not a directory\n", encoding="utf-8")
+            case "record a nested file with the main one":
+                nested = bundle / "nested" / "helpers.mthds"
+                nested.parent.mkdir()
+                nested.write_text('domain = "helpers"\n', encoding="utf-8")
+                sidecar = json.loads((tree / "sources.json").read_text(encoding="utf-8"))
+                sources = {**sidecar["sources"], "methods/summarize/nested/helpers.mthds": hashlib.sha256(nested.read_bytes()).hexdigest()}
+                self.record_in_sidecar(tree, sources=sources)
+            case "add a file that is not a .mthds file":
+                (bundle / "README.md").write_text("# summarize\n", encoding="utf-8")
+            case _:
+                pytest.fail(f"unknown change {change!r}")
+
+        python = self.run_python_gate(tmp_path, "generated/summarize")
+        typescript = self.run_typescript_gate(tmp_path, "generated/summarize", sdk_index=self.STUB_SDK_THAT_CAN_CRASH)
+        for name, result in (("python", python), ("typescript", typescript)):
+            reported = [line.strip() for line in result.stderr.splitlines() if line.strip().startswith("stale-source: ")]
+            if not expected_lines:
+                assert result.returncode == 0, f"{name}: {self.explain(result)}"
+                assert reported == [], f"{name}: {self.explain(result)}"
+                continue
+            assert result.returncode == 1, f"{name}: {self.explain(result)}"
+            for expected in expected_lines:
+                assert expected in reported, f"{name} did not report {expected!r}\n{self.explain(result)}"
+            assert result.stdout.endswith("codegen-check: drift\n"), f"{name}: {self.explain(result)}"
+        # Twins: the same paths reported in the same order. Only an OS error's own wording may differ between them.
+        python_paths = [line.strip().split(" — ")[0] for line in python.stderr.splitlines() if line.strip().startswith("stale-source: ")]
+        typescript_paths = [line.strip().split(" — ")[0] for line in typescript.stderr.splitlines() if line.strip().startswith("stale-source: ")]
+        assert python_paths == typescript_paths, f"python: {python.stderr}\ntypescript: {typescript.stderr}"
+
+    def test_the_sidecar_records_the_bundle_directory_and_every_reader_uses_it(self) -> None:
+        """The gates can list the bundle only because step 7 records its directory, and the gates are not the only
+        readers the fix had to reach. Refresh mode took its file set from `method.files`, so it regenerated from the
+        old set while the call site ran the new one; the editing skills matched a sidecar only on the files its
+        `sources` named, which a new file never is; and a standalone organize, which rewrites the bundle's files
+        wholesale, said nothing at all."""
+        body = self.integrate
+        assert '"bundle_dir": "methods/summarize-pdf",' in body
+        assert "**`bundle_dir` is the directory step 9's call site loads the bundle from**" in body
+        # The sidecar example and the TypeScript call site name the same directory.
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        assert 'const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");' in typescript
+        assert "from the directory step 7 records as `bundle_dir` and from no other" in body
+        assert "**file set, which is re-read from `bundle_dir` and never taken from `method.files`**" in self.refresh_cells(body)["taken from disk"]
+        assert "a file edited, removed or added" in self.refresh_cells(body)["re-checked"]
+        assert "never add the file's hash to `sources` by hand" in body
+
+        templates = self.REPO_ROOT / "templates" / "skills"
+        edit = (templates / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "**or whose `bundle_dir` holds a `.mthds` file this edit created**" in edit
+        design = (templates / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "**or whose `bundle_dir` holds a `.mthds` file this re-entry created**" in design
+        organize = (templates / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "**When invoked on its own rather than by `/pipelex-design`**" in organize
+        assert "or whose `bundle_dir` is this directory or holds it" in organize
 
     @pytest.mark.parametrize(
         "mutation",
