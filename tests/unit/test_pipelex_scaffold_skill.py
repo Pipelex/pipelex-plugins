@@ -87,6 +87,26 @@ class TestPipelexScaffoldSkill:
         for rule in self.RULES:
             assert rule in body, f"missing rule: {rule}"
 
+    def test_the_skill_body_carries_the_guards_the_references_state(self) -> None:
+        """Two guards were stated in `references/initializers.md` and pinned only there.
+
+        The skill body is the document an agent actually executes; a reference it is told to read
+        is a second hop. Round 2 added `--no-workspace` to every `uv init` in the reference and
+        asserted it there, while the named-framework recipe *in the skill* kept the bare form — so
+        the reference said "on every `uv init` above" and the executable line one hop away
+        contradicted it. These assertions run on the template and on all three renders, because a
+        rule that holds only in `templates/` is a rule no user reads.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            # A bare `uv init --package <dir>` appends a [tool.uv.workspace] table to the USER'S
+            # own pyproject.toml and leaves the new project without its own lock.
+            assert "uv init --package --no-workspace <dir>" in body
+            assert "uv init --package <dir>" not in body, "a bare uv init absorbs <dir> into the parent workspace"
+            # The append is gated: on the fresh-clone shortcut the env file may be one the user
+            # filled, and a second assignment after theirs is the one dotenv resolves to.
+            assert "grep -q '^PIPELEX_API_KEY=.\\+' <dir>/.env.local || printf" in body
+            assert ">> <dir>/.env.local`.\n" not in body, "an ungated append shadows a key the user already filled"
+
     def test_fresh_clone_shortcut_and_template_checkout_stop(self) -> None:
         body = self.scaffold
         assert "**The fresh-clone shortcut.**" in body
@@ -196,6 +216,11 @@ class TestPipelexScaffoldSkill:
         assert "never infer it from which initializer ran" in body
         # Both pristine commits carry the pathspec, so the staging cannot escape <dir>.
         assert body.count("git -C <dir> add -A -- .") == 2
+        # `add -A -- .` bounds only the staging; a bare `git commit` commits the whole index,
+        # so anything the user had staged in an enclosing repo would ride along. Both commits
+        # carry the pathspec, which leaves their staged work staged.
+        assert 'commit -m "Start from Pipelex/<starter> <version> (<sha>)" -- .' in body
+        assert 'commit -m "Scaffold <framework or language> project" -- .' in body
         assert "git -C <dir> add -A &&" not in body
         # The read-back must name paths; a --stat count cannot tell a scaffold from a swept worktree.
         assert "git -C <dir> diff --cached --name-only" in body

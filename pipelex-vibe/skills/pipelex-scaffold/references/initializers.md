@@ -25,7 +25,7 @@ After the initializer: `git init -b main` only if it did not initialize a reposi
 
 | Want | Command | `git init`? | Where `src/` lands |
 |---|---|---|---|
-| **Minimal (the default when no framework is named)** | `mkdir <dir> && cd <dir> && npm init -y && npm install --save-dev typescript @types/node && npx tsc --init --strict --module nodenext --target es2022 --rootDir src --outDir dist` then set `"type": "module"` in `package.json` | no | `src/` (create it); `/pipelex-integrate` puts the generated tree under `src/generated/` |
+| **Minimal (the default when no framework is named)** | `mkdir -p <dir> && cd <dir> && npm init -y && npm install --save-dev typescript @types/node && npx tsc --init --strict --module nodenext --target es2022 --rootDir src --outDir dist` then set `"type": "module"` in `package.json` — **but read the resolution note below first: prefer `--module esnext --moduleResolution bundler` unless the user actually wants Node's own resolution**, because `nodenext` is the shape that meets the emitter defect | no | `src/` (create it); `/pipelex-integrate` puts the generated tree under `src/generated/` |
 | Next.js app (the JS starter's shape, without the starter) | `npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes` | yes (`--disable-git` to skip) | `src/app/`; generated tree under `src/generated/` |
 | Vite + React | `npm create vite@latest <dir> -- --template react-ts` then `(cd <dir> && npm install)` | no | `src/` |
 | Hono server | `npm create hono@latest <dir> -- --template nodejs --pm npm --install` | no | `src/` |
@@ -44,5 +44,5 @@ After the initializer: `git init -b main` only if it did not initialize a reposi
 ## What every branch-B project shares afterwards
 
 - One commit, the pristine scaffold, so the user's first real change is a clean diff.
-- `.env.example` committed, `.env` ignored, `PIPELEX_API_KEY` filled only from the shell environment.
+- `.env.example` and `.env` written, `.env` ignored, `PIPELEX_API_KEY` filled only from the shell environment. Both land *after* the pristine commit, which holds the initializer's output as it came, so they stay untracked for the user to review and commit — the same posture branch A leaves the bootstrap's edits in.
 - Nothing else Pipelex-shaped: the SDK dependency, the `methods/` directory and the generated tree arrive with the first `/pipelex-integrate`.
