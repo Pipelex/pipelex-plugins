@@ -1075,7 +1075,7 @@ class TestPipelexIntegrateSkill:
             "the dependencies (except an `@pipelex/sdk`, or a `python-pydantic` project's `pipelex-sdk`, "
             "pinned below step 8's floor, raised as step 8 raises it"
         )
-        assert refresh_dependencies in body
+        assert refresh_dependencies in self.refresh_cells(body)["left alone"]
 
         gate = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
         assert f'const SDK_MINIMUM = "{self.TYPESCRIPT_SDK_FLOOR}";' in gate
@@ -1089,6 +1089,59 @@ class TestPipelexIntegrateSkill:
             config = load_target_config(self.REPO_ROOT / "targets", target_name)
             installed = (resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "SKILL.md").read_text(encoding="utf-8")
             assert f"`zod` and `@pipelex/sdk` for TypeScript — at least `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR}," in installed, target_name
+
+    def refresh_cells(self, body: str) -> dict[str, str]:
+        """Refresh mode's table, its one body row cut into its three cells, keyed by the header it sits under."""
+        header = self.the_line(body, "| Taken from disk |")
+        assert header == "| Taken from disk | Re-derived and re-checked | Left alone |", header
+        row = self.the_line(body, "| the selector, target, destination and `pipe` record")
+        cells = [cell.strip() for cell in row.split(" | ")]
+        assert len(cells) == 3, f"the refresh row should have three cells, found {len(cells)}: {row!r}"
+        return {"taken from disk": cells[0].removeprefix("| "), "re-checked": cells[1], "left alone": cells[2].removesuffix(" |")}
+
+    # What refresh does to the drift gate, pinned in the template and in every target's committed skill. A
+    # refresh used to leave the gate wiring alone except to install a missing Python script, so on a project
+    # whose methods A and B predate the gate, refreshing A installed it and registered A, and refreshing B found
+    # the script present and never registered B — and no refresh ever replaced a gate script an earlier version
+    # of the skill had copied, such as a `codegen-check.mjs` that exits 1 when its SDK is missing.
+    REFRESH_GATE_RULES = (
+        "**the drift gate of the refreshed method's language**, re-checked against step 10 on every refresh",
+        "`scripts/codegen-check.mjs` for `ts-zod`, `scripts/codegen_check.py` for `python-pydantic`",
+        "**a missing script is installed and wired as step 10 does**",
+        "**a script that differs byte for byte from the reference is re-copied verbatim**",
+        "**the refreshed method's generated directory is added to the gate command's arguments when it is not among them**",
+        "each said in the report",
+        "for `python-structures` there is no script to copy, so only the last applies, to its `pipelex codegen check` wiring",
+    )
+    REFRESH_REFERENCE_RULE = (
+        "on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. "
+        "A refresh also re-copies the script when the project's copy differs from this reference, and installs it when the project has none"
+    )
+
+    @pytest.mark.parametrize("target_name", ["template", "prod", "codex", "mistral-vibe"])
+    def test_refresh_brings_the_gate_up_to_date_and_registers_the_refreshed_method(self, target_name: str) -> None:
+        """Refresh re-checks the gate as step 10 would install it — script present, script current, the refreshed
+        directory registered — and leaves every other method's tree and registration alone."""
+        if target_name == "template":
+            body = self.integrate
+        else:
+            config = load_target_config(self.REPO_ROOT / "targets", target_name)
+            body = (resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "SKILL.md").read_text(encoding="utf-8")
+        cells = self.refresh_cells(body)
+        for rule in self.REFRESH_GATE_RULES:
+            assert rule in cells["re-checked"], f"{target_name}: the refresh table no longer re-checks the gate this way: {rule!r}"
+        left_alone = cells["left alone"]
+        assert "other methods' trees and their registrations in the gate" in left_alone
+        # The gate is no longer something a refresh leaves alone, with or without the one exception it used to carry.
+        assert "the gate wiring" not in left_alone
+        assert "integrated before that gate existed" not in body
+        assert "bring the drift gate up to step 10" in body
+
+        for reference in ("python.md", "typescript.md"):
+            text = (self.REFERENCES_DIR / reference).read_text(encoding="utf-8")
+            assert self.REFRESH_REFERENCE_RULE in text, f"references/{reference} still registers a directory only as it is integrated"
+        changelog = self.the_line((self.REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), "**`pipelex-integrate` — wire an MTHDS method")
+        assert "A refresh keeps the gate current as well:" in changelog
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
