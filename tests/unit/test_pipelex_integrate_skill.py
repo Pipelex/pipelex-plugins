@@ -197,8 +197,13 @@ class TestPipelexIntegrateSkill:
         row = self.the_line(body, "| success with `orphans[]` non-empty")
         # Refresh mode's rule is one sentence run of a long paragraph, so cut it out rather than
         # scanning the paragraph — the rest of it is about content hashes and the call site.
+        # The cut stops BEFORE "Any other `is_current: false` still ends the refresh": that sentence
+        # is the stopping rule and belongs to the other branch, so including it would put a genuine
+        # halt instruction inside a region the assertions below require not to halt — passing only
+        # because `HALT_VOCABULARY` happens to spell "stop" and not "ends". That clause is asserted
+        # on the whole paragraph instead, in the caller.
         opens = "**A non-empty `orphans[]` with an empty `drifts[]` does not end a refresh either**"
-        closes = "still ends the refresh, there as here."
+        closes = "`orphans_truncated: true` → say detection was partial."
         paragraph = self.the_line(body, opens)
         start = paragraph.index(opens)
         refresh = paragraph[start : paragraph.index(closes, start) + len(closes)]
@@ -262,6 +267,24 @@ class TestPipelexIntegrateSkill:
         assert "Confirm **`is_current: true`** and an empty **`orphans[]`**" in gate
         assert "the two branches below carry the two cases where it is not" in gate
         assert "two methods in one directory therefore read as permanently non-current, by design" in body
+
+        # Refresh mode's own stopping rule, asserted on the whole paragraph because the continuing
+        # region above is deliberately cut before it.
+        assert "Any other `is_current: false` still ends the refresh, there as here." in body
+
+        # Step 11 runs the gate this skill installed, and a run that continued past orphans reaches it
+        # with that gate red BY DESIGN — which is new: before the ruling, such a run never got here.
+        # Its two pre-existing dispositions do not cover the case, and the nearest of them reads as an
+        # instruction to fix it, whose cheapest discharge is deleting the orphan the never-bend rules
+        # forbid. So step 11 has to claim the case and say it is not the agent's to fix.
+        verify = self.the_line(body, "then its type checker, then the gate you installed")
+        assert "is neither, and it is not yours to fix" in verify, (
+            f"{target_name}: step 11 does not claim the non-zero gate a continued run leaves behind, so its "
+            f"'yours to fix' clause is the nearest reading: {verify!r}"
+        )
+        assert "Deleting an orphan to turn it green is the one remedy the rules that never bend forbid" in verify
+        assert "dedicated directory per generation is the real one" in verify
+        assert self.HALT_VOCABULARY.search(verify) is None, f"{target_name}: step 11 now ends the run over an orphan"
 
         # Step 4 enumerates the stops that leave a lock with no sidecar. Orphans alone is not one of
         # them any more, and the `is_current: false` item is qualified so the sentence stays true.

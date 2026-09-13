@@ -165,7 +165,7 @@ With the project's own package manager (read the lockfile): `zod` and `@pipelex/
 
 ### Step 11: Verify
 
-Run the project's formatter **on the files you wrote only** — never on the generated tree; the step-5 exclusions are what make a later project-wide run safe — then its type checker, then the gate you installed. A failure in your own code is yours to fix before reporting; a failure inside the generated tree is reported, never patched.
+Run the project's formatter **on the files you wrote only** — never on the generated tree; the step-5 exclusions are what make a later project-wide run safe — then its type checker, then the gate you installed. A failure in your own code is yours to fix before reporting; a failure inside the generated tree is reported, never patched. **A gate that exits non-zero only because the directory holds the orphans step 6 let through is neither, and it is not yours to fix**: it is the expected state of a run that continued, it counts each orphan as a drift exactly as step 6 said it would, and it is reported in step 12's words rather than cleared. Deleting an orphan to turn it green is the one remedy the rules that never bend forbid; a dedicated directory per generation is the real one, and it is the user's to take.
 
 ### Step 12: Report
 
