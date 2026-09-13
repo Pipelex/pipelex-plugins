@@ -146,7 +146,9 @@ class TestPipelexIntegrateSkill:
         sidecar, add the dependencies and write the call site, and reports the orphan paths loudly
         on the way — and because the hazardous cause (another method's same-named files already
         overwritten by the write that just succeeded) is indistinguishable from the benign ones
-        inside the tool, that report is the only protection the user gets.
+        inside the tool, that report is the only protection the user gets — in refresh mode too, where the
+        ruling's own continuation is what puts a sidecar on a directory another method's tree may still
+        occupy, so a later refresh overwrites those same-named files again.
 
         Three regions have to agree, so all three are checked: the step-6 branch, its row in the
         failure table, and the refresh-mode path. The biting assertion is the halt-vocabulary scan
@@ -181,6 +183,8 @@ class TestPipelexIntegrateSkill:
         assert "may therefore have been overwritten by the write that just succeeded" in orphans
         assert "a dedicated directory per generation as the fix" in orphans
         assert "this write may have overwritten same-named files of another method" in row
+        assert "the regeneration has overwritten the other method's same-named files again" in refresh
+        assert "rather than describing the orphans as merely stale" in refresh
         assert "`orphans_truncated: true` → say orphan detection was partial" in orphans
         assert "`orphans_truncated: true` → say detection was partial" in row
         assert "`orphans_truncated: true` → say detection was partial" in refresh
