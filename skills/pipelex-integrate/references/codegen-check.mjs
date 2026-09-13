@@ -12,17 +12,18 @@
 // a bundle edited without a regeneration is caught as `stale-source`.
 //
 // Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, an unreadable
-// file, a symlink in the tree). Precedence across directories: 2 > 1 > 0.
+// file, a symlink in the tree, a check that throws, @pipelex/sdk not importable). Precedence
+// across directories: 2 > 1 > 0.
 //
-// It imports only Node builtins and @pipelex/sdk, and writes through process.stdout /
-// process.stderr so a no-console lint rule stays quiet. When @pipelex/sdk ships this check
-// as a command, replace this file with that one line.
+// It is the twin of codegen_check.py, which does the same for a Python project over
+// pipelex-sdk. It imports only Node builtins and @pipelex/sdk (0.13.0 or later), and writes
+// through process.stdout / process.stderr so a no-console lint rule stays quiet. When
+// @pipelex/sdk ships this check as a command, replace this file with that one line.
 
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { CodegenLockError, isStampableArtifactPath, runCodegenCheck } from "@pipelex/sdk";
 
 const EXIT_CURRENT = 0;
 const EXIT_DRIFT = 1;
@@ -31,6 +32,8 @@ const EXIT_NO_VERDICT = 2;
 const LOCK_FILENAME = "codegen.lock";
 const SIDECAR_FILENAME = "sources.json";
 const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next"]);
+const SDK_EXPORTS = ["CodegenLockError", "isStampableArtifactPath", "runCodegenCheck"];
+const SDK_MINIMUM = "0.13.0";
 
 // `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
 // artifact given a BOM would hash as its un-BOM'd self, match the lock, and report current while
@@ -39,6 +42,42 @@ const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const out = (line) => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
+const describe = (error) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+
+/**
+ * @pipelex/sdk's namespace, or null once the reason it cannot be used is on stderr.
+ *
+ * Imported here rather than by a static `import` at the top of the file: a static import that
+ * cannot resolve fails before any of this runs, and the uncaught error exits 1 — which every
+ * gate reads as drift, in a tree nobody checked. A gate that cannot run has no verdict to give.
+ */
+async function loadSdk() {
+  let sdk;
+  try {
+    sdk = await import("@pipelex/sdk");
+  } catch (error) {
+    // Only the SDK itself not resolving is the missing-SDK case. A package the SDK imports going
+    // missing is ERR_MODULE_NOT_FOUND too, but it names that package, and it means a broken install.
+    if (error?.code === "ERR_MODULE_NOT_FOUND" && String(error.message).includes("'@pipelex/sdk'")) {
+      err(
+        `codegen-check: no verdict — @pipelex/sdk ${SDK_MINIMUM} or later is not importable (${error.message}). ` +
+          "Run this script from inside the project, with its dependencies installed, through its package manager, e.g. `npm run codegen:check`.",
+      );
+    } else {
+      err(`codegen-check: no verdict — @pipelex/sdk could not be loaded (${describe(error)}). Reinstall the project's dependencies.`);
+    }
+    return null;
+  }
+  const missing = SDK_EXPORTS.filter((name) => typeof sdk[name] !== "function");
+  if (missing.length > 0) {
+    err(
+      `codegen-check: no verdict — the installed @pipelex/sdk has no ${missing.join(", ")}, so it predates the offline check. ` +
+        `Raise the project's @pipelex/sdk to ${SDK_MINIMUM} or later and install its dependencies.`,
+    );
+    return null;
+  }
+  return sdk;
+}
 
 /** Every regular file under `root`, as sorted forward-slash paths relative to it. Refuses symlinks. */
 async function walk(root, relative = "") {
@@ -68,8 +107,8 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** The lock check: { code, lines } — never throws. */
-async function checkTree(dir) {
+/** The lock check: { code, lines }. A state of the tree is always an outcome; anything else it throws is `settle`'s. */
+async function checkTree(dir, { CodegenLockError, isStampableArtifactPath, runCodegenCheck }) {
   let lockContent;
   try {
     lockContent = await readStrict(path.join(dir, LOCK_FILENAME));
@@ -103,7 +142,7 @@ async function checkTree(dir) {
     if (error instanceof CodegenLockError) {
       return { code: EXIT_NO_VERDICT, lines: [`  no verdict: ${LOCK_FILENAME} — ${error.message}`] };
     }
-    throw error;
+    throw error; // not a state of the tree, so no verdict for it: see `settle`
   }
 }
 
@@ -161,6 +200,19 @@ async function checkSources(dir) {
   return { code: lines.length ? EXIT_DRIFT : EXIT_CURRENT, lines };
 }
 
+/**
+ * Run one check over one directory. An error the check did not expect is no verdict for that
+ * directory, and the precedence below decides the exit code: uncaught, it would end the whole run
+ * with exit 1, which reads as drift, and every directory after it would go unchecked.
+ */
+async function settle(name, check) {
+  try {
+    return await check();
+  } catch (error) {
+    return { code: EXIT_NO_VERDICT, lines: [`  no verdict: the ${name} check failed — ${describe(error)}`] };
+  }
+}
+
 function worse(a, b) {
   // Precedence: no verdict > drift > current.
   if (a === EXIT_NO_VERDICT || b === EXIT_NO_VERDICT) return EXIT_NO_VERDICT;
@@ -169,6 +221,9 @@ function worse(a, b) {
 }
 
 async function main(argv) {
+  const sdk = await loadSdk();
+  if (sdk === null) return EXIT_NO_VERDICT;
+
   const dirs = argv.slice(2);
   if (dirs.length === 0) {
     err("usage: node scripts/codegen-check.mjs <generated-dir> [<generated-dir> ...]");
@@ -178,8 +233,8 @@ async function main(argv) {
   let exitCode = EXIT_CURRENT;
   for (const dir of dirs) {
     out(`${dir}`);
-    const tree = await checkTree(dir);
-    const sources = tree.code === EXIT_NO_VERDICT ? { code: EXIT_CURRENT, lines: [] } : await checkSources(dir);
+    const tree = await settle("lock", () => checkTree(dir, sdk));
+    const sources = tree.code === EXIT_NO_VERDICT ? { code: EXIT_CURRENT, lines: [] } : await settle("source", () => checkSources(dir));
     const code = worse(tree.code, sources.code);
     const write = code === EXIT_CURRENT ? out : err;
     for (const line of [...tree.lines, ...sources.lines]) write(line);

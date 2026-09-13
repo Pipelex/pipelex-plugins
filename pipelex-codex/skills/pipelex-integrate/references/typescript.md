@@ -117,7 +117,7 @@ Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`. It 
 }
 ```
 
-Add every method's directory to the `codegen:check` line as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree). It runs from the project root because `sources.json` records source paths relative to it. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
+Add every method's directory to the `codegen:check` line as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It runs from the project root because `sources.json` records source paths relative to it. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check (it needs 0.13.0 or later) is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
 
 ## The Node-only boundary
 

@@ -517,6 +517,118 @@ class TestPipelexIntegrateSkill:
         else:
             assert "codegen-check: drift" in result.stdout
 
+    # A stub `@pipelex/sdk` whose check answers from the lock's text: a lock reading `crash` makes it throw
+    # something that is not a `CodegenLockError`, `drift` makes it report a hand edit, anything else is current.
+    STUB_SDK_THAT_CAN_CRASH = (
+        "export class CodegenLockError extends Error {}\n"
+        "export const isStampableArtifactPath = (p) => p.endsWith('.ts');\n"
+        "export const runCodegenCheck = async ({ lockContent }) => {\n"
+        "  if (lockContent.includes('crash')) throw new TypeError('the stub crashed');\n"
+        "  if (lockContent.includes('drift')) return { isCurrent: false, crateFingerprint: 'stub', engineVersion: '0.0.0',\n"
+        "    drifts: [{ category: 'hand-edited', path: 'types.ts', detail: 'edited below the stamp' }] };\n"
+        "  return { isCurrent: true, drifts: [], crateFingerprint: 'stubfingerprint', engineVersion: '0.0.0' };\n"
+        "};\n"
+    )
+
+    def run_typescript_gate(self, root: Path, *arguments: str, sdk_index: str | None) -> subprocess.CompletedProcess[str]:
+        """Copy the shipped script into `root` and run it from there, beside a stub `@pipelex/sdk` whose module
+        body is `sdk_index` — or with no `@pipelex/sdk` resolvable at all when it is `None`. Skipped when no
+        `node` is on the PATH."""
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on the PATH")
+        gate = root / "codegen-check.mjs"
+        gate.write_bytes((self.REFERENCES_DIR / "codegen-check.mjs").read_bytes())
+        if sdk_index is not None:
+            stub = root / "node_modules" / "@pipelex" / "sdk"
+            stub.mkdir(parents=True, exist_ok=True)
+            (stub / "package.json").write_text(
+                '{"name":"@pipelex/sdk","version":"0.0.0-stub","type":"module","main":"index.js","exports":{".":"./index.js"}}',
+                encoding="utf-8",
+            )
+            (stub / "index.js").write_text(sdk_index, encoding="utf-8")
+        return subprocess.run([node, str(gate), *arguments], cwd=root, capture_output=True, text=True, check=False)
+
+    @staticmethod
+    def write_typescript_tree(root: Path, name: str, lock: str) -> Path:
+        tree = root / "generated" / name
+        tree.mkdir(parents=True)
+        (tree / "codegen.lock").write_text(f"{lock}\n", encoding="utf-8")
+        (tree / "types.ts").write_text("export const x = 1;\n", encoding="utf-8")
+        return tree
+
+    @pytest.mark.parametrize(
+        ("sdk_index", "expected_message"),
+        [
+            pytest.param(None, "codegen-check: no verdict — @pipelex/sdk 0.13.0 or later is not importable (", id="not-installed"),
+            pytest.param(
+                "export class CodegenLockError extends Error {}\n",
+                "the installed @pipelex/sdk has no isStampableArtifactPath, runCodegenCheck, so it predates the offline check. "
+                "Raise the project's @pipelex/sdk to 0.13.0 or later",
+                id="too-old",
+            ),
+            pytest.param(
+                'import "a-package-nobody-installed";\nexport const x = 1;\n',
+                "codegen-check: no verdict — @pipelex/sdk could not be loaded (Error: Cannot find package 'a-package-nobody-installed'",
+                id="broken-install",
+            ),
+        ],
+    )
+    def test_the_typescript_gate_has_no_verdict_when_the_sdk_cannot_be_used(
+        self, sdk_index: str | None, expected_message: str, tmp_path: Path
+    ) -> None:
+        """A static import of `@pipelex/sdk` failed before the script ran, and the uncaught error exited 1,
+        which a CI step reads as drift in a tree nobody checked — while the Python twin exits 2. Not
+        installed, too old to carry the check, and installed but unloadable are all no verdict, and only the
+        first is told it is not importable: a package the SDK itself imports going missing is the same
+        `ERR_MODULE_NOT_FOUND`, and calling it a missing SDK would send the user after the wrong fix."""
+        self.write_typescript_tree(tmp_path, "m", "lock_version = 1")
+        result = self.run_typescript_gate(tmp_path, "generated/m", sdk_index=sdk_index)
+        assert result.returncode == 2, self.explain(result)
+        assert expected_message in result.stderr, self.explain(result)
+        assert "node:internal" not in result.stderr, "the failure reached the user as a stack trace, not a verdict"
+        if sdk_index is None:
+            assert "npm run codegen:check" in result.stderr
+        else:
+            assert "is not importable" not in result.stderr
+        assert result.stdout == ""
+
+    def test_the_typescript_gate_has_no_verdict_when_a_check_throws(self, tmp_path: Path) -> None:
+        """An error a check did not expect is no verdict for that directory — never an uncaught rejection that
+        exits 1, reads as drift and leaves every later directory unchecked — and the precedence across
+        directories still decides the exit code. The lock check is made to throw by the SDK, the source check
+        by a sidecar nested deeper than sorting its entries can go, which `JSON.parse` accepts."""
+        self.write_typescript_tree(tmp_path, "crash", "crash")
+        self.write_typescript_tree(tmp_path, "drift", "drift")
+        self.write_typescript_tree(tmp_path, "current", "current")
+        deep = self.write_typescript_tree(tmp_path, "deep", "current")
+        depth = 100_000
+        (deep / "sources.json").write_text('{"sources": {"a": ' + "[" * depth + "]" * depth + ', "b": "x"}}', encoding="utf-8")
+
+        crashed = self.run_typescript_gate(tmp_path, "generated/crash", sdk_index=self.STUB_SDK_THAT_CAN_CRASH)
+        assert crashed.returncode == 2, self.explain(crashed)
+        assert "  no verdict: the lock check failed — TypeError: the stub crashed" in crashed.stderr
+        assert crashed.stdout.endswith("codegen-check: no verdict\n")
+
+        overflowed = self.run_typescript_gate(tmp_path, "generated/deep", sdk_index=self.STUB_SDK_THAT_CAN_CRASH)
+        assert overflowed.returncode == 2, self.explain(overflowed)
+        assert "  no verdict: the source check failed — RangeError: " in overflowed.stderr
+        assert overflowed.stdout.endswith("codegen-check: no verdict\n")
+
+        # The run goes on past the crash to report every directory, and the worst verdict wins whatever the order.
+        everything = self.run_typescript_gate(
+            tmp_path, "generated/crash", "generated/drift", "generated/current", sdk_index=self.STUB_SDK_THAT_CAN_CRASH
+        )
+        assert everything.returncode == 2, self.explain(everything)
+        assert "hand-edited: types.ts — edited below the stamp" in everything.stderr
+        assert "generated/current\n  1 artifact(s) current" in everything.stdout
+        reversed_order = self.run_typescript_gate(
+            tmp_path, "generated/current", "generated/drift", "generated/crash", sdk_index=self.STUB_SDK_THAT_CAN_CRASH
+        )
+        assert reversed_order.returncode == 2, self.explain(reversed_order)
+        no_crash = self.run_typescript_gate(tmp_path, "generated/drift", "generated/current", sdk_index=self.STUB_SDK_THAT_CAN_CRASH)
+        assert no_crash.returncode == 1, self.explain(no_crash)
+
     def test_the_python_call_site_refuses_an_empty_bundle(self) -> None:
         """`Path.rglob` on a missing or empty directory returns nothing and raises nothing, so a
         wrong `BUNDLE_DIR` would submit `mthds_contents=[]` and fail server-side against the pipe
@@ -806,6 +918,10 @@ class TestPipelexIntegrateSkill:
         assert imports, "the script should import through static ESM imports"
         for module in imports:
             assert module.startswith("node:") or module == "@pipelex/sdk", f"unexpected import: {module}"
+        # The SDK is imported dynamically, inside a catch that turns its absence into no verdict. A static
+        # import of it fails before any line of the script runs, and that uncaught failure exits 1: drift.
+        assert "@pipelex/sdk" not in imports
+        assert re.findall(r'\bimport\(\s*"([^"]+)"\s*\)', script) == ["@pipelex/sdk"]
         assert "runCodegenCheck" in script and "isStampableArtifactPath" in script
         assert "process.stdout.write" in script and "process.stderr.write" in script
         assert "console." not in script
