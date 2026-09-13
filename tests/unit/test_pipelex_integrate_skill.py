@@ -50,11 +50,38 @@ class TestPipelexIntegrateSkill:
         "**Narrow according to the output's `multiplicity`, which step 3 recorded**",
     )
 
-    # The closed set of ways an instruction to end the run can be written. The orphans branch,
-    # its failure-table row and the refresh-mode sentence are deliberately written without any of
-    # them — they say "does not end the run" about the neighbour instead — so a literal scan over
-    # those regions is a real guard rather than a guess at one phrasing.
+    # The closed set of ways an instruction to end the run can be written. The continuing regions —
+    # step 6's orphans branch, its failure-table row, refresh mode — are written without any of
+    # them, and "do nothing else" is in the set because that is the phrase the decision struck, so
+    # restoring it fails here instead of passing as a clarification of an unchanged rule.
     HALT_VOCABULARY = re.compile(r"\b(?:stop|stops|stopped|stopping|abort|aborts|aborting|halt|halts|do nothing else)\b", re.IGNORECASE)
+
+    # How a region says the run proceeds past a write the check marks non-current. Used to FIND the
+    # continuing regions rather than to spell them, so the condition assertions below reach whatever
+    # those regions are later reworded into rather than only the wording in front of them now.
+    CONTINUE_VOCABULARY = re.compile(
+        r"carry on|carries on|continue to step|continues|runs on through|does not end (?:the run|a refresh)",
+        re.IGNORECASE,
+    )
+
+    # The two halves of the ruled condition, each in the forms it may legitimately take: the branch
+    # headers read "`orphans[]` non-empty and `drifts[]` empty", the refresh sentence reads "a
+    # non-empty `orphans[]` with an empty `drifts[]`". Both halves must appear wherever the run
+    # continues — dropping the `drifts[]` half is exactly what turns the branch back into the
+    # blanket exemption that no gate could reach.
+    ORPHANS_NON_EMPTY = re.compile(r"`orphans\[\]`[^.|]{0,40}non-empty|non-empty[^.|]{0,40}`orphans\[\]`", re.IGNORECASE)
+    DRIFTS_EMPTY = re.compile(r"`drifts\[\]`[^.|]{0,40}empty|empty[^.|]{0,40}`drifts\[\]`", re.IGNORECASE)
+
+    # `is_current` is `false` on the continuing branch and on the stopping one alike, so a region
+    # that continues has to say it is not what the branch is read from. This is the assertion the
+    # first implementation lacked altogether, which is how a continue branch an agent could never
+    # reach — it checks `is_current`, finds `false`, and stops — stayed green through a whole round.
+    NOT_THE_VERDICT = re.compile(r"never (?:from )?`is_current`", re.IGNORECASE)
+
+    # A mention of overwriting inside a continuing region is admissible only as a denial: the
+    # hazardous case reports an EMPTY `orphans[]`, because every method of a target emits the same
+    # file names, so the files that would be clobbered are overwritten without being reported at all.
+    OVERWRITE_DENIAL = re.compile(r"\b(?:never|cannot|none|without)\b", re.IGNORECASE)
 
     @property
     def integrate(self) -> str:
@@ -128,7 +155,7 @@ class TestPipelexIntegrateSkill:
         assert "a **403** on `mthds_codegen` is a feature gate, not a key problem" in body
         assert 'never say "check your key" for a 403' in body
         assert '`kind: "paywall"`' in body
-        assert "report by name, never delete" in body
+        assert "Report the orphan paths by name, never delete one" in body
         assert "never delete, move or clear the named file" in body
         assert "and never offer to" in body
         # A lock is not this method's without a sidecar naming it: same file names mean a silent overwrite, not an orphan.
@@ -139,77 +166,135 @@ class TestPipelexIntegrateSkill:
         assert 'a known defect of the ts-zod emitter, which writes `from "./types"`' in body
         assert "Changing the project's `moduleResolution` is the user's call to make, not yours" in body
 
-    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
-    def test_orphans_on_a_successful_write_continue_the_run(self, target_name: str) -> None:
-        """Ruled by the founder on 2026-09-13, against the review's recommendation: a non-empty
-        `orphans[]` on a successful write does **not** end the run. The skill goes on to write the
-        sidecar, add the dependencies and write the call site, and reports the orphan paths loudly
-        on the way — and because the hazardous cause (another method's same-named files already
-        overwritten by the write that just succeeded) is indistinguishable from the benign ones
-        inside the tool, that report is the only protection the user gets — in refresh mode too, where the
-        ruling's own continuation is what puts a sidecar on a directory another method's tree may still
-        occupy, so a later refresh overwrites those same-named files again.
+    def continuing_regions(self, body: str) -> dict[str, str]:
+        """Every region that tells the agent to proceed past a write the check marks non-current,
+        keyed by where it is. Cut out by its anchor rather than searched for by the sentence under
+        test, so the assertions apply to the region as a whole.
+        """
+        orphans = self.the_line(body, "- Success with **`orphans[]` non-empty")
+        row = self.the_line(body, "| success with `orphans[]` non-empty")
+        # Refresh mode's rule is one sentence run of a long paragraph, so cut it out rather than
+        # scanning the paragraph — the rest of it is about content hashes and the call site.
+        opens = "**A non-empty `orphans[]` with an empty `drifts[]` does not end a refresh either**"
+        closes = "still ends the refresh, there as here."
+        paragraph = self.the_line(body, opens)
+        start = paragraph.index(opens)
+        refresh = paragraph[start : paragraph.index(closes, start) + len(closes)]
+        return {"step 6's orphans branch": orphans, "the failure table's orphans row": row, "refresh mode": refresh}
 
-        Four regions have to agree, so all four are checked: the step-6 branch, its row in the
-        failure table, the refresh-mode path, and step 12, which specifies the report the ruling
-        makes the whole protection and which the run now reaches ten steps after the orphans are seen.
-        The biting assertion is the halt-vocabulary scan
-        over each of them rather than a search for one phrase — whoever later "fixes" the asymmetry
-        with the neighbouring branch will write *some* instruction to end the run, and the struck
-        "do nothing else" is in the same closed set, which is what makes its replacement rather
-        than its clarification enforced. The neighbour is pinned in the opposite direction, so
-        neither half of the deliberate asymmetry can be flattened without a test going red.
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_run_continues_on_orphans_alone_and_on_nothing_else(self, target_name: str) -> None:
+        """Re-ruled by the founder on 2026-09-13 (`L-260912-3d5693`), replacing an earlier ruling of
+        the same day that a review proved unimplementable. **The run continues when `orphans[]` is
+        non-empty and `drifts[]` is empty, read off those two fields and never inferred from
+        `is_current`; anything that also drifted ends the run.**
+
+        What this test guards is the *condition*, because the condition is the whole decision and its
+        absence is what made the first implementation green and wrong. `pipelex-mcp` sets
+        `is_current: false` the moment a directory holds an orphan, so there is no
+        success-with-orphans verdict to branch on: a branch phrased on the verdict is unreachable,
+        and a branch phrased on nothing is a blanket exemption that swallows real drift. So every
+        region that tells the agent to carry on must name both halves of the condition and must say
+        the verdict is not what distinguishes them, and the stopping branch must claim every other
+        false verdict. Asserting the continue wording exists — which is all the first test did —
+        proves none of that.
         """
         body = self.render(target_name)
-        orphans = self.the_line(body, "- Success with **`orphans[]` non-empty**")
-        disowned = self.the_line(body, "- Success with **`is_current: false`**")
-        row = self.the_line(body, "| success with `orphans[]` non-empty |")
-        # Step 12 is where the user-facing report is specified, and the run now provably reaches it,
-        # so the obligation has to survive the ten steps between there and step 6.
-        report = self.the_line(body, "What was generated and where; the target and why;")
-        # Refresh mode's orphans rule is one sentence run of a long paragraph, so cut it out rather
-        # than scanning the paragraph — the rest of it is about hashes and the call site.
-        opens, closes = "**A non-empty `orphans[]` does not end a refresh either**", "there as here."
-        paragraph = self.the_line(body, opens)
-        refresh = paragraph[paragraph.index(opens) : paragraph.index(closes, paragraph.index(opens)) + len(closes)]
+        regions = self.continuing_regions(body)
 
-        for where, line in (("step 6", orphans), ("the failure table", row), ("refresh mode", refresh)):
-            found = self.HALT_VOCABULARY.search(line)
-            assert found is None, f"{target_name}: {where}'s orphans path ends the run ({found.group(0)!r} in {line!r})"
+        for where, region in regions.items():
+            assert self.CONTINUE_VOCABULARY.search(region), f"{target_name}: {where} no longer tells the agent to proceed"
+            assert self.ORPHANS_NON_EMPTY.search(region), f"{target_name}: {where} continues without requiring a non-empty `orphans[]`"
+            assert self.DRIFTS_EMPTY.search(region), (
+                f"{target_name}: {where} continues without requiring an empty `drifts[]` — the ruled condition is gone "
+                f"and the branch is the blanket exemption again: {region!r}"
+            )
+            assert self.NOT_THE_VERDICT.search(region), (
+                f"{target_name}: {where} does not say the branch is read off the two lists and never from `is_current`, "
+                f"which is `false` on both branches, so an agent reading the verdict takes the stopping one: {region!r}"
+            )
+            halt = self.HALT_VOCABULARY.search(region)
+            assert halt is None, f"{target_name}: {where} ends the run ({halt.group(0)!r} in {region!r})"
 
-        # The run continues, and the steps it continues into are named.
-        assert "**Carry on to step 7 and report loudly.**" in orphans
-        assert "finish the integration — the sidecar, the dependencies, the call site" in orphans
-        assert "**continue to step 7**" in row
-        assert "the refresh runs on through the type checker, the call site and the sidecar" in refresh
+        # The stopping branch claims every false verdict the condition above does not, so the two are
+        # exhaustive: an agent holding a result with any non-orphan drift has exactly one branch.
+        stops = self.the_line(body, "- Success with **`is_current: false` for any reason the branch above does not claim**")
+        assert "a non-empty `drifts[]`, with or without orphans beside it" in stops
+        assert self.HALT_VOCABULARY.search(stops), f"{target_name}: the non-orphan-drift branch no longer ends the run"
+        stop_row = self.the_line(body, "| success with `is_current: false` for any other reason |")
+        assert self.HALT_VOCABULARY.search(stop_row), f"{target_name}: the failure table's drift row no longer ends the run"
+        assert "never commit a tree the check rejects" in stops
 
-        # The report is the protection, so it owes the paths, the overwrite possibility and the remedy.
-        assert "The report names the orphan paths" in orphans
-        assert "may therefore have been overwritten by the write that just succeeded" in orphans
-        assert "a dedicated directory per generation as the fix" in orphans
-        assert "this write may have overwritten same-named files of another method" in row
-        assert "the regeneration has overwritten the other method's same-named files again" in refresh
-        assert "any orphans step 6 reported" in report
-        assert "files of another method may have been overwritten by the write that succeeded" in report
-        assert "restated here rather than left behind at step 6" in report
-        assert "rather than describing the orphans as merely stale" in refresh
-        assert "`orphans_truncated: true` → say orphan detection was partial" in orphans
-        assert "`orphans_truncated: true` → say detection was partial" in row
-        assert "`orphans_truncated: true` → say detection was partial" in refresh
+        # The success gate and the never-bend rule were right before the decision and the ruling
+        # agrees with them: a clean tree is both fields, and two generations in one directory are
+        # non-current by design. The gate also has to reach the branches that carry its two failures.
+        gate = self.the_line(body, '- `status: "ok"`, `is_valid: true`, and `output_dir` present')
+        assert "Confirm **`is_current: true`** and an empty **`orphans[]`**" in gate
+        assert "the two branches below carry the two cases where it is not" in gate
+        assert "two methods in one directory therefore read as permanently non-current, by design" in body
 
-        # An orphan is never deleted — the ruling changed whether to proceed, nothing else.
-        assert "never delete an orphan" in orphans
-        assert "never delete" in row
-        assert "never deletes them" in refresh
+        # Step 4 enumerates the stops that leave a lock with no sidecar. Orphans alone is not one of
+        # them any more, and the `is_current: false` item is qualified so the sentence stays true.
+        assert "every stop between them — an `is_current: false` that step 6 does not let through, a partial write whose retry also failed —" in body
 
-        # The asymmetry with the neighbour is stated, and the neighbour still ends the run.
-        assert "**The branch below ends the run and this one does not, and the asymmetry is deliberate**" in orphans
-        assert "Unlike the row below, this one does not end the run" in row
-        assert "An `is_current: false` still ends the refresh, there as here." in refresh
-        assert "and stop; never commit a tree the check rejects" in disowned
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_no_continuing_region_claims_an_overwrite_the_signal_cannot_show(self, target_name: str) -> None:
+        """The first ruling made a loud report the whole protection against another method's
+        same-named files having been overwritten by the write that just succeeded. Step 4 of this
+        same skill says why that cannot be: every method of a target emits the same file names, so
+        generating into a shared directory overwrites the other method's stamped files *rather than
+        reporting an orphan*. A non-empty `orphans[]` therefore appears only where the prior tree
+        held files this generation does not emit — which is exactly where nothing was clobbered.
 
-        # Step 4 enumerates the stops that leave a lock with no sidecar; orphans is no longer one.
-        assert "every stop between them — a reported `is_current: false`, a partial write whose retry also failed —" in body
+        So a continuing region may mention overwriting only to rule it out, and what it owes instead
+        is what the signal does mean: artifacts this generation does not list, none deleted, a
+        dedicated directory per generation as the fix, and the gate red until the directory holds one
+        generation. Step 12 is included because the run now provably reaches it and that is where
+        the user reads any of this.
+        """
+        body = self.render(target_name)
+        regions = dict(self.continuing_regions(body))
+        regions["step 12's report"] = self.the_line(body, "What was generated and where; the target and why;")
+
+        for where, region in regions.items():
+            for found in re.finditer(r"overwr\w+", region):
+                preceding = region[max(0, found.start() - 140) : found.start()]
+                assert self.OVERWRITE_DENIAL.search(preceding), (
+                    f"{target_name}: {where} states an overwrite as a possibility, which a non-empty `orphans[]` "
+                    f"cannot show: {region[max(0, found.start() - 140) : found.end() + 80]!r}"
+                )
+
+        for where, region in regions.items():
+            assert "this generation does not list" in region, f"{target_name}: {where} does not say what an orphan actually is"
+            assert "dedicated directory per generation" in region, f"{target_name}: {where} drops the remedy"
+        assert "none of them deleted" in regions["step 6's orphans branch"]
+        assert "never delete one" in regions["the failure table's orphans row"]
+        assert "never deletes them" in regions["refresh mode"]
+        assert "none of them were deleted" in regions["step 12's report"]
+
+        # Continuing leaves the gate this skill installs red, because that gate counts an orphan as a
+        # drift — and the one way to turn it green is the deletion the never-bend rules forbid.
+        assert "exits non-zero on this directory until it holds one generation" in regions["step 6's orphans branch"]
+        assert "deleting an orphan to turn it green is the one remedy forbidden above" in regions["step 6's orphans branch"]
+        assert "counts each as a drift until it holds one generation" in regions["the failure table's orphans row"]
+        assert "the gate stays non-zero on that directory until it holds one generation" in regions["refresh mode"]
+        assert "counts each one as a drift" in regions["step 12's report"]
+
+        # Partial detection stays partial detection rather than a clean tree.
+        assert "say orphan detection was partial rather than reporting a clean tree" in regions["step 6's orphans branch"]
+        for where in ("the failure table's orphans row", "refresh mode"):
+            assert "`orphans_truncated: true` → say detection was partial" in regions[where]
+
+        # The struck sentences of both superseded rulings, neither of which may come back.
+        for struck in (
+            "do nothing else",
+            "the check owns the tree",
+            "the check says the tree is current",
+            "may therefore have been overwritten by the write that just succeeded",
+            "this write may have overwritten same-named files of another method",
+            "the regeneration has overwritten the other method's same-named files again",
+        ):
+            assert struck not in body, f"{target_name}: a struck phrase is back in the skill: {struck!r}"
 
     def test_the_call_sites_submit_the_whole_bundle_not_just_main(self) -> None:
         """Generation takes every `.mthds` file of the bundle, so the run must too.
