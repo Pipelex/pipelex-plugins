@@ -1196,6 +1196,77 @@ class TestPipelexIntegrateSkill:
         changelog = self.the_line((self.REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), "**`pipelex-integrate` — wire an MTHDS method")
         assert "A refresh keeps the gate current as well:" in changelog
 
+    # Why the gate script is excluded, said in both references: formatted once, it differs from the reference
+    # forever, so every refresh re-copies the unformatted bytes and the project's own format check goes red.
+    GATE_SCRIPT_EXCLUSION_REASON = (
+        "a refresh compares it byte for byte with this reference, so a reformat would make every refresh re-copy it "
+        "and leave the project's own format check failing on `scripts/`"
+    )
+
+    @pytest.mark.parametrize("target_name", ["template", "prod", "codex", "mistral-vibe"])
+    def test_the_copied_gate_script_is_excluded_like_the_generated_tree(self, target_name: str) -> None:
+        """The gate script is copied verbatim and refresh re-copies one that differs byte for byte from the
+        reference, while refresh never runs the formatter. Left inside a project's `ruff format --check` or
+        `prettier --check`, the first integration formats the copy and every later refresh finds it different,
+        re-copies the unformatted reference and leaves the project's own format check failing. So step 5 and
+        both references put each script in the formatter and linter exclusions, and step 11 never formats it."""
+        if target_name == "template":
+            body = self.integrate
+            references = self.REFERENCES_DIR
+        else:
+            config = load_target_config(self.REPO_ROOT / "targets", target_name)
+            installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate"
+            body = (installed / "SKILL.md").read_text(encoding="utf-8")
+            references = installed / "references"
+
+        step_5 = self.the_line(body, "Add the generated directory to the formatter's and linter's ignore lists")
+        both_scripts = (
+            "and with it the gate script step 10 will copy — "
+            "`scripts/codegen-check.mjs` for `ts-zod`, `scripts/codegen_check.py` for `python-pydantic`"
+        )
+        assert both_scripts in step_5, f"{target_name}: step 5 no longer excludes each gate script"
+        assert "The script's entry goes in now as well, before the script exists" in step_5
+        # The type checker is not told to exclude the script: only the tree's coverage is confirmed.
+        assert "while leaving its coverage of the script as it is" in step_5
+        assert "Do this **before** step 6" in step_5
+
+        for bullet in ("- **TypeScript**: copy [references/codegen-check.mjs]", "- **Python, `python-pydantic`**:"):
+            assert "**never formatted or linted**, which step 5's exclusion keeps true" in self.the_line(body, bullet), f"{target_name}: {bullet}"
+
+        step_11 = self.the_line(body, "Run the project's formatter **on the files you wrote only**")
+        assert "never on the generated tree or the gate script step 10 copied;" in step_11, f"{target_name}: step 11 formats the gate script"
+
+        cells = self.refresh_cells(body)
+        exclusions_first = "each compared and copied only after the tooling exclusions are verified to name it"
+        assert exclusions_first in cells["re-checked"], f"{target_name}: refresh re-copies the gate before verifying its exclusion"
+        left_alone = (
+            "the tooling exclusions for the generated directory and, where step 10 copies one, "
+            "the gate script (verified before the gate is re-checked"
+        )
+        assert left_alone in cells["left alone"], f"{target_name}: refresh's exclusions no longer cover the gate script"
+
+        python = (references / "python.md").read_text(encoding="utf-8")
+        python_row = self.the_line(python, "| **Formatter and linter** |")
+        assert "`[tool.ruff]` → add the generated directory and the gate script `scripts/codegen_check.py`" in python_row
+        assert "`[tool.black]` → `extend-exclude`, one regex matching both" in python_row
+        assert "`[tool.isort]` → both in `skip` / `extend_skip_glob`" in python_row
+        assert 'extend-exclude = ["<package>/generated", "scripts/codegen_check.py"]' in python
+        assert "extend-exclude = '^/(<package>/generated/|scripts/codegen_check\\.py$)'" in python
+        assert 'extend_skip_glob = ["<package>/generated/*", "scripts/codegen_check.py"]' in python
+        assert "codegen_check" not in self.the_line(python, "| **Type checker still covers the tree** |")
+
+        typescript = (references / "typescript.md").read_text(encoding="utf-8")
+        formatter_row = self.the_line(typescript, "| **Formatter** |")
+        assert "add `src/generated/` and the gate script `scripts/codegen-check.mjs` to `.prettierignore`" in formatter_row
+        assert '`"!scripts/codegen-check.mjs"`' in formatter_row and '`"scripts/codegen-check.mjs"` before Biome 2' in formatter_row
+        linter_row = self.the_line(typescript, "| **Linter** |")
+        assert 'add `"src/generated/**"` and `"scripts/codegen-check.mjs"` to `globalIgnores([...])`' in linter_row
+        assert "the same two lines in `.eslintignore`" in linter_row
+        assert "codegen-check" not in self.the_line(typescript, "| **Type checker still covers the tree** |")
+
+        for reference, text in (("python.md", python), ("typescript.md", typescript)):
+            assert self.GATE_SCRIPT_EXCLUSION_REASON in text, f"{target_name}: references/{reference} no longer says why the script is excluded"
+
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
