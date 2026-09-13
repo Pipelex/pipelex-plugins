@@ -2,11 +2,41 @@
 
 from __future__ import annotations
 
+import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
+
+REPO_ROOT = Path(__file__).parents[2]
+SKILL_TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-scaffold" / "SKILL.md.j2"
+STARTERS_REFERENCE = REPO_ROOT / "skills" / "pipelex-scaffold" / "references" / "starters.md"
+
+BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
+# The one string both acquisition recipes point at a real remote, swapped for a
+# local repository so the recipes run as shipped without touching the network.
+STARTER_URL = "https://github.com/Pipelex/<starter>.git"
+
+NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the acquisition recipes are git")
+
+
+def _bash_blocks(text: str) -> list[str]:
+    return [match.group(1) for match in BASH_BLOCK.finditer(text)]
+
+
+def _recipe(text: str, marker: str) -> str:
+    """The one shipped bash block containing `marker`, verbatim.
+
+    Pinned to exactly one so that a recipe split in two, or a second one written
+    beside it, fails here instead of letting this suite execute an arbitrary half.
+    """
+    blocks = [block for block in _bash_blocks(text) if marker in block]
+    assert len(blocks) == 1, f"expected exactly one bash block containing {marker!r}, found {len(blocks)}"
+    return blocks[0]
 
 
 class TestPipelexScaffoldSkill:
@@ -148,6 +178,56 @@ class TestPipelexScaffoldSkill:
             assert "never offer to move, delete or merge what it holds to make room" in body
             assert "never delete, move or write into it, and never offer to" in body
 
+    def test_branch_a_acquires_into_the_directory_the_lone_git_rule_admits(self) -> None:
+        """`L-260913-f28d9d`, ruled 2026-09-13: branch A serves the lone-`.git` directory too.
+
+        The earlier ruling made a directory whose only entry is `.git` read as empty, which branch
+        B can honour because `uv init` accepts such a directory. Branch A could not: its first
+        command on the chosen directory is `git clone`, and git refuses a destination already
+        holding a `.git`. So the skill admitted a directory it then could not populate, and the
+        founder's own motivating case — `mkdir my-app && cd my-app && git init` — dead-ended for
+        anyone who wanted the starter rather than the initializer. Scoping the allowance to branch
+        B was rejected: it would answer that user with the refusal the exception was written to
+        remove, and the ruling would mean two different things depending on which branch they
+        landed in.
+
+        Branch A now acquires beside the directory and moves in. These are the claims the recipe
+        one file over is executed against in `TestScaffoldAcquisitionRecipes`; asserted on the
+        template, on all three renders and on the reference, because round 1 found a guard that
+        had been pinned against the reference alone and was missing from the document an agent
+        actually executes.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            assert "**Local, into a directory that already holds a repository.**" in body
+            # Both halves of the ruling: the same end state, and the user's repository left alone.
+            assert "The end state is the one the default recipe reaches" in body
+            assert "the repository the user made goes on standing instead of being replaced" in body
+            # Ordering: the destructive line is spent on the temporary path before anything moves.
+            assert "**No `rm -rf` here ever addresses a path under `<dir>`, and that is the ordering rather than a coincidence.**" in body
+            assert 'the only two paths any delete is pointed at are `"$tmp/.git"` and `"$tmp"`' in body
+            # Dotfiles: the naive glob drops them and still exits 0.
+            assert '**`cp -R "$tmp"/. <dir>/`, and never `mv "$tmp"/* <dir>/`.**' in body
+            assert "The glob matches no entry beginning with a dot" in body
+            # Collision: one admitted entry, so the template can only add.
+            assert '**The `ls -A` line is the "Where" rule read again, against the copy.**' in body
+            assert "a collision is therefore impossible rather than merely unlikely" in body
+            assert "Nothing of the user's is overwritten, moved or deleted to make room" in body
+            # The guards and the cleanup hold only inside one shell.
+            assert "**The chain goes out as one command.**" in body
+            # The user's repository is not re-initialised; the pristine commit lands on their branch.
+            assert "**Nothing is initialized here.**" in body
+            assert "the commit lands on the user's branch, on top of their history" in body
+            # And the failure table sends branch A down this route rather than at a clone.
+            assert "On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it" in body
+
+        # The reference is the file the skill names as carrying every command, so the recipe and
+        # the three properties that make it safe are stated there as well as in the skill body.
+        reference = STARTERS_REFERENCE.read_text(encoding="utf-8")
+        assert 'tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX") || exit 1' in reference
+        assert "**No `rm -rf` in it addresses a path under `<dir>`**" in reference
+        assert '**`cp -R "$tmp"/. <dir>/` carries the entries beginning with a dot**' in reference
+        assert "**the `ls -A` line admits exactly one entry**" in reference
+
     def test_declares_no_mcp_tool(self) -> None:
         """The scaffold skill is MCP-free: no allowed-tools entry, no MCP-absent STOP message."""
         body = self.scaffold
@@ -268,3 +348,293 @@ class TestPipelexScaffoldSkill:
             assert (installed / reference).read_bytes() == (self.REFERENCES_DIR / reference).read_bytes(), (
                 f"{target_name}: references/{reference} is stale — run `make build`"
             )
+
+
+@NEEDS_GIT
+class TestScaffoldAcquisitionRecipes:
+    """Branch A's two acquisition recipes, extracted from the skill and executed.
+
+    `L-260913-f28d9d` was ruled with a condition attached: the recipe is proven by being
+    run, not by being read. Three reasons, each specific. It touches the one area of this
+    skill that deletes; this campaign's history is that recipes composed during review
+    rounds became the next round's defects; and `references/starters.md` already warns that
+    the `|| exit` guard holds only inside one shell, which is the single thing standing
+    between a `rm -rf` and a user's repository.
+
+    So these tests read the bash blocks out of the skill template, swap the starter's URL
+    for a local repository standing in for it, and run the bytes as shipped. Nothing is
+    mocked and nothing is paraphrased: a recipe reworded in the skill is the recipe that
+    runs here. No network, so this is part of the default suite rather than opt-in.
+    """
+
+    DEFAULT_MARKER = "rm -rf <dir>/.git && git -C <dir> init -b main"
+    PRESERVING_MARKER = "mktemp -d"
+
+    @staticmethod
+    def _commit(repository: Path, message: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repository), "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", message],
+            check=True,
+        )
+
+    @pytest.fixture(scope="class")
+    def starter(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
+        """A local repository standing in for a starter template.
+
+        It carries what makes the move hard rather than what makes it look real: entries
+        beginning with a dot at the top level and nested inside one, which is the failure
+        the shipped `cp -R "$tmp"/.` form exists to avoid.
+        """
+        template = tmp_path_factory.mktemp("starter-template")
+        (template / "src").mkdir()
+        (template / ".github" / "workflows").mkdir(parents=True)
+        (template / ".claude" / "skills" / "bootstrap").mkdir(parents=True)
+        (template / "package.json").write_text('{"name": "pipelex-starter-js", "version": "0.4.2"}\n', encoding="utf-8")
+        (template / "README.md").write_text("# Starter\n", encoding="utf-8")
+        (template / "src" / "index.ts").write_text("export const x = 1\n", encoding="utf-8")
+        (template / ".gitignore").write_text("node_modules/\n.env.local\n", encoding="utf-8")
+        (template / ".env.example").write_text("PIPELEX_BASE_URL=https://api.pipelex.com\nPIPELEX_API_KEY=\n", encoding="utf-8")
+        (template / ".github" / "workflows" / "ci.yml").write_text("name: ci\n", encoding="utf-8")
+        (template / ".claude" / "skills" / "bootstrap" / "SKILL.md").write_text("# bootstrap\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(template), "init", "-q", "-b", "main"], check=True)
+        subprocess.run(["git", "-C", str(template), "add", "-A"], check=True)
+        self._commit(template, "the template as it came")
+        return template
+
+    # Every entry the stand-in starter ships, so a dropped one is named rather than counted.
+    TEMPLATE_ENTRIES = frozenset({"package.json", "README.md", "src", ".gitignore", ".env.example", ".github", ".claude"})
+    DOTTED_ENTRIES = frozenset({".gitignore", ".env.example", ".github", ".claude"})
+
+    def _run(
+        self,
+        recipe: str,
+        *,
+        starter: Path,
+        target: Path,
+        path_prefix: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """The recipe as shipped, with only the remote and `<dir>` bound."""
+        script = recipe.replace(STARTER_URL, f"file://{starter}").replace("<dir>", str(target))
+        assert "<dir>" not in script and "github.com" not in script, "a placeholder survived the binding"
+        environment = dict(os.environ)
+        if path_prefix is not None:
+            environment["PATH"] = f"{path_prefix}{os.pathsep}{environment['PATH']}"
+        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False, env=environment)
+
+    @property
+    def default_recipe(self) -> str:
+        return _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), self.DEFAULT_MARKER)
+
+    @property
+    def preserving_recipe(self) -> str:
+        return _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), self.PRESERVING_MARKER)
+
+    @staticmethod
+    def _entries(directory: Path) -> set[str]:
+        return {entry.name for entry in directory.iterdir()}
+
+    @staticmethod
+    def _make_repository(directory: Path, branch: str) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "-C", str(directory), "init", "-q", "-b", branch], check=True)
+
+    @staticmethod
+    def _temporaries_beside(target: Path) -> list[str]:
+        return [entry.name for entry in target.parent.iterdir() if entry.name.startswith(".pipelex-starter-")]
+
+    def test_the_default_recipe_populates_a_directory_that_does_not_exist(self, starter: Path, tmp_path: Path) -> None:
+        target = tmp_path / "my-app"
+        result = self._run(self.default_recipe, starter=starter, target=target)
+        assert result.returncode == 0, result.stderr
+        assert self._entries(target) == self.TEMPLATE_ENTRIES | {".git"}
+        # Fresh history and no remote: what GitHub's "Use this template" button produces.
+        assert subprocess.run(["git", "-C", str(target), "remote"], capture_output=True, text=True, check=True).stdout == ""
+        assert subprocess.run(["git", "-C", str(target), "log", "-1"], capture_output=True, text=True, check=False).returncode != 0
+
+    def test_the_default_recipe_populates_an_empty_directory(self, starter: Path, tmp_path: Path) -> None:
+        target = tmp_path / "my-app"
+        target.mkdir()
+        result = self._run(self.default_recipe, starter=starter, target=target)
+        assert result.returncode == 0, result.stderr
+        assert self._entries(target) == self.TEMPLATE_ENTRIES | {".git"}
+
+    def test_the_default_recipe_cannot_serve_a_lone_git_directory(self, starter: Path, tmp_path: Path) -> None:
+        """The reproduction the ruling was made on, kept executable.
+
+        This is why the preserving recipe exists, and the assertion that would go green if
+        someone decided one recipe was enough after all. The `|| exit` holds, so the user's
+        repository is untouched — the cost is a dead end, not damage.
+        """
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        result = self._run(self.default_recipe, starter=starter, target=target)
+        assert result.returncode != 0
+        assert "already exists and is not an empty directory" in result.stderr
+        assert self._entries(target) == {".git"}
+
+    def test_the_preserving_recipe_leaves_the_users_repository_standing(self, starter: Path, tmp_path: Path) -> None:
+        """The ruling itself: their commit, their branch, their reflog, their remote.
+
+        An assertion that the run succeeded is not the claim being made — the claim is that
+        the repository the user made survived it, so every part of it is read back.
+        """
+        target = tmp_path / "my-app"
+        self._make_repository(target, "trunk")
+        (target / "NOTES.md").write_text("my notes\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(target), "add", "NOTES.md"], check=True)
+        self._commit(target, "my own first commit")
+        subprocess.run(["git", "-C", str(target), "rm", "-q", "NOTES.md"], check=True)
+        self._commit(target, "and then I emptied the worktree")
+        subprocess.run(["git", "-C", str(target), "remote", "add", "origin", "https://github.com/someone/theirs.git"], check=True)
+
+        def read(*arguments: str) -> str:
+            return subprocess.run(["git", "-C", str(target), *arguments], capture_output=True, text=True, check=True).stdout
+
+        commits_before, branch_before, reflog_before = read("log", "--format=%H"), read("rev-parse", "--abbrev-ref", "HEAD"), read("reflog")
+        assert self._entries(target) == {".git"}, "the fixture is not the lone-.git shape the ruling is about"
+
+        result = self._run(self.preserving_recipe, starter=starter, target=target)
+        assert result.returncode == 0, result.stderr
+
+        assert read("log", "--format=%H") == commits_before, "a commit of the user's did not survive"
+        assert read("rev-parse", "--abbrev-ref", "HEAD") == branch_before == "trunk\n"
+        assert read("reflog") == reflog_before, "the reflog was rewritten"
+        assert "https://github.com/someone/theirs.git" in read("remote", "-v"), "the user's remote is gone"
+        assert "pipelex-starter" not in read("remote", "-v"), "the template's remote came with it"
+        # Their first commit still holds the file they put in it, so nothing was rewritten quietly.
+        assert "NOTES.md" in read("show", "--stat", "--format=", f"{commits_before.split()[-1]}")
+        assert read("fsck", "--no-progress") == ""
+        # And the template arrived, so this is an acquisition and not a no-op that preserved
+        # the repository by doing nothing at all.
+        assert self._entries(target) == self.TEMPLATE_ENTRIES | {".git"}
+
+    def test_the_preserving_recipe_carries_every_entry_beginning_with_a_dot(self, starter: Path, tmp_path: Path) -> None:
+        """`mv "$tmp"/*` drops these and exits 0, so the failure looks exactly like success.
+
+        Read off the destination rather than reasoned about from the glob, which is the
+        whole point: a starter that arrives without its `.gitignore` commits `node_modules/`
+        into the baseline, and nothing in the run says so.
+        """
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        result = self._run(self.preserving_recipe, starter=starter, target=target)
+        assert result.returncode == 0, result.stderr
+        assert self.DOTTED_ENTRIES <= self._entries(target)
+        # Nested inside a dot-directory too, not just at the top level.
+        assert (target / ".github" / "workflows" / "ci.yml").is_file()
+        assert (target / ".claude" / "skills" / "bootstrap" / "SKILL.md").is_file()
+        # And the recipe never reaches for the glob that would have dropped them.
+        assert 'mv "$tmp"/*' not in self.preserving_recipe
+
+    def test_the_preserving_recipe_refuses_a_directory_holding_git_and_anything_else(self, starter: Path, tmp_path: Path) -> None:
+        """Not the ruled case. The exception is one entry named `.git`, never `.git` and friends."""
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        (target / "my-file.txt").write_text("mine\n", encoding="utf-8")
+        result = self._run(self.preserving_recipe, starter=starter, target=target)
+        assert result.returncode != 0
+        assert self._entries(target) == {".git", "my-file.txt"}
+        assert (target / "my-file.txt").read_text(encoding="utf-8") == "mine\n"
+        assert self._temporaries_beside(target) == []
+
+    def test_the_preserving_recipe_refuses_a_directory_holding_only_ignorable_cruft(self, starter: Path, tmp_path: Path) -> None:
+        """The names the earlier ruling deliberately declined go on refusing.
+
+        `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` are not an exception waiting to be
+        granted: a list that grows by guesswork is how this rule drifts back into the agent
+        judging which of a user's files matter, which is what the refusal exists to forbid.
+        The recipe's own `ls -A` line is that rule in executable form, so it is read here.
+        """
+        target = tmp_path / "my-app"
+        target.mkdir()
+        (target / ".idea").mkdir()
+        (target / ".vscode").mkdir()
+        (target / ".DS_Store").write_text("", encoding="utf-8")
+        (target / "Thumbs.db").write_text("", encoding="utf-8")
+        result = self._run(self.preserving_recipe, starter=starter, target=target)
+        assert result.returncode != 0
+        assert self._entries(target) == {".idea", ".vscode", ".DS_Store", "Thumbs.db"}
+        assert self._temporaries_beside(target) == []
+
+    def test_no_delete_in_the_preserving_recipe_addresses_a_path_under_the_target(self, starter: Path, tmp_path: Path) -> None:
+        """The ordering claim, recorded rather than argued.
+
+        Every argument every `rm` is given is logged by a shim on the `PATH`, and the run is
+        read back: the only paths a delete may be pointed at are the temporary clone's `.git`
+        and the temporary clone itself. This is what makes the recipe safe to aim at a
+        directory holding somebody's repository, and it is the assertion that would fail if
+        the discard were ever reordered to after the copy.
+        """
+        real_rm = shutil.which("rm")
+        assert real_rm is not None, "these tests already require a POSIX userland"
+        log = tmp_path / "rm-targets.log"
+        shim_bin = tmp_path / "shim-bin"
+        shim_bin.mkdir()
+        shim = shim_bin / "rm"
+        shim.write_text(
+            f'#!/bin/sh\nfor a in "$@"; do case "$a" in -*) ;; *) echo "$a" >> "{log}";; esac; done\nexec {real_rm} "$@"\n',
+            encoding="utf-8",
+        )
+        shim.chmod(0o755)
+
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        result = self._run(self.preserving_recipe, starter=starter, target=target, path_prefix=shim_bin)
+        assert result.returncode == 0, result.stderr
+
+        targets = [line for line in log.read_text(encoding="utf-8").splitlines() if line]
+        assert targets, "the shim recorded nothing — the recipe no longer deletes, or the shim was bypassed"
+        under_the_users_directory = [line for line in targets if Path(line) == target or target in Path(line).parents]
+        assert under_the_users_directory == [], f"a delete was pointed inside the user's directory: {under_the_users_directory}"
+        assert all(".pipelex-starter-" in line for line in targets), f"a delete left the temporary path: {targets}"
+
+    def test_the_preserving_recipe_removes_its_temporary_path_on_success_and_on_refusal(self, starter: Path, tmp_path: Path) -> None:
+        """A temporary directory left beside the user's project is litter they did not make,
+        and on the refusal paths it is litter with a whole starter inside it."""
+        succeeding = tmp_path / "ok" / "my-app"
+        self._make_repository(succeeding, "main")
+        assert self._run(self.preserving_recipe, starter=starter, target=succeeding).returncode == 0
+        assert self._temporaries_beside(succeeding) == []
+
+        refusing = tmp_path / "no" / "my-app"
+        self._make_repository(refusing, "main")
+        (refusing / "theirs.txt").write_text("mine\n", encoding="utf-8")
+        assert self._run(self.preserving_recipe, starter=starter, target=refusing).returncode != 0
+        assert self._temporaries_beside(refusing) == []
+
+        # A clone that cannot run at all: the failure the `|| exit` chain was written for.
+        unreachable = tmp_path / "gone" / "my-app"
+        self._make_repository(unreachable, "main")
+        missing_remote = self.preserving_recipe.replace(STARTER_URL, f"file://{tmp_path / 'no-such-repository'}")
+        assert self._run(missing_remote, starter=starter, target=unreachable).returncode != 0
+        assert self._temporaries_beside(unreachable) == []
+        assert self._entries(unreachable) == {".git"}
+
+    def test_the_temporary_path_is_beside_the_target_and_collision_proof(self, starter: Path, tmp_path: Path) -> None:
+        """Beside, so the acquisition never crosses a filesystem or a small `/tmp`; named by
+        `mktemp`, so two runs in the same parent cannot land on each other."""
+        recipe = self.preserving_recipe
+        assert 'tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX")' in recipe
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        # The name is generated, so the same recipe run twice in one parent must not collide.
+        assert self._run(recipe, starter=starter, target=target).returncode == 0
+        second = tmp_path / "other-app"
+        self._make_repository(second, "main")
+        assert self._run(recipe, starter=starter, target=second).returncode == 0
+        assert self._temporaries_beside(target) == []
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_recipes_executed_here_are_the_bytes_every_target_ships(self, target_name: str) -> None:
+        """This suite executes the template, so the renders must carry the same block.
+
+        The acquisition recipes carry no Jinja, which is what makes reading the template
+        safe — but that is a claim about the renders, so it is read off them rather than
+        argued. `make agent-check` proves the committed trees are fresh; this proves the
+        freshness is of these lines, which are the ones a user installs and runs.
+        """
+        config = load_target_config(REPO_ROOT / "targets", target_name)
+        installed = (resolve_output_dir(REPO_ROOT, config.source) / "skills" / "pipelex-scaffold" / "SKILL.md").read_text(encoding="utf-8")
+        template = SKILL_TEMPLATE.read_text(encoding="utf-8")
+        for marker in (self.DEFAULT_MARKER, self.PRESERVING_MARKER):
+            assert _recipe(installed, marker) == _recipe(template, marker), f"{target_name}: the shipped recipe is not the one executed here"

@@ -30,7 +30,7 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 |---|---|---|
 | **Language** | the user's word; the language the method's consumer is written in; a framework the user named | ask |
 | **Which branch** | a **named framework** the starters do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"no demo code"**, **"just a project"** → the initializer; a **web app people use in a browser**, forms, an upload flow → the JS starter; a **CLI, script, batch job, worker or service** in Python → the Python starter | one question offering the matching starter first, saying what it brings (durable runs, forms or CLI modes, codegen wiring, CI, its own `release` skill) and what it costs (demos to keep as references or to strip) |
-| **Where** | the directory the user named; **"here"** when the working directory is empty — **and a directory whose only entry is `.git` is empty for this rule**, because `mkdir my-app && cd my-app && git init` is an ordinary way to arrive here and branch B runs `git init -b main` in the directory it is working in one step later; else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory. **A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else** — not a class of files you may decide to overlook. Every other entry still refuses, `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` included: judging which of a user's files matter is the thing this rule exists to forbid, and a list that grows by guesswork is how it would come back. The rule is about **a directory you are creating a project in**, which is why the fresh-clone shortcut below is not an exception to it: there the project is already there and you are finishing it, not writing over someone's work |
+| **Where** | the directory the user named; **"here"** when the working directory is empty — **and a directory whose only entry is `.git` is empty for this rule**, because `mkdir my-app && cd my-app && git init` is an ordinary way to arrive here and branch B runs `git init -b main` in the directory it is working in one step later, while branch A acquires beside it and moves in so that the repository already there goes on standing (Step 2); else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory. **A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else** — not a class of files you may decide to overlook. Every other entry still refuses, `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` included: judging which of a user's files matter is the thing this rule exists to forbid, and a list that grows by guesswork is how it would come back. The rule is about **a directory you are creating a project in**, which is why the fresh-clone shortcut below is not an exception to it: there the project is already there and you are finishing it, not writing over someone's work |
 | **GitHub or local** | the user asked for a GitHub repository → `gh repo create --template`, after confirmation; otherwise a local clone with fresh history | local |
 
 **The fresh-clone shortcut.** A starter clone already in the working directory that has not been bootstrapped — `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"` — **and whose `origin` does not point at `Pipelex/pipelex-starter-…`** is branch A entered at step 4: acquisition already happened, so go straight to running the clone's bootstrap. Do not clone again.
@@ -70,6 +70,29 @@ The `|| exit` on the clone is not decoration: the line below it deletes a `.git`
 
 The clone's `.git` is removed on purpose: it is the template's history and remote, and leaving it would make `git status` and a future `git push` belong to Pipelex's template rather than to the user's project. This is exactly what GitHub's "Use this template" button produces — a copy with no history and no remote — and it is why the starters' READMEs tell humans not to clone directly. Fresh history is how you honour that.
 
+**Local, into a directory that already holds a repository.** The "Where" rule reads a directory whose only entry is `.git` as empty, and `git clone` cannot serve it: git refuses any destination already holding a `.git` and stops with `destination path '<dir>' already exists and is not an empty directory`. So acquire **beside** the directory and move in. The end state is the one the default recipe reaches — the template in `<dir>`, no template history, no Pipelex remote — and the repository the user made goes on standing instead of being replaced:
+
+```bash
+tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX") || exit 1
+git clone --depth 1 https://github.com/Pipelex/<starter>.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+git -C "$tmp" rev-parse HEAD                     # the template SHA, for the commit message
+# the template version: package.json "version" (JS) or pyproject.toml version (Python)
+rm -rf "$tmp/.git" || { rm -rf "$tmp"; exit 1; }
+[ "$(ls -A <dir>)" = ".git" ] || { rm -rf "$tmp"; exit 1; }
+cp -R "$tmp"/. <dir>/ || { rm -rf "$tmp"; exit 1; }
+rm -rf "$tmp"
+```
+
+**No `rm -rf` here ever addresses a path under `<dir>`, and that is the ordering rather than a coincidence.** The template's history is discarded while the clone is still at a path `mktemp` made for this one command, so the destructive line is spent before anything moves: the only two paths any delete is pointed at are `"$tmp/.git"` and `"$tmp"`. Compare the default recipe, where the same line runs on `<dir>` itself and `|| exit` is the whole thing standing between it and a user's history. Here there is nothing for a guard to hold, which is what makes this the form you may aim at a directory holding somebody's repository.
+
+**`cp -R "$tmp"/. <dir>/`, and never `mv "$tmp"/* <dir>/`.** The glob matches no entry beginning with a dot, so the naive move leaves `.gitignore`, `.env.example`, `.github/` and `.claude/` behind, exits `0`, and the line after it deletes the temporary directory they are still sitting in — a starter arriving without its `.gitignore`, whose pristine commit then swallows `node_modules/`, reported as a success. The trailing `/.` copies the directory's *contents*, dotfiles included, with no shell globbing involved at all. Confirm it with `ls -A <dir>` after the copy rather than trusting the form.
+
+**The `ls -A` line is the "Where" rule read again, against the copy.** It is not the decision — the "Where" question settled that — it is the last look before anything lands, put next to the copy so nothing can change between the two. It admits exactly one entry, `.git`, which the clone has not had since the line above: a collision is therefore impossible rather than merely unlikely, and the template can only add to the directory. Anything else — `.git` beside a file of the user's, a `.DS_Store`, a `README.md` they wrote — stops here with nothing copied, the temporary path removed and the directory as it was. A discarded shallow clone is the cheap half of that trade. Nothing of the user's is overwritten, moved or deleted to make room, here or anywhere.
+
+**The chain goes out as one command.** The guards hold only inside one shell — the same reason the `|| exit` above is load-bearing, stated in full in [references/starters.md](references/starters.md) — and split across separate calls this one loses its cleanup too, leaving the temporary directory beside the user's project with no line left to remove it.
+
+**Nothing is initialized here.** The default recipe ends `git init -b main` because it has just deleted the only repository at that path. This one ends on the user's repository, their branch and their remote, which is the whole point of taking the long way round.
+
 **GitHub, on request.** When the user asked for a repository on GitHub:
 
 ```bash
@@ -86,7 +109,7 @@ Both forms take the template's default-branch head. Do not offer a release tag u
 git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)" -- .
 ```
 
-This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came.
+This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came. One qualification on the acquisition into a directory that already held a repository: the commit lands on the user's branch, on top of their history rather than opening a new one, and `add -A -- .` also records whatever deletion their worktree was already showing — their own pending change and not one this skill made, so name it in the report instead of undoing it.
 
 ### Step 4: Run the clone's own bootstrap
 
@@ -167,8 +190,8 @@ Two lines are easy to forget and matter:
 | Condition | Do this |
 |---|---|
 | A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain — first check a version manager the machine already has (`nvm`, `fnm`, `volta`, `asdf`, `mise`) and use its runtime, saying so |
-| The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse |
-| `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory |
+| The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse. On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it, which git refuses outright |
+| `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory, and on the acquisition beside an existing repository the chain removes its own temporary path and copies nothing |
 | `gh` is absent or not authenticated | fall back to the local clone; say the GitHub repository can be created later with `gh repo create --source .` |
 | The clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |

@@ -35,6 +35,21 @@ The version comes from `package.json` (`"version"`) on JS and from `pyproject.to
 
 **The `|| exit` on the clone is load-bearing and is not decoration**, for the reason `/pipelex-scaffold`'s Step 2 gives in full: the line below it deletes a `.git` directory, and a clone that never ran — a network failure, or `<dir>` already existing — leaves that `rm -rf` to find whatever `.git` is actually at that path, destroying a repository of the user's irrecoverably. The guard only holds inside one shell, so when the two lines go out as separate commands, check the clone's exit status yourself before typing the `rm -rf`, and never type it on a path you have not just created.
 
+Into a directory whose only entry is `.git` — the one shape the "Where" rule reads as empty and `git clone` still refuses — acquire beside it and move in, so the user's own repository stands and the end state is the same as above:
+
+```bash
+tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX") || exit 1
+git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+git clone --depth 1 https://github.com/Pipelex/pipelex-starter-python.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+git -C "$tmp" rev-parse HEAD
+rm -rf "$tmp/.git" || { rm -rf "$tmp"; exit 1; }
+[ "$(ls -A <dir>)" = ".git" ] || { rm -rf "$tmp"; exit 1; }
+cp -R "$tmp"/. <dir>/ || { rm -rf "$tmp"; exit 1; }
+rm -rf "$tmp"
+```
+
+Three things in that chain are load-bearing, and `/pipelex-scaffold`'s Step 2 gives each in full. **No `rm -rf` in it addresses a path under `<dir>`**: the template's history is discarded while the clone is still at a path `mktemp` made for this command, before anything moves, so the guarded-deletion problem above does not arise here at all. **`cp -R "$tmp"/. <dir>/` carries the entries beginning with a dot** — `.gitignore`, `.env.example`, `.github/`, `.claude/` — every one of which `mv "$tmp"/* <dir>/` leaves behind while exiting `0`. And **the `ls -A` line admits exactly one entry**, `.git`, which the clone no longer has, so the template can only add to the directory and anything else stops the run with nothing copied and the temporary path removed. It is one chain and goes out as one command, for the reason the paragraph above gives.
+
 GitHub repository, on request and after confirmation (visibility asked, default private; GitHub makes the initial commit, so no pristine commit of your own):
 
 ```bash

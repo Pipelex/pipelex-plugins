@@ -109,6 +109,7 @@ Owner: `pipelex-plugins`. **Gate:** `scaffold-design.md`'s boxes ratified (Phase
 - [x] The report (S§5) with the session note as its own line.
 - [x] Mode (S§6) and a failure table condensed from S§7, including the "this is the template's own checkout" stop.
 - [x] `## Reference`: links to `references/starters.md` and `references/initializers.md`.
+- [x] Branch A's acquisition into a directory whose only entry is `.git`, as `L-260913-f28d9d` ruled it on 2026-09-13: a `mktemp` path beside the target, the template's history discarded there before anything moves, the directory re-read immediately before the copy, `cp -R "$tmp"/. <dir>/` so the dotfiles come too, the temporary path removed on every exit, and no `git init` because the repository is the user's. Stated in the skill, in `references/starters.md` and in the failure table; executed against every directory shape by `TestScaffoldAcquisitionRecipes`.
 - [x] The non-empty refusal as `L-260912-724b71` ruled it on 2026-09-13: a lone `.git` reads as empty, at both sites (the "Where" row and the failure-table stop row), written as that one directory entry by name — the cruft list was declined, so `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` still refuse and the test pins them refusing. Never *offering* to clear is untouched.
 
 **The references — `skills/pipelex-scaffold/references/`**

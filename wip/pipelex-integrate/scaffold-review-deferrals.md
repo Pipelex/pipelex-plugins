@@ -11,7 +11,7 @@ Everything below was read and verified in the tree — none of it rests on a rev
 
 ## Carried elsewhere
 
-- **A directory holding only `.git` is one branch A cannot clone into** — the sharpest finding of the round, raised by three reviewers. It needs a ruling because every fix changes behaviour the founder ruled on, so it is its own decision item: `L-260913-f28d9d`.
+- **A directory holding only `.git` is one branch A cannot clone into** — the sharpest finding of the round, raised by three reviewers. It needed a ruling because every fix changes behaviour the founder ruled on, so it became its own decision item, `L-260913-f28d9d`. Ruled on 2026-09-13 — branch A acquires beside such a directory and leaves the user's repository standing — and implemented on this branch, so it is no longer carried.
 - **A branch-B project writes `.env` that nothing loads into the process** — rediscovered by the Codex review, already open as `L-260912-059765`. No new trace needed.
 
 ## Deferred here
