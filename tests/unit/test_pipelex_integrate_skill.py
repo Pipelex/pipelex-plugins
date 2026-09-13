@@ -70,7 +70,24 @@ class TestPipelexIntegrateSkill:
     # continues — dropping the `drifts[]` half is exactly what turns the branch back into the
     # blanket exemption that no gate could reach.
     ORPHANS_NON_EMPTY = re.compile(r"`orphans\[\]`[^.|]{0,40}non-empty|non-empty[^.|]{0,40}`orphans\[\]`", re.IGNORECASE)
-    DRIFTS_EMPTY = re.compile(r"`drifts\[\]`[^.|]{0,40}empty|empty[^.|]{0,40}`drifts\[\]`", re.IGNORECASE)
+    DRIFTS_EMPTY = re.compile(r"`drifts\[\]`[^.|]{0,40}(?<!non-)empty|(?<!non-)empty[^.|]{0,40}`drifts\[\]`", re.IGNORECASE)
+
+    # The two halves searched for separately are not the condition, and a region can satisfy both
+    # while stating neither as its condition: step 6's branch reads `drifts[]` three times, so
+    # striking `and `drifts[]` empty` from its header leaves the later, non-conditional mentions to
+    # answer `DRIFTS_EMPTY` — and the branch is the blanket exemption again with the suite green.
+    # This pins the conjunction inside one clause, which is the only place it decides anything.
+    CONDITION = re.compile(
+        r"`orphans\[\]`[^.|]{0,30}non-empty[^.|]{0,30}`drifts\[\]`[^.|]{0,30}(?<!non-)empty"
+        r"|non-empty[^.|]{0,30}`orphans\[\]`[^.|]{0,30}(?<!non-)empty[^.|]{0,30}`drifts\[\]`",
+        re.IGNORECASE,
+    )
+
+    # `orphans[]` is always present and empty when clean; `drifts[]` is present only when non-empty
+    # (`pipelex-mcp/SPEC.md` → `drifts?: unknown[]; // present when non-empty`). So the field the
+    # continuing branch is read off is ABSENT in exactly the case that branch must recognise, and a
+    # region telling an agent to read two lists owes it that the missing one is the empty one.
+    ABSENT_DRIFTS_IS_EMPTY = re.compile(r"present only when (?:it is )?non-empty", re.IGNORECASE)
 
     # `is_current` is `false` on the continuing branch and on the stopping one alike, so a region
     # that continues has to say it is not what the branch is read from. This is the assertion the
@@ -208,6 +225,14 @@ class TestPipelexIntegrateSkill:
             assert self.DRIFTS_EMPTY.search(region), (
                 f"{target_name}: {where} continues without requiring an empty `drifts[]` — the ruled condition is gone "
                 f"and the branch is the blanket exemption again: {region!r}"
+            )
+            assert self.CONDITION.search(region), (
+                f"{target_name}: {where} names both halves somewhere but states neither as the condition it branches on, "
+                f"which is the blanket exemption wearing the condition's vocabulary: {region!r}"
+            )
+            assert self.ABSENT_DRIFTS_IS_EMPTY.search(region), (
+                f"{target_name}: {where} sends the agent to read `drifts[]` without saying it is present only when "
+                f"non-empty, so the field the branch turns on is absent in exactly the case the branch is for: {region!r}"
             )
             assert self.NOT_THE_VERDICT.search(region), (
                 f"{target_name}: {where} does not say the branch is read off the two lists and never from `is_current`, "
