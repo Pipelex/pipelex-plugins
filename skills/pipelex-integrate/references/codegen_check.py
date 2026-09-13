@@ -12,7 +12,7 @@ bundle edited without a regeneration is caught as `stale-source`.
 
 Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, a malformed or unreadable lock
 or tree, a symlink at the generated directory or on an artifact's path, a check that raises, `pipelex-sdk`
-not importable). Precedence across directories: 2 > 1 > 0.
+not importable or failing while it loads). Precedence across directories: 2 > 1 > 0.
 
 It is the twin of `codegen-check.mjs`, which does the same for a TypeScript project over `@pipelex/sdk`,
 and the two fail closed on the same malformed sidecars. It imports only the standard library and
@@ -42,6 +42,17 @@ except ImportError as import_error:
         "Run this script with the project's own environment, e.g. `uv run python scripts/codegen_check.py …`.\n"
     )
     sys.exit(2)  # EXIT_NO_VERDICT, which a linter will not let this file define above its imports
+except Exception as load_error:
+    # The one place this script meets an SDK whose exception surface at import is open-ended: a pydantic
+    # whose pydantic-core does not match it raises `SystemError`, a corrupt SDK file `SyntaxError`. Uncaught,
+    # any of them exits 1 — drift — over a tree nobody checked. `BaseException` is left alone, so an
+    # interrupt stays an interrupt. `_describe` is defined below the imports, so its format is inlined.
+    sys.stderr.write(
+        f"codegen-check: no verdict — pipelex-sdk failed while loading ({type(load_error).__name__}: {load_error}). "
+        "The project's environment looks broken: reinstall its dependencies, e.g. `uv sync --reinstall`; "
+        "running the script under another interpreter will not fix it.\n"
+    )
+    sys.exit(2)  # EXIT_NO_VERDICT
 
 EXIT_CURRENT = 0
 EXIT_DRIFT = 1

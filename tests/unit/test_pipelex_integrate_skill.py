@@ -904,6 +904,55 @@ class TestPipelexIntegrateSkill:
         assert "pipelex-sdk 0.10.0 or later is not importable" in result.stderr
         assert "uv run python scripts/codegen_check.py" in result.stderr
 
+    @pytest.mark.parametrize(
+        ("stub_files", "expected_error"),
+        [
+            pytest.param(
+                {"codegen_check.py": 'raise TypeError("the stub crashed at import")\n'},
+                "TypeError: the stub crashed at import",
+                id="raises-at-import",
+            ),
+            pytest.param(
+                {"codegen_check.py": "def run_codegen_check(*, root):\n    return None\n", "errors.py": "class CodegenLockError(Exception\n"},
+                "SyntaxError: ",
+                id="corrupt-file",
+            ),
+        ],
+    )
+    def test_the_python_gate_has_no_verdict_when_the_sdk_fails_while_loading(
+        self, stub_files: dict[str, str], expected_error: str, tmp_path: Path
+    ) -> None:
+        """An installed `pipelex-sdk` that raises something other than `ImportError` while it loads — a pydantic
+        whose pydantic-core does not match it raises `SystemError`, a corrupt SDK file `SyntaxError` — escaped the
+        import guard, printed a traceback and exited 1, which every gate reads as drift. It is no verdict, named
+        for what it is: a broken environment to reinstall, not an interpreter to change."""
+        self.write_python_project(tmp_path)
+        stub = tmp_path / "stub-site" / "pipelex_sdk"
+        stub.mkdir(parents=True)
+        (stub / "__init__.py").write_text("", encoding="utf-8")
+        for name, body in stub_files.items():
+            (stub / name).write_text(body, encoding="utf-8")
+        gate = tmp_path / "scripts" / "codegen_check.py"
+        gate.parent.mkdir(parents=True)
+        gate.write_bytes((self.REFERENCES_DIR / "codegen_check.py").read_bytes())
+        # The stub comes first on the path, so it shadows the real `pipelex-sdk` this suite's environment carries.
+        environment = {**os.environ, "PYTHONPATH": str(stub.parent), "PYTHONDONTWRITEBYTECODE": "1"}
+        result = subprocess.run(
+            [sys.executable, str(gate), "generated/summarize"],
+            cwd=tmp_path,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 2, self.explain(result)
+        loading = "codegen-check: no verdict — pipelex-sdk failed while loading ("
+        assert f"{loading}{expected_error}" in result.stderr, self.explain(result)
+        assert "reinstall its dependencies" in result.stderr
+        assert "is not importable" not in result.stderr
+        assert "Traceback" not in result.stderr
+        assert result.stdout == ""
+
     def test_the_python_gate_has_no_verdict_when_the_lock_check_raises(self, tmp_path: Path) -> None:
         """Whatever the lock check raises beyond the states it turns into outcomes is no verdict for that
         directory, and the run goes on to check the rest. A lock holding an integer longer than Python's
@@ -1025,8 +1074,12 @@ class TestPipelexIntegrateSkill:
         assert '.read_bytes().decode("utf-8")' in script
         assert '.decode("utf-8-sig")' not in script
         assert "json.loads(text, parse_constant=_reject_json_constant)" in script
-        # One broad catch, inside `settle`, around each check; and a stream that escapes what it cannot encode.
-        assert script.count("except Exception") == 1
+        # Two broad catches: one around the SDK import, whose failures at load are open-ended, and one inside
+        # `settle`, around each check. Neither reaches `BaseException`, so an interrupt stays an interrupt.
+        # And a stream that escapes what it cannot encode.
+        assert script.count("except Exception") == 2
+        assert "except BaseException" not in script
+        assert script.index("except ImportError as import_error:") < script.index("except Exception as load_error:")
         assert 'settle(name="lock", check=partial(check_tree, directory=directory))' in script
         assert 'settle(name="source", check=partial(check_sources, directory=directory))' in script
         assert 'stream.reconfigure(errors="backslashreplace")' in script
