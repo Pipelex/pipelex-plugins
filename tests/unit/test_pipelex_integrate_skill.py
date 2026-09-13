@@ -89,6 +89,11 @@ class TestPipelexIntegrateSkill:
     # region telling an agent to read two lists owes it that the missing one is the empty one.
     ABSENT_DRIFTS_IS_EMPTY = re.compile(r"present only when (?:it is )?non-empty", re.IGNORECASE)
 
+    # Continuing leaves the step-10 gate red, which is the consequence the report owes the user — but
+    # step 10 installs no gate at all for a `python-pydantic` consumer, so an unqualified claim tells
+    # that user a check that does not exist is failing, and step 12 would say both things at once.
+    GATE_ONLY_WHERE_INSTALLED = re.compile(r"where the project has one|where a gate was installed|gets a gate at all", re.IGNORECASE)
+
     # `is_current` is `false` on the continuing branch and on the stopping one alike, so a region
     # that continues has to say it is not what the branch is read from. This is the assertion the
     # first implementation lacked altogether, which is how a continue branch an agent could never
@@ -304,6 +309,21 @@ class TestPipelexIntegrateSkill:
         assert "counts each as a drift until it holds one generation" in regions["the failure table's orphans row"]
         assert "the gate stays non-zero on that directory until it holds one generation" in regions["refresh mode"]
         assert "counts each one as a drift" in regions["step 12's report"]
+
+        # Every region that makes the gate claim qualifies it, because one of the three targets gets
+        # no gate: step 10 installs none for a `python-pydantic` consumer, where the refresh is the
+        # whole guard. Unqualified, step 12 would tell that user in one breath that the gate counts
+        # each orphan as a drift and that no offline drift check exists.
+        # Keyed on the claim and not on the step number: refresh mode makes it as "the gate stays
+        # non-zero" without naming step 10 at all, so a guard spelled `"step 10" in region` skips the
+        # one region whose wording does not carry the number.
+        for where, region in regions.items():
+            if "gate" not in region:
+                continue
+            assert self.GATE_ONLY_WHERE_INSTALLED.search(region), (
+                f"{target_name}: {where} claims the step-10 gate counts the orphans without saying the project may "
+                f"have no gate — which a `python-pydantic` consumer does not: {region!r}"
+            )
 
         # Partial detection stays partial detection rather than a clean tree.
         assert "say orphan detection was partial rather than reporting a clean tree" in regions["step 6's orphans branch"]
