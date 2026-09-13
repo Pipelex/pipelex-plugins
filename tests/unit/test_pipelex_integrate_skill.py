@@ -50,9 +50,34 @@ class TestPipelexIntegrateSkill:
         "**Narrow according to the output's `multiplicity`, which step 3 recorded**",
     )
 
+    # The closed set of ways an instruction to end the run can be written. The orphans branch,
+    # its failure-table row and the refresh-mode sentence are deliberately written without any of
+    # them — they say "does not end the run" about the neighbour instead — so a literal scan over
+    # those regions is a real guard rather than a guess at one phrasing.
+    HALT_VOCABULARY = re.compile(r"\b(?:stop|stops|stopped|stopping|abort|aborts|aborting|halt|halts|do nothing else)\b", re.IGNORECASE)
+
     @property
     def integrate(self) -> str:
         return self.TEMPLATE.read_text(encoding="utf-8")
+
+    def render(self, target_name: str) -> str:
+        """The skill as the named target renders it — what a user of that harness installs."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-integrate"],
+            target_name=config.name,
+        )
+        return next(content for path, content in rendered.items() if path.match("skills/pipelex-integrate/SKILL.md"))
+
+    @staticmethod
+    def the_line(body: str, needle: str) -> str:
+        """The one line carrying `needle`. Two of them is a duplicated rule, which is its own defect."""
+        lines = [line for line in body.splitlines() if needle in line]
+        assert len(lines) == 1, f"expected exactly one line containing {needle!r}, found {len(lines)}"
+        return lines[0]
 
     def test_the_rules_that_never_bend_are_stated(self) -> None:
         body = self.integrate
@@ -113,6 +138,66 @@ class TestPipelexIntegrateSkill:
         # The emitter's extensionless import is a known defect: named, never patched in the stamped tree.
         assert 'a known defect of the ts-zod emitter, which writes `from "./types"`' in body
         assert "Changing the project's `moduleResolution` is the user's call to make, not yours" in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_orphans_on_a_successful_write_continue_the_run(self, target_name: str) -> None:
+        """Ruled by the founder on 2026-09-13, against the review's recommendation: a non-empty
+        `orphans[]` on a successful write does **not** end the run. The skill goes on to write the
+        sidecar, add the dependencies and write the call site, and reports the orphan paths loudly
+        on the way — and because the hazardous cause (another method's same-named files already
+        overwritten by the write that just succeeded) is indistinguishable from the benign ones
+        inside the tool, that report is the only protection the user gets.
+
+        Three regions have to agree, so all three are checked: the step-6 branch, its row in the
+        failure table, and the refresh-mode path. The biting assertion is the halt-vocabulary scan
+        over each of them rather than a search for one phrase — whoever later "fixes" the asymmetry
+        with the neighbouring branch will write *some* instruction to end the run, and the struck
+        "do nothing else" is in the same closed set, which is what makes its replacement rather
+        than its clarification enforced. The neighbour is pinned in the opposite direction, so
+        neither half of the deliberate asymmetry can be flattened without a test going red.
+        """
+        body = self.render(target_name)
+        orphans = self.the_line(body, "- Success with **`orphans[]` non-empty**")
+        disowned = self.the_line(body, "- Success with **`is_current: false`**")
+        row = self.the_line(body, "| success with `orphans[]` non-empty |")
+        # Refresh mode's orphans rule is one sentence run of a long paragraph, so cut it out rather
+        # than scanning the paragraph — the rest of it is about hashes and the call site.
+        opens, closes = "**A non-empty `orphans[]` does not end a refresh either**", "there as here."
+        paragraph = self.the_line(body, opens)
+        refresh = paragraph[paragraph.index(opens) : paragraph.index(closes, paragraph.index(opens)) + len(closes)]
+
+        for where, line in (("step 6", orphans), ("the failure table", row), ("refresh mode", refresh)):
+            found = self.HALT_VOCABULARY.search(line)
+            assert found is None, f"{target_name}: {where}'s orphans path ends the run ({found.group(0)!r} in {line!r})"
+
+        # The run continues, and the steps it continues into are named.
+        assert "**Carry on to step 7 and report loudly.**" in orphans
+        assert "finish the integration — the sidecar, the dependencies, the call site" in orphans
+        assert "**continue to step 7**" in row
+        assert "the refresh runs on through the type checker, the call site and the sidecar" in refresh
+
+        # The report is the protection, so it owes the paths, the overwrite possibility and the remedy.
+        assert "The report names the orphan paths" in orphans
+        assert "may therefore have been overwritten by the write that just succeeded" in orphans
+        assert "a dedicated directory per generation as the fix" in orphans
+        assert "this write may have overwritten same-named files of another method" in row
+        assert "`orphans_truncated: true` → say orphan detection was partial" in orphans
+        assert "`orphans_truncated: true` → say detection was partial" in row
+        assert "`orphans_truncated: true` → say detection was partial" in refresh
+
+        # An orphan is never deleted — the ruling changed whether to proceed, nothing else.
+        assert "never delete an orphan" in orphans
+        assert "never delete" in row
+        assert "never deletes them" in refresh
+
+        # The asymmetry with the neighbour is stated, and the neighbour still ends the run.
+        assert "**The branch below ends the run and this one does not, and the asymmetry is deliberate**" in orphans
+        assert "Unlike the row below, this one does not end the run" in row
+        assert "An `is_current: false` still ends the refresh, there as here." in refresh
+        assert "and stop; never commit a tree the check rejects" in disowned
+
+        # Step 4 enumerates the stops that leave a lock with no sidecar; orphans is no longer one.
+        assert "every stop between them — a reported `is_current: false`, a partial write whose retry also failed —" in body
 
     def test_the_call_sites_submit_the_whole_bundle_not_just_main(self) -> None:
         """Generation takes every `.mthds` file of the bundle, so the run must too.
@@ -268,14 +353,7 @@ class TestPipelexIntegrateSkill:
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
-        rendered = render_templates(
-            self.REPO_ROOT / "templates",
-            self.REPO_ROOT,
-            config.template_vars,
-            include_skills=["pipelex-integrate"],
-            target_name=config.name,
-        )
-        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-integrate/SKILL.md"))
+        body = self.render(target_name)
         assert "# Integrate an MTHDS method into a codebase" in body
         assert "{%" not in body
         assert "{{" not in body
