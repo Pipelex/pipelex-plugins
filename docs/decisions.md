@@ -202,6 +202,15 @@ After writing a tree, `mthds_codegen` reports *orphans*: stamped files already i
 
 **Two options not taken, in the order they become the way back.** Changing `pipelex-mcp` to report success-with-orphans when nothing else drifted would fix the conflation at its source rather than reading around it, but it spans the capability code, the `SPEC.md` tool contract other consumers read, and then this skill — so it is the answer if reading the two fields here proves insufficient. Branching on whether the orphan set resembles another method's complete current generation was judged most correct and most expensive when the decision was first framed, and the second premise above retires it: the hazardous case carries no signal at all, so no reasoning over the orphan set can detect it.
 
+## The scaffold's env file moves the base URL with the key (2026-09-13)
+
+`pipelex-scaffold` filled `PIPELEX_API_KEY` from the shell and left `PIPELEX_BASE_URL` at the example's `https://api.pipelex.com`. A key is refused by every plane but the one that issued it — the same fact that made Codex forward both variables by name — so a shell exporting a dev or staging pair got an env file pairing that plane's key with production's URL. The session worked, because the SDK reads the process environment, and the project broke the first time something read the file instead. It was seen in the codegen sprint's acceptance walkthrough against the dev plane.
+
+- **When the key is filled from the environment, the base URL is filled from it too**, whenever the shell sets one. A file that already carried the user's key keeps both of its lines untouched.
+- **A base URL set in the shell with no key beside it is not copied.** The key the user then fetches from `app.pipelex.com` is production's, which the example's URL already names; copying the URL alone would split the pair in the other direction. The report says the file points at production and that the shell's URL was not copied.
+- **One test on the key decides both lines, in one command.** The example ships its URL line non-empty, so the URL cannot carry a presence guard of its own, and the key's guard repeated as a second command would find the key the first just wrote. The URL is appended as a later assignment rather than rewritten in place: every dotenv reader resolves a repeated name to its later line, which the key's append already relied on, and appending avoids `sed -i`, whose arguments differ between BSD and GNU. `tests/unit/test_pipelex_scaffold_skill.py` extracts the command from the rendered skill and executes it in every POSIX shell on the machine, against both example shapes.
+- **The report names the plane by a test, never an echo**: `[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production || echo other`.
+
 ## License & distribution
 
 **Apache 2.0**; repo made public when ready (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.

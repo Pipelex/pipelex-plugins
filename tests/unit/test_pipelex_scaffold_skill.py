@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -24,9 +25,78 @@ STARTER_URL = "https://github.com/Pipelex/<starter>.git"
 
 NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the acquisition recipes are git")
 
+# The env-file write, as the skill ships it. The marker names the one bash block that fills the
+# file; the two fragments are what make it one decision: the key's guard opens the braces, and the
+# base URL's append sits inside them rather than following as a second command.
+ENV_FILE_MARKER = r"""printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL" >> <dir>/.env.local"""
+ENV_FILE_KEY_GUARD = r"""[ -z "${PIPELEX_API_KEY:-}" ] || grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local || {"""
+ENV_FILE_URL_APPEND = r"""{ [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL" >> <dir>/.env.local; }"""
+# The file-side confirmations and the plane test, which print a verdict and never a value.
+ENV_FILE_KEY_CONFIRMATION = r"""grep -q '^PIPELEX_API_KEY=.\+' <dir>/.env.local && echo filled || echo empty"""
+ENV_FILE_URL_CONFIRMATION = r"""grep -qxF "PIPELEX_BASE_URL=$PIPELEX_BASE_URL" <dir>/.env.local && echo copied || echo missing"""
+PLANE_TEST = r"""[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production || echo other"""
+
+PRODUCTION_URL = "https://api.pipelex.com"
+# Fake credentials only. The machine's own PIPELEX_* values are removed from every environment
+# these tests build, so no real key can reach a temporary file or an assertion message.
+FAKE_KEY = "plx_fake_key_for_tests_0000"
+FAKE_URL = "https://api.fake-plane.example"
+# The JS starter's example shape (comments, blank lines, a third variable, a trailing newline) and
+# branch B's two-line example written without one, which is the shape an append can glue onto.
+STARTER_EXAMPLE = (
+    "# Pipelex API endpoint and credentials.\n"
+    "PIPELEX_BASE_URL=https://api.pipelex.com\n"
+    "PIPELEX_API_KEY=\n"
+    "\n"
+    "# Default execution mode for the examples.\n"
+    "NEXT_PUBLIC_EXECUTION_MODE=durable\n"
+)
+INITIALIZER_EXAMPLE = "PIPELEX_BASE_URL=https://api.pipelex.com\nPIPELEX_API_KEY="
+
 
 def _bash_blocks(text: str) -> list[str]:
     return [match.group(1) for match in BASH_BLOCK.finditer(text)]
+
+
+def _dotenv_reading(text: str) -> dict[str, str]:
+    """An env file resolved the way dotenv readers resolve it.
+
+    Blank lines and comments are skipped, an optional `export ` prefix is dropped, and a name
+    assigned twice resolves to its later assignment — which is what python-dotenv, Node's `dotenv`
+    and `util.parseEnv`, and a Makefile `include` all do, and the property the skill's append relies on.
+    """
+    resolved: dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, value = stripped.removeprefix("export ").split("=", 1)
+        resolved[name.strip()] = value.strip()
+    return resolved
+
+
+def _shell_environment(credentials: dict[str, str]) -> dict[str, str]:
+    """The test process's environment with this machine's credentials removed and fakes put in.
+
+    `BASH_ENV` and `ENV` are dropped too, so no startup file a shell would source can put a real
+    value back.
+    """
+    environment = {name: value for name, value in os.environ.items() if name not in {"PIPELEX_API_KEY", "PIPELEX_BASE_URL", "BASH_ENV", "ENV"}}
+    environment.update(credentials)
+    return environment
+
+
+def _shells() -> list[list[str]]:
+    """Every POSIX shell on this machine an agent's harness might run the command in.
+
+    `zsh` runs with `-f` so that no `.zshenv` of the machine's can export a real credential into it.
+    """
+    shells: list[list[str]] = []
+    for name, flags in (("bash", []), ("sh", []), ("zsh", ["-f"])):
+        executable = shutil.which(name)
+        if executable is not None:
+            shells.append([executable, *flags])
+    return shells
 
 
 def _recipe(text: str, marker: str) -> str:
@@ -135,7 +205,7 @@ class TestPipelexScaffoldSkill:
             assert "uv init --package <dir>" not in body, "a bare uv init absorbs <dir> into the parent workspace"
             # The append is gated: on the fresh-clone shortcut the env file may be one the user
             # filled, and a second assignment after theirs is the one dotenv resolves to.
-            assert "grep -q '^PIPELEX_API_KEY=.\\+' <dir>/.env.local || printf" in body
+            assert "grep -q '^PIPELEX_API_KEY=.\\+' <dir>/.env.local || {" in body
             assert ">> <dir>/.env.local`.\n" not in body, "an ungated append shadows a key the user already filled"
 
     def test_fresh_clone_shortcut_and_template_checkout_stop(self) -> None:
@@ -300,6 +370,194 @@ class TestPipelexScaffoldSkill:
         reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
         assert "**On Python, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**" in reference
         assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
+
+    def test_the_base_url_moves_with_the_key_in_every_copy_a_user_installs(self) -> None:
+        """`L-260913-15af9f`: the key was copied from the shell and the base URL left at production.
+
+        A key is refused by every plane but the one that issued it, so a shell exporting a dev or
+        staging pair got an env file pairing that plane's key with production's URL — invisible to
+        the session, which reads the process environment, and broken the first time anything read
+        the file. The URL now moves with the key, inside the one command whose test on the key
+        decides both lines: the example ships its URL line non-empty, so the URL can carry no
+        presence guard of its own, and the key's guard repeated after the key is written would
+        never move it. Asserted on the template, on the three in-memory renders and on the three
+        committed trees, because the executed tests below run the command out of one of them.
+        """
+        template = self.scaffold
+        recipe = _recipe(template, ENV_FILE_MARKER)
+        assert ENV_FILE_KEY_GUARD in recipe
+        assert ENV_FILE_URL_APPEND in recipe
+        # Inside the braces the key's guard opens, so decided by the same test and never on its own.
+        assert recipe.index(ENV_FILE_KEY_GUARD) < recipe.index(ENV_FILE_URL_APPEND)
+        assert recipe.rstrip().endswith("}")
+
+        bodies = [template]
+        for target_name in ("prod", "codex", "mistral-vibe"):
+            config = load_target_config(self.REPO_ROOT / "targets", target_name)
+            installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-scaffold" / "SKILL.md"
+            bodies.extend([self.render(target_name), installed.read_text(encoding="utf-8")])
+        for body in bodies:
+            assert _recipe(body, ENV_FILE_MARKER) == recipe, "a copy ships a different env-file command than the one executed here"
+            assert "**`PIPELEX_BASE_URL` moves with the key.**" in body
+            assert (
+                "**A base URL set in the shell with no key beside it is not copied**, because the key the user then fetches from "
+                "`app.pipelex.com` is production's, which the example's URL already names." in body
+            )
+            assert "**The one test on the key decides both lines, which is why the URL's append sits inside the key's braces" in body
+            assert "**The report names the plane the file points at, without printing the URL.**" in body
+            assert ENV_FILE_KEY_CONFIRMATION in body
+            assert ENV_FILE_URL_CONFIRMATION in body
+            assert PLANE_TEST in body
+            assert "stays as the example ships it" not in body, "the sentence that split the credential is back"
+
+        starters = STARTERS_REFERENCE.read_text(encoding="utf-8")
+        initializers = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
+        assert "**The env file's two Pipelex lines are one credential.**" in starters
+        assert "`PIPELEX_BASE_URL` filled from it too when the shell sets one beside the key" in initializers
+        assert "filled by the skill's one env-file command" in initializers
+        for reference in (starters, initializers):
+            assert "stays as the example ships it" not in reference
+
+    def _run_env_file_command(
+        self, *, shell: list[str], command: str, project: Path, credentials: dict[str, str]
+    ) -> subprocess.CompletedProcess[str]:
+        """One shipped command, `<dir>` bound to `project`, run with fake credentials only."""
+        script = command.replace("<dir>", str(project))
+        assert "<dir>" not in script, "a placeholder survived the binding"
+        return subprocess.run(
+            [*shell, "-c", script],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_shell_environment(credentials),
+            cwd=str(project),
+        )
+
+    @staticmethod
+    def _node_reading(env_file: Path) -> dict[str, str] | None:
+        """The file as Node's own dotenv parser resolves it, or None where this machine has none."""
+        node = shutil.which("node")
+        if node is None:
+            return None
+        script = (
+            "const util = require('node:util');"
+            "if (typeof util.parseEnv !== 'function') process.exit(3);"
+            "process.stdout.write(JSON.stringify(util.parseEnv(require('node:fs').readFileSync(process.argv[1], 'utf8'))));"
+        )
+        result = subprocess.run([node, "-e", script, str(env_file)], capture_output=True, text=True, check=False)
+        if result.returncode == 3:
+            return None
+        assert result.returncode == 0, result.stderr
+        reading: dict[str, str] = json.loads(result.stdout)
+        return reading
+
+    @pytest.mark.parametrize("example", [STARTER_EXAMPLE, INITIALIZER_EXAMPLE], ids=["starter-example", "initializer-example-without-final-newline"])
+    @pytest.mark.parametrize(
+        ("credentials", "expected_key", "expected_url", "expected_plane"),
+        [
+            pytest.param({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL}, FAKE_KEY, FAKE_URL, "other", id="both-set"),
+            pytest.param(
+                {"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": f"{PRODUCTION_URL}/"},
+                FAKE_KEY,
+                f"{PRODUCTION_URL}/",
+                "production",
+                id="both-set-production-spelled-with-a-trailing-slash",
+            ),
+            pytest.param({"PIPELEX_API_KEY": FAKE_KEY}, FAKE_KEY, PRODUCTION_URL, None, id="key-only"),
+            pytest.param({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": ""}, FAKE_KEY, PRODUCTION_URL, None, id="key-beside-an-empty-base-url"),
+            pytest.param({}, "", PRODUCTION_URL, None, id="neither"),
+            pytest.param({"PIPELEX_BASE_URL": FAKE_URL}, "", PRODUCTION_URL, None, id="base-url-without-a-key"),
+        ],
+    )
+    def test_the_env_file_command_writes_the_pair_the_shell_holds(
+        self,
+        example: str,
+        credentials: dict[str, str],
+        expected_key: str,
+        expected_url: str,
+        expected_plane: str | None,
+        tmp_path: Path,
+    ) -> None:
+        """Run the command the skill ships, and read the file the way the project will.
+
+        The claim is about what a dotenv reader resolves, not about which lines were written, so
+        every case is read back through a last-assignment-wins reading — and through Node's own
+        `util.parseEnv` where this machine has it. A base URL the shell sets with no key beside it
+        is not copied, and a shell with no key leaves the example byte for byte as it came. The
+        command runs in every POSIX shell on the machine, because the harness that runs it for a
+        user may be any of them, and the confirmations and the plane test the skill prescribes are
+        run too: they are commands an agent types, so they are held to the same standard.
+        """
+        command = _recipe(self.render("prod"), ENV_FILE_MARKER)
+        shells = _shells()
+        assert shells, "these tests already require a POSIX shell"
+        for shell in shells:
+            project = tmp_path / Path(shell[0]).name
+            project.mkdir()
+            env_file = project / ".env.local"
+            env_file.write_text(example, encoding="utf-8")
+
+            result = self._run_env_file_command(shell=shell, command=command, project=project, credentials=credentials)
+            assert result.returncode == 0, f"{shell[0]}: {result.stderr}"
+            assert result.stdout == "", f"{shell[0]}: the write printed something"
+
+            written = env_file.read_text(encoding="utf-8")
+            # The example's own lines are kept as they were, and nothing appended is glued onto the
+            # last of them — which a file without a final newline invites, and the leading newline
+            # in the command is there to prevent.
+            assert written.splitlines()[: len(example.splitlines())] == example.splitlines(), f"{shell[0]}: the example's lines were altered"
+            reading = _dotenv_reading(written)
+            assert reading["PIPELEX_API_KEY"] == expected_key, f"{shell[0]}: the key resolved to the wrong value"
+            assert reading["PIPELEX_BASE_URL"] == expected_url, f"{shell[0]}: the base URL resolved to the wrong plane"
+            # Nothing else the example carries changed meaning.
+            untouched = {name: value for name, value in _dotenv_reading(example).items() if not name.startswith("PIPELEX_")}
+            assert {name: value for name, value in reading.items() if not name.startswith("PIPELEX_")} == untouched
+            if not expected_key:
+                assert written == example, f"{shell[0]}: a shell with no key still changed the file"
+            node_reading = self._node_reading(env_file)
+            if node_reading is not None:
+                assert node_reading["PIPELEX_API_KEY"] == expected_key, f"{shell[0]}: Node reads a different key"
+                assert node_reading["PIPELEX_BASE_URL"] == expected_url, f"{shell[0]}: Node reads a different base URL"
+
+            key_confirmation = self._run_env_file_command(shell=shell, command=ENV_FILE_KEY_CONFIRMATION, project=project, credentials=credentials)
+            assert key_confirmation.stdout == ("filled\n" if expected_key else "empty\n")
+            if expected_plane is not None:
+                url_confirmation = self._run_env_file_command(
+                    shell=shell, command=ENV_FILE_URL_CONFIRMATION, project=project, credentials=credentials
+                )
+                assert url_confirmation.stdout == "copied\n"
+                plane = self._run_env_file_command(shell=shell, command=PLANE_TEST, project=project, credentials=credentials)
+                assert plane.stdout == f"{expected_plane}\n"
+
+    @pytest.mark.parametrize(
+        "carried",
+        [
+            "PIPELEX_BASE_URL=https://api.pipelex.com\nPIPELEX_API_KEY=plx_the_users_own_fake_key\n",
+            "PIPELEX_BASE_URL=http://127.0.0.1:8081\nPIPELEX_API_KEY=plx_the_users_own_fake_key",
+        ],
+        ids=["their-key-beside-the-example-url", "their-key-beside-their-own-url-without-final-newline"],
+    )
+    def test_the_env_file_command_leaves_a_file_that_already_carries_a_key_byte_for_byte(self, carried: str, tmp_path: Path) -> None:
+        """The fresh-clone shortcut: the env file may be one the user filled, base URL and all.
+
+        With a different pair exported in the shell, neither line may move — a later assignment of
+        either one would silently replace a working credential while the report said theirs was
+        kept. Compared as bytes, because "resolves the same" would pass a file that had grown lines.
+        """
+        command = _recipe(self.render("prod"), ENV_FILE_MARKER)
+        for shell in _shells():
+            project = tmp_path / Path(shell[0]).name
+            project.mkdir()
+            env_file = project / ".env.local"
+            env_file.write_bytes(carried.encode("utf-8"))
+            result = self._run_env_file_command(
+                shell=shell,
+                command=command,
+                project=project,
+                credentials={"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL},
+            )
+            assert result.returncode == 0, f"{shell[0]}: {result.stderr}"
+            assert env_file.read_bytes() == carried.encode("utf-8"), f"{shell[0]}: a file carrying the user's key was changed"
 
     def test_declares_no_mcp_tool(self) -> None:
         """The scaffold skill is MCP-free: no allowed-tools entry, no MCP-absent STOP message."""
