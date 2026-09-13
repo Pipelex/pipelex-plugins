@@ -150,8 +150,10 @@ class TestPipelexIntegrateSkill:
         ruling's own continuation is what puts a sidecar on a directory another method's tree may still
         occupy, so a later refresh overwrites those same-named files again.
 
-        Three regions have to agree, so all three are checked: the step-6 branch, its row in the
-        failure table, and the refresh-mode path. The biting assertion is the halt-vocabulary scan
+        Four regions have to agree, so all four are checked: the step-6 branch, its row in the
+        failure table, the refresh-mode path, and step 12, which specifies the report the ruling
+        makes the whole protection and which the run now reaches ten steps after the orphans are seen.
+        The biting assertion is the halt-vocabulary scan
         over each of them rather than a search for one phrase — whoever later "fixes" the asymmetry
         with the neighbouring branch will write *some* instruction to end the run, and the struck
         "do nothing else" is in the same closed set, which is what makes its replacement rather
@@ -162,6 +164,9 @@ class TestPipelexIntegrateSkill:
         orphans = self.the_line(body, "- Success with **`orphans[]` non-empty**")
         disowned = self.the_line(body, "- Success with **`is_current: false`**")
         row = self.the_line(body, "| success with `orphans[]` non-empty |")
+        # Step 12 is where the user-facing report is specified, and the run now provably reaches it,
+        # so the obligation has to survive the ten steps between there and step 6.
+        report = self.the_line(body, "What was generated and where; the target and why;")
         # Refresh mode's orphans rule is one sentence run of a long paragraph, so cut it out rather
         # than scanning the paragraph — the rest of it is about hashes and the call site.
         opens, closes = "**A non-empty `orphans[]` does not end a refresh either**", "there as here."
@@ -184,6 +189,9 @@ class TestPipelexIntegrateSkill:
         assert "a dedicated directory per generation as the fix" in orphans
         assert "this write may have overwritten same-named files of another method" in row
         assert "the regeneration has overwritten the other method's same-named files again" in refresh
+        assert "any orphans step 6 reported" in report
+        assert "files of another method may have been overwritten by the write that succeeded" in report
+        assert "restated here rather than left behind at step 6" in report
         assert "rather than describing the orphans as merely stale" in refresh
         assert "`orphans_truncated: true` → say orphan detection was partial" in orphans
         assert "`orphans_truncated: true` → say detection was partial" in row
