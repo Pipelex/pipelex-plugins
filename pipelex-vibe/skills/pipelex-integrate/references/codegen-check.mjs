@@ -16,9 +16,9 @@
 // across directories: 2 > 1 > 0.
 //
 // It is the twin of codegen_check.py, which does the same for a Python project over
-// pipelex-sdk. It imports only Node builtins and @pipelex/sdk (0.13.0 or later), and writes
-// through process.stdout / process.stderr so a no-console lint rule stays quiet. When
-// @pipelex/sdk ships this check as a command, replace this file with that one line.
+// pipelex-sdk. It imports only Node builtins and @pipelex/sdk, and writes through
+// process.stdout / process.stderr so a no-console lint rule stays quiet. When @pipelex/sdk
+// ships this check as a command, replace this file with that one line.
 
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile } from "node:fs/promises";
@@ -32,8 +32,13 @@ const EXIT_NO_VERDICT = 2;
 const LOCK_FILENAME = "codegen.lock";
 const SIDECAR_FILENAME = "sources.json";
 const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next"]);
+// The SDK is tested for the exports the check uses, not for a version, so an SDK that has them gets a
+// verdict whatever it is. SDK_MINIMUM is what a message asks the user to install: the floor
+// /pipelex-integrate's step 8 puts in the project, which carries these exports and everything the
+// call site the skill writes uses. Naming the older release that first carried the exports would send the
+// user through a second upgrade.
 const SDK_EXPORTS = ["CodegenLockError", "isStampableArtifactPath", "runCodegenCheck"];
-const SDK_MINIMUM = "0.13.0";
+const SDK_MINIMUM = "0.17.0";
 
 // `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
 // artifact given a BOM would hash as its un-BOM'd self, match the lock, and report current while

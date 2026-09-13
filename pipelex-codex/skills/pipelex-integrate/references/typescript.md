@@ -1,6 +1,6 @@
 # Integrating into a TypeScript project
 
-Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.17 and move only when that package does.
+Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.17.0, the floor the skill's step 8 installs, and move only when that package does.
 
 ## Detecting the project
 
@@ -117,7 +117,7 @@ Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`. It 
 }
 ```
 
-Add every method's directory to the `codegen:check` line as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It runs from the project root because `sources.json` records source paths relative to it. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check (it needs 0.13.0 or later) is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
+Add every method's directory to the `codegen:check` line as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It runs from the project root because `sources.json` records source paths relative to it. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.17.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
 
 ## The Node-only boundary
 

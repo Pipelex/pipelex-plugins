@@ -135,6 +135,15 @@ class TestPipelexIntegrateSkill:
         (None, 0),
     )
 
+    # The lowest `@pipelex/sdk` carrying everything the TypeScript output uses: the gate's three exports
+    # arrived in 0.13.0, `method_id` runs in 0.14.0, `method_ref` runs in 0.16.0 (below it the option is typed
+    # `never`, so a by-ref call site does not compile), and `prepareInputs` by all three sources — the upload the
+    # call site's docstring points at — in 0.17.0, which also stopped it calling `/v1/build/inputs` and reading
+    # a text field merely named `url` from disk. Step 8 raises an older pin to it, and every place that names a
+    # TypeScript SDK version names this one.
+    TYPESCRIPT_SDK_FLOOR = "0.17.0"
+    VERSION = re.compile(r"\b\d+\.\d+(?:\.\d+)?\b")
+
     # A python-pydantic artifact body, stamped and locked by `stamped` and `write_python_project`.
     MODELS_BODY = "from pydantic import BaseModel\n\n\nclass Summary(BaseModel):\n    text: str\n"
     FINGERPRINT = "f" * 64
@@ -560,11 +569,11 @@ class TestPipelexIntegrateSkill:
     @pytest.mark.parametrize(
         ("sdk_index", "expected_message"),
         [
-            pytest.param(None, "codegen-check: no verdict — @pipelex/sdk 0.13.0 or later is not importable (", id="not-installed"),
+            pytest.param(None, f"codegen-check: no verdict — @pipelex/sdk {TYPESCRIPT_SDK_FLOOR} or later is not importable (", id="not-installed"),
             pytest.param(
                 "export class CodegenLockError extends Error {}\n",
                 "the installed @pipelex/sdk has no isStampableArtifactPath, runCodegenCheck, so it predates the offline check. "
-                "Raise the project's @pipelex/sdk to 0.13.0 or later",
+                f"Raise the project's @pipelex/sdk to {TYPESCRIPT_SDK_FLOOR} or later",
                 id="too-old",
             ),
             pytest.param(
@@ -925,6 +934,47 @@ class TestPipelexIntegrateSkill:
         assert "runCodegenCheck" in script and "isStampableArtifactPath" in script
         assert "process.stdout.write" in script and "process.stderr.write" in script
         assert "console." not in script
+
+    def test_the_typescript_sdk_floor_is_one_number_everywhere(self) -> None:
+        """Step 8 names the `@pipelex/sdk` floor and raises an older pin to it, as it does for `pipelex-sdk`, and
+        every other place that names a TypeScript SDK version names the same one: the step 10 bullet, the failure
+        row, refresh mode, the reference, the gate's `SDK_MINIMUM` and the changelog. A bump that updates one and
+        misses another fails here, on the place it missed."""
+        body = self.integrate
+        step_8 = self.the_line(body, "With the project's own package manager (read the lockfile):")
+        clause = re.search(r"`zod` and `@pipelex/sdk` for TypeScript — at least `@pipelex/sdk` (\S+), (.*?); `pydantic`", step_8)
+        assert clause, "step 8 names no @pipelex/sdk floor"
+        assert clause.group(1) == self.TYPESCRIPT_SDK_FLOOR
+        assert "so an older pin already in the project is raised and the report says so" in clause.group(2)
+
+        # Every version these TypeScript-only regions carry is the floor, and each carries it at least once.
+        regions = {
+            "step 10's TypeScript bullet": self.the_line(body, "- **TypeScript**: copy [references/codegen-check.mjs]"),
+            "the failure row": self.the_line(body, "| the TypeScript gate exits `2` saying `@pipelex/sdk` is not importable"),
+        }
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        for index_line, line in enumerate(typescript.splitlines()):
+            if "@pipelex/sdk" in line and self.VERSION.search(line):
+                regions[f"typescript.md line {index_line + 1}"] = line
+        assert len(regions) >= 4, "typescript.md should name the floor in its header and its offline gate section"
+        for where, text in regions.items():
+            assert set(self.VERSION.findall(text)) == {self.TYPESCRIPT_SDK_FLOOR}, f"{where} names {self.VERSION.findall(text)}"
+
+        # Refresh mode names no number: it defers to step 8, so it cannot fall behind a bump.
+        assert "the dependencies (except an `@pipelex/sdk` pinned below step 8's floor, raised as step 8 raises it" in body
+
+        gate = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
+        assert f'const SDK_MINIMUM = "{self.TYPESCRIPT_SDK_FLOOR}";' in gate
+        assert self.VERSION.findall(gate) == [self.TYPESCRIPT_SDK_FLOOR], "the gate names a version other than SDK_MINIMUM"
+
+        changelog = self.the_line((self.REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), "**`pipelex-integrate` — wire an MTHDS method")
+        assert re.findall(r"`@pipelex/sdk` (\d+\.\d+\.\d+)", changelog) == [self.TYPESCRIPT_SDK_FLOOR]
+
+        # What a user installs: the committed skill of every target carries step 8's floor.
+        for target_name in ("prod", "codex", "mistral-vibe"):
+            config = load_target_config(self.REPO_ROOT / "targets", target_name)
+            installed = (resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "SKILL.md").read_text(encoding="utf-8")
+            assert f"`zod` and `@pipelex/sdk` for TypeScript — at least `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR}," in installed, target_name
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
