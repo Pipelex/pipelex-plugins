@@ -96,7 +96,7 @@ Only after the candidate verdict matches:
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree, never beside the bundle — and for each one whose `sources` name a file in this directory, or whose `bundle_dir` is this directory or holds it, say the generated types there are now stale and offer `/pipelex-integrate` to refresh them: an equivalent verdict leaves the concept set as it was, but the new layout removes, rewrites and adds the very files the sidecar hashed, so that project's drift gate reports each of them as `stale-source` until a refresh records the new layout. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
 
 ---
 

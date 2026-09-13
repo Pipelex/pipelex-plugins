@@ -7,8 +7,10 @@ own environment (the one `pipelex-sdk` is installed in), and one generated direc
 
 For each directory it (1) runs `pipelex-sdk`'s `run_codegen_check` over the stamped files against
 `codegen.lock` — pure hashing, no engine, no network, no API key, and no `pipelex` runtime — and (2)
-compares the SHA-256 recorded for each .mthds source in `sources.json` against the file on disk, so a
-bundle edited without a regeneration is caught as `stale-source`.
+compares the SHA-256 recorded for each .mthds source in `sources.json` against the file on disk, and the
+recorded sources against every .mthds file under the sidecar's `bundle_dir`, which is what the call site
+loads, so a bundle changed without a regeneration — a file edited, removed or added — is caught as
+`stale-source`.
 
 Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, a malformed or unreadable lock
 or tree, a symlink at the generated directory or on an artifact's path, a check that raises, `pipelex-sdk`
@@ -25,6 +27,9 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import posixpath
+import stat
 import sys
 from collections.abc import Callable
 from functools import partial
@@ -67,6 +72,23 @@ class Outcome(NamedTuple):
     """One check's exit code and the lines explaining it."""
 
     code: int
+    lines: tuple[str, ...]
+
+
+class Recorded(NamedTuple):
+    """What a sidecar recorded about a local bundle: its sources as sorted pairs, and the directory the call site loads."""
+
+    sources: list[tuple[str, object]]
+    bundle_dir: str
+
+
+class Bundle(NamedTuple):
+    """The .mthds files the call site loads, each normalized path mapped to the path shown for it.
+
+    `paths` is None when the directory cannot be listed, and `lines` then says why.
+    """
+
+    paths: dict[Path, str] | None
     lines: tuple[str, ...]
 
 
@@ -115,7 +137,7 @@ def check_tree(*, directory: Path) -> Outcome:
 
 
 def check_sources(*, directory: Path) -> Outcome:
-    """Run the sidecar check: each recorded .mthds source, by its path relative to the project root."""
+    """Run the sidecar check: each recorded .mthds source and the bundle directory, by their paths relative to the project root."""
     try:
         # Strict UTF-8 over the raw bytes, and deliberately not `utf-8-sig`: a byte-order mark stays in the
         # text, so `json.loads` refuses it exactly as the TypeScript twin's `JSON.parse` does. Handing
@@ -128,14 +150,14 @@ def check_sources(*, directory: Path) -> Outcome:
     except (OSError, ValueError, RecursionError) as exc:
         # `UnicodeDecodeError` and `json.JSONDecodeError` are both `ValueError`s.
         return Outcome(code=EXIT_DRIFT, lines=(f"  stale-source: {SIDECAR_FILENAME} — unreadable ({exc}), so staleness cannot be ruled out",))
-    recorded_sources = _recorded_sources(sidecar=sidecar)
-    if isinstance(recorded_sources, Outcome):
-        return recorded_sources
-    return _compare_sources(recorded_sources=recorded_sources)
+    recorded = _recorded_sources(sidecar=sidecar)
+    if isinstance(recorded, Outcome):
+        return recorded
+    return _compare_sources(recorded=recorded)
 
 
-def _recorded_sources(*, sidecar: object) -> list[tuple[str, object]] | Outcome:
-    """Return the sidecar's `sources` as sorted pairs, or the outcome that ends the check before any is read."""
+def _recorded_sources(*, sidecar: object) -> Recorded | Outcome:
+    """Return the sidecar's `sources` and `bundle_dir`, or the outcome that ends the check before any source is read."""
     # A file whose whole content is `null`, `[]`, `"x"`, `42` or `true` is valid JSON and not an object. Read
     # through `.get()` or a truthiness test, every one of them looks like the legitimate absent case, and the
     # gate would announce "a by-ref or by-id integration" and exit 0 over a sidecar that says nothing of the
@@ -147,33 +169,88 @@ def _recorded_sources(*, sidecar: object) -> list[tuple[str, object]] | Outcome:
     # A present-but-wrong-shaped `sources` must fail the way an unreadable sidecar does. Coerced to `{}` it
     # would check nothing, print nothing and exit 0 — the one input that is both silent and green. An explicit
     # `null` is why presence is tested with `in` rather than by reading the value: `None` is not absent.
-    if "sources" not in fields:
+    if "sources" not in fields and "bundle_dir" not in fields:
         return Outcome(code=EXIT_CURRENT, lines=(NO_SOURCES_LINE,))
-    sources = fields["sources"]
+    sources = fields.get("sources")
     if not isinstance(sources, dict):
         return Outcome(code=EXIT_DRIFT, lines=(f"  stale-source: {SIDECAR_FILENAME} — `sources` is not an object, so staleness cannot be ruled out",))
     recorded_sources = sorted(cast("dict[str, object]", sources).items())
-    if not recorded_sources:
+    if not recorded_sources and "bundle_dir" not in fields:
         return Outcome(code=EXIT_CURRENT, lines=(NO_SOURCES_LINE,))
-    return recorded_sources
+    # The hashes alone prove only that the recorded files are unchanged. The call site loads every .mthds file
+    # under its bundle directory, so a file added beside them changes what runs while every recorded hash still
+    # matches: without the directory, that addition cannot be ruled out.
+    if "bundle_dir" not in fields:
+        return Outcome(
+            code=EXIT_DRIFT,
+            lines=(
+                f"  stale-source: {SIDECAR_FILENAME} — records sources but no `bundle_dir`, so a .mthds file added to the bundle cannot be ruled out",
+            ),
+        )
+    bundle_dir = fields["bundle_dir"]
+    if not isinstance(bundle_dir, str) or not bundle_dir:
+        return Outcome(
+            code=EXIT_DRIFT, lines=(f"  stale-source: {SIDECAR_FILENAME} — `bundle_dir` is not a non-empty string, so staleness cannot be ruled out",)
+        )
+    return Recorded(sources=recorded_sources, bundle_dir=bundle_dir)
 
 
-def _compare_sources(*, recorded_sources: list[tuple[str, object]]) -> Outcome:
-    """Hash each recorded source on disk and compare it with the SHA-256 the sidecar recorded."""
-    stale_lines: list[str] = []
+def _normalized(path: Path) -> Path:
+    """The absolute path with `.` and `..` collapsed lexically, as the TypeScript twin's `path.resolve` does: no symlink is followed."""
+    return Path(os.path.normpath(path.absolute()))
+
+
+def _compare_sources(*, recorded: Recorded) -> Outcome:
+    """Hash each recorded source on disk against the SHA-256 the sidecar recorded, and match the recorded set against the bundle's."""
     project_root = Path.cwd()
-    for source, recorded in recorded_sources:
+    bundle = _list_bundle(project_root=project_root, bundle_dir=recorded.bundle_dir)
+    stale_lines: list[str] = list(bundle.lines)
+    recorded_paths: set[Path] = set()
+    for source, recorded_hash in recorded.sources:
+        resolved = _normalized(project_root / source)
+        recorded_paths.add(resolved)
         try:
-            on_disk = hashlib.sha256((project_root / source).read_bytes()).hexdigest()
+            on_disk = hashlib.sha256(resolved.read_bytes()).hexdigest()
         except FileNotFoundError:
             stale_lines.append(f"  stale-source: {source} — recorded as a source but no longer on disk")
             continue
         except (OSError, ValueError) as exc:
             stale_lines.append(f"  stale-source: {source} — recorded as a source but unreadable ({exc})")
             continue
-        if on_disk != recorded:
+        if on_disk != recorded_hash:
             stale_lines.append(f"  stale-source: {source} — edited since the types were generated")
+        elif bundle.paths is not None and resolved not in bundle.paths:
+            stale_lines.append(
+                f"  stale-source: {source} — recorded as a source but not under {recorded.bundle_dir}, so the call site does not load it"
+            )
+    if bundle.paths is not None:
+        for resolved, shown in bundle.paths.items():
+            if resolved not in recorded_paths:
+                stale_lines.append(f"  stale-source: {shown} — added to the bundle since the types were generated")
     return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines))
+
+
+def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
+    """List the .mthds files the call site loads, the way it lists them: `rglob("*.mthds")` under the bundle directory."""
+    root = project_root / bundle_dir
+    # Asked first because `rglob` answers a missing directory and a file alike with an empty list, while the
+    # TypeScript twin's `readdir` raises for both; asking here makes the two gates say the same thing.
+    try:
+        root_stat = root.stat()
+    except FileNotFoundError:
+        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but no longer on disk",))
+    except (OSError, ValueError) as exc:
+        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but unreadable ({exc})",))
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but not a directory",))
+    shown_by_path = {
+        _normalized(match): posixpath.normpath(posixpath.join(bundle_dir, match.relative_to(root).as_posix())) for match in root.rglob("*.mthds")
+    }
+    # Ordered by the path shown, which is how the TypeScript twin orders them; `Path` ordering compares parts.
+    paths = dict(sorted(shown_by_path.items(), key=lambda item: item[1]))
+    if not paths:
+        return Bundle(paths=paths, lines=(f"  stale-source: {bundle_dir} — holds no .mthds file, so the call site has no bundle to load",))
+    return Bundle(paths=paths, lines=())
 
 
 def settle(*, name: str, check: Callable[[], Outcome]) -> Outcome:

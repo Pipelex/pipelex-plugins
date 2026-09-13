@@ -8,8 +8,10 @@
 //
 // For each directory it (1) runs @pipelex/sdk's runCodegenCheck over the stamped files
 // against codegen.lock — pure hashing, no engine, no network, no API key — and (2) compares
-// the SHA-256 recorded for each .mthds source in sources.json against the file on disk, so
-// a bundle edited without a regeneration is caught as `stale-source`.
+// the SHA-256 recorded for each .mthds source in sources.json against the file on disk, and
+// the recorded sources against every .mthds file under the sidecar's `bundle_dir`, which is
+// what the call site loads, so a bundle changed without a regeneration — a file edited,
+// removed or added — is caught as `stale-source`.
 //
 // Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, an unreadable
 // file, a symlink in the tree, a check that throws, @pipelex/sdk not importable). Precedence
@@ -21,7 +23,7 @@
 // ships this check as a command, replace this file with that one line.
 
 import { createHash } from "node:crypto";
-import { lstat, readdir, readFile } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -151,7 +153,7 @@ async function checkTree(dir, { CodegenLockError, isStampableArtifactPath, runCo
   }
 }
 
-/** The sidecar check against the .mthds sources, relative to the project root: { code, lines }. */
+/** The sidecar check against the .mthds sources and the bundle directory, relative to the project root: { code, lines }. */
 async function checkSources(dir) {
   let sidecar;
   try {
@@ -178,31 +180,85 @@ async function checkSources(dir) {
   // in the sidecar really is an array), and `null` is why this does not use `??`, which would
   // quietly turn an explicit null into the legitimate absent case.
   const sources = sidecar.sources;
-  if (sources === undefined) {
+  const bundleDir = sidecar.bundle_dir;
+  if (sources === undefined && bundleDir === undefined) {
     return { code: EXIT_CURRENT, lines: [`  ${SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply`] };
   }
   if (typeof sources !== "object" || sources === null || Array.isArray(sources)) {
     return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — \`sources\` is not an object, so staleness cannot be ruled out`] };
   }
   const recordedSources = Object.entries(sources).sort();
-  if (recordedSources.length === 0) {
+  if (recordedSources.length === 0 && bundleDir === undefined) {
     return { code: EXIT_CURRENT, lines: [`  ${SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply`] };
+  }
+  // The hashes alone prove only that the recorded files are unchanged. The call site loads every .mthds
+  // file under its bundle directory, so a file added beside them changes what runs while every recorded
+  // hash still matches: without the directory, that addition cannot be ruled out.
+  if (bundleDir === undefined) {
+    return {
+      code: EXIT_DRIFT,
+      lines: [`  stale-source: ${SIDECAR_FILENAME} — records sources but no \`bundle_dir\`, so a .mthds file added to the bundle cannot be ruled out`],
+    };
+  }
+  if (typeof bundleDir !== "string" || bundleDir === "") {
+    return { code: EXIT_DRIFT, lines: [`  stale-source: ${SIDECAR_FILENAME} — \`bundle_dir\` is not a non-empty string, so staleness cannot be ruled out`] };
   }
 
   const lines = [];
+  const loaded = await listBundle(bundleDir);
+  lines.push(...loaded.lines);
+  const recordedPaths = new Set();
   for (const [source, recorded] of recordedSources) {
+    const resolved = path.resolve(process.cwd(), source);
+    recordedPaths.add(resolved);
     let onDisk;
     try {
-      onDisk = sha256(await readFile(path.resolve(process.cwd(), source)));
+      onDisk = sha256(await readFile(resolved));
     } catch (error) {
       lines.push(`  stale-source: ${source} — recorded as a source but ${error.code === "ENOENT" ? "no longer on disk" : `unreadable (${error.message})`}`);
       continue;
     }
     if (onDisk !== recorded) {
       lines.push(`  stale-source: ${source} — edited since the types were generated`);
+    } else if (loaded.paths !== null && !loaded.paths.has(resolved)) {
+      lines.push(`  stale-source: ${source} — recorded as a source but not under ${bundleDir}, so the call site does not load it`);
+    }
+  }
+  if (loaded.paths !== null) {
+    for (const [resolved, shown] of loaded.paths) {
+      if (!recordedPaths.has(resolved)) lines.push(`  stale-source: ${shown} — added to the bundle since the types were generated`);
     }
   }
   return { code: lines.length ? EXIT_DRIFT : EXIT_CURRENT, lines };
+}
+
+/**
+ * The .mthds files the call site loads, listed the way it lists them: `readdir` with `recursive`, every
+ * name ending in `.mthds`. Returns { paths, lines }: `paths` maps each file's resolved path to the path
+ * shown for it, and is null when the directory cannot be listed, which `lines` then explains.
+ */
+async function listBundle(bundleDir) {
+  const root = path.resolve(process.cwd(), bundleDir);
+  let names;
+  try {
+    // Asked first so a missing or non-directory bundle reads the same as in the Python twin, whose
+    // `rglob` answers both with an empty list rather than an error.
+    if (!(await stat(root)).isDirectory()) {
+      return { paths: null, lines: [`  stale-source: ${bundleDir} — recorded as the bundle directory but not a directory`] };
+    }
+    names = await readdir(root, { recursive: true });
+  } catch (error) {
+    const reason = error.code === "ENOENT" ? "no longer on disk" : `unreadable (${error.message})`;
+    return { paths: null, lines: [`  stale-source: ${bundleDir} — recorded as the bundle directory but ${reason}`] };
+  }
+  const paths = new Map();
+  for (const name of names.filter((entry) => entry.endsWith(".mthds")).sort()) {
+    paths.set(path.join(root, name), path.posix.join(bundleDir, name.split(path.sep).join("/")));
+  }
+  if (paths.size === 0) {
+    return { paths, lines: [`  stale-source: ${bundleDir} — holds no .mthds file, so the call site has no bundle to load`] };
+  }
+  return { paths, lines: [] };
 }
 
 /**
