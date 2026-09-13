@@ -50,7 +50,8 @@ const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");
 /** Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`. A bundle is one
  *  closure: a main file that imports a sibling needs that sibling submitted with it, or the
  *  run fails to load what the generated types were projected from. `recursive` needs Node
- *  >= 20.1 (or >= 18.17); below that, walk the directory yourself. */
+ *  >= 20.1, which the SDK's own Node floor (>= 22.12) already guarantees, and the
+ *  drift gate lists the bundle with this same call, so keep it rather than a walk of your own. */
 async function readBundle(): Promise<string[]> {
   const names = (await readdir(BUNDLE_DIR, { recursive: true })).filter((name) => name.endsWith(".mthds")).sort();
   return Promise.all(names.map((name) => readFile(path.join(BUNDLE_DIR, name), "utf8")));
