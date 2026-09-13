@@ -15,6 +15,7 @@ from scripts.gen_skill_docs import load_target_config, render_templates, resolve
 REPO_ROOT = Path(__file__).parents[2]
 SKILL_TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-scaffold" / "SKILL.md.j2"
 STARTERS_REFERENCE = REPO_ROOT / "skills" / "pipelex-scaffold" / "references" / "starters.md"
+INITIALIZERS_REFERENCE = REPO_ROOT / "skills" / "pipelex-scaffold" / "references" / "initializers.md"
 
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
 # The one string both acquisition recipes point at a real remote, swapped for a
@@ -162,7 +163,7 @@ class TestPipelexScaffoldSkill:
             # The exception, at both sites, each stated as one named entry and not as a category.
             assert "**and a directory whose only entry is `.git` is empty for this rule**" in body
             assert "**A directory holding nothing but `.git` is empty here and is written into**" in body
-            assert "branch B runs `git init -b main` in the directory it is working in one step later" in body
+            assert "a repository the user made is not work of theirs to write over" in body
             # And the refusal everything else still meets, with the declined names spelled out.
             assert (
                 "**A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else**"
@@ -206,8 +207,13 @@ class TestPipelexScaffoldSkill:
             assert "**No `rm -rf` here ever addresses a path under `<dir>`, and that is the ordering rather than a coincidence.**" in body
             assert 'the only two paths any delete is pointed at are `"$tmp/.git"` and `"$tmp"`' in body
             # Dotfiles: the naive glob drops them and still exits 0.
-            assert '**`cp -R "$tmp"/. <dir>/`, and never `mv "$tmp"/* <dir>/`.**' in body
+            assert '**`cp -R "$tmp"/. "$dir"/`, and never `mv "$tmp"/* "$dir"/`.**' in body
             assert "The glob matches no entry beginning with a dot" in body
+            # The destination is resolved before its parent is computed, so `.` cannot make the
+            # temporary path a child of the target. Round 2 found the unresolved form refusing
+            # every "scaffold here", which is the ruling's own motivating case.
+            assert "**The first line resolves the destination, and that is what keeps the temporary path a sibling rather than a child.**" in body
+            assert "would put the temporary directory **inside** the destination" in body
             # Collision: one admitted entry, so the template can only add.
             assert '**The `ls -A` line is the "Where" rule read again, against the copy.**' in body
             assert "a collision is therefore impossible rather than merely unlikely" in body
@@ -223,10 +229,77 @@ class TestPipelexScaffoldSkill:
         # The reference is the file the skill names as carrying every command, so the recipe and
         # the three properties that make it safe are stated there as well as in the skill body.
         reference = STARTERS_REFERENCE.read_text(encoding="utf-8")
-        assert 'tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX") || exit 1' in reference
+        assert "dir=$(cd <dir> && pwd) || exit 1" in reference
+        assert 'tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-starter-XXXXXX") || exit 1' in reference
         assert "**No `rm -rf` in it addresses a path under `<dir>`**" in reference
-        assert '**`cp -R "$tmp"/. <dir>/` carries the entries beginning with a dot**' in reference
+        assert '**`cp -R "$tmp"/. "$dir"/` carries the entries beginning with a dot**' in reference
         assert "**the `ls -A` line admits exactly one entry**" in reference
+        assert "**The first line resolves `<dir>` to an absolute path before the parent is computed from it**" in reference
+
+    def test_every_acquisition_block_names_one_starter(self) -> None:
+        """Round 2: the reference's blocks each carried both starters' URLs on consecutive lines.
+
+        Read as the chain the prose calls them — "It is one chain and goes out as one command" —
+        the second clone lands on a destination the first has just filled, fails, and its handler
+        deletes the successful clone before anything is copied. The skill body had always used a
+        single `<starter>` placeholder, so this was the body-and-reference divergence round 1 was
+        told to watch for, reappearing on the other side.
+        """
+        reference = STARTERS_REFERENCE.read_text(encoding="utf-8")
+        assert "pipelex-starter-js.git" not in reference
+        assert "pipelex-starter-python.git" not in reference
+        assert "--template Pipelex/pipelex-starter-js" not in reference
+        assert "--template Pipelex/pipelex-starter-python" not in reference
+        # The placeholder is bound where the blocks begin, so `<starter>` is not left dangling.
+        assert "`<starter>` below is the one the choice above settled" in reference
+        assert "never a menu to run top to bottom" in reference
+
+    def test_the_lone_git_rule_does_not_promise_a_git_init_that_must_not_run(self) -> None:
+        """Round 2: the "Where" row justified the exception with behaviour that cannot occur there.
+
+        It read "branch B runs `git init -b main` in the directory it is working in one step later"
+        — but in the lone-`.git` case the user has already run `git init`, so Step 3's own test finds
+        `<dir>` is its own repository and branch B must not re-run it. The rationale invited an agent
+        to expect the one command the step exists to gate.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            assert "it does **not** re-run `git init` there" in body
+            assert "since Step 3's test finds `<dir>` is already its own repository" in body
+            assert "branch B runs `git init -b main` in the directory it is working in one step later" not in body
+
+    def test_the_pristine_commit_confirms_when_it_lands_on_the_users_repository(self) -> None:
+        """Round 2: the Mode section's carve-out was made false by the preserving acquisition.
+
+        It read "the pristine commit does not need confirmation — it is on a directory this skill
+        just created, holding the template as it came, and no user content is at stake". On the
+        preserving path none of those three grounds holds: the directory is the user's, the commit
+        lands on their branch, and `add -A -- .` sweeps in whatever their worktree was already
+        showing. Step 3 was qualified when the ruling landed and the Mode section was not, which is
+        the half-application this suite exists to catch.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            assert "The pristine commit does not need confirmation **on a directory this skill created**" in body
+            assert "**The acquisition into a directory that already held a repository is the exception**" in body
+            assert "None of the three grounds above holds" in body
+            # And Step 3 says what to put in front of the user rather than only what to report.
+            assert "That is the commit the Mode section sends back for confirmation" in body
+            assert "`git -C <dir> status --short` before staging says what will ride along" in body
+
+    def test_branch_b_locks_the_python_project_before_the_hand_off(self) -> None:
+        """Round 2: `uv init` writes a `pyproject.toml` and neither a lock file nor an environment.
+
+        `/pipelex-integrate` picks the package manager off the lock file and reads its absence as
+        `pip install` into the active environment, so the default Python scaffold — the minimal and
+        script forms, which are what "no framework named" selects — handed over a uv project for the
+        next skill to install into with pip, and into no environment at all. Asserted on the body and
+        on the reference, because either alone is the half-application.
+        """
+        for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
+            assert "**On Python, finish with `uv sync` from inside `<dir>`.**" in body
+            assert "reads no lock file as `pip install` into the active environment" in body
+        reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
+        assert "**On Python, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**" in reference
+        assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
 
     def test_declares_no_mcp_tool(self) -> None:
         """The scaffold skill is MCP-free: no allowed-tools entry, no MCP-absent STOP message."""
@@ -247,12 +320,21 @@ class TestPipelexScaffoldSkill:
         # leaves that line to delete whatever `.git` is at that path — a user's history, if <dir>
         # was theirs. The SKILL.md carries it; so must the reference the skill names as the source
         # of every command, or the guard exists only in the copy nobody executes from.
-        assert "git clone --depth 1 https://github.com/Pipelex/pipelex-starter-js.git <dir> || exit" in starters
-        assert "git clone --depth 1 https://github.com/Pipelex/pipelex-starter-python.git <dir> || exit" in starters
+        assert "git clone --depth 1 https://github.com/Pipelex/<starter>.git <dir> || exit" in starters
         assert "The `|| exit` on the clone is load-bearing" in starters
-        assert "gh repo create <owner>/<name> --template Pipelex/pipelex-starter-python" in starters
-        assert "shell out to a `pipelex` CLI the starter does not depend on" in starters
+        # Round 1 put the `-- .` pathspec on the commit as well as on the staging and wrote that it
+        # is on "both commands for a reason"; the reference kept the old bare commit, so the rule
+        # held only in the copy an agent does not read the commands out of. The mirror of the
+        # half-application round 1 was itself convened to fix.
+        assert 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)" -- .' in starters
+        assert "**The `-- .` pathspec is on the commit as well as on the staging**" in starters
+        # And the initializers reference must send the reader to the repository test rather than to
+        # the inference the skill body forbids by name.
         initializers = (self.REFERENCES_DIR / "initializers.md").read_text(encoding="utf-8")
+        assert "**the test, never the inference from which initializer ran**" in initializers
+        assert "`git init -b main` only if `git -C <dir> rev-parse --show-toplevel` does not print `<dir>` itself" in initializers
+        assert "gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone" in starters
+        assert "shell out to a `pipelex` CLI the starter does not depend on" in starters
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
         # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
@@ -412,14 +494,28 @@ class TestScaffoldAcquisitionRecipes:
         starter: Path,
         target: Path,
         path_prefix: Path | None = None,
+        dir_literal: str | None = None,
+        cwd: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
-        """The recipe as shipped, with only the remote and `<dir>` bound."""
-        script = recipe.replace(STARTER_URL, f"file://{starter}").replace("<dir>", str(target))
+        """The recipe as shipped, with only the remote and `<dir>` bound.
+
+        `dir_literal` binds `<dir>` to a spelling other than the target's absolute path — `.`, say —
+        and `cwd` is the directory the shell starts in, which is what makes such a spelling mean the
+        target at all.
+        """
+        script = recipe.replace(STARTER_URL, f"file://{starter}").replace("<dir>", dir_literal or str(target))
         assert "<dir>" not in script and "github.com" not in script, "a placeholder survived the binding"
         environment = dict(os.environ)
         if path_prefix is not None:
             environment["PATH"] = f"{path_prefix}{os.pathsep}{environment['PATH']}"
-        return subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False, env=environment)
+        return subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=environment,
+            cwd=None if cwd is None else str(cwd),
+        )
 
     @property
     def default_recipe(self) -> str:
@@ -610,11 +706,46 @@ class TestScaffoldAcquisitionRecipes:
         assert self._temporaries_beside(unreachable) == []
         assert self._entries(unreachable) == {".git"}
 
+    @pytest.mark.parametrize("spelling", [".", "./"])
+    def test_the_preserving_recipe_serves_the_destination_spelled_here(self, starter: Path, tmp_path: Path, spelling: str) -> None:
+        """The destination is usually `.`, and the recipe has to survive being told so.
+
+        `mkdir my-app && cd my-app && git init` is the "Where" rule's own account of how a user
+        reaches a directory holding nothing but `.git`, and they then ask for the project *here* —
+        so `<dir>` binds to `.`, not to a path with a parent to speak of. Computing the parent from
+        that spelling gives `.` again, which puts the temporary directory inside the destination;
+        the `ls -A` line then finds it beside `.git` and refuses, every time, on the one case the
+        ruling was written to serve. Every other recipe test binds `<dir>` to an absolute path,
+        which is exactly why this went unnoticed until round 2.
+        """
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        (target / "NOTES.md").write_text("theirs\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(target), "add", "NOTES.md"], check=True)
+        self._commit(target, "the user's own commit")
+        (target / "NOTES.md").unlink()
+        head = subprocess.run(["git", "-C", str(target), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout
+
+        result = self._run(self.preserving_recipe, starter=starter, target=target, dir_literal=spelling, cwd=target)
+
+        assert result.returncode == 0, result.stderr
+        assert self.TEMPLATE_ENTRIES <= self._entries(target)
+        assert self.DOTTED_ENTRIES <= self._entries(target)
+        # The temporary path was a sibling, and it was cleaned up.
+        assert self._temporaries_beside(target) == []
+        assert [entry for entry in self._entries(target) if entry.startswith(".pipelex-starter-")] == []
+        # And the user's repository is untouched: same commit, same branch.
+        assert subprocess.run(["git", "-C", str(target), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout == head
+        assert (
+            subprocess.run(["git", "-C", str(target), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+            == "main"
+        )
+
     def test_the_temporary_path_is_beside_the_target_and_collision_proof(self, starter: Path, tmp_path: Path) -> None:
         """Beside, so the acquisition never crosses a filesystem or a small `/tmp`; named by
         `mktemp`, so two runs in the same parent cannot land on each other."""
         recipe = self.preserving_recipe
-        assert 'tmp=$(mktemp -d "$(dirname <dir>)/.pipelex-starter-XXXXXX")' in recipe
+        assert 'tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-starter-XXXXXX")' in recipe
         target = tmp_path / "my-app"
         self._make_repository(target, "main")
         # The name is generated, so the same recipe run twice in one parent must not collide.
