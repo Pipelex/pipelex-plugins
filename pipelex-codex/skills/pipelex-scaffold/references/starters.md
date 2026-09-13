@@ -19,6 +19,8 @@ Both are GitHub **template repositories** under the `Pipelex` organization. Each
 | **Docs worth reading after bootstrap** | `docs/codegen.md`, `docs/add-method.md`, `docs/input-form.md`, `docs/adopt-in-an-existing-project.md`; README → "Swap in your own pipeline" and "Remove an example" | `docs/codegen.md`, `docs/cli-architecture.md`; README → the per-command sections |
 | **Demos it carries** | several demo methods, one tab each; keep them as references or strip them with the README's "Remove an example" checklist | several demo methods, one CLI command each; keep them as references or remove the command and its method directory together |
 
+**The env file's two Pipelex lines name one plane.** Both examples ship `PIPELEX_BASE_URL=https://api.pipelex.com` beside an empty `PIPELEX_API_KEY`, and a key is refused by every plane but the one that issued it. So when `/pipelex-scaffold` writes the env file it copies a base URL the shell sets whether or not the shell also sets a key — an exported base URL is the plane the user has declared, and the Python starter's example itself documents a keyless self-hosted runner — and copies the key only when the shell sets it; a shell that sets neither leaves the example as it came, and an env file that already carries a key keeps both lines as they are. The command, its one guard and the report's wording for the plane the file points at are in the skill's env-file step.
+
 ## Acquisition
 
 `<starter>` below is the one the choice above settled — `pipelex-starter-js` or `pipelex-starter-python` — and each block is a single chain for that one starter, never a menu to run top to bottom.

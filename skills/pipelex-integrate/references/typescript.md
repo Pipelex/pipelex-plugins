@@ -1,6 +1,6 @@
 # Integrating into a TypeScript project
 
-Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.17 and move only when that package does.
+Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.17.0, the floor the skill's step 8 installs, and move only when that package does.
 
 ## Detecting the project
 
@@ -9,15 +9,15 @@ Companion to `/pipelex-integrate` for a project that has a `package.json`. Every
 | **TypeScript build** | a `tsconfig.json`; a `typescript` dev dependency; a bundler or runtime that strips types (Next.js, Vite, tsx, Bun, Deno) | a plain JavaScript project is asked — `types.ts` needs a TypeScript build; the alternative is `python-pydantic`'s sibling in this language, which does not exist yet, so the honest answer is "add TypeScript or skip codegen" |
 | **Package manager** | the lockfile: `package-lock.json` → npm, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lock` / `bun.lockb` → bun | none → npm, stated |
 | **Generated root** | an existing directory already holding generated code (`generated/`, `gen/`, `__generated__/`) → beside it; else `src/generated/` when `src/` exists; else `generated/` | ask |
-| **Formatter** | `.prettierrc*` or a `prettier` dev dependency → add `src/generated/` to `.prettierignore` (create the file if absent); `biome.json*` → the files-ignore key its version uses (`files.ignore` before Biome 2, `files.includes` with a `!` negation from Biome 2 on) | a formatter this table does not name: read its config, add the equivalent, say so |
-| **Linter** | `eslint.config.*` (flat config) → add `"src/generated/**"` to `globalIgnores([...])` or an `{ ignores: [...] }` entry; legacy `.eslintrc*` → `.eslintignore`; Biome as above | same |
+| **Formatter** | `.prettierrc*` or a `prettier` dev dependency → add `src/generated/` and the gate script `scripts/codegen-check.mjs` to `.prettierignore`, one line each (create the file if absent); `biome.json*` → both paths under the files-ignore key its version uses (`files.ignore` with `"src/generated/**"` and `"scripts/codegen-check.mjs"` before Biome 2, `files.includes` with a `!` negation of each, `"!src/generated"` and `"!scripts/codegen-check.mjs"`, from Biome 2 on) | a formatter this table does not name: read its config, add the equivalent for both paths, say so |
+| **Linter** | `eslint.config.*` (flat config) → add `"src/generated/**"` and `"scripts/codegen-check.mjs"` to `globalIgnores([...])` or an `{ ignores: [...] }` entry; legacy `.eslintrc*` → the same two lines in `.eslintignore`; Biome as above | same |
 | **Type checker still covers the tree** | `tsconfig.json` `include` / `exclude` — the generated directory must stay inside `include` and outside `exclude` | an exclusion that would drop it is **not** added; the report says the typecheck is the check that covers generated code |
 | **Aggregate gate** | `package.json` `scripts.check` / `ci` / `validate` / `verify`; a Makefile `check` target; a `.github/workflows/*.yml` job with a lint or test step; `.pre-commit-config.yaml` | none: the `codegen:check` script alone, and a sentence in the report saying where to call it |
 | **Call-site location** | the project's existing service / action / client layer (`src/actions/`, `src/services/`, `src/lib/`, `src/server/`) → beside it | `src/pipelex/` |
 | **Not gitignored** | the generated root and `sources.json` must be committable | a `.gitignore` pattern that swallows them is reported and un-ignored on confirmation |
 | **Owns a codegen harness** | `scripts.codegen` in `package.json`; `sources.json` with a `derived` map; `docs/codegen.md`; `make add-method` | either of the first two → the harness section below, but **read the script before believing it**: `"codegen": "graphql-codegen"` or a protobuf generator satisfies the name and generates no MTHDS types, and deferring to it would skip the dependencies, the exclusions, the sidecar and the gate while generating nothing. Pipelex-specific evidence — it calls `mthds_codegen`, a `pipelex` CLI, or reads `methods/` — is what makes it this method's harness; without that, integrate normally and leave the unrelated harness alone |
 
-Why the exclusions are not optional: the ts-zod emitter prints at Prettier's defaults (80 columns). A project that prints at another width, or a linter with an autofix, rewrites the bytes, breaks every stamp, and makes the offline check report the whole tree as hand-edited. The type checker, by contrast, must keep covering the tree — that is the check that catches a call site drifting from its types.
+Why the exclusions are not optional: the ts-zod emitter prints at Prettier's defaults (80 columns). A project that prints at another width, or a linter with an autofix, rewrites the bytes, breaks every stamp, and makes the offline check report the whole tree as hand-edited. The type checker, by contrast, must keep covering the tree — that is the check that catches a call site drifting from its types. The gate script is excluded from the formatter and the linter too, before it exists, because it is copied verbatim and a refresh compares it byte for byte with this reference, so a reformat would make every refresh re-copy it and leave the project's own format check failing on `scripts/`; nothing about it changes for the type checker.
 
 ## The generated tree
 
@@ -50,7 +50,8 @@ const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");
 /** Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`. A bundle is one
  *  closure: a main file that imports a sibling needs that sibling submitted with it, or the
  *  run fails to load what the generated types were projected from. `recursive` needs Node
- *  >= 20.1 (or >= 18.17); below that, walk the directory yourself. */
+ *  >= 20.1, which the SDK's own Node floor (>= 22.12) already guarantees, and the
+ *  drift gate lists the bundle with this same call, so keep it rather than a walk of your own. */
 async function readBundle(): Promise<string[]> {
   const names = (await readdir(BUNDLE_DIR, { recursive: true })).filter((name) => name.endsWith(".mthds")).sort();
   return Promise.all(names.map((name) => readFile(path.join(BUNDLE_DIR, name), "utf8")));
@@ -106,7 +107,7 @@ Parameter types from the signature: `string` for Text and Date (ISO 8601), `numb
 
 ## The offline gate
 
-Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`. It imports only Node builtins and `@pipelex/sdk`, runs under plain `node` whatever the project's TypeScript build, and prints through `process.stdout` / `process.stderr` so a `no-console` rule does not fire. Register it and extend the existing gate:
+Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`, and never format or lint it: step 5 put it in the formatter and linter exclusions beside the generated directory. It imports only Node builtins and `@pipelex/sdk`, runs under plain `node` whatever the project's TypeScript build, and prints through `process.stdout` / `process.stderr` so a `no-console` rule does not fire. Register it and extend the existing gate:
 
 ```json
 {
@@ -117,7 +118,7 @@ Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`. It 
 }
 ```
 
-Add every method's directory to the `codegen:check` line as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree). It runs from the project root because `sources.json` records source paths relative to it. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
+Add every method's directory to the `codegen:check` line as it is integrated, and on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. A refresh also re-copies the script when the project's copy differs from this reference, and installs it when the project has none, so a project integrated by an older version of the skill gets the current gate. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with the same recursive `readdir` the call site's `readBundle` uses — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. It runs from the project root because `sources.json` records its source paths and `bundle_dir` relative to it, and `bundle_dir` is the call site's `BUNDLE_DIR` expressed that way. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.17.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
 
 ## The Node-only boundary
 
