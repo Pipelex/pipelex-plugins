@@ -22,3 +22,17 @@ These rest on a reviewer's word alone: they were sorted as real but not importan
 ## Noticed while fixing
 
 - **The refresh table's "Left alone" cell still lists "the tooling exclusions (verified, re-added only if missing)"**, which refresh re-checks and re-applies, so it arguably belongs in the column round 1 renamed "Re-derived and re-checked". Reported by the implementer of round 1's refresh fix; a placement in a table, with no behaviour behind it.
+
+## Round 2
+
+Round 2 of `/rev` on the same branch (2026-09-14, profile 4, bar `defects`) ran the same reviewers over the branch at `383fec5`. It fixed a broken `pipelex-sdk` load being read as drift by the Python gate (`6b15707`) and a refresh that re-copied a gate script the project's formatter had reformatted (`0a8981c`). What it left is below.
+
+### Carried elsewhere
+
+- **The added-bundle-file gap was raised again** by the Codex adversarial pass. It is still `L-260913-d509aa`.
+- **Black's and isort's exclusions are skipped when pre-commit passes filenames.** Found by the implementer of round 2's fixes while checking the exclusion entries in a scratch project; it predates the branch and applies to the generated tree as much as to the gate script, so it is its own item, `L-260913-50b58c`.
+
+### Deferred here
+
+- **The advice is wrong when a package `pipelex-sdk` depends on is missing.** Raised by `code-review` beside the import-guard defect and confirmed by the verifier as message quality only: such a load raises `ModuleNotFoundError`, which the gate already turns into exit 2, but the message still says `pipelex-sdk` is not importable and advises another interpreter rather than a reinstall. The TypeScript twin tells the two cases apart.
+- **unverified: the two test-module splits** round 1 deferred were raised again by cubic, with the same reasoning.
