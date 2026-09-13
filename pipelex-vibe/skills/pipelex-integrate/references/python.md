@@ -13,7 +13,7 @@ Companion to `/pipelex-integrate` for a project that has a `pyproject.toml` (or 
 | **Formatter and linter** | `[tool.ruff]` → add the generated directory to `exclude` (or `extend-exclude`); `[tool.black]` → `extend-exclude`; `[tool.isort]` → `skip` / `extend_skip_glob` | a tool this table does not name: read its config, add the equivalent, say so |
 | **Type checker still covers the tree** | `[tool.pyright]` `include` / `exclude`; `[tool.mypy]` `packages` / `files` / `exclude` | an exclusion that would drop it is **not** added; generated code stays type-checked |
 | **Packaged for distribution** | a `[build-system]` table and an import package | the bundle goes **inside** the package (`<package>/methods/<name>/main.mthds`) and `*.mthds` plus `codegen.lock` are registered as package data, as the Python starter does — a wheel that ships the call site must ship the bundle it loads at call time; an unpackaged app keeps `methods/<name>/` at the project root |
-| **Aggregate gate** | a Makefile `check` target; `.github/workflows/*.yml`; `.pre-commit-config.yaml`; a `nox`/`tox` session | none: nothing to wire for `python-pydantic` anyway (below) |
+| **Aggregate gate** | a Makefile `check` target; `.github/workflows/*.yml`; `.pre-commit-config.yaml`; a `nox`/`tox` session | none: the gate script alone, and a sentence in the report saying where to call it |
 | **Call-site location** | the project's existing service / client layer (`services/`, `clients/`, `api/`) → beside it | `<package>/pipelex/` |
 | **Not gitignored** | the generated root and `sources.json` must be committable | reported and un-ignored on confirmation |
 | **Owns a codegen harness** | a `codegen` Makefile target; `docs/codegen.md`; `<package>/generated/` beside `<package>/methods/` | the harness section below |
@@ -101,10 +101,22 @@ Facts the module leans on: `PipelexAPIClient()` reads `PIPELEX_API_KEY` and `PIP
 
 Parameters are keyword-only, typed from the signature: `str` for Text and Date (ISO 8601), `float` for Number, `bool` for YesNo, `dict[str, Any]` with a `url` key for Image and Document, the generated model for a structured concept or a composite native, `list[T]` for a list, `T | None = None` for a non-required input. Names are the pipe's input names as declared. A project that already constructs a `PipelexAPIClient` somewhere gets that construction reused instead of a fresh `async with` per call; an async-native project (FastAPI, an existing async codebase) gets the async function alone, without the `_sync` wrapper.
 
-## The drift gate — an honest asymmetry
+## The offline gate
 
-- **`python-pydantic`**: **no gate is installed.** `pipelex-sdk` has no offline check yet, and the only one that exists — `pipelex codegen check <dir>` — lives in the `pipelex` runtime, which a hosted-API consumer deliberately does not install. Do not add `pipelex` as a dependency to get a gate; that reverses the decision the target expresses. Write the sidecar anyway (refresh mode and `/pipelex-edit`'s staleness notice read it) and put this sentence in the report: *the generated tree is protected by its stamps and lock, but nothing in CI proves it current; run `/pipelex-integrate` again after every bundle edit.* When the Python SDK gains the check, this section becomes one line.
-- **`python-structures`**: the project already depends on `pipelex`, so wire `pipelex codegen check <package>/generated/<method>` into its existing gate (a Makefile `check` target, a workflow step). Exit codes: `0` current, `1` drift, `2` no lock or an unreadable lock. Offline: no engine boot, no network, no key.
+**`python-pydantic`.** Copy `references/codegen_check.py` verbatim to `scripts/codegen_check.py`, at the project root and never inside the import package, where a wheel would ship it. It imports only the standard library and `pipelex-sdk`, and runs `pipelex_sdk.codegen_check.run_codegen_check` over each generated directory — the SDK's mirror of `pipelex codegen check`, pure hashing with no engine, no network, no key and no `pipelex` runtime, carried by `pipelex-sdk` from 0.10.0 on — then compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk. Do not add `pipelex` as a dependency to get a gate: that reverses the decision the target expresses, and this gate needs nothing the consumer does not already have. The script writes through `sys.stdout` / `sys.stderr`, so a no-print rule (Ruff's `T201`) does not fire, and it passes pyright's strict mode, so leave it inside the type checker's coverage.
+
+Run it from the project root with **the project's own environment**, the one step 8 put `pipelex-sdk` in: `uv run python scripts/codegen_check.py …` under uv, `poetry run python …` under poetry, `pipenv run python …` under pipenv, and the active environment's `python` otherwise. An interpreter without the SDK does not guess: it exits `2` and names the fix. Extend the project's existing gate rather than inventing one — for a Makefile, a target the `check` target depends on:
+
+```make
+codegen-check: ## Offline drift check over the generated trees
+	uv run python scripts/codegen_check.py <package>/generated/summarize_pdf
+
+check: lint typecheck codegen-check
+```
+
+and otherwise the same command as a step of an existing workflow job, as a `repo: local` hook in `.pre-commit-config.yaml` (`language: system`, `pass_filenames: false`), or as a line of the `nox` / `tox` session that already lints. Add every method's directory to that command as it is integrated. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, a malformed or unreadable lock or tree, a symlink at the generated directory or on an artifact's path, `pipelex-sdk` not importable). It runs from the project root because `sources.json` records source paths relative to it. When `pipelex-sdk` ships this as a command of its own, the script is replaced by that one line.
+
+**`python-structures`.** The project already depends on `pipelex`, so wire `pipelex codegen check <package>/generated/<method>` into its existing gate (a Makefile `check` target, a workflow step). Exit codes: `0` current, `1` drift, `2` no lock or an unreadable lock. Offline: no engine boot, no network, no key.
 
 ## A project that owns a codegen harness
 

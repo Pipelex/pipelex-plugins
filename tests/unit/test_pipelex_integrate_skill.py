@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import ast
+import hashlib
+import json
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,7 +26,7 @@ class TestPipelexIntegrateSkill:
     REPO_ROOT = Path(__file__).parents[2]
     TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-integrate" / "SKILL.md.j2"
     REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-integrate" / "references"
-    REFERENCES = ("typescript.md", "python.md", "codegen-check.mjs")
+    REFERENCES = ("typescript.md", "python.md", "codegen-check.mjs", "codegen_check.py")
     RULES = (
         "**The write arm, always.** Every `mthds_codegen` call passes `output_dir`.",
         "never by calling again without `output_dir` and writing the returned bytes yourself",
@@ -89,10 +93,51 @@ class TestPipelexIntegrateSkill:
     # region telling an agent to read two lists owes it that the missing one is the empty one.
     ABSENT_DRIFTS_IS_EMPTY = re.compile(r"present only when (?:it is )?non-empty", re.IGNORECASE)
 
-    # Continuing leaves the step-10 gate red, which is the consequence the report owes the user — but
-    # step 10 installs no gate at all for a `python-pydantic` consumer, so an unqualified claim tells
-    # that user a check that does not exist is failing, and step 12 would say both things at once.
-    GATE_ONLY_WHERE_INSTALLED = re.compile(r"where the project has one|where a gate was installed|gets a gate at all", re.IGNORECASE)
+    # Continuing leaves the step-10 gate red, which is the consequence the report owes the user — but a
+    # project that owns a codegen harness skips step 10 for its own check, so the claim is about the
+    # step-10 gate only where one was installed. It was first written for the `python-pydantic`
+    # consumer, who then got no gate at all; that consumer has one now, and the claim covers it.
+    GATE_ONLY_WHERE_INSTALLED = re.compile(r"where the project has one|where a gate was installed", re.IGNORECASE)
+
+    # The sentences that told a `python-pydantic` consumer it has no offline gate. `pipelex-sdk` 0.10.0
+    # ships the check and step 10 installs it, so any of these coming back is a user told that nothing
+    # can prove their generated tree current while the SDK they were just given carries the proof.
+    STRUCK_NO_PYTHON_GATE = (
+        "no gate is installed",
+        "has no offline check yet",
+        "which a `python-pydantic` consumer does not",
+        "no offline drift check exists yet",
+        "the only drift guard a Python consumer has",
+        "the asymmetry sentence",
+        "gets no offline gate yet",
+    )
+
+    # The sidecars both offline gates are run against, so the Python twin fails closed exactly where the
+    # TypeScript script does. Bytes, because a byte-order mark and a non-UTF-8 file are cases; `None` is
+    # no `sources.json` at all. Each non-object case reported `current` with exit 0 in some version of
+    # one gate or the other before a guard went in.
+    SIDECAR_CASES: tuple[tuple[bytes | None, int], ...] = (
+        (b"null", 1),
+        (b"[]", 1),
+        (b'"a string"', 1),
+        (b"42", 1),
+        (b"true", 1),
+        (b'{"method": {"id": "mt_x"}}', 0),
+        (b'{"sources": {}}', 0),
+        (b'{"sources": null}', 1),
+        (b'{"sources": []}', 1),
+        (b"{", 1),
+        (b"\xef\xbb\xbf" + b'{"sources": {}}', 1),
+        (b"\xff", 1),
+        # Python's `json` accepts `NaN` where `JSON.parse` refuses it, so without its guard this one is
+        # green in the Python gate and red in the TypeScript one.
+        (b'{"sources": {}, "retries": NaN}', 1),
+        (None, 0),
+    )
+
+    # A python-pydantic artifact body, stamped and locked by `stamped` and `write_python_project`.
+    MODELS_BODY = "from pydantic import BaseModel\n\n\nclass Summary(BaseModel):\n    text: str\n"
+    FINGERPRINT = "f" * 64
 
     # `is_current` is `false` on the continuing branch and on the stopping one alike, so a region
     # that continues has to say it is not what the branch is read from. This is the assertion the
@@ -333,10 +378,8 @@ class TestPipelexIntegrateSkill:
         assert "the gate stays non-zero on that directory until it holds one generation" in regions["refresh mode"]
         assert "counts each one as a drift" in regions["step 12's report"]
 
-        # Every region that makes the gate claim qualifies it, because one of the three targets gets
-        # no gate: step 10 installs none for a `python-pydantic` consumer, where the refresh is the
-        # whole guard. Unqualified, step 12 would tell that user in one breath that the gate counts
-        # each orphan as a drift and that no offline drift check exists.
+        # Every region that makes the gate claim qualifies it, because a project that owns a codegen
+        # harness skips step 10 and keeps its own check (see `GATE_ONLY_WHERE_INSTALLED`).
         # Keyed on the claim and not on the step number: refresh mode makes it as "the gate stays
         # non-zero" without naming step 10 at all, so a guard spelled `"step 10" in region` skips the
         # one region whose wording does not carry the number.
@@ -345,8 +388,15 @@ class TestPipelexIntegrateSkill:
                 continue
             assert self.GATE_ONLY_WHERE_INSTALLED.search(region), (
                 f"{target_name}: {where} claims the step-10 gate counts the orphans without saying the project may "
-                f"have no gate — which a `python-pydantic` consumer does not: {region!r}"
+                f"have no step-10 gate — which a harness-owned project does not: {region!r}"
             )
+
+        # And no region may carve the Python consumer out of the claim any more. Step 10 installs that
+        # consumer's gate over `pipelex-sdk`'s own check, which counts an orphan as a drift exactly as the
+        # TypeScript one does, so the red gate after a continued run is theirs too.
+        for where, region in regions.items():
+            for struck in self.STRUCK_NO_PYTHON_GATE:
+                assert struck not in region, f"{target_name}: {where} still says a Python consumer has no gate: {struck!r}"
 
         # Partial detection stays partial detection rather than a clean tree.
         assert "say orphan detection was partial rather than reporting a clean tree" in regions["step 6's orphans branch"]
@@ -416,21 +466,8 @@ class TestPipelexIntegrateSkill:
         assert 'new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })' in gate
         assert "process.exit(await main" not in gate
 
-    @pytest.mark.parametrize(
-        ("sidecar", "expected_exit"),
-        [
-            ("null", 1),
-            ("[]", 1),
-            ('"a string"', 1),
-            ("42", 1),
-            ("true", 1),
-            ('{"method": {"id": "mt_x"}}', 0),
-            ('{"sources": {}}', 0),
-            ('{"sources": null}', 1),
-            ('{"sources": []}', 1),
-        ],
-    )
-    def test_the_gate_runs_and_refuses_a_non_object_sidecar(self, sidecar: str, expected_exit: int, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(("sidecar", "expected_exit"), SIDECAR_CASES)
+    def test_the_gate_runs_and_refuses_a_non_object_sidecar(self, sidecar: bytes | None, expected_exit: int, tmp_path: Path) -> None:
         """Run the gate, do not read it. Every case here was found by executing it, and the
         non-object-sidecar ones reported `current` with exit 0 before the guard went in — the
         failure the file's own header calls its one job to avoid.
@@ -463,7 +500,8 @@ class TestPipelexIntegrateSkill:
         tree.mkdir(parents=True)
         (tree / "codegen.lock").write_text("lock_version = 1\n", encoding="utf-8")
         (tree / "types.ts").write_text("export const x = 1;\n", encoding="utf-8")
-        (tree / "sources.json").write_text(sidecar, encoding="utf-8")
+        if sidecar is not None:
+            (tree / "sources.json").write_bytes(sidecar)
         result = subprocess.run(
             [node, str(gate), "generated/m"],
             cwd=tmp_path,
@@ -496,14 +534,271 @@ class TestPipelexIntegrateSkill:
         assert "**The call site is edited only if it no longer type-checks or the `pipe` record no longer matches the signature**" in body
         assert '"generator": "pipelex-integrate"' in body
 
-    def test_python_gate_asymmetry_is_honest(self) -> None:
+    def test_the_python_consumer_gets_a_gate_and_never_the_runtime(self) -> None:
+        """`pipelex-sdk` 0.10.0 ships `run_codegen_check`, the pure-hashing mirror of `pipelex codegen
+        check`, precisely so a hosted-API consumer has a gate without installing `pipelex`. Step 10 used
+        to tell that consumer no gate existed; it now installs one shaped like the TypeScript branch.
+        """
         body = self.integrate
-        assert "**Python, `python-pydantic`**: **no gate is installed.**" in body
-        assert "do not add `pipelex` as a dependency to get a gate" in body
+        python_branch = self.the_line(body, "- **Python, `python-pydantic`**:")
+        assert "copy [references/codegen_check.py](references/codegen_check.py) **verbatim** to `scripts/codegen_check.py`" in python_branch
+        assert "**extend the project's existing aggregate gate**" in python_branch
+        assert "**Run it with the project's own environment**" in python_branch
+        assert "never add `pipelex` as a dependency to get a gate" in python_branch
+        assert "exits `0` current / `1` drift or stale source / `2` no verdict" in python_branch
+        assert "A project with no aggregate gate gets the script and one sentence in the report saying where to call it." in python_branch
         assert "pipelex codegen check <dir>" in body
+        # The gate runs the SDK's check, which the project's pin has to reach.
+        assert "at least `pipelex-sdk` 0.10.0 for a `python-pydantic` consumer" in body
+        assert "where the drift gate was wired and the command that runs it" in self.the_line(
+            body, "What was generated and where; the target and why;"
+        )
+
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
-        assert "**no gate is installed.**" in python
+        assert "## The offline gate" in python
+        assert "Copy `references/codegen_check.py` verbatim to `scripts/codegen_check.py`" in python
+        assert "Run it from the project root with **the project's own environment**" in python
+        assert "Do not add `pipelex` as a dependency to get a gate" in python
         assert "there is **no barrel** in `pipelex_sdk` by design" in python
+
+        # Every place that told a Python consumer it has no gate, swept together: this skill, its
+        # reference, the sibling skills that repeated the claim, and the repo's own account of itself.
+        swept = (
+            self.TEMPLATE,
+            self.REFERENCES_DIR / "python.md",
+            self.REPO_ROOT / "templates" / "skills" / "pipelex-edit" / "SKILL.md.j2",
+            self.REPO_ROOT / "templates" / "skills" / "pipelex-design" / "SKILL.md.j2",
+            self.REPO_ROOT / "docs" / "decisions.md",
+            self.REPO_ROOT / "docs" / "build-targets.md",
+            self.REPO_ROOT / "README.md",
+            self.REPO_ROOT / "CHANGELOG.md",
+        )
+        for path in swept:
+            text = path.read_text(encoding="utf-8")
+            for struck in self.STRUCK_NO_PYTHON_GATE:
+                assert struck not in text, f"{path.relative_to(self.REPO_ROOT)} still says a Python consumer has no gate: {struck!r}"
+
+    @classmethod
+    def stamped(cls, body: str) -> tuple[str, str]:
+        """A Python artifact in the stamp grammar `pipelex-sdk` reads, and the body hash its lock records."""
+        content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        stamp = (
+            "# >>> pipelex-codegen-stamp >>>\n"
+            f"# crate_fingerprint: {cls.FINGERPRINT}\n"
+            "# engine_version: 0.0.0\n"
+            "# projection: types / python-pydantic\n"
+            "# options: {}\n"
+            f"# content_hash: {content_hash}\n"
+            "# <<< pipelex-codegen-stamp <<<\n"
+        )
+        return stamp + body, content_hash
+
+    def write_python_project(self, root: Path, method: str = "summarize") -> Path:
+        """A bundle under `methods/<method>/` and its generated tree under `generated/<method>/` — stamped
+        artifact, lock and sidecar, current by construction — and the tree's path."""
+        bundle = root / "methods" / method / "main.mthds"
+        bundle.parent.mkdir(parents=True)
+        bundle.write_text(f'domain = "{method}"\n', encoding="utf-8")
+        tree = root / "generated" / method
+        tree.mkdir(parents=True)
+        artifact, content_hash = self.stamped(self.MODELS_BODY)
+        (tree / "models.py").write_text(artifact, encoding="utf-8")
+        (tree / "codegen.lock").write_text(
+            f'lock_version = 1\ncrate_fingerprint = "{self.FINGERPRINT}"\nengine_version = "0.0.0"\n\n'
+            f'[[artifacts]]\npath = "models.py"\ncontent_hash = "{content_hash}"\n',
+            encoding="utf-8",
+        )
+        source = f"methods/{method}/main.mthds"
+        sidecar = {
+            "generator": "pipelex-integrate",
+            "method": {"files": [source]},
+            "target": "python-pydantic",
+            "sources": {source: hashlib.sha256(bundle.read_bytes()).hexdigest()},
+        }
+        (tree / "sources.json").write_text(json.dumps(sidecar), encoding="utf-8")
+        return tree
+
+    def run_python_gate(self, root: Path, *arguments: str, without_site_packages: bool = False) -> subprocess.CompletedProcess[str]:
+        """Copy the shipped script where step 10 puts it and run it from the project root, as a gate does.
+
+        It runs under this suite's own interpreter, whose environment carries `pipelex-sdk` as a dev
+        dependency; `without_site_packages` takes that environment away, as a wrong interpreter would.
+        """
+        gate = root / "scripts" / "codegen_check.py"
+        gate.parent.mkdir(parents=True, exist_ok=True)
+        gate.write_bytes((self.REFERENCES_DIR / "codegen_check.py").read_bytes())
+        isolation = ["-I", "-S"] if without_site_packages else []
+        return subprocess.run(
+            [sys.executable, *isolation, str(gate), *arguments],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    @staticmethod
+    def explain(result: subprocess.CompletedProcess[str]) -> str:
+        return f"exit {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_the_python_gate_passes_a_current_tree(self, tmp_path: Path) -> None:
+        """The baseline every other case mutates: a tree the SDK's check accepts, a sidecar whose source
+        hash matches the bundle on disk, exit 0 and nothing on stderr."""
+        self.write_python_project(tmp_path)
+        result = self.run_python_gate(tmp_path, "generated/summarize")
+        assert result.returncode == 0, self.explain(result)
+        assert f"tree current (crate {self.FINGERPRINT[:12]}, engine 0.0.0)" in result.stdout
+        assert result.stdout.endswith("codegen-check: current\n")
+        assert result.stderr == ""
+
+    @pytest.mark.parametrize(
+        ("mutation", "expected_line"),
+        [
+            pytest.param("edit below the stamp", "hand-edited: models.py", id="hand-edited"),
+            pytest.param("restamp a different body", "modified: models.py", id="modified"),
+            pytest.param("delete the artifact", "missing: models.py", id="missing"),
+            pytest.param("park a stamped file beside the tree", "orphan: stale.py", id="orphan"),
+            pytest.param("give the artifact a byte-order mark", "hand-edited: models.py", id="bom-artifact"),
+            pytest.param("edit the bundle", "stale-source: methods/summarize/main.mthds — edited since the types were generated", id="stale-source"),
+            pytest.param(
+                "delete the bundle", "stale-source: methods/summarize/main.mthds — recorded as a source but no longer on disk", id="source-gone"
+            ),
+        ],
+    )
+    def test_the_python_gate_reports_drift_and_stale_sources(self, mutation: str, expected_line: str, tmp_path: Path) -> None:
+        """Exit 1 for every drift the SDK's check reports and for a bundle edited or removed since the
+        types were generated. The orphan is the case the skill's continue path leaves behind: the gate
+        counts it as a drift in Python exactly as in TypeScript."""
+        tree = self.write_python_project(tmp_path)
+        models = tree / "models.py"
+        bundle = tmp_path / "methods" / "summarize" / "main.mthds"
+        match mutation:
+            case "edit below the stamp":
+                models.write_text(models.read_text(encoding="utf-8") + "# a hand edit\n", encoding="utf-8")
+            case "restamp a different body":
+                models.write_text(self.stamped(self.MODELS_BODY + "# a second generation\n")[0], encoding="utf-8")
+            case "delete the artifact":
+                models.unlink()
+            case "park a stamped file beside the tree":
+                (tree / "stale.py").write_text(self.stamped("VALUE = 1\n")[0], encoding="utf-8")
+            case "give the artifact a byte-order mark":
+                models.write_bytes(b"\xef\xbb\xbf" + models.read_bytes())
+            case "edit the bundle":
+                bundle.write_text(bundle.read_text(encoding="utf-8") + "# edited\n", encoding="utf-8")
+            case "delete the bundle":
+                bundle.unlink()
+            case _:
+                pytest.fail(f"unknown mutation {mutation!r}")
+        result = self.run_python_gate(tmp_path, "generated/summarize")
+        assert result.returncode == 1, self.explain(result)
+        assert expected_line in result.stderr, self.explain(result)
+        assert "Run /pipelex-integrate to refresh the generated types." in result.stderr
+        assert result.stdout.endswith("codegen-check: drift\n")
+
+    @pytest.mark.parametrize(
+        "mutation",
+        [
+            "delete the lock",
+            "corrupt the lock",
+            "name a symlink to the tree",
+            "name a directory that does not exist",
+            "delete the lock, break the sidecar",
+        ],
+    )
+    def test_the_python_gate_has_no_verdict_without_a_readable_lock(self, mutation: str, tmp_path: Path) -> None:
+        """Exit 2, never 1: no lock, a malformed lock and a symlinked generated directory are the absence
+        of a verdict, and a tree with no verdict is not read on to its sidecar — so a broken sidecar
+        beside a missing lock still reports no verdict rather than drift."""
+        tree = self.write_python_project(tmp_path)
+        argument = "generated/summarize"
+        match mutation:
+            case "delete the lock":
+                (tree / "codegen.lock").unlink()
+            case "corrupt the lock":
+                (tree / "codegen.lock").write_text("lock_version = [\n", encoding="utf-8")
+            case "name a symlink to the tree":
+                (tmp_path / "generated" / "link").symlink_to(tree, target_is_directory=True)
+                argument = "generated/link"
+            case "name a directory that does not exist":
+                argument = "generated/nowhere"
+            case "delete the lock, break the sidecar":
+                (tree / "codegen.lock").unlink()
+                (tree / "sources.json").write_bytes(b"null")
+            case _:
+                pytest.fail(f"unknown mutation {mutation!r}")
+        result = self.run_python_gate(tmp_path, argument)
+        assert result.returncode == 2, self.explain(result)
+        assert "  no verdict: " in result.stderr
+        assert "stale-source" not in result.stderr
+        assert result.stdout.endswith("codegen-check: no verdict\n")
+
+    @pytest.mark.parametrize(("sidecar", "expected_exit"), SIDECAR_CASES)
+    def test_the_python_gate_refuses_every_sidecar_the_typescript_gate_refuses(
+        self, sidecar: bytes | None, expected_exit: int, tmp_path: Path
+    ) -> None:
+        """The same table as the TypeScript gate's run, over a real current tree: the two scripts must
+        fail closed on the same malformed sidecars and stay green on the same legitimate ones."""
+        tree = self.write_python_project(tmp_path)
+        if sidecar is None:
+            (tree / "sources.json").unlink()
+        else:
+            (tree / "sources.json").write_bytes(sidecar)
+        result = self.run_python_gate(tmp_path, "generated/summarize")
+        assert result.returncode == expected_exit, f"sidecar {sidecar!r}: {self.explain(result)}"
+        if expected_exit == 0:
+            assert result.stdout.endswith("codegen-check: current\n")
+        else:
+            assert "stale-source: sources.json" in result.stderr
+            assert result.stdout.endswith("codegen-check: drift\n")
+
+    def test_the_python_gate_reports_the_worst_verdict_across_directories(self, tmp_path: Path) -> None:
+        """Precedence is no verdict > drift > current, whatever order the directories are named in, and a
+        gate given no directory has nothing to check."""
+        self.write_python_project(tmp_path, "summarize")
+        drifted = self.write_python_project(tmp_path, "extract")
+        (drifted / "models.py").write_text((drifted / "models.py").read_text(encoding="utf-8") + "# a hand edit\n", encoding="utf-8")
+        unlocked = self.write_python_project(tmp_path, "classify")
+        (unlocked / "codegen.lock").unlink()
+
+        assert self.run_python_gate(tmp_path, "generated/summarize").returncode == 0
+        assert self.run_python_gate(tmp_path, "generated/extract", "generated/summarize").returncode == 1
+        assert self.run_python_gate(tmp_path, "generated/classify", "generated/extract", "generated/summarize").returncode == 2
+        assert self.run_python_gate(tmp_path, "generated/summarize", "generated/extract", "generated/classify").returncode == 2
+
+        usage = self.run_python_gate(tmp_path)
+        assert usage.returncode == 2
+        assert usage.stderr.startswith("usage: python scripts/codegen_check.py")
+
+    def test_the_python_gate_has_no_verdict_outside_the_projects_environment(self, tmp_path: Path) -> None:
+        """Run by an interpreter that cannot import `pipelex-sdk` — a system `python3` instead of the
+        project's environment — the gate exits 2 and says how to run it. An uncaught ImportError would
+        exit 1, which a CI step reads as drift in a tree nobody checked."""
+        self.write_python_project(tmp_path)
+        result = self.run_python_gate(tmp_path, "generated/summarize", without_site_packages=True)
+        assert result.returncode == 2, self.explain(result)
+        assert "pipelex-sdk 0.10.0 or later is not importable" in result.stderr
+        assert "uv run python scripts/codegen_check.py" in result.stderr
+
+    def test_the_python_gate_imports_only_the_standard_library_and_the_sdk(self) -> None:
+        """What a consumer's project already has is all the script may need, and it keeps the two
+        decoding choices that make it refuse what the TypeScript gate refuses."""
+        script = (self.REFERENCES_DIR / "codegen_check.py").read_text(encoding="utf-8")
+        imported: list[str] = []
+        for node in ast.walk(ast.parse(script)):
+            if isinstance(node, ast.Import):
+                imported.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                imported.append(node.module or "")
+        assert imported, "the script should import something"
+        for module in imported:
+            top_level = module.split(".")[0]
+            assert top_level == "pipelex_sdk" or top_level in sys.stdlib_module_names, f"unexpected import: {module}"
+        assert "from pipelex_sdk.codegen_check import run_codegen_check" in script
+        assert "sys.stdout.write" in script and "sys.stderr.write" in script
+        assert "print(" not in script
+        # A BOM stays in the decoded sidecar, so `json.loads` refuses it; `utf-8-sig` would strip it.
+        assert '.read_bytes().decode("utf-8")' in script
+        assert '.decode("utf-8-sig")' not in script
+        assert "json.loads(text, parse_constant=_reject_json_constant)" in script
 
     def test_the_check_script_imports_only_node_builtins_and_the_sdk(self) -> None:
         script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
