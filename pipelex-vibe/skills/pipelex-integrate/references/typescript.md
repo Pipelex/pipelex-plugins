@@ -126,8 +126,9 @@ Add every method's directory to the `codegen:check` line as it is integrated, an
 
 ## A project that owns a codegen harness
 
-A project made from `pipelex-starter-js`, or one that copied its codegen kit, has: `npm run codegen` (regenerates every `methods/*` tree through the hosted `/v1/codegen`, writes `contracts.ts` and `sources.json` with a `derived` map), `npm run codegen:check` (offline, in `make check`), `npm run codegen:verify` (semantic, keyed), and `make add-method METHOD=<mt_…|github.com/…>` (manifest, tree, action trio, narrower, form, tab — one shot, never overwrites). On such a project:
+A project made from the method app (`pipelex-method-apps`' `webapp-js/`) or from `pipelex-starter-js`, or one that copied their codegen kit, has: `npm run codegen` (regenerates every `methods/*` tree through the hosted `/v1/codegen`, writes `contracts.ts` and `sources.json` with a `derived` map), `npm run codegen:check` (offline, in `make check`), `npm run codegen:verify` (semantic, keyed), and `make add-method METHOD=…` (the bundle or the manifest, the tree, the action trio, the narrower, the form, and the registry entry or tab — one shot, never overwrites). On such a project:
 
-- a local bundle goes under `methods/<name>/main.mthds`, then `npm run codegen`; the fan-out follows `docs/codegen.md` and the existing actions under `src/actions/` and narrowers under `src/types/`;
+- a local bundle is one command when `make add-method` takes a bundle path, as the method app's does and as its usage in `make help` says: `make add-method METHOD=<path to the bundle>` copies the bundle into `methods/<name>/` and writes the whole slice;
+- where `make add-method` takes only a catalog id or an address, as the gallery's does, a local bundle goes under `methods/<name>/main.mthds`, then `npm run codegen`; the fan-out follows `docs/codegen.md` and the existing actions under `src/actions/` and narrowers under `src/types/`;
 - a catalog or published method goes through `make add-method`;
 - the verification is `make check`; the refresh is `npm run codegen`; no `sources.json` of this skill's shape, no `scripts/codegen-check.mjs`, no second generated directory.
