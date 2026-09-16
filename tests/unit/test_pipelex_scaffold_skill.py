@@ -1207,7 +1207,13 @@ class TestMethodAppBranch:
             assert "report no URL" in body
             # No listener is a server that did not start, never a diagnosis about the host.
             assert "**Nothing listens** means the server did not start" in body
-            assert "| Nothing listens once the wait is spent | the server did not start" in body
+            assert "| Nothing listens on the port | the server did not start" in body
+            # A server still starting when the wait ends is stopped, launcher and descendants, before the retry.
+            assert "nothing to stop" not in body
+            assert dev.index("launcher=$!") < dev.index("until lsof")
+            assert 'stop_tree "$launcher"' in dev
+            # bash's and sh's built-in `pwd -P` keep the typed letter case, and `lsof` reports the disk's.
+            assert "dir=$(cd <dir> && env pwd -P)" in dev
             assert "which the template's newer versions do not" not in body
             # A retry never leaves the first server running on another port.
             assert "**Never start a second server while one this step started still runs**" in body
@@ -1219,8 +1225,8 @@ class TestMethodAppBranch:
             assert STOP_COMMAND in body
             # The report restarts the server on the port it reported, bound as the skill bound it.
             assert f"how to start it again (`{RESTART_COMMAND}` from inside the project)" in body
-            # Without lsof, port-check passes whatever holds the port and the listener cannot be read.
-            assert "The method app also needs `make`, `curl` and `lsof`" in body
+            # Without lsof, port-check passes whatever holds the port and the listener cannot be read; without pgrep, a slow start cannot be stopped.
+            assert "The method app also needs `make`, `curl`, `lsof` and `pgrep`" in body
             # The starters keep the ruling that the skill starts no server for them.
             assert body.index("do not start `make dev`") > body.index("#### A starter: hand off")
 
@@ -1278,9 +1284,20 @@ def _can_bind(host: str) -> bool:
         return True
 
 
-# The dev-server block waits on `lsof` and proves the page with `curl`; both are the method app's prerequisites.
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+# The dev-server block waits on `lsof`, stops a slow start with `pgrep` and proves the page with `curl`;
+# all three are the method app's prerequisites.
 NEEDS_SERVER_TOOLS = pytest.mark.skipif(
-    shutil.which("lsof") is None or shutil.which("curl") is None, reason="the dev-server block needs lsof and curl"
+    any(shutil.which(tool) is None for tool in ("lsof", "curl", "pgrep")), reason="the dev-server block needs lsof, pgrep and curl"
 )
 
 
@@ -1827,6 +1844,65 @@ class TestMethodAppRecipes:
         self._page(target)
         result = self._dev_block(target=target, port=port, shim_bin=shim_bin, tmp_path=tmp_path, shell=shell, bound="5")
         assert result.returncode != 0
-        assert f"nothing listens on port {port}" in result.stderr
+        assert f"nothing listens on port {port}: the server exited" in result.stderr
         assert "stopped" not in result.stderr
         assert "usage" not in result.stderr.lower()
+
+    @NEEDS_SERVER_TOOLS
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_dev_server_block_stops_a_server_still_starting_when_the_wait_ends(self, tmp_path: Path, shell: list[str]) -> None:
+        """A `make dev` that has not opened its port by the end of the wait is stopped, with every process under it.
+
+        The stand-in hands the start to a child that sleeps before it serves, as `make` hands it to npm
+        and npm to Next: stopping the launcher alone would leave that child to open the port later,
+        unchecked, while the retry starts a second server.
+        """
+        port = _free_port()
+        pid_file = tmp_path / "server.pid"
+        child_file = tmp_path / "child.pid"
+        shim_bin = self._make_shim(
+            tmp_path / "shim-bin",
+            '[ "$3" = dev ] || exit 0\n'
+            'cd "$2" || exit 1\n'
+            f'echo $$ > "{pid_file}"\n'
+            f'(sleep 30; exec "{sys.executable}" -m http.server "${{4#APP_PORT=}}" --bind 127.0.0.1) &\n'
+            f'echo $! > "{child_file}"\n'
+            "wait\n",
+        )
+        target = tmp_path / "receipt-review"
+        self._page(target)
+        try:
+            result = self._dev_block(target=target, port=port, shim_bin=shim_bin, tmp_path=tmp_path, shell=shell, bound="5")
+            assert result.returncode != 0
+            assert f"nothing listens on port {port} yet, so the server this command started was stopped" in result.stderr
+            launched = [int(path.read_text(encoding="utf-8").strip()) for path in (pid_file, child_file)]
+            deadline = time.monotonic() + 10
+            while any(_alive(pid) for pid in launched) and time.monotonic() < deadline:
+                time.sleep(0.1)
+            assert not any(_alive(pid) for pid in launched), "the block left a process it launched running"
+            assert not _answers(port)
+        finally:
+            self._stop(child_file)
+            self._stop(pid_file)
+
+    @NEEDS_SERVER_TOOLS
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_dev_server_block_knows_its_server_through_a_path_typed_in_another_case(self, tmp_path: Path, shell: list[str]) -> None:
+        """On a case-insensitive disk, a project named in another letter case is still the project.
+
+        The `pwd -P` built into bash and sh keeps the case the path was typed in, and `lsof` reports the
+        case on disk, so a block comparing the two would take its own server for a stranger.
+        """
+        self._page(tmp_path / "Receipt-Review")
+        typed = tmp_path / "receipt-review"
+        if not typed.exists():
+            pytest.skip("this disk tells letter case apart")
+        port = _free_port()
+        pid_file = tmp_path / "server.pid"
+        shim_bin = self._serving_shim(tmp_path / "shim-bin", pid_file, bind='"${5#APP_HOST=}"')
+        try:
+            result = self._dev_block(target=typed, port=port, shim_bin=shim_bin, tmp_path=tmp_path, shell=shell)
+            assert result.returncode == 0, result.stderr
+            assert result.stdout.splitlines()[0] == "200"
+        finally:
+            self._stop(pid_file)

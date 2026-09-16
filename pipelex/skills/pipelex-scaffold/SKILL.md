@@ -80,7 +80,7 @@ Check before touching anything, and **stop** on a missing piece with the exact t
 
 Three things this clause does not license. **A shim is not a runtime**: `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set", so the test is that `node --version` *answers*, not that the binary resolves — and that case is a stop, not a manager to activate. **The floor still applies**: a manager holding Node 18 does not satisfy the template's `engines` floor, and "a runtime the machine already has" never means a version below it. And **`volta` and `mise` install on first use** — `volta run`, `mise x` and `mise use` will fetch a version they do not have — which is the toolchain install this step forbids: use only a version the manager already holds, and stop rather than let it download one. Note too that `nvm`, `fnm` and `volta` manage Node alone and can never supply `uv`.
 
-- **JavaScript**: Node at or above the floor the template's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the templates' e2e specs `require()` it), and `npm`. The method app also needs `make`, `curl` and `lsof`: without `lsof` the template's `port-check` passes whatever holds the port, and step 6 can neither prove where its server listens nor stop it.
+- **JavaScript**: Node at or above the floor the template's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the templates' e2e specs `require()` it), and `npm`. The method app also needs `make`, `curl`, `lsof` and `pgrep`: without `lsof` the template's `port-check` passes whatever holds the port, and step 6 can neither prove where its server listens nor stop it; without `pgrep` step 6 cannot stop a server that has not opened its port in time.
 - **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
 - **Both**: `git`. The GitHub form also needs `gh` authenticated — `gh auth status`.
 
@@ -247,14 +247,19 @@ node -e 'const dev = JSON.parse(require("fs").readFileSync(process.argv[1], "utf
 
 The template names the host `-H ${APP_HOST:-127.0.0.1}`, and a script naming a loopback address itself passes too. On a refusal, start nothing and report no URL. Say that this copy's dev script does not bind the server to this machine, so this skill does not start it, and that the user can start it bound by hand with `npx next dev -H 127.0.0.1 -p <port>` from inside the project.
 
-Then start the server detached, so that it outlives the command that started it. The same command waits for the port to open, checks who holds it and where it listens, stops a server of this project's that listens beyond this machine before any page can compile, and only then requests the page:
+Then start the server detached, so that it outlives the command that started it. The same command waits for the port to open, stops everything it launched when the port has not opened by the end of the wait, checks who holds the port and where it listens, stops a server of this project's that listens beyond this machine before any page can compile, and only then requests the page. The directory is resolved by the external `pwd`, because the one built into bash and sh keeps the letter case the path was typed in, while `lsof` reports the case on disk:
 
 ```bash
-dir=$(cd <dir> && pwd -P) || exit 1
+dir=$(cd <dir> && env pwd -P) || exit 1
 log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
 nohup make -C "$dir" dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
-n=0; until lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || [ "$n" -ge 300 ]; do sleep 0.2; n=$((n + 1)); done
-lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || { echo "nothing listens on port <port>; server log: $log" >&2; exit 1; }
+launcher=$!
+stop_tree() { kill -STOP "$1" 2>/dev/null || return 0; for child in $(pgrep -P "$1"); do stop_tree "$child"; done; kill -TERM "$1" 2>/dev/null; kill -CONT "$1" 2>/dev/null; }
+n=0; until lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || ! kill -0 "$launcher" 2>/dev/null || [ "$n" -ge 300 ]; do sleep 0.2; n=$((n + 1)); done
+if ! lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1; then
+  if kill -0 "$launcher" 2>/dev/null; then stop_tree "$launcher"; echo "nothing listens on port <port> yet, so the server this command started was stopped; server log: $log" >&2; exit 1; fi
+  echo "nothing listens on port <port>: the server exited; server log: $log" >&2; exit 1
+fi
 for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do
   [ "$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)" = "$dir" ] || { echo "port <port> is held by pid $pid, which is not this project; server log: $log" >&2; exit 1; }
   if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print $9 }' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
@@ -267,7 +272,7 @@ grep -o '<title>[^<]*</title>' "$page"; echo "listening on this machine alone; s
 
 Each refusal names its cause, and each has one reading:
 
-- **Nothing listens** means the server did not start: read the log's tail, fix the cause, and retry on the same port.
+- **Nothing listens** means the server did not start. Either it exited before opening the port, or it had not opened the port by the end of the wait. In that second case the command stops the process it launched and every process under it, suspending each one before stopping its children so that none can start another. Either way, nothing this step started is still running: read the log's tail, fix the cause, and retry on the same port.
 - **A holder that is not this project** means another process took the port after `port-check` passed, and the `port-check` inside `make dev` refused. Leave that process alone and take the next port up.
 - **A server that listened beyond this machine** has already been stopped by the command itself. Report no URL and say that this copy's `make dev` does not bind the server to this machine, which the dev-script check above should have caught.
 
@@ -358,7 +363,7 @@ Two lines are easy to forget and matter:
 | The dev server's port is held by another directory | `port-check` names the holder; leave it alone and take the next port |
 | The port is already served by this checkout | a server this step started: stop it and take the same port again; one the user started: ask whether they stop it or you take the next port. Never leave two servers of this step's running |
 | The copy's dev script names no loopback host | start nothing and report no URL: its Server Actions would spend the key for anyone on the network. Say the user can start it bound by hand with `npx next dev -H 127.0.0.1 -p <port>` |
-| Nothing listens once the wait is spent | the server did not start: read the log's tail, fix the cause and retry on the same port; nothing to stop |
+| Nothing listens on the port | the server did not start: it exited, or it had not opened the port by the end of the wait and the command stopped everything it had launched. Read the log's tail, fix the cause and retry on the same port |
 | The port is held by a process that is not this project, after `port-check` passed | another process took it in between; leave it alone and take the next port |
 | The page does not answer `200` | read the server log's tail, fix the cause, stop the server this step started, and retry on the same port; never report a URL that did not answer |
 | The server listened beyond loopback | the start command has already stopped it; report no URL and say this copy's `make dev` does not bind the server to this machine |
