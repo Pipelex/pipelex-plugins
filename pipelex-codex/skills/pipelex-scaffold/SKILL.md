@@ -35,13 +35,23 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 - **The method app**: `package.json` still says `pipelex-method-webapp-js`, and `scripts/create.mts` is still there.
 - **A starter**: `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"`.
 
-**Make sure the copy is a repository of its own before reading anything from git.** A copy is often made without git (the method app's README copies the directory and runs `git init` afterwards), and a copy may sit inside another repository, whose `HEAD` and `origin` git would read instead. So test it, as branch B's step 3 does, and initialize only where the test fails:
+**Read git before initializing anything.** A copy is often made without git (the method app's README copies the directory and runs `git init` afterwards), and a copy may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-method-apps`, so git places its checkout inside the family repository, where it passes every test above. One command tells the cases apart, and initializes only a copy that no repository tracks:
 
 ```bash
-[ "$(git -C <dir> rev-parse --show-toplevel 2>/dev/null)" = "$(cd <dir> && pwd -P)" ] || git -C <dir> init -b main
+case "$(git -C <dir> remote get-url origin 2>/dev/null)" in
+  */Pipelex/pipelex-method-apps*|*:Pipelex/pipelex-method-apps*|*/Pipelex/pipelex-starter-*|*:Pipelex/pipelex-starter-*)
+    echo "this is a template's own checkout, not a copy of it" >&2; exit 1 ;;
+esac
+prefix=$(git -C <dir> rev-parse --show-prefix 2>/dev/null) || prefix=outside
+case "$prefix" in
+  "") ;;
+  outside) git -C <dir> init -b main ;;
+  *) if git -C <dir> ls-files -- . | grep -q .; then echo "an enclosing repository already tracks this directory" >&2; exit 1; fi
+     git -C <dir> init -b main ;;
+esac
 ```
 
-Then read the copy's `origin`: one pointing at `Pipelex/pipelex-method-apps` or `Pipelex/pipelex-starter-…` is the template's own checkout, which the last row of the failure table stops on. When the repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make step 3's pristine commit first, because the gesture's or the bootstrap's changes are reviewable only against it, and the Python bootstrap's `git mv` refuses a path git does not track. The directory is the user's, so that commit confirms like the one the Mode section describes.
+The `origin` it reads belongs to whichever repository holds the directory, and it is read before anything is initialized, so a template's own checkout stops here (the last row of the failure table) whether the directory is its repository's root or a directory inside it. `--show-prefix` prints nothing when the directory is its repository's root, which needs no path comparison and so survives symlinks and letter case. **A directory another repository already tracks is not a fresh copy**, whoever owns that repository, a fork of the family under another name included: stop and ask the user what they meant, rather than planting a second repository inside theirs. A copy that nothing tracks gets a repository of its own, whether it stands alone or sits untracked inside the user's repository, as branch B's step 3 does. When that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make step 3's pristine commit first, because the gesture's or the bootstrap's changes are reviewable only against it, and the Python bootstrap's `git mv` refuses a path git does not track. The directory is the user's, so that commit confirms like the one the Mode section describes.
 
 [references/starters.md](references/starters.md) compares the templates and carries every command below; [references/initializers.md](references/initializers.md) carries the initializers.
 
@@ -222,19 +232,39 @@ make -C <dir> port-check APP_PORT=4300
 
 A refusal naming another directory is another app: leave it alone, try 4301, then the next port up, and use the first one the check accepts. A refusal saying the port **is already served by this checkout** is this project's own server, not a holder to step around. When this step started it, on an attempt whose page did not answer, stop it with the report's stop command and take the same port again. When the user started it, say so and ask whether they stop it or you take the next port up. **Never start a second server while one this step started still runs**, because the report's stop command names one port.
 
-Then start the server detached, bound to this machine alone, so that it outlives the command that started it, make one request to the page, and read where the server listens:
+**The server listens on this machine alone, and a copy that cannot promise it is not started.** The page's Server Actions run the method with the key in `.env.local` and do not check who is calling, so a server reachable from the network lets anyone on it spend that key, from the moment the port opens, which is before the first page compiles. `next dev` listens on every interface unless its command line names a host, and no environment variable changes that. So before anything starts, read the dev script the copy's `make dev` runs:
 
 ```bash
-log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
-nohup make -C <dir> dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
-curl -sS -o "$page" -w '%{http_code}\n' --retry 60 --retry-delay 1 --retry-connrefused --retry-max-time 120 --max-time 120 "http://localhost:<port>/"
-grep -o '<title>[^<]*</title>' "$page"; echo "server log: $log"
-lsof -nP -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print "listening on " $9 }' | sort -u
+node -e 'const dev = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).scripts?.dev ?? ""; process.exit(/(^|\s)(-H|--hostname)(\s+|=)("?)(\$\{APP_HOST:-127\.0\.0\.1\}|127\.0\.0\.1|localhost|::1)\4(\s|$)/.test(dev) ? 0 : 1)' <dir>/package.json || { echo "this copy's dev server would listen on every interface" >&2; exit 1; }
 ```
 
-**The server listens on this machine alone.** The page's Server Actions run the method with the key in `.env.local` and do not check who is calling, so a server reachable from the network lets anyone on it spend that key. `APP_HOST=127.0.0.1` is the template's switch for it, and the last line proves the switch took: every `listening on` line must name `127.0.0.1:<port>` or `[::1]:<port>`. A `*:<port>`, any other address, or no line at all means this copy's `make dev` ignored the switch. Stop the server at once with the report's stop command, report no URL, and say that this copy's `make dev` listens on every interface, which the template's newer versions do not.
+The template names the host `-H ${APP_HOST:-127.0.0.1}`, and a script naming a loopback address itself passes too. On a refusal, start nothing and report no URL. Say that this copy's dev script does not bind the server to this machine, so this skill does not start it, and that the user can start it bound by hand with `npx next dev -H 127.0.0.1 -p <port>` from inside the project.
 
-The retries wait out the server's start and the first compilation of the page, for two minutes at most. A `200` under the project's title is the proof, since the page is the method's form. Anything else, including no answer once the retries are spent, is read from the server log's tail, fixed at the cause, and retried on the same port once the server this step started is stopped. **Never report a URL that did not answer.** Nothing is run through the method: this skill stops once the page answers.
+Then start the server detached, so that it outlives the command that started it. The same command waits for the port to open, checks who holds it and where it listens, stops a server of this project's that listens beyond this machine before any page can compile, and only then requests the page:
+
+```bash
+dir=$(cd <dir> && pwd -P) || exit 1
+log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
+nohup make -C "$dir" dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
+n=0; until lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || [ "$n" -ge 300 ]; do sleep 0.2; n=$((n + 1)); done
+lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || { echo "nothing listens on port <port>; server log: $log" >&2; exit 1; }
+for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do
+  [ "$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)" = "$dir" ] || { echo "port <port> is held by pid $pid, which is not this project; server log: $log" >&2; exit 1; }
+  if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print $9 }' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
+    kill "$pid"; echo "the server listened beyond this machine and was stopped; server log: $log" >&2; exit 1
+  fi
+done
+curl -sS -o "$page" -w '%{http_code}\n' --retry 60 --retry-delay 1 --retry-connrefused --retry-max-time 120 --max-time 120 "http://localhost:<port>/"
+grep -o '<title>[^<]*</title>' "$page"; echo "listening on this machine alone; server log: $log"
+```
+
+Each refusal names its cause, and each has one reading:
+
+- **Nothing listens** means the server did not start: read the log's tail, fix the cause, and retry on the same port.
+- **A holder that is not this project** means another process took the port after `port-check` passed, and the `port-check` inside `make dev` refused. Leave that process alone and take the next port up.
+- **A server that listened beyond this machine** has already been stopped by the command itself. Report no URL and say that this copy's `make dev` does not bind the server to this machine, which the dev-script check above should have caught.
+
+The retries wait out the first compilation of the page, for two minutes at most. A `200` under the project's title is the proof, since the page is the method's form. Anything else, including no answer once the retries are spent, is read from the server log's tail, fixed at the cause, and retried on the same port once the server this step started is stopped. **Never report a URL that did not answer.** Nothing is run through the method: this skill stops once the page answers.
 
 #### A starter: hand off
 
@@ -284,7 +314,7 @@ Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipele
 
 ## The report
 
-**On the method app, the URL comes first**: `http://localhost:<port>`, that the dev server runs in the background and answers on this machine alone, how to stop it (`kill $(lsof -ti tcp:<port> -sTCP:LISTEN)`), and how to start it again (`make dev APP_PORT=<port> APP_HOST=127.0.0.1` from inside the project). Then say, in this order:
+**On the method app, the URL comes first**: `http://localhost:<port>`, that the dev server runs in the background and answers on this machine alone, how to stop it (`for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do kill "$pid"; done`), and how to start it again (`make dev APP_PORT=<port> APP_HOST=127.0.0.1` from inside the project). Then say, in this order:
 
 - what was created and where, with the project name and title the gesture derived;
 - the template it came from, `pipelex-method-apps`' `webapp-js/`, at which version and SHA;
@@ -320,8 +350,11 @@ Two lines are easy to forget and matter:
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
 | The dev server's port is held by another directory | `port-check` names the holder; leave it alone and take the next port |
 | The port is already served by this checkout | a server this step started: stop it and take the same port again; one the user started: ask whether they stop it or you take the next port. Never leave two servers of this step's running |
+| The copy's dev script names no loopback host | start nothing and report no URL: its Server Actions would spend the key for anyone on the network. Say the user can start it bound by hand with `npx next dev -H 127.0.0.1 -p <port>` |
+| Nothing listens once the wait is spent | the server did not start: read the log's tail, fix the cause and retry on the same port; nothing to stop |
+| The port is held by a process that is not this project, after `port-check` passed | another process took it in between; leave it alone and take the next port |
 | The page does not answer `200` | read the server log's tail, fix the cause, stop the server this step started, and retry on the same port; never report a URL that did not answer |
-| The server listens beyond loopback, or `lsof` shows no listener | stop it at once with the report's stop command and report no URL: its Server Actions spend the key for anyone who reaches them. Say this copy's `make dev` ignores `APP_HOST` |
+| The server listened beyond loopback | the start command has already stopped it; report no URL and say this copy's `make dev` does not bind the server to this machine |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `PIPELEX_API_KEY` is not in the shell environment (a starter or an initializer) | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation. A base URL the shell sets is still copied, by the same command: when it is not production's, the report says the file points at another plane and warns that a key from `app.pipelex.com` is production's and will be refused there |
 | `PIPELEX_BASE_URL` is set in the shell | copy it, with the key or without one, inside the one command the file's key test guards and never as a second command after it; say the base URL came from the environment, and whether it is production's, read with a test (`[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production`) and never with an echo |

@@ -57,7 +57,7 @@ The pristine commit is a command of its own, because on a repository the user ma
 git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .
 ```
 
-Then, from inside the copy, `make create METHOD=<method>` with a bundle given as an absolute path, and `make dev APP_PORT=<port> APP_HOST=127.0.0.1` once it is green, so the server, whose Server Actions spend the key for whoever calls them, answers on this machine alone. Neither step is reimplemented here: `docs/create.md` in the copy is the reference.
+Then, from inside the copy, `make create METHOD=<method>` with a bundle given as an absolute path, and `make dev APP_PORT=<port> APP_HOST=127.0.0.1` once it is green, so the server, whose Server Actions spend the key for whoever calls them, answers on this machine alone. `/pipelex-scaffold` starts it only on a copy whose `package.json` dev script names the host (`next dev -H ${APP_HOST:-127.0.0.1} …`), because without that `next dev` listens on every interface whatever `APP_HOST` says, and it checks where the server listens before the first request. Neither step is reimplemented here: `docs/create.md` in the copy is the reference.
 
 A GitHub repository, on request, is created from the local copy after the pristine commit — the method app is a directory, not a template repository, so `--template` has nothing to point at — and confirmed first, visibility asked:
 
