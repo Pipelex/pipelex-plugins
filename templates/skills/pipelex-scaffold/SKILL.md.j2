@@ -1,19 +1,19 @@
 ---
 name: pipelex-scaffold
-description: Start a new project that will call MTHDS methods through Pipelex, in TypeScript or Python — from one of the Pipelex starter templates or from the ecosystem's own initializer — and hand it to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "set up a Pipelex project from scratch", "new Python CLI for this method", "which starter should I use", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user is standing in a freshly cloned pipelex-starter-js or pipelex-starter-python that has not been renamed yet — this skill runs the template's own bootstrap for them. Not for adding Pipelex to code that already exists: that is /pipelex-integrate.
+description: Start a new project that will call MTHDS methods through Pipelex, in TypeScript or Python — from a Pipelex template or from the ecosystem's own initializer. A TypeScript web app for a method comes from the method-app template, created for that method in one command and left running with its URL reported; every other project is handed to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "build me a web app for this method", "set up a Pipelex project from scratch", "new Python CLI for this method", "which starter should I use", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user stands in a fresh copy of a Pipelex template not yet made theirs — this skill finishes it with the template's own gesture. Not for adding Pipelex to code that already exists: that is /pipelex-integrate.
 {% include "skills/shared/frontmatter.md.j2" %}
 ---
 
 # Scaffold a project for Pipelex methods
 
-Give a user who has no project yet a project that is ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
+Give a user who has no project yet a project that runs their method, or one that is ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
 
-- **One of the Pipelex starters** when the user wants the opinionated shape: `pipelex-starter-js` for a web app whose forms are rendered from the methods' own contracts, `pipelex-starter-python` for a CLI or service that runs methods in the three execution modes. You acquire the template, commit it once as it came, then run the clone's **own** `bootstrap` skill — the rename logic lives in the starters and is never reimplemented here.
+- **A Pipelex template** when the user wants the opinionated shape. For a web app around a method, in TypeScript, that is **the method app**: the `webapp-js/` directory of `pipelex-method-apps`, a Next.js app that ships no method. You copy the directory, commit it once as it came, and run the copy's **own** `make create` with the user's method, which names the project after the method, scaffolds the method's form and result view, writes the env file and runs the project's checks. For a CLI or a service in Python, it is `pipelex-starter-python`. `pipelex-starter-js`, the gallery of worked examples the method app was extracted from, is acquired only when the user names it. A starter is cloned, committed once, then renamed by the clone's **own** `bootstrap` skill. The create gesture and the rename logic live in the templates and are never reimplemented here.
 - **The ecosystem's own initializer** when the user wants their framework or a minimal project: `uv init --package`, `npm create next-app@latest`, `django-admin startproject`, whatever the framework documents. You run it; you never assemble a project by hand.
 
-Both branches end the same way: an env file that follows the starters' convention, one pristine commit that makes everything after it reviewable, and the hand-off — to `/pipelex-integrate` when a method exists, to `/pipelex-design` first when none does.
+Every path makes one pristine commit, which makes everything after it reviewable. **The method app ends with the app running**: the method is already in the page, so the dev server is started and the report leads with its URL. The starters and the initializer end with an env file that follows the starters' convention and the hand-off — to `/pipelex-integrate` when a method exists, to `/pipelex-design` first when none does.
 
-**What this skill is not.** Not a template engine (no cookiecutter, no copier, no framework matrix of its own), not a bootstrap (the starters own theirs), not a runner or a dev-server launcher, not a deployer. It needs no MCP tool and no API key: git, the starters' scripts and the ecosystem's initializers are all it uses.
+**What this skill is not.** Not a template engine (no cookiecutter, no copier, no framework matrix of its own), not a bootstrap (the templates own theirs), not a runner, not a deployer. The one server it starts is the method app's own dev server, at the end of that path. It needs no MCP tool and never handles an API key itself: git, the templates' own gestures and the ecosystem's initializers are all it uses, and the method app's gesture reads the key where the user put it.
 
 ## Choosing the branch
 
@@ -22,33 +22,68 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 | Question | Signals, in order | When inconclusive |
 |---|---|---|
 | **Language** | the user's word; the language the method's consumer is written in; a framework the user named | ask |
-| **Which branch** | a **named framework** the starters do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"no demo code"**, **"just a project"** → the initializer; a **web app people use in a browser**, forms, an upload flow → the JS starter; a **CLI, script, batch job, worker or service** in Python → the Python starter | one question offering the matching starter first, saying what it brings (durable runs, forms or CLI modes, codegen wiring, CI, its own `release` skill) and what it costs (demos to keep as references or to strip) |
+| **Which branch** | a **named framework** the templates do not carry (FastAPI, Django, Express, Hono, a plain library, a Lambda) → the initializer; **"minimal"**, **"just a project"**, **"no template"** → the initializer; **`pipelex-starter-js`**, "the starter", "the gallery" or "with the examples" named → the gallery; a **web app people use in a browser** in TypeScript — forms, an upload flow, "an app for my method" — → the method app, and **"no demo code"** there too, since it ships none; a **CLI, script, batch job, worker or service** in Python → the Python starter; "no demo code" in Python → the initializer | one question offering the matching template first and the initializer beside it, saying what the template brings — the method app: a page rendering the method's form and result, durable runs, codegen wiring and CI, created for the method in one command and left running; the Python starter: CLI modes, codegen wiring, CI and its own `release` skill, with demos to keep as references or to strip. **The gallery is never offered**: it is acquired only when the user names it |
 | **Where** | the directory the user named; **"here"** when the working directory is empty — **and a directory whose only entry is `.git` is empty for this rule**, because `mkdir my-app && cd my-app && git init` is an ordinary way to arrive here and a repository the user made is not work of theirs to write over: branch B runs its initializer in the directory as it stands and leaves that repository alone — it does **not** re-run `git init` there, since Step 3's test finds `<dir>` is already its own repository — while branch A acquires beside it and moves in, so the repository already there goes on standing either way (Step 2); else a kebab-case directory named after the project | ask; never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room — the answer is another directory. **A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else** — not a class of files you may decide to overlook. Every other entry still refuses, `.DS_Store`, `.idea/`, `.vscode/` and `Thumbs.db` included: judging which of a user's files matter is the thing this rule exists to forbid, and a list that grows by guesswork is how it would come back. The rule is about **a directory you are creating a project in**, which is why the fresh-clone shortcut below is not an exception to it: there the project is already there and you are finishing it, not writing over someone's work |
-| **GitHub or local** | the user asked for a GitHub repository → `gh repo create --template`, after confirmation; otherwise a local clone with fresh history | local |
+| **GitHub or local** | the user asked for a GitHub repository → `gh repo create`, after confirmation (Step 2 says which form); otherwise a local copy with fresh history | local |
 
-**The fresh-clone shortcut.** A starter clone already in the working directory that has not been bootstrapped — `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"` — **and whose `origin` does not point at `Pipelex/pipelex-starter-…`** is branch A entered at step 4: acquisition already happened, so go straight to running the clone's bootstrap. Do not clone again.
+**The method app needs the method first.** It ships no method, and `make create` is the gesture that makes a copy the user's, so a user with no method yet goes to `/pipelex-design` first and comes back with the bundle. Nothing is copied meanwhile. The method is a bundle — a `.mthds` file or a directory of them — a catalog id (`mt_…`), or a published package address (`github.com/<owner>/<repo>[/<package>][@<tag>]`).
 
-[references/starters.md](references/starters.md) compares the two starters and carries every command below; [references/initializers.md](references/initializers.md) carries the initializers.
+**The method app's directory is named after the method** when the user named none: a bundle's `domain`, read from its `.mthds` file and kebab-cased, or a package address's last path segment without its tag, kebab-cased — the names `make create` gives the project. A catalog id carries no name you can read without a call, so ask.
+
+**The fresh-clone shortcut.** A copy of a template already in the working directory that has not been made the user's is branch A entered at step 4: acquisition already happened. Do not clone again.
+
+- **The method app**: `package.json` still says `pipelex-method-webapp-js`, `scripts/create.mts` is still there, and the repository's `origin` does not point at `Pipelex/pipelex-method-apps`. When that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make step 3's pristine commit first, because `make create`'s changes are reviewable only against it. The directory is the user's, so that commit confirms like the one the Mode section describes.
+- **A starter**: `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"`, and the `origin` does not point at `Pipelex/pipelex-starter-…`.
+
+[references/starters.md](references/starters.md) compares the templates and carries every command below; [references/initializers.md](references/initializers.md) carries the initializers.
 
 ## Mode
 
 Automatic by default, with the plugin's usual rules: an explicit user signal wins ("just do it" → automatic; "walk me through" → interactive); a genuinely ambiguous branch is one question, asked once; a request that gave every input up front proceeds without re-asking. Two things always confirm, in every mode: **`gh repo create`**, because it creates a repository on GitHub, and whatever the clone's bootstrap skill confirms on its own account. The pristine commit does not need confirmation **on a directory this skill created** — it holds the template as it came, and no user content is at stake. **The acquisition into a directory that already held a repository is the exception**, and it is a third thing that always confirms: there the commit lands on the user's branch, on top of their history, and `add -A -- .` records whatever their worktree was already showing along with the template (Step 3). None of the three grounds above holds, so state what will be staged and what it will land on, and ask — in every mode.
 
-## Branch A — one of the starters
+On the method app, interactive mode runs `make create` with `DRY_RUN=1` first and shows the user the identity and the plan it prints; automatic mode runs it directly, because its read-only half refuses before anything is written.
+
+## Branch A — a Pipelex template
 
 ### Step 1: Prerequisites
 
-Check before touching anything, and **stop** on a missing piece with the exact thing missing and the starter README's own line about it. Never install a toolchain — but a runtime the machine already has and only the `PATH` is missing is not a missing piece: when `node` or `uv` is absent while a version manager on the machine carries one (`nvm`, `fnm`, `volta`, `asdf`, `mise`), activate it for this work and say in the report which one you used and that the user's own shell may not have it. Stop only when no usable runtime can be reached that way.
+Check before touching anything, and **stop** on a missing piece with the exact thing missing and the template README's own line about it. Never install a toolchain — but a runtime the machine already has and only the `PATH` is missing is not a missing piece: when `node` or `uv` is absent while a version manager on the machine carries one (`nvm`, `fnm`, `volta`, `asdf`, `mise`), activate it for this work and say in the report which one you used and that the user's own shell may not have it. Stop only when no usable runtime can be reached that way.
 
-**Activating it means resolving it to an absolute path, not sourcing a shell.** Your shell state does not survive from one command to the next — each one starts again from the user's profile, which is the profile that did not have the runtime — so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next. Resolve the binary once (`ls "$NVM_DIR"/versions/node/*/bin/node`, `volta which node`, `mise which node`, `asdf which node`, `fnm exec --using=<v> -- which node`), keep that directory, and prefix **every** later command with it — `PATH="<that dir>:$PATH" …` — the clone's bootstrap and its `make all` / `make agent-check` included, because those are separate commands too. Verify the runtime answers under that prefix **before** step 2, so a machine you cannot actually reach stops while nothing has been created; discovering it at step 4 has already spent the pristine commit.
+**Activating it means resolving it to an absolute path, not sourcing a shell.** Your shell state does not survive from one command to the next — each one starts again from the user's profile, which is the profile that did not have the runtime — so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next. Resolve the binary once (`ls "$NVM_DIR"/versions/node/*/bin/node`, `volta which node`, `mise which node`, `asdf which node`, `fnm exec --using=<v> -- which node`), keep that directory, and prefix **every** later command with it — `PATH="<that dir>:$PATH" …` — the method app's `make create` and `make dev`, the clone's bootstrap and its `make all` / `make agent-check` included, because those are separate commands too. Verify the runtime answers under that prefix **before** step 2, so a machine you cannot actually reach stops while nothing has been created; discovering it at step 4 has already spent the pristine commit.
 
-Three things this clause does not license. **A shim is not a runtime**: `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set", so the test is that `node --version` *answers*, not that the binary resolves — and that case is a stop, not a manager to activate. **The floor still applies**: a manager holding Node 18 does not satisfy the starter's `engines` floor, and "a runtime the machine already has" never means a version below it. And **`volta` and `mise` install on first use** — `volta run`, `mise x` and `mise use` will fetch a version they do not have — which is the toolchain install this step forbids: use only a version the manager already holds, and stop rather than let it download one. Note too that `nvm`, `fnm` and `volta` manage Node alone and can never supply `uv`.
+Three things this clause does not license. **A shim is not a runtime**: `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set", so the test is that `node --version` *answers*, not that the binary resolves — and that case is a stop, not a manager to activate. **The floor still applies**: a manager holding Node 18 does not satisfy the template's `engines` floor, and "a runtime the machine already has" never means a version below it. And **`volta` and `mise` install on first use** — `volta run`, `mise x` and `mise use` will fetch a version they do not have — which is the toolchain install this step forbids: use only a version the manager already holds, and stop rather than let it download one. Note too that `nvm`, `fnm` and `volta` manage Node alone and can never supply `uv`.
 
-- **JavaScript**: Node at or above the floor the starter's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the starter's e2e specs `require()` it), and `npm`.
+- **JavaScript**: Node at or above the floor the template's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the templates' e2e specs `require()` it), and `npm`. The method app also needs `make` and `curl`.
 - **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
 - **Both**: `git`. The GitHub form also needs `gh` authenticated — `gh auth status`.
 
+**The method app also needs a key its gesture can read.** `make create` reads `PIPELEX_API_KEY` from the shell environment, or from an `.env.local` already in the project, and refuses without one. Test the shell before step 2 (`[ -n "${PIPELEX_API_KEY:-}" ] && echo set || echo unset`). When it is unset, say so before anything is created, and offer the two ways a key reaches the gesture without crossing the conversation: the user restarts the harness from a shell that exports it, or you carry on through step 3 and the user writes `<dir>/.env.local` themselves before you run step 4 — `cp .env.example .env.local`, then the key and the base URL of the plane that issued it, typed in their own editor. The gesture never touches an `.env.local` that already exists. The base URL follows the same path: the gesture runs against the plane the shell declares, or that file, and against production when neither declares one.
+
 ### Step 2: Acquire the template
+
+#### The method app
+
+The template is one directory of the `pipelex-method-apps` repository, and a project is a copy of that directory alone: the repository's root files — its own README, `VERSION`, the family's Makefile and workflows — are not part of it. So nothing is cloned into `<dir>`. The chain clones the repository shallow into a temporary path beside `<dir>`, reads the family's identity, copies `webapp-js/` in, and initializes a repository only where there is none. One chain serves a directory that does not exist, an empty one, and one whose only entry is `.git`:
+
+```bash
+mkdir -p <dir> && dir=$(cd <dir> && pwd) || exit 1
+case "$(ls -A "$dir")" in ""|.git) ;; *) exit 1 ;; esac
+tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-method-apps-XXXXXX") || exit 1
+git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+git -C "$tmp" rev-parse HEAD                     # the family SHA, for the commit message
+cat "$tmp/VERSION"                               # the family version, for the commit message
+[ -f "$tmp/webapp-js/package.json" ] || { echo "the default branch carries no webapp-js/" >&2; rm -rf "$tmp"; exit 1; }
+case "$(ls -A "$dir")" in ""|.git) ;; *) rm -rf "$tmp"; exit 1 ;; esac
+cp -R "$tmp/webapp-js"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
+rm -rf "$tmp"
+[ -e "$dir/.git" ] || git -C "$dir" init -b main
+```
+
+It is the starters' acquisition beside the directory, below, and the properties that make that one safe hold here for the reasons given there. The destination is resolved before its parent is taken, so a `<dir>` spelled `.` keeps the temporary path a sibling. No `rm -rf` addresses a path under `<dir>`. `cp -R "$tmp/webapp-js"/. "$dir"/` carries the entries beginning with a dot (`.gitignore`, `.env.example`, `.claude/`, `.husky/`). The directory is read once before anything is fetched and once more right before the copy, and anything but nothing or a lone `.git` stops the run with nothing copied and the temporary path removed. The chain goes out as one command. **The last line initializes only a directory with no repository of its own**, so a repository the user made goes on standing, and the pristine commit lands on their branch, as Step 3 says.
+
+**The `webapp-js/` test is load-bearing.** The copy takes the default branch's head, and a head that does not carry the directory would otherwise copy nothing and report success. Stop there, say what the clone lacked, and do not fall back to the gallery or to another directory of the repository.
+
+#### A starter
 
 **Local, the default.** Clone shallow, read the template's identity, then detach from it:
 
@@ -89,7 +124,9 @@ rm -rf "$tmp"
 
 **Nothing is initialized here.** The default recipe ends `git init -b main` because it has just deleted the only repository at that path. This one ends on the user's repository, their branch and their remote, which is the whole point of taking the long way round.
 
-**GitHub, on request.** When the user asked for a repository on GitHub:
+#### GitHub, on request
+
+**A starter** is a GitHub template repository. When the user asked for a repository on GitHub:
 
 ```bash
 gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone
@@ -97,23 +134,44 @@ gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone
 
 `--clone` takes no destination argument: it clones into `./<name>` under the current working directory, so for this form `<dir>` **is** `<name>` — either choose the repository name to match the directory the "Where" question settled, or rebind `<dir>` to `./<name>` before step 4, because every step after this one addresses `<dir>` literally. Visibility is the user's call: ask, default `--private`. Creating a repository on GitHub is outward-facing, so **state the exact command and confirm before running it**, in every mode. GitHub writes the initial commit itself — skip step 3 and continue at step 4. If `gh` is absent or not authenticated, fall back to the local clone and say the repository can be created later with `gh repo create --source .`.
 
-Both forms take the template's default-branch head. Do not offer a release tag unless the user asks for one.
+**The method app** is a directory, not a template repository, so `--template` has nothing to point at. Copy it locally as above and make the pristine commit, then create the repository from the copy — `gh repo create <owner>/<name> --private --source <dir> --remote origin` — confirmed in every mode like the other form, visibility asked. It pushes nothing; the user pushes once they have committed what `make create` changed.
+
+Every form takes the template's default-branch head. Do not offer a release tag unless the user asks for one.
 
 ### Step 3: Commit the pristine template — exactly once
 
 ```bash
-git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<starter> <version> (<sha>)" -- .
+git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<template> <version> (<sha>)" -- .
 ```
 
-This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came. One qualification on the acquisition into a directory that already held a repository: the commit lands on the user's branch, on top of their history rather than opening a new one, and `add -A -- .` also records whatever deletion their worktree was already showing — their own pending change and not one this skill made, so name it in the report instead of undoing it. That is the commit the Mode section sends back for confirmation, and this is what to put in front of the user: `git -C <dir> status --short` before staging says what will ride along, and it is the difference between a baseline commit and a line in their history that says "Start from Pipelex/…" over a change they made.
+`<template>` is `pipelex-method-apps/webapp-js`, `pipelex-starter-js` or `pipelex-starter-python`; for the method app, the version is the family's `VERSION`. This is the **one commit this skill makes**, and it is load-bearing twice over: the Python starter's bootstrap renames the package directory with `git mv`, which refuses a path git does not track, and a committed baseline is what turns `make create`'s or the bootstrap's edits into a diff the user can read before committing them. Nothing of the user's is in it — it is the template as it came. One qualification on the acquisition into a directory that already held a repository: the commit lands on the user's branch, on top of their history rather than opening a new one, and `add -A -- .` also records whatever deletion their worktree was already showing — their own pending change and not one this skill made, so name it in the report instead of undoing it. That is the commit the Mode section sends back for confirmation, and this is what to put in front of the user: `git -C <dir> status --short` before staging says what will ride along, and it is the difference between a baseline commit and a line in their history that says "Start from Pipelex/…" over a change they made.
 
-### Step 4: Run the clone's own bootstrap
+### Step 4: Make the project the user's
+
+#### The method app: run its create gesture
+
+```bash
+log=$(mktemp "${TMPDIR:-/tmp}/pipelex-create-XXXXXX") || exit 1
+make -C <dir> create METHOD='<method>' > "$log" 2>&1; rc=$?
+tail -n 40 "$log"; echo "make create exited $rc; the whole log is $log"
+```
+
+`<method>` is what the user has. A bundle, whether a `.mthds` file or a directory of them, is **given as an absolute path**, because the gesture reads a relative path from the directory make runs in, which is `<dir>` and not where the user stood; the gesture copies it into the project. A catalog id is `mt_…`, and a package address is `github.com/<owner>/<repo>[/<package>][@<tag>]`. Add `NAME='…'`, `TITLE='…'` and `DESCRIPTION='…'` only when the conversation already holds them or the user asked for something other than what the method carries, since the gesture derives all three from the method. Add `AUTHOR_NAME`, `AUTHOR_EMAIL`, `REPO_URL` and `LICENSE` only when the user gave them, because nothing is invented. `METHOD_NAME`, `PIPE` and `LABEL` answer a refusal that names them. Every value goes in single quotes, with a quote inside one spelled `'\''`, because the shell reads the line before make does.
+
+What the gesture does is the template's to say — `<dir>/docs/create.md`, until the gesture removes that document along with itself — and none of it is reimplemented here. It fetches the method once, scaffolds its slice, runs the template's bootstrap with the values it derived, writes `.env.local` with exactly one base-URL line, re-syncs the lock file, runs `make all`, and removes the bootstrap once that is green. It commits nothing. Give the command several minutes: on a fresh copy it installs the dependencies, and it ends with a production build. The gesture names variables and never prints their values, so the log's tail is safe to read. The `.env.local` it wrote is not: the rules of the env-file step below hold for it too.
+
+- **A refusal in its read-only half** leaves the copy exactly as it was, so the gesture can run again. Relay the message, supply a value it asks for from the conversation or by asking the user once, and re-run. A refusal naming a capability the API does not serve means the plane the gesture ran against does not serve what codegen needs yet. Say so, point at the template README's line on which plane does, and stop there: never substitute a base URL the user did not declare, because a key is refused by every plane but the one that issued it.
+- **A failure after the scaffold** cannot be undone by running the gesture again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off.
+
+#### A starter: run the clone's own bootstrap
 
 Read `<dir>/.claude/skills/bootstrap/SKILL.md` and follow it as written. The project's skills are not loaded in this session — it began elsewhere — so read the file; do not look for a `/bootstrap` command. Run every command it gives from inside the project directory (`cd <dir> && …`, or `-C <dir>`), because that skill assumes it is standing in the repo root.
 
 Feed it what the conversation already holds — the project name, title, description, author, repository URL, license — so that it asks once, consolidated, for whatever is left, exactly as its own Step 2 says. It dry-runs, previews, runs, re-syncs the lock file, runs the project's own checks (`make all` on JS; `make agent-check` and `make agent-test` on Python), and removes itself. Its rules stand unchanged: it never commits, its edits stay uncommitted for the user's review (the Python renames are staged by `git mv`, which its skill explains), and a red check is fixed, never skipped. **Add nothing to that procedure and reimplement none of it.** If the clone carries no bootstrap skill — a future template dropped it — follow the README's "manual equivalent" list and say that the template changed.
 
-### Step 5: The env file
+### Step 5: The env file — a starter only
+
+The method app's gesture wrote `.env.local` in step 4, or kept the one the user wrote, so on the method app go straight to step 6. On a starter:
 
 ```bash
 cp -n <dir>/.env.example <dir>/.env.local   # JS: Next.js reads .env.local
@@ -142,7 +200,28 @@ A file-editing tool is the one form that cannot be made safe, whatever it is cal
 
 A value that passed the test is copied verbatim and never inspected, so say in the report that it was taken from the environment **and not validated** — a placeholder someone exported once passes a presence test and fails the first run, and this skill never calls the API, so it cannot tell the difference. **The report names the plane the file points at, without printing the URL**, and reads whether a copied URL is the example's production URL by a test rather than an echo: `[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production || echo other`. When the base URL came from the environment together with the key, say so, and say whether it is production's. When the key came from the environment with no base URL beside it, or the shell set neither, say the file points at production as the example ships it. **When the base URL came from the environment without a key and is not production's, say the file points at another plane, and warn that a key from `app.pipelex.com` is production's and will be refused there — a key for that plane goes on the file's `PIPELEX_API_KEY=` line.** When it came without a key and is production's, say the file points at production and that its key comes from `app.pipelex.com`. Confirm the file is gitignored before writing a key into it — both starters ignore it, but check.
 
-### Step 6: Verify and hand off
+### Step 6: Start the app, or hand off
+
+#### The method app: start the dev server and prove the page answers
+
+`make create`'s `make all` is the verification. Then start the app. The template serves on port 4300, and its `port-check` target says whether a port is free and, when it is not, which process in which directory holds it:
+
+```bash
+make -C <dir> port-check APP_PORT=4300
+```
+
+On a refusal, leave the holder alone and try 4301, then the next port up, and use the first one the check accepts. Then start the server detached, so that it outlives the command that started it, and make one request to the page:
+
+```bash
+log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
+nohup make -C <dir> dev APP_PORT=<port> > "$log" 2>&1 &
+curl -sS -o "$page" -w '%{http_code}\n' --retry 60 --retry-delay 1 --retry-connrefused --max-time 120 "http://localhost:<port>/"
+grep -o '<title>[^<]*</title>' "$page"; echo "server log: $log"
+```
+
+The retries wait out the server's start and the first compilation of the page. A `200` under the project's title is the proof, since the page is the method's form. Anything else, including no answer once the retries are spent, is read from the server log's tail, fixed at the cause and retried. **Never report a URL that did not answer.** Nothing is run through the method: this skill stops once the page answers.
+
+#### A starter: hand off
 
 The bootstrap's own checks are the verification; do not start `make dev`. Write the report (below), then hand the user's method to `/pipelex-integrate`, which recognizes the starter's codegen harness (`npm run codegen`, `make codegen`, `make add-method`) and defers to it rather than writing a second one.
 
@@ -177,7 +256,7 @@ The `-- .` pathspec is the second half of the guard, and it is on **both** comma
 
 ### Step 4: The env file
 
-Write `.env.example` with the two lines the starters share, make sure `.env` is gitignored, and copy the example to `.env` under branch A's rule for the key and the base URL — the same one command, with `.env` in place of `.env.local`, so a base URL the shell sets is copied here too, with the key or without one:
+Write `.env.example` with the two lines the starters share, make sure `.env` is gitignored, and copy the example to `.env` under the rule of branch A's env-file step for the key and the base URL — the same one command, with `.env` in place of `.env.local`, so a base URL the shell sets is copied here too, with the key or without one:
 
 ```
 PIPELEX_BASE_URL=https://api.pipelex.com
@@ -190,31 +269,50 @@ Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipele
 
 ## The report
 
-Say, in this order: what was created and where; which template or initializer it came from, at which version and SHA; that this skill made exactly one commit and what it holds; what the bootstrap changed and that those changes are uncommitted for review, in the bootstrap's own words (branch A); which env file was written, whether the key was filled from the environment or left for the user, and which plane the file points at, named without printing the URL as branch A's env-file step says; the demos the starter still carries and where the README's removal checklist is (branch A); and the hand-off.
+**On the method app, the URL comes first**: `http://localhost:<port>`, that the dev server runs in the background, how to stop it (`kill $(lsof -ti tcp:<port> -sTCP:LISTEN)`), and how to start it again (`make dev` from inside the project). Then say, in this order:
+
+- what was created and where, with the project name and title the gesture derived;
+- the template it came from, `pipelex-method-apps`' `webapp-js/`, at which version and SHA;
+- that this skill made exactly one commit, and what it holds;
+- that `make create`'s changes are uncommitted for review (`git status`, `git diff`);
+- which plane `.env.local` points at, named without printing the URL;
+- how to add a second method, and how to regenerate after editing the bundle;
+- the two lines below.
+
+The plane is the one the gesture ran against. When the shell exports a base URL, it is that one, read with the plane test of branch A's env-file step and never with an echo. When the user wrote `.env.local` themselves, say it was kept, and do not read it. Otherwise it is production. A second method is `make add-method METHOD=…`, which takes a bundle path, a catalog id or an address, and renders two methods as tabs. The regeneration after editing the bundle is `npm run codegen`.
+
+**Otherwise, say in this order**: what was created and where; which template or initializer it came from, at which version and SHA; that this skill made exactly one commit and what it holds; what the bootstrap changed and that those changes are uncommitted for review, in the bootstrap's own words (a starter); which env file was written, whether the key was filled from the environment or left for the user, and which plane the file points at, named without printing the URL as branch A's env-file step says; the demos the starter still carries and where the README's removal checklist is (a starter); and the hand-off.
 
 Two lines are easy to forget and matter:
 
-- **The project's own instructions and skills load in a session started inside it.** Its `CLAUDE.md` / `AGENTS.md` and its `release` and `bump-*` skills are not in the current session; {% if platform == "claude" %}`cd <dir> && claude`{% else %}`cd <dir>`, then starting {{ harness_name }} there,{% endif %} is how they arrive.
-- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. One exception, and it is the version-manager machine of step 1: the workshop is spawned with `npx` on the **harness's** own `PATH`, which no activation of yours reaches, so a `node` only reachable through `nvm` or `fnm` means no workshop at all. Say so there instead — the hand-off needs the harness restarted from a shell where the runtime is active. Hand the method to it{% if platform == "claude" %} with `/pipelex-integrate`{% else %} by opening `../pipelex-integrate/SKILL.md` and following it{% endif %}; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first.
+- **The project's own instructions and skills load in a session started inside it.** Its `CLAUDE.md` / `AGENTS.md` and its own skills (`bump-sdk` and the like, and a starter's `release`) are not in the current session; {% if platform == "claude" %}`cd <dir> && claude`{% else %}`cd <dir>`, then starting {{ harness_name }} there,{% endif %} is how they arrive.
+- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. One exception, and it is the version-manager machine of step 1: the workshop is spawned with `npx` on the **harness's** own `PATH`, which no activation of yours reaches, so a `node` only reachable through `nvm` or `fnm` means no workshop at all. Say so there instead — the hand-off needs the harness restarted from a shell where the runtime is active. Hand the method to it{% if platform == "claude" %} with `/pipelex-integrate`{% else %} by opening `../pipelex-integrate/SKILL.md` and following it{% endif %}; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first. On the method app the method is already in the page, and `/pipelex-integrate` runs the project's `make add-method` for the next one.
 
 ## When something goes wrong
 
 | Condition | Do this |
 |---|---|
-| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the starter README's line about it; never install a toolchain — first check a version manager the machine already has (`nvm`, `fnm`, `volta`, `asdf`, `mise`) and use its runtime, saying so |
+| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first check a version manager the machine already has (`nvm`, `fnm`, `volta`, `asdf`, `mise`) and use its runtime, saying so |
 | The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse. On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it, which git refuses outright |
-| `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory, and on the acquisition beside an existing repository the chain removes its own temporary path and copies nothing |
-| `gh` is absent or not authenticated | fall back to the local clone; say the GitHub repository can be created later with `gh repo create --source .` |
-| The clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
+| `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory, and on an acquisition beside the directory the chain removes its own temporary path and copies nothing |
+| The method app's clone carries no `webapp-js/` | STOP: the chain copied nothing and removed its temporary path; say what the default branch lacked, and never fall back to the gallery or copy another directory |
+| `gh` is absent or not authenticated | fall back to the local copy; say the GitHub repository can be created later with `gh repo create --source .` |
+| The method app has no key for its gesture | before anything is created, say so and offer the two ways of Step 1 — a harness restarted from a shell that exports it, or an `.env.local` the user writes themselves before step 4; never ask for the key in the conversation |
+| `make create` refuses in its read-only half | relay its message; supply the value it asks for from the conversation or ask the user once, then re-run; for a capability the plane does not serve, stop and say which plane the template's README names — never a base URL the user did not declare |
+| `make create` fails after its scaffold | fix the cause, never by editing `src/generated/`, then run the steps its message names; never re-run the gesture, which refuses a project |
+| The method app's copy has no `make create` | STOP: the template changed; say so, and never assemble the app by hand |
+| A starter clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
+| The dev server's port is held | `port-check` names the holder; leave it alone and take the next port |
+| The page does not answer `200` | read the server log's tail, fix the cause and retry; never report a URL that did not answer |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
-| `PIPELEX_API_KEY` is not in the shell environment | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation. A base URL the shell sets is still copied, by the same command: when it is not production's, the report says the file points at another plane and warns that a key from `app.pipelex.com` is production's and will be refused there |
+| `PIPELEX_API_KEY` is not in the shell environment (a starter or an initializer) | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation. A base URL the shell sets is still copied, by the same command: when it is not production's, the report says the file points at another plane and warns that a key from `app.pipelex.com` is production's and will be refused there |
 | `PIPELEX_BASE_URL` is set in the shell | copy it, with the key or without one, inside the one command the file's key test guards and never as a second command after it; say the base URL came from the environment, and whether it is production's, read with a test (`[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production`) and never with an echo |
 | you need to know whether a key or a base URL is set | test it without printing it (`[ -n "${PIPELEX_API_KEY:-}" ] && echo set`, and the same for `PIPELEX_BASE_URL`); never `env \| grep PIPELEX`, never echo the value, never move it with a file-editing tool, never read the env file back — a key in the transcript is a key to rotate |
-| The working directory is the template's own checkout (its `origin` remote points at `Pipelex/pipelex-starter-…`) | STOP: this is the template, not a copy of it — acquire a copy in another directory. This is what separates it from the fresh-clone shortcut, which is a copy of the template and carries somebody else's `origin` or none |
+| The working directory is a template's own checkout (its `origin` remote points at `Pipelex/pipelex-method-apps` or `Pipelex/pipelex-starter-…`) | STOP: this is the template, not a copy of it — acquire a copy in another directory. This is what separates it from the fresh-clone shortcut, which is a copy of the template and carries somebody else's `origin` or none |
 
 ## Reference
 
-- [references/starters.md](references/starters.md) — the two starters side by side: what each brings, its prerequisite floors, the acquisition commands, its env file, its bootstrap, its demos and their removal checklist, and the codegen harness `/pipelex-integrate` will find.
+- [references/starters.md](references/starters.md) — the method app, the gallery and the Python starter side by side: what each brings, its prerequisite floors, the acquisition commands, its env file, its create gesture or bootstrap, its demos, and the codegen harness `/pipelex-integrate` will find.
 - [references/initializers.md](references/initializers.md) — per language, the minimal default and the common frameworks' non-interactive initializers, whether each runs `git init`, and where the import package or `src/` root lands.
-- `/pipelex-integrate` — the skill this one hands every project to.
+- `/pipelex-integrate` — the skill this one hands every project to, except a method app, which already runs its method.

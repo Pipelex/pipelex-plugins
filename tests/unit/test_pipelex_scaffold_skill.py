@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import shutil
+import signal
+import socket
 import subprocess
+import sys
+import time
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -22,6 +28,16 @@ BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
 # The one string both acquisition recipes point at a real remote, swapped for a
 # local repository so the recipes run as shipped without touching the network.
 STARTER_URL = "https://github.com/Pipelex/<starter>.git"
+
+# The method app's blocks, each named by a string that occurs in exactly one of them. The family's
+# URL is swapped for a local repository, as the starter's is, so the copy runs without the network.
+METHOD_APPS_URL = "https://github.com/Pipelex/pipelex-method-apps.git"
+METHOD_APP_MARKER = "pipelex-method-apps.git"
+CREATE_MARKER = "create METHOD='<method>'"
+DEV_SERVER_MARKER = "nohup make -C <dir> dev APP_PORT=<port>"
+PORT_CHECK_COMMAND = "make -C <dir> port-check APP_PORT=4300"
+STOP_COMMAND = "kill $(lsof -ti tcp:<port> -sTCP:LISTEN)"
+TARGETS = ("prod", "codex", "mistral-vibe")
 
 NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the acquisition recipes are git")
 
@@ -102,6 +118,26 @@ def _shells() -> list[list[str]]:
     return shells
 
 
+def _render_skill(target_name: str) -> str:
+    """The skill as one target's users read it, rendered from `templates/` in memory."""
+    config = load_target_config(REPO_ROOT / "targets", target_name)
+    rendered = render_templates(
+        REPO_ROOT / "templates",
+        REPO_ROOT,
+        config.template_vars,
+        include_skills=["pipelex-scaffold"],
+        target_name=config.name,
+    )
+    return next(content for path, content in rendered.items() if path.match("skills/pipelex-scaffold/SKILL.md"))
+
+
+def _git_commit(repository: Path, message: str) -> None:
+    subprocess.run(
+        ["git", "-C", str(repository), "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", message],
+        check=True,
+    )
+
+
 def _recipe(text: str, marker: str) -> str:
     """The one shipped bash block containing `marker`, verbatim.
 
@@ -176,15 +212,7 @@ class TestPipelexScaffoldSkill:
         conditionals are resolved here, and the committed trees under `pipelex*/` are built from
         exactly this call.
         """
-        config = load_target_config(self.REPO_ROOT / "targets", target_name)
-        rendered = render_templates(
-            self.REPO_ROOT / "templates",
-            self.REPO_ROOT,
-            config.template_vars,
-            include_skills=["pipelex-scaffold"],
-            target_name=config.name,
-        )
-        return next(content for path, content in rendered.items() if path.match("skills/pipelex-scaffold/SKILL.md"))
+        return _render_skill(target_name)
 
     def test_the_rules_are_stated(self) -> None:
         body = self.scaffold
@@ -586,7 +614,7 @@ class TestPipelexScaffoldSkill:
         body = self.scaffold
         assert "mcp__" not in body
         assert "plugin manifest spawns" not in body
-        assert "It needs no MCP tool and no API key" in body
+        assert "It needs no MCP tool and never handles an API key itself" in body
 
     def test_integrate_hands_a_missing_project_to_scaffold(self) -> None:
         integrate = (self.SKILLS / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -670,7 +698,7 @@ class TestPipelexScaffoldSkill:
         # `add -A -- .` bounds only the staging; a bare `git commit` commits the whole index,
         # so anything the user had staged in an enclosing repo would ride along. Both commits
         # carry the pathspec, which leaves their staged work staged.
-        assert 'commit -m "Start from Pipelex/<starter> <version> (<sha>)" -- .' in body
+        assert 'commit -m "Start from Pipelex/<template> <version> (<sha>)" -- .' in body
         assert 'commit -m "Scaffold <framework or language> project" -- .' in body
         assert "git -C <dir> add -A &&" not in body
         # The read-back must name paths; a --stat count cannot tell a scaffold from a swept worktree.
@@ -739,14 +767,11 @@ class TestScaffoldAcquisitionRecipes:
     """
 
     DEFAULT_MARKER = "rm -rf <dir>/.git && git -C <dir> init -b main"
-    PRESERVING_MARKER = "mktemp -d"
+    PRESERVING_MARKER = ".pipelex-starter-XXXXXX"
 
     @staticmethod
     def _commit(repository: Path, message: str) -> None:
-        subprocess.run(
-            ["git", "-C", str(repository), "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", message],
-            check=True,
-        )
+        _git_commit(repository, message)
 
     @pytest.fixture(scope="class")
     def starter(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
@@ -1056,5 +1081,393 @@ class TestScaffoldAcquisitionRecipes:
         config = load_target_config(REPO_ROOT / "targets", target_name)
         installed = (resolve_output_dir(REPO_ROOT, config.source) / "skills" / "pipelex-scaffold" / "SKILL.md").read_text(encoding="utf-8")
         template = SKILL_TEMPLATE.read_text(encoding="utf-8")
-        for marker in (self.DEFAULT_MARKER, self.PRESERVING_MARKER):
+        for marker in (self.DEFAULT_MARKER, self.PRESERVING_MARKER, METHOD_APP_MARKER, CREATE_MARKER, DEV_SERVER_MARKER):
             assert _recipe(installed, marker) == _recipe(template, marker), f"{target_name}: the shipped recipe is not the one executed here"
+
+
+class TestMethodAppBranch:
+    """The TypeScript branch is the method app, driven to a running page.
+
+    Ratified on 2026-09-16 with the method-app template: a TypeScript web app around a method is a
+    copy of `pipelex-method-apps`' `webapp-js/`, made the user's by the template's own `make create`
+    and left with its dev server up and its URL reported. The gallery, `pipelex-starter-js`, is
+    acquired only when the user names it. The skill carries none of the gesture: it copies,
+    commits once, drives the command and proves the page answers. Asserted on the template and on
+    every render, because a rule that holds only in `templates/` is a rule no user reads.
+    """
+
+    @staticmethod
+    def bodies() -> list[str]:
+        return [SKILL_TEMPLATE.read_text(encoding="utf-8")] + [_render_skill(target) for target in TARGETS]
+
+    def test_the_typescript_branch_copies_the_method_app_and_the_gallery_waits_to_be_named(self) -> None:
+        for body in self.bodies():
+            assert "the `webapp-js/` directory of `pipelex-method-apps`" in body
+            assert (
+                "`pipelex-starter-js`, the gallery of worked examples the method app was extracted from, is acquired only when the user names it"
+                in body
+            )
+            assert "**The gallery is never offered**" in body
+            assert "**The method app needs the method first.**" in body
+            recipe = _recipe(body, METHOD_APP_MARKER)
+            # Only the template directory crosses, and only into a directory the "Where" rule admits.
+            assert 'cp -R "$tmp/webapp-js"/. "$dir"/' in recipe
+            assert recipe.count('case "$(ls -A "$dir")" in ""|.git)') == 2, "the directory is read before the fetch and again before the copy"
+            assert '[ -f "$tmp/webapp-js/package.json" ]' in recipe
+            # A repository the user made is never initialized over.
+            assert recipe.rstrip().endswith('[ -e "$dir/.git" ] || git -C "$dir" init -b main')
+            assert "**The `webapp-js/` test is load-bearing.**" in body
+            assert "do not fall back to the gallery" in body
+            # One pristine commit for every template, named by the family and the directory.
+            assert "`<template>` is `pipelex-method-apps/webapp-js`, `pipelex-starter-js` or `pipelex-starter-python`" in body
+            # The method app is not a template repository, so the GitHub form starts from the copy.
+            assert "gh repo create <owner>/<name> --private --source <dir> --remote origin" in body
+
+    def test_the_create_gesture_is_driven_and_never_reimplemented(self) -> None:
+        for body in self.bodies():
+            create = _recipe(body, CREATE_MARKER)
+            assert "make -C <dir> create METHOD='<method>'" in create
+            assert "**given as an absolute path**" in body
+            assert "only when the conversation already holds them or the user asked for something other than what the method carries" in body
+            assert "none of it is reimplemented here" in body
+            assert "never by editing `src/generated/`" in body
+            assert "It commits nothing." in body
+            # The gesture writes its own env file, so the skill's env-file step is the starters' alone.
+            assert "### Step 5: The env file — a starter only" in body
+            assert "The method app's gesture wrote `.env.local` in step 4" in body
+            # The key reaches the gesture without crossing the conversation, and before anything is made.
+            assert "**The method app also needs a key its gesture can read.**" in body
+            assert "never ask for the key in the conversation" in body
+            assert "never substitute a base URL the user did not declare" in body
+
+    def test_no_block_assigns_a_name_zsh_reserves(self) -> None:
+        """`status` is read-only in zsh, the default shell on macOS, so `status=$?` aborts the line."""
+        for body in self.bodies():
+            for block in _bash_blocks(body):
+                assert re.search(r"(^|[\s;])(status|path|argv)=", block) is None, f"a block assigns a zsh-reserved name: {block!r}"
+
+    def test_the_method_app_ends_with_the_page_answering_and_the_url_first(self) -> None:
+        for body in self.bodies():
+            assert "The one server it starts is the method app's own dev server" in body
+            assert PORT_CHECK_COMMAND in body
+            dev = _recipe(body, DEV_SERVER_MARKER)
+            assert "--retry-connrefused" in dev
+            assert "**Never report a URL that did not answer.**" in body
+            assert "Nothing is run through the method" in body
+            assert "**On the method app, the URL comes first**" in body
+            assert STOP_COMMAND in body
+            # The starters keep the ruling that the skill starts no server for them.
+            assert body.index("do not start `make dev`") > body.index("#### A starter: hand off")
+
+    def test_the_reference_puts_the_method_app_first_and_carries_its_recipe(self) -> None:
+        reference = STARTERS_REFERENCE.read_text(encoding="utf-8")
+        assert "| | The method app (`pipelex-method-apps/webapp-js`) | `pipelex-starter-js` (the gallery) | `pipelex-starter-python` |" in reference
+        assert "The skill acquires it only when the user names it." in reference
+        # The reference's chain is the skill's, followed by the pristine commit.
+        skill_recipe = _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), METHOD_APP_MARKER)
+        reference_recipe = _recipe(reference, METHOD_APP_MARKER)
+        assert reference_recipe.startswith(skill_recipe), "the reference ships a different copy-out chain than the skill"
+        assert 'commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .' in reference_recipe
+        assert "gh repo create <owner>/<name> --private --source <dir> --remote origin" in reference
+
+    def test_integrate_runs_the_bundle_arm_on_a_project_that_has_one(self) -> None:
+        """A project made from the method app scaffolds a local bundle with one command.
+
+        The gallery's `make add-method` refuses a bundle path, so `/pipelex-integrate` sent every
+        local bundle down the hand-written route. The method app's takes one, and its usage says so.
+        """
+        integrate = (REPO_ROOT / "templates" / "skills" / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "**a local bundle is one command when the project's `make add-method` takes a bundle path**" in integrate
+        assert "**otherwise, place the method where the project keeps them**" in integrate
+        typescript = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "typescript.md").read_text(encoding="utf-8")
+        assert "a local bundle is one command when `make add-method` takes a bundle path" in typescript
+        assert "where `make add-method` takes only a catalog id or an address, as the gallery's does" in typescript
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = probe.getsockname()[1]
+        return port
+
+
+def _answers(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2) as response:
+            return bool(response.status == 200)
+    except OSError:
+        return False
+
+
+@NEEDS_GIT
+class TestMethodAppRecipes:
+    """The method app's blocks, extracted from the skill and executed.
+
+    The copy-out chain touches a directory the user may have made, so it is proven the way the
+    starters' acquisition is: run as shipped against a local repository standing in for the
+    family, with only the URL and `<dir>` bound. The create and dev-server blocks are run too,
+    against a `make` stand-in, in every POSIX shell on the machine: they are commands an agent
+    types, and a harness may run them in any of those shells.
+    """
+
+    WEBAPP_ENTRIES = frozenset({"package.json", "README.md", "src", "scripts", ".gitignore", ".env.example", ".claude", ".husky"})
+
+    @staticmethod
+    def _make_family(root: Path, *, with_webapp: bool) -> Path:
+        """A stand-in for `pipelex-method-apps`: family files at the root, the template in `webapp-js/`."""
+        (root / ".github" / "workflows").mkdir(parents=True)
+        (root / "VERSION").write_text("0.2.0\n", encoding="utf-8")
+        (root / "README.md").write_text("# the family\n", encoding="utf-8")
+        (root / "Makefile").write_text("check:\n\ttrue\n", encoding="utf-8")
+        (root / ".github" / "workflows" / "family.yml").write_text("name: family\n", encoding="utf-8")
+        if with_webapp:
+            webapp = root / "webapp-js"
+            for directory in ("src", "scripts", ".claude/skills/bootstrap", ".husky"):
+                (webapp / directory).mkdir(parents=True)
+            (webapp / "package.json").write_text('{"name": "pipelex-method-webapp-js", "version": "0.2.0"}\n', encoding="utf-8")
+            (webapp / "README.md").write_text("# the web app template\n", encoding="utf-8")
+            (webapp / "src" / "page.tsx").write_text("export default function Page() {}\n", encoding="utf-8")
+            (webapp / "scripts" / "create.mts").write_text("// the create gesture\n", encoding="utf-8")
+            (webapp / ".gitignore").write_text("node_modules/\n.env*.local\n", encoding="utf-8")
+            (webapp / ".env.example").write_text("PIPELEX_BASE_URL=https://api.pipelex.com\nPIPELEX_API_KEY=\n", encoding="utf-8")
+            (webapp / ".claude" / "skills" / "bootstrap" / "SKILL.md").write_text("# bootstrap\n", encoding="utf-8")
+            (webapp / ".husky" / "pre-commit").write_text("npx lint-staged\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "init", "-q", "-b", "main"], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+        _git_commit(root, "the family as it came")
+        return root
+
+    @pytest.fixture(scope="class")
+    def family(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
+        return self._make_family(tmp_path_factory.mktemp("method-apps"), with_webapp=True)
+
+    @property
+    def recipe(self) -> str:
+        return _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), METHOD_APP_MARKER)
+
+    def _run(
+        self,
+        *,
+        family: Path,
+        target: Path,
+        shell: list[str] | None = None,
+        dir_literal: str | None = None,
+        cwd: Path | None = None,
+        path_prefix: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        script = self.recipe.replace(METHOD_APPS_URL, f"file://{family}").replace("<dir>", dir_literal or str(target))
+        assert "<dir>" not in script and "github.com" not in script, "a placeholder survived the binding"
+        environment = dict(os.environ)
+        if path_prefix is not None:
+            environment["PATH"] = f"{path_prefix}{os.pathsep}{environment['PATH']}"
+        return subprocess.run(
+            [*(shell or ["bash"]), "-c", script],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=environment,
+            cwd=None if cwd is None else str(cwd),
+        )
+
+    @staticmethod
+    def _git(repository: Path, *arguments: str) -> str:
+        return subprocess.run(["git", "-C", str(repository), *arguments], capture_output=True, text=True, check=True).stdout
+
+    @staticmethod
+    def _entries(directory: Path) -> set[str]:
+        return {entry.name for entry in directory.iterdir()}
+
+    @staticmethod
+    def _temporaries_beside(target: Path) -> list[str]:
+        return [entry.name for entry in target.parent.iterdir() if entry.name.startswith(".pipelex-method-apps-")]
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_copy_populates_a_directory_that_does_not_exist(self, family: Path, tmp_path: Path, shell: list[str]) -> None:
+        target = tmp_path / "receipt-review"
+        result = self._run(family=family, target=target, shell=shell)
+        assert result.returncode == 0, result.stderr
+        # The template directory alone: none of the family's root files came with it.
+        assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
+        assert (target / "README.md").read_text(encoding="utf-8") == "# the web app template\n"
+        assert (target / ".claude" / "skills" / "bootstrap" / "SKILL.md").is_file()
+        assert (target / ".husky" / "pre-commit").is_file()
+        # A fresh repository, with no history and no remote, and the family's identity printed.
+        assert self._git(target, "remote") == ""
+        assert subprocess.run(["git", "-C", str(target), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert "0.2.0" in result.stdout
+        assert self._git(family, "rev-parse", "HEAD").strip() in result.stdout
+        assert self._temporaries_beside(target) == []
+
+    def test_the_copy_populates_an_empty_directory(self, family: Path, tmp_path: Path) -> None:
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        result = self._run(family=family, target=target)
+        assert result.returncode == 0, result.stderr
+        assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_copy_leaves_the_users_repository_standing(self, family: Path, tmp_path: Path, shell: list[str]) -> None:
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "trunk"], check=True)
+        (target / "NOTES.md").write_text("mine\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(target), "add", "NOTES.md"], check=True)
+        _git_commit(target, "my own first commit")
+        subprocess.run(["git", "-C", str(target), "rm", "-q", "NOTES.md"], check=True)
+        _git_commit(target, "and then I emptied the worktree")
+        subprocess.run(["git", "-C", str(target), "remote", "add", "origin", "https://github.com/someone/theirs.git"], check=True)
+        before = (self._git(target, "log", "--format=%H"), self._git(target, "reflog"), self._git(target, "rev-parse", "--abbrev-ref", "HEAD"))
+        assert self._entries(target) == {".git"}
+
+        result = self._run(family=family, target=target, shell=shell)
+
+        assert result.returncode == 0, result.stderr
+        # Not re-initialized: the same history, reflog, branch and remote.
+        assert (
+            self._git(target, "log", "--format=%H"),
+            self._git(target, "reflog"),
+            self._git(target, "rev-parse", "--abbrev-ref", "HEAD"),
+        ) == before
+        assert "https://github.com/someone/theirs.git" in self._git(target, "remote", "-v")
+        assert "pipelex-method-apps" not in self._git(target, "remote", "-v")
+        assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
+
+    @pytest.mark.parametrize("spelling", [".", "./"])
+    def test_the_copy_serves_the_destination_spelled_here(self, family: Path, tmp_path: Path, spelling: str) -> None:
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "main"], check=True)
+        result = self._run(family=family, target=target, dir_literal=spelling, cwd=target)
+        assert result.returncode == 0, result.stderr
+        assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
+        assert self._temporaries_beside(target) == []
+
+    @pytest.mark.parametrize(
+        "occupants",
+        [{"theirs.txt"}, {".git", "theirs.txt"}, {".DS_Store", ".idea", ".vscode", "Thumbs.db"}],
+        ids=["a-file", "git-and-a-file", "ignorable-cruft"],
+    )
+    def test_the_copy_refuses_anything_but_nothing_or_a_lone_git(self, family: Path, tmp_path: Path, occupants: set[str]) -> None:
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        for name in occupants:
+            if name == ".git":
+                subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "main"], check=True)
+            elif name in {".idea", ".vscode"}:
+                (target / name).mkdir()
+            else:
+                (target / name).write_text("mine\n", encoding="utf-8")
+        result = self._run(family=family, target=target)
+        assert result.returncode != 0
+        assert self._entries(target) == occupants
+        assert self._temporaries_beside(target) == []
+
+    def test_the_copy_stops_when_the_default_branch_carries_no_webapp_js(self, tmp_path: Path) -> None:
+        """The family's `main` before its mono-repo release: a head with no `webapp-js/` copies nothing."""
+        old_family = self._make_family(tmp_path / "old-family", with_webapp=False)
+        target = tmp_path / "receipt-review"
+        result = self._run(family=old_family, target=target)
+        assert result.returncode != 0
+        assert "no webapp-js/" in result.stderr
+        assert self._entries(target) == set()
+        assert self._temporaries_beside(target) == []
+
+    def test_the_copy_removes_its_temporary_path_when_the_clone_fails(self, tmp_path: Path) -> None:
+        target = tmp_path / "receipt-review"
+        result = self._run(family=tmp_path / "no-such-repository", target=target)
+        assert result.returncode != 0
+        assert self._temporaries_beside(target) == []
+        assert self._entries(target) == set()
+
+    def test_no_delete_in_the_copy_addresses_a_path_under_the_target(self, family: Path, tmp_path: Path) -> None:
+        real_rm = shutil.which("rm")
+        assert real_rm is not None, "these tests already require a POSIX userland"
+        log = tmp_path / "rm-targets.log"
+        shim_bin = tmp_path / "shim-bin"
+        shim_bin.mkdir()
+        shim = shim_bin / "rm"
+        shim.write_text(
+            f'#!/bin/sh\nfor a in "$@"; do case "$a" in -*) ;; *) echo "$a" >> "{log}";; esac; done\nexec {real_rm} "$@"\n', encoding="utf-8"
+        )
+        shim.chmod(0o755)
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "main"], check=True)
+
+        result = self._run(family=family, target=target, path_prefix=shim_bin)
+
+        assert result.returncode == 0, result.stderr
+        deleted = [line for line in log.read_text(encoding="utf-8").splitlines() if line]
+        assert deleted, "the shim recorded nothing — the chain no longer deletes, or the shim was bypassed"
+        assert [line for line in deleted if Path(line) == target or target in Path(line).parents] == []
+        assert all(".pipelex-method-apps-" in line for line in deleted), deleted
+
+    @staticmethod
+    def _make_shim(directory: Path, body: str) -> Path:
+        directory.mkdir(exist_ok=True)
+        shim = directory / "make"
+        shim.write_text(f"#!/bin/sh\n{body}", encoding="utf-8")
+        shim.chmod(0o755)
+        return directory
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize("exit_code", [0, 3])
+    def test_the_create_block_runs_the_gesture_and_reports_its_exit(self, tmp_path: Path, shell: list[str], exit_code: int) -> None:
+        """The block reports the gesture's exit status in every shell, zsh included, where `status` is read-only."""
+        arguments_log = tmp_path / "make-arguments.log"
+        shim_bin = self._make_shim(tmp_path / "shim-bin", f'printf \'%s\\n\' "$@" > "{arguments_log}"\necho "the gesture ran"\nexit {exit_code}\n')
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        bundle = tmp_path / "my bundles" / "receipt_review"
+        block = _recipe(_render_skill("prod"), CREATE_MARKER).replace("<dir>", str(target)).replace("<method>", str(bundle))
+        environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}", "TMPDIR": str(tmp_path)}
+
+        result = subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, env=environment)
+
+        assert result.returncode == 0, result.stderr
+        assert "the gesture ran" in result.stdout
+        assert f"make create exited {exit_code};" in result.stdout
+        # The path reaches make as one argument, space and all.
+        assert arguments_log.read_text(encoding="utf-8").splitlines() == ["-C", str(target), "create", f"METHOD={bundle}"]
+
+    @pytest.mark.skipif(shutil.which("curl") is None, reason="the dev-server block proves the page with curl")
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_dev_server_block_outlives_its_command_and_proves_the_page(self, tmp_path: Path, shell: list[str]) -> None:
+        """`nohup make dev &`, then one request: the server answers after the command has returned.
+
+        `make` is a stand-in that serves the project directory, so the block's own `curl` reads a
+        real page, and the report's stop command is run against the server the block started.
+        """
+        port = _free_port()
+        pid_file = tmp_path / "server.pid"
+        shim_bin = self._make_shim(
+            tmp_path / "shim-bin",
+            '[ "$3" = dev ] || exit 0\n'
+            'cd "$2" || exit 1\n'
+            f'echo $$ > "{pid_file}"\n'
+            f'exec "{sys.executable}" -m http.server "${{4#APP_PORT=}}" --bind 127.0.0.1\n',
+        )
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        (target / "index.html").write_text("<html><head><title>Receipt Review</title></head><body></body></html>\n", encoding="utf-8")
+        block = _recipe(_render_skill("prod"), DEV_SERVER_MARKER).replace("<dir>", str(target)).replace("<port>", str(port))
+        environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}", "TMPDIR": str(tmp_path)}
+        try:
+            result = subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, env=environment, timeout=120)
+            assert result.returncode == 0, result.stderr
+            assert result.stdout.splitlines()[0] == "200"
+            assert "<title>Receipt Review</title>" in result.stdout
+            # The command has returned, and the server it started still answers.
+            assert _answers(port)
+
+            if shutil.which("lsof") is not None:
+                stop = STOP_COMMAND.replace("<port>", str(port))
+                assert subprocess.run(["bash", "-c", stop], capture_output=True, text=True, check=False).returncode == 0
+                deadline = time.monotonic() + 10
+                while _answers(port) and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                assert not _answers(port), "the report's stop command left the server running"
+        finally:
+            if pid_file.exists():
+                with contextlib.suppress(ProcessLookupError, ValueError):
+                    os.kill(int(pid_file.read_text(encoding="utf-8").strip()), signal.SIGTERM)

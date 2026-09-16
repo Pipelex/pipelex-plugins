@@ -22,7 +22,7 @@ Take a method — a local `.mthds` bundle, a published address (`method_ref`), o
 6. write one typed call-site module per method, running it through `@pipelex/sdk` or `pipelex-sdk` and narrowing its output with the generated binder or model;
 7. verify with the project's own type checker and the gate you just installed.
 
-Re-running on a project that already carries a generated tree is **[refresh mode](#refresh-mode)**, the common case. A project that already **owns a codegen harness** — one made from a Pipelex starter — keeps it: see [that section](#a-project-that-owns-a-codegen-harness) before generating anything.
+Re-running on a project that already carries a generated tree is **[refresh mode](#refresh-mode)**, the common case. A project that already **owns a codegen harness** — one made from a Pipelex template — keeps it: see [that section](#a-project-that-owns-a-codegen-harness) before generating anything.
 
 **What this skill is not.** Not a build tool (no watch mode, no per-project harness — the workshop is the harness), not a runner (`/pipelex-inputs` prepares inputs and offers a run), not a design skill (a method that does not validate or cannot run goes back to `/pipelex-design`). It writes no tests, routes, UI or CLI commands and edits no existing business code: it stops at one callable module per method plus one shared helper, and a user who wants more says so.
 
@@ -179,9 +179,10 @@ One `mthds_codegen` call with the recorded arguments. Read what happened from th
 
 ## A project that owns a codegen harness
 
-A project made from `pipelex-starter-js` or `pipelex-starter-python`, or one that adopted their pattern, regenerates every method in one place, checks them in one place, and keeps its own sidecar. Writing this skill's tree beside that would leave two regeneration paths, two sidecar dialects and files the workshop never emits. So on such a project:
+A project made from the method app (`pipelex-method-apps`' `webapp-js/`), `pipelex-starter-js` or `pipelex-starter-python`, or one that adopted their pattern, regenerates every method in one place, checks them in one place, and keeps its own sidecar. Writing this skill's tree beside that would leave two regeneration paths, two sidecar dialects and files the workshop never emits. So on such a project:
 
-- **place the method where the project keeps them** — `methods/<name>/main.mthds`, or the project's manifest form for a catalog or published method;
+- **a local bundle is one command when the project's `make add-method` takes a bundle path**, which its usage in `make help` says, as the method app's does: `make add-method METHOD=<path to the bundle>` copies the bundle into `methods/<name>/` and writes the whole slice, call site included, so nothing below is done by hand except the verification;
+- **otherwise, place the method where the project keeps them** — `methods/<name>/main.mthds`, or the project's manifest form for a catalog or published method;
 - **run the project's generator** — `make add-method METHOD=…` when the project has it and the method is remote, its `codegen` script or Makefile target otherwise;
 - **write the call site the way the project's docs and existing methods do** (`docs/codegen.md`, `docs/add-method.md`, the existing actions or CLI commands), not the shape of step 9;
 - **skip steps 5, 7, 8 and 10** — the exclusions, dependencies, sidecar and gate already exist — and verify with the project's own aggregate gate (`make check` / `make all`);
