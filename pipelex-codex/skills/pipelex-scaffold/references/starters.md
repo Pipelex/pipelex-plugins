@@ -47,10 +47,17 @@ case "$(ls -A "$dir")" in ""|.git) ;; *) rm -rf "$tmp"; exit 1 ;; esac
 cp -R "$tmp/webapp-js"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
 rm -rf "$tmp"
 [ -e "$dir/.git" ] || git -C "$dir" init -b main
-git -C "$dir" add -A -- . && git -C "$dir" commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .
 ```
 
-The properties that make the starters' acquisition beside a repository safe, below, hold for this chain for the same reasons. Git never clones into the destination, so there is no template history to discard in it, and only `webapp-js/` crosses; the repository's own root files stay behind. **The `webapp-js/` test stops a default-branch head that does not carry the directory**, which would otherwise copy nothing and exit `0`. **The last line before the commit initializes only a destination with no repository of its own**, so a repository the user made goes on standing and the commit lands on their branch; that commit is the one `/pipelex-scaffold` confirms first. Then, from inside the copy, `make create METHOD=<method>` with a bundle given as an absolute path, and `make dev` once it is green. Neither step is reimplemented here: `docs/create.md` in the copy is the reference.
+The properties that make the starters' acquisition beside a repository safe, below, hold for this chain for the same reasons. Git never clones into the destination, so there is no template history to discard in it, and only `webapp-js/` crosses; the repository's own root files stay behind. **The `webapp-js/` test stops a default-branch head that does not carry the directory**, which would otherwise copy nothing and exit `0`. **The last line initializes only a destination with no repository of its own**, so a repository the user made goes on standing.
+
+The pristine commit is a command of its own, because on a repository the user made it lands on their branch, and `/pipelex-scaffold` confirms that first:
+
+```bash
+git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .
+```
+
+Then, from inside the copy, `make create METHOD=<method>` with a bundle given as an absolute path, and `make dev APP_PORT=<port> APP_HOST=127.0.0.1` once it is green, so the server, whose Server Actions spend the key for whoever calls them, answers on this machine alone. Neither step is reimplemented here: `docs/create.md` in the copy is the reference.
 
 A GitHub repository, on request, is created from the local copy after the pristine commit — the method app is a directory, not a template repository, so `--template` has nothing to point at — and confirmed first, visibility asked:
 
@@ -99,7 +106,7 @@ gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone
 
 ## What makes a copy the user's
 
-**The method app: `make create`.** It is the template's own script, one-shot and non-interactive: a value it cannot derive is a refusal naming the flag, never a prompt. It fetches the method once and derives the package name, the title and the description from it (`NAME=`, `TITLE=`, `DESCRIPTION=` override them); author, repository URL and license are never invented. It then scaffolds the method, runs the bootstrap with the derived values and `--clean`, writes `.env.local`, re-syncs the lock file and runs `make all`, and removes the bootstrap once that is green. Nothing is committed, so the whole result is a diff against the pristine commit. `DRY_RUN=1` prints the plan and writes nothing. A failure after the scaffold is finished by hand with the steps its message names, because the gesture refuses a copy that is already a project.
+**The method app: `make create`.** It is the template's own script, one-shot and non-interactive: a value it cannot derive is a refusal naming the flag, never a prompt. It fetches the method once and derives the package name, the title and the description from it (`NAME=`, `TITLE=`, `DESCRIPTION=` override them); author, repository URL and license are never invented. It then scaffolds the method, runs the bootstrap with the derived values and `--clean`, writes `.env.local`, re-syncs the lock file and runs `make all`, and removes the bootstrap once that is green. Nothing is committed, so the whole result is a diff against the pristine commit. `DRY_RUN=1` prints the plan and changes no tracked file; like every run on a fresh copy, it installs the dependencies first, which writes `node_modules/` and lets husky set the repository's `core.hooksPath`. A failure after the scaffold is finished by hand with the steps its message names, because the gesture refuses a copy that is already a project.
 
 **A starter: the clone's `bootstrap` skill.** Both starters carry `.claude/skills/bootstrap/SKILL.md` with a bundled script (`scripts/bootstrap.mjs` / `scripts/bootstrap.py`). Read the file in the clone and follow it; the shape is the same on both:
 

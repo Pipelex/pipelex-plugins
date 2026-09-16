@@ -37,18 +37,28 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 
 **The method app's directory is named after the method** when the user named none: a bundle's `domain`, read from its `.mthds` file and kebab-cased, or a package address's last path segment without its tag, kebab-cased — the names `make create` gives the project. A catalog id carries no name you can read without a call, so ask.
 
-**The fresh-clone shortcut.** A copy of a template already in the working directory that has not been made the user's is branch A entered at step 4: acquisition already happened. Do not clone again.
+**The fresh-clone shortcut.** A copy of a template already in the working directory that has not been made the user's is branch A entered at step 4: acquisition already happened. Do not clone again. The copy says what it is:
 
-- **The method app**: `package.json` still says `pipelex-method-webapp-js`, `scripts/create.mts` is still there, and the repository's `origin` does not point at `Pipelex/pipelex-method-apps`. When that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make step 3's pristine commit first, because `make create`'s changes are reviewable only against it. The directory is the user's, so that commit confirms like the one the Mode section describes.
-- **A starter**: `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"`, and the `origin` does not point at `Pipelex/pipelex-starter-…`.
+- **The method app**: `package.json` still says `pipelex-method-webapp-js`, and `scripts/create.mts` is still there.
+- **A starter**: `package.json` still says `pipelex-starter-js`, or `pyproject.toml` still says `name = "piper"`.
+
+**Make sure the copy is a repository of its own before reading anything from git.** A copy is often made without git (the method app's README copies the directory and runs `git init` afterwards), and a copy may sit inside another repository, whose `HEAD` and `origin` git would read instead. So test it, as branch B's step 3 does, and initialize only where the test fails:
+
+```bash
+[ "$(git -C <dir> rev-parse --show-toplevel 2>/dev/null)" = "$(cd <dir> && pwd -P)" ] || git -C <dir> init -b main
+```
+
+Then read the copy's `origin`: one pointing at `Pipelex/pipelex-method-apps` or `Pipelex/pipelex-starter-…` is the template's own checkout, which the last row of the failure table stops on. When the repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make step 3's pristine commit first, because the gesture's or the bootstrap's changes are reviewable only against it, and the Python bootstrap's `git mv` refuses a path git does not track. The directory is the user's, so that commit confirms like the one the Mode section describes.
 
 [references/starters.md](references/starters.md) compares the templates and carries every command below; [references/initializers.md](references/initializers.md) carries the initializers.
+
+**Every placeholder is substituted as one shell word.** `<dir>`, `<port>`, `<owner>/<name>` and the rest are typed into commands the shell reads first, so a value holding a space or a character the shell interprets goes in single quotes (`'my app'`), with a quote inside spelled `'\''`, unless the block already quotes the placeholder, as `METHOD='<method>'` does. Unquoted, `mkdir -p my app` makes two directories, and a chain goes on in the wrong one.
 
 ## Mode
 
 Automatic by default, with the plugin's usual rules: an explicit user signal wins ("just do it" → automatic; "walk me through" → interactive); a genuinely ambiguous branch is one question, asked once; a request that gave every input up front proceeds without re-asking. Two things always confirm, in every mode: **`gh repo create`**, because it creates a repository on GitHub, and whatever the clone's bootstrap skill confirms on its own account. The pristine commit does not need confirmation **on a directory this skill created** — it holds the template as it came, and no user content is at stake. **The acquisition into a directory that already held a repository is the exception**, and it is a third thing that always confirms: there the commit lands on the user's branch, on top of their history, and `add -A -- .` records whatever their worktree was already showing along with the template (Step 3). None of the three grounds above holds, so state what will be staged and what it will land on, and ask — in every mode.
 
-On the method app, interactive mode runs `make create` with `DRY_RUN=1` first and shows the user the identity and the plan it prints; automatic mode runs it directly, because its read-only half refuses before anything is written.
+On the method app, interactive mode runs `make create` with `DRY_RUN=1` first and shows the user the identity and the plan it prints; automatic mode runs it directly, because its read-only half refuses before it changes a tracked file. Either way, the first run on a fresh copy installs the dependencies before anything else, which takes minutes, writes `node_modules/`, and lets the template's husky point the repository's `core.hooksPath` at the project's hooks. A dry run is not free, and a repository the user made gets that setting too.
 
 ## Branch A — a Pipelex template
 
@@ -60,7 +70,7 @@ Check before touching anything, and **stop** on a missing piece with the exact t
 
 Three things this clause does not license. **A shim is not a runtime**: `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set", so the test is that `node --version` *answers*, not that the binary resolves — and that case is a stop, not a manager to activate. **The floor still applies**: a manager holding Node 18 does not satisfy the template's `engines` floor, and "a runtime the machine already has" never means a version below it. And **`volta` and `mise` install on first use** — `volta run`, `mise x` and `mise use` will fetch a version they do not have — which is the toolchain install this step forbids: use only a version the manager already holds, and stop rather than let it download one. Note too that `nvm`, `fnm` and `volta` manage Node alone and can never supply `uv`.
 
-- **JavaScript**: Node at or above the floor the template's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the templates' e2e specs `require()` it), and `npm`. The method app also needs `make` and `curl`.
+- **JavaScript**: Node at or above the floor the template's `package.json` `engines` field names (`node --version`; 22.12 at writing — the SDK is ESM-only and the templates' e2e specs `require()` it), and `npm`. The method app also needs `make`, `curl` and `lsof`: without `lsof` the template's `port-check` passes whatever holds the port, and step 6 can neither prove where its server listens nor stop it.
 - **Python**: `uv` on the PATH (the starter installs and locks with it) and a Python inside the starter's `requires-python` range that `uv python find` can see (3.11 to 3.14 at writing).
 - **Both**: `git`. The GitHub form also needs `gh` authenticated — `gh auth status`.
 
@@ -167,7 +177,7 @@ tail -n 40 "$log"; echo "make create exited $rc; the whole log is $log"
 
 What the gesture does is the template's to say — `<dir>/docs/create.md`, until the gesture removes that document along with itself — and none of it is reimplemented here. It fetches the method once, scaffolds its slice, runs the template's bootstrap with the values it derived, writes `.env.local` with exactly one base-URL line, re-syncs the lock file, runs `make all`, and removes the bootstrap once that is green. It commits nothing. Give the command several minutes: on a fresh copy it installs the dependencies, and it ends with a production build. The gesture names variables and never prints their values, so the log's tail is safe to read. The `.env.local` it wrote is not: the rules of the env-file step below hold for it too.
 
-- **A refusal in its read-only half** leaves the copy exactly as it was, so the gesture can run again. Relay the message, supply a value it asks for from the conversation or by asking the user once, and re-run. A refusal naming a capability the API does not serve means the plane the gesture ran against does not serve what codegen needs yet. Say so, point at the template README's line on which plane does, and stop there: never substitute a base URL the user did not declare, because a key is refused by every plane but the one that issued it.
+- **A refusal in its read-only half** changes no tracked file, so the gesture can run again; the dependencies it installed first stay, and the next run skips that install. Relay the message, supply a value it asks for from the conversation or by asking the user once, and re-run. A refusal naming a capability the API does not serve means the plane the gesture ran against does not serve what codegen needs yet. Say so, point at the template README's line on which plane does, and stop there: never substitute a base URL the user did not declare, because a key is refused by every plane but the one that issued it.
 - **A failure after the scaffold** cannot be undone by running the gesture again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off.
 
 #### A starter: run the clone's own bootstrap
@@ -217,16 +227,21 @@ A value that passed the test is copied verbatim and never inspected, so say in t
 make -C <dir> port-check APP_PORT=4300
 ```
 
-On a refusal, leave the holder alone and try 4301, then the next port up, and use the first one the check accepts. Then start the server detached, so that it outlives the command that started it, and make one request to the page:
+A refusal naming another directory is another app: leave it alone, try 4301, then the next port up, and use the first one the check accepts. A refusal saying the port **is already served by this checkout** is this project's own server, not a holder to step around. When this step started it, on an attempt whose page did not answer, stop it with the report's stop command and take the same port again. When the user started it, say so and ask whether they stop it or you take the next port up. **Never start a second server while one this step started still runs**, because the report's stop command names one port.
+
+Then start the server detached, bound to this machine alone, so that it outlives the command that started it, make one request to the page, and read where the server listens:
 
 ```bash
 log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
-nohup make -C <dir> dev APP_PORT=<port> > "$log" 2>&1 &
-curl -sS -o "$page" -w '%{http_code}\n' --retry 60 --retry-delay 1 --retry-connrefused --max-time 120 "http://localhost:<port>/"
+nohup make -C <dir> dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
+curl -sS -o "$page" -w '%{http_code}\n' --retry 60 --retry-delay 1 --retry-connrefused --retry-max-time 120 --max-time 120 "http://localhost:<port>/"
 grep -o '<title>[^<]*</title>' "$page"; echo "server log: $log"
+lsof -nP -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print "listening on " $9 }' | sort -u
 ```
 
-The retries wait out the server's start and the first compilation of the page. A `200` under the project's title is the proof, since the page is the method's form. Anything else, including no answer once the retries are spent, is read from the server log's tail, fixed at the cause and retried. **Never report a URL that did not answer.** Nothing is run through the method: this skill stops once the page answers.
+**The server listens on this machine alone.** The page's Server Actions run the method with the key in `.env.local` and do not check who is calling, so a server reachable from the network lets anyone on it spend that key. `APP_HOST=127.0.0.1` is the template's switch for it, and the last line proves the switch took: every `listening on` line must name `127.0.0.1:<port>` or `[::1]:<port>`. A `*:<port>`, any other address, or no line at all means this copy's `make dev` ignored the switch. Stop the server at once with the report's stop command, report no URL, and say that this copy's `make dev` listens on every interface, which the template's newer versions do not.
+
+The retries wait out the server's start and the first compilation of the page, for two minutes at most. A `200` under the project's title is the proof, since the page is the method's form. Anything else, including no answer once the retries are spent, is read from the server log's tail, fixed at the cause, and retried on the same port once the server this step started is stopped. **Never report a URL that did not answer.** Nothing is run through the method: this skill stops once the page answers.
 
 #### A starter: hand off
 
@@ -276,7 +291,7 @@ Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipele
 
 ## The report
 
-**On the method app, the URL comes first**: `http://localhost:<port>`, that the dev server runs in the background, how to stop it (`kill $(lsof -ti tcp:<port> -sTCP:LISTEN)`), and how to start it again (`make dev` from inside the project). Then say, in this order:
+**On the method app, the URL comes first**: `http://localhost:<port>`, that the dev server runs in the background and answers on this machine alone, how to stop it (`kill $(lsof -ti tcp:<port> -sTCP:LISTEN)`), and how to start it again (`make dev APP_PORT=<port> APP_HOST=127.0.0.1` from inside the project). Then say, in this order:
 
 - what was created and where, with the project name and title the gesture derived;
 - the template it came from, `pipelex-method-apps`' `webapp-js/`, at which version and SHA;
@@ -310,8 +325,10 @@ Two lines are easy to forget and matter:
 | The method app's copy has no `make create` | STOP: the template changed; say so, and never assemble the app by hand |
 | A starter clone carries no `bootstrap` skill | follow the README's manual list; say the template changed |
 | The bootstrap's checks are red | its own rule: fix the cause and re-run; never hand off on red |
-| The dev server's port is held | `port-check` names the holder; leave it alone and take the next port |
-| The page does not answer `200` | read the server log's tail, fix the cause and retry; never report a URL that did not answer |
+| The dev server's port is held by another directory | `port-check` names the holder; leave it alone and take the next port |
+| The port is already served by this checkout | a server this step started: stop it and take the same port again; one the user started: ask whether they stop it or you take the next port. Never leave two servers of this step's running |
+| The page does not answer `200` | read the server log's tail, fix the cause, stop the server this step started, and retry on the same port; never report a URL that did not answer |
+| The server listens beyond loopback, or `lsof` shows no listener | stop it at once with the report's stop command and report no URL: its Server Actions spend the key for anyone who reaches them. Say this copy's `make dev` ignores `APP_HOST` |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `PIPELEX_API_KEY` is not in the shell environment (a starter or an initializer) | leave the value empty in the env file; say where a key comes from and where it goes; never ask for it in the conversation. A base URL the shell sets is still copied, by the same command: when it is not production's, the report says the file points at another plane and warns that a key from `app.pipelex.com` is production's and will be refused there |
 | `PIPELEX_BASE_URL` is set in the shell | copy it, with the key or without one, inside the one command the file's key test guards and never as a second command after it; say the base URL came from the environment, and whether it is production's, read with a test (`[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production`) and never with an echo |

@@ -34,9 +34,14 @@ STARTER_URL = "https://github.com/Pipelex/<starter>.git"
 METHOD_APPS_URL = "https://github.com/Pipelex/pipelex-method-apps.git"
 METHOD_APP_MARKER = "pipelex-method-apps.git"
 CREATE_MARKER = "create METHOD='<method>'"
-DEV_SERVER_MARKER = "nohup make -C <dir> dev APP_PORT=<port>"
+DEV_SERVER_MARKER = "nohup make -C <dir> dev APP_PORT=<port> APP_HOST=127.0.0.1"
+OWN_REPOSITORY_MARKER = "rev-parse --show-toplevel 2>/dev/null)"
 PORT_CHECK_COMMAND = "make -C <dir> port-check APP_PORT=4300"
 STOP_COMMAND = "kill $(lsof -ti tcp:<port> -sTCP:LISTEN)"
+RESTART_COMMAND = "make dev APP_PORT=<port> APP_HOST=127.0.0.1"
+PRISTINE_METHOD_APP_COMMIT = (
+    'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .'
+)
 TARGETS = ("prod", "codex", "mistral-vibe")
 
 NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the acquisition recipes are git")
@@ -1081,7 +1086,7 @@ class TestScaffoldAcquisitionRecipes:
         config = load_target_config(REPO_ROOT / "targets", target_name)
         installed = (resolve_output_dir(REPO_ROOT, config.source) / "skills" / "pipelex-scaffold" / "SKILL.md").read_text(encoding="utf-8")
         template = SKILL_TEMPLATE.read_text(encoding="utf-8")
-        for marker in (self.DEFAULT_MARKER, self.PRESERVING_MARKER, METHOD_APP_MARKER, CREATE_MARKER, DEV_SERVER_MARKER):
+        for marker in (self.DEFAULT_MARKER, self.PRESERVING_MARKER, METHOD_APP_MARKER, CREATE_MARKER, DEV_SERVER_MARKER, OWN_REPOSITORY_MARKER):
             assert _recipe(installed, marker) == _recipe(template, marker), f"{target_name}: the shipped recipe is not the one executed here"
 
 
@@ -1132,6 +1137,10 @@ class TestMethodAppBranch:
             assert "none of it is reimplemented here" in body
             assert "never by editing `src/generated/`" in body
             assert "It commits nothing." in body
+            # The gesture installs the dependencies before its refusals, dry run included.
+            assert "refuses before it changes a tracked file" in body
+            assert "changes no tracked file, so the gesture can run again" in body
+            assert "exactly as it was, so the gesture" not in body
             # The gesture writes its own env file, so the skill's env-file step is the starters' alone.
             assert "### Step 5: The env file — a starter only" in body
             assert "The method app's gesture wrote `.env.local` in step 4" in body
@@ -1139,6 +1148,23 @@ class TestMethodAppBranch:
             assert "**The method app also needs a key its gesture can read.**" in body
             assert "never ask for the key in the conversation" in body
             assert "never substitute a base URL the user did not declare" in body
+
+    def test_placeholders_are_substituted_as_one_shell_word(self) -> None:
+        for body in self.bodies():
+            assert "**Every placeholder is substituted as one shell word.**" in body
+            assert "unless the block already quotes the placeholder, as `METHOD='<method>'` does" in body
+
+    def test_the_fresh_copy_is_made_its_own_repository_before_git_is_read(self) -> None:
+        for body in self.bodies():
+            assert "**Make sure the copy is a repository of its own before reading anything from git.**" in body
+            block = _recipe(body, OWN_REPOSITORY_MARKER)
+            assert (
+                block.strip() == '[ "$(git -C <dir> rev-parse --show-toplevel 2>/dev/null)" = "$(cd <dir> && pwd -P)" ] || git -C <dir> init -b main'
+            )
+            # The origin and the first commit are read only after the test.
+            shortcut = body[body.index("**The fresh-clone shortcut.**") :]
+            assert shortcut.index(OWN_REPOSITORY_MARKER) < shortcut.index("Then read the copy's `origin`")
+            assert shortcut.index(OWN_REPOSITORY_MARKER) < shortcut.index("git -C <dir> rev-parse -q --verify HEAD")
 
     def test_no_block_assigns_a_name_zsh_reserves(self) -> None:
         """`status` is read-only in zsh, the default shell on macOS, so `status=$?` aborts the line."""
@@ -1152,10 +1178,24 @@ class TestMethodAppBranch:
             assert PORT_CHECK_COMMAND in body
             dev = _recipe(body, DEV_SERVER_MARKER)
             assert "--retry-connrefused" in dev
+            # A per-attempt limit alone lets a hanging server hold the command for as long as the retries last.
+            assert "--retry-max-time 120" in dev
+            # The Server Actions spend the key for whoever calls them, so the server answers on loopback alone.
+            assert dev.rstrip().endswith("""lsof -nP -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print "listening on " $9 }' | sort -u""")
+            assert "**The server listens on this machine alone.**" in body
+            assert "report no URL" in body
+            # A retry never leaves the first server running on another port.
+            assert "**Never start a second server while one this step started still runs**" in body
+            assert "is already served by this checkout" in body
+            assert "retried on the same port once the server this step started is stopped" in body
             assert "**Never report a URL that did not answer.**" in body
             assert "Nothing is run through the method" in body
             assert "**On the method app, the URL comes first**" in body
             assert STOP_COMMAND in body
+            # The report restarts the server on the port it reported, bound as the skill bound it.
+            assert f"how to start it again (`{RESTART_COMMAND}` from inside the project)" in body
+            # Without lsof, port-check passes whatever holds the port and the listener cannot be read.
+            assert "The method app also needs `make`, `curl` and `lsof`" in body
             # The starters keep the ruling that the skill starts no server for them.
             assert body.index("do not start `make dev`") > body.index("#### A starter: hand off")
 
@@ -1163,11 +1203,16 @@ class TestMethodAppBranch:
         reference = STARTERS_REFERENCE.read_text(encoding="utf-8")
         assert "| | The method app (`pipelex-method-apps/webapp-js`) | `pipelex-starter-js` (the gallery) | `pipelex-starter-python` |" in reference
         assert "The skill acquires it only when the user names it." in reference
-        # The reference's chain is the skill's, followed by the pristine commit.
+        # The reference's chain is the skill's. The pristine commit is a block of its own, because on a
+        # repository the user made it lands on their branch and is confirmed before it runs.
         skill_recipe = _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), METHOD_APP_MARKER)
         reference_recipe = _recipe(reference, METHOD_APP_MARKER)
-        assert reference_recipe.startswith(skill_recipe), "the reference ships a different copy-out chain than the skill"
-        assert 'commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version> (<sha>)" -- .' in reference_recipe
+        assert reference_recipe == skill_recipe, "the reference ships a different copy-out chain than the skill"
+        assert 'git -C "$dir" commit' not in reference_recipe and " add -A" not in reference_recipe
+        assert _recipe(reference, "webapp-js <version>").strip() == PRISTINE_METHOD_APP_COMMIT
+        assert "make dev APP_PORT=<port> APP_HOST=127.0.0.1" in reference
+        # A dry run installs the dependencies first, so it is not free of writes.
+        assert "writes nothing" not in reference
         assert "gh repo create <owner>/<name> --private --source <dir> --remote origin" in reference
 
     def test_integrate_runs_the_bundle_arm_on_a_project_that_has_one(self) -> None:
@@ -1342,6 +1387,15 @@ class TestMethodAppRecipes:
         assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
         assert self._temporaries_beside(target) == []
 
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_copy_serves_a_name_with_a_space_substituted_as_one_word(self, family: Path, tmp_path: Path, shell: list[str]) -> None:
+        target = tmp_path / "receipt review"
+        result = self._run(family=family, target=target, shell=shell, dir_literal="'receipt review'", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert self._entries(target) == self.WEBAPP_ENTRIES | {".git"}
+        assert not (tmp_path / "receipt").exists() and not (tmp_path / "review").exists()
+        assert self._temporaries_beside(target) == []
+
     @pytest.mark.parametrize(
         "occupants",
         [{"theirs.txt"}, {".git", "theirs.txt"}, {".DS_Store", ".idea", ".vscode", "Thumbs.db"}],
@@ -1403,6 +1457,66 @@ class TestMethodAppRecipes:
         assert all(".pipelex-method-apps-" in line for line in deleted), deleted
 
     @staticmethod
+    def _own_repository(*, dir_literal: str, shell: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        block = _recipe(SKILL_TEMPLATE.read_text(encoding="utf-8"), OWN_REPOSITORY_MARKER).replace("<dir>", dir_literal)
+        assert "<dir>" not in block
+        return subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, cwd=str(cwd))
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_a_copy_without_a_repository_gets_one(self, tmp_path: Path, shell: list[str]) -> None:
+        target = tmp_path / "receipt review"
+        target.mkdir()
+        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
+        result = self._own_repository(dir_literal="'receipt review'", shell=shell, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert (target / ".git").is_dir()
+        assert self._git(target, "symbolic-ref", "--short", "HEAD").strip() == "main"
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_a_copy_inside_another_repository_gets_its_own(self, tmp_path: Path, shell: list[str]) -> None:
+        parent = tmp_path / "monorepo"
+        parent.mkdir()
+        subprocess.run(["git", "-C", str(parent), "init", "-q", "-b", "trunk"], check=True)
+        (parent / "README.md").write_text("theirs\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(parent), "add", "README.md"], check=True)
+        _git_commit(parent, "the user's own history")
+        before = (self._git(parent, "log", "--format=%H"), self._git(parent, "status", "--porcelain"))
+        target = parent / "apps" / "receipt-review"
+        target.mkdir(parents=True)
+        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
+        result = self._own_repository(dir_literal=str(target), shell=shell, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        # The copy is a repository of its own, with no commit yet, so the pristine commit is made there.
+        assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(target.resolve())
+        assert subprocess.run(["git", "-C", str(target), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert self._git(parent, "log", "--format=%H") == before[0]
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize("through_symlink", [False, True], ids=["direct", "through-a-symlink"])
+    def test_a_copy_that_is_its_own_repository_is_left_alone(self, tmp_path: Path, shell: list[str], through_symlink: bool) -> None:
+        real = tmp_path / "real"
+        real.mkdir()
+        target = real / "receipt-review"
+        target.mkdir()
+        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "trunk"], check=True)
+        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
+        subprocess.run(["git", "-C", str(target), "add", "package.json"], check=True)
+        _git_commit(target, "the user's copy")
+        before = (self._git(target, "log", "--format=%H"), self._git(target, "reflog"), self._git(target, "rev-parse", "--abbrev-ref", "HEAD"))
+        spelled = target
+        if through_symlink:
+            (tmp_path / "linked").symlink_to(real, target_is_directory=True)
+            spelled = tmp_path / "linked" / "receipt-review"
+        result = self._own_repository(dir_literal=str(spelled), shell=shell, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert "Reinitialized" not in result.stdout + result.stderr
+        assert (
+            self._git(target, "log", "--format=%H"),
+            self._git(target, "reflog"),
+            self._git(target, "rev-parse", "--abbrev-ref", "HEAD"),
+        ) == before
+
+    @staticmethod
     def _make_shim(directory: Path, body: str) -> Path:
         directory.mkdir(exist_ok=True)
         shim = directory / "make"
@@ -1443,9 +1557,10 @@ class TestMethodAppRecipes:
         shim_bin = self._make_shim(
             tmp_path / "shim-bin",
             '[ "$3" = dev ] || exit 0\n'
+            'case "$5" in APP_HOST=?*) ;; *) echo "no host given" >&2; exit 2 ;; esac\n'
             'cd "$2" || exit 1\n'
             f'echo $$ > "{pid_file}"\n'
-            f'exec "{sys.executable}" -m http.server "${{4#APP_PORT=}}" --bind 127.0.0.1\n',
+            f'exec "{sys.executable}" -m http.server "${{4#APP_PORT=}}" --bind "${{5#APP_HOST=}}"\n',
         )
         target = tmp_path / "receipt-review"
         target.mkdir()
@@ -1459,6 +1574,10 @@ class TestMethodAppRecipes:
             assert "<title>Receipt Review</title>" in result.stdout
             # The command has returned, and the server it started still answers.
             assert _answers(port)
+            if shutil.which("lsof") is not None:
+                # The block reads back where the server listens: loopback, and nothing else.
+                listeners = [line for line in result.stdout.splitlines() if line.startswith("listening on ")]
+                assert listeners == [f"listening on 127.0.0.1:{port}"], result.stdout
 
             if shutil.which("lsof") is not None:
                 stop = STOP_COMMAND.replace("<port>", str(port))
