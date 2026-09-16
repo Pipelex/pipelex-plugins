@@ -254,7 +254,7 @@ dir=$(cd <dir> && env pwd -P) || exit 1
 log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
 nohup make -C "$dir" dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
 launcher=$!
-stop_tree() { kill -STOP "$1" 2>/dev/null || return 0; for child in $(pgrep -P "$1"); do stop_tree "$child"; done; kill -TERM "$1" 2>/dev/null; kill -CONT "$1" 2>/dev/null; }
+stop_tree() { local p; for p; do kill -STOP "$p" 2>/dev/null || continue; stop_tree $(pgrep -P "$p"); kill -TERM "$p" 2>/dev/null; kill -CONT "$p" 2>/dev/null; done; }
 n=0; until lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || ! kill -0 "$launcher" 2>/dev/null || [ "$n" -ge 300 ]; do sleep 0.2; n=$((n + 1)); done
 if ! lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1; then
   if kill -0 "$launcher" 2>/dev/null; then stop_tree "$launcher"; echo "nothing listens on port <port> yet, so the server this command started was stopped; server log: $log" >&2; exit 1; fi
@@ -262,7 +262,7 @@ if ! lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1; then
 fi
 for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do
   [ "$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)" = "$dir" ] || { echo "port <port> is held by pid $pid, which is not this project; server log: $log" >&2; exit 1; }
-  if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print $9 }' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
+  if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN -Fn | sed -n 's/^n//p' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
     kill "$pid"; echo "the server listened beyond this machine and was stopped; server log: $log" >&2; exit 1
   fi
 done
