@@ -16,6 +16,8 @@ from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
 STALE_REF_PATTERN = re.compile(r"references/(?:" + "|".join(re.escape(stem) for stem in _SHARED_STEMS) + r")")
+# Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
+ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
 TARGETS_DIR_NAME = "targets"
 DEFAULTS_FILE = "defaults.toml"
@@ -369,6 +371,26 @@ def check_stale_references(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_skill_argument_placeholders(base_dir: Path) -> list[str]:
+    """Check that no generated SKILL.md carries a token Claude Code replaces with the invocation's arguments.
+
+    Before the model reads a skill body, Claude Code substitutes `$ARGUMENTS` with the whole argument
+    string and `$0`, `$1`, … with its whitespace-separated words, so shell code holding `"$1"` or
+    `awk '{ print $9 }'` reaches the model as a different command whenever the skill was invoked with
+    enough words. The pattern is wider than Claude Code's own, which spares `$1x` and leaves `$N` alone
+    when there are too few words: a guard should not depend on either detail. Every target is scanned
+    because the body is shared, and reference files are not, because a tool reads them unsubstituted.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            for idx, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
+                for match in ARGUMENT_PLACEHOLDER_PATTERN.finditer(line):
+                    rel = skill_md.relative_to(base_dir)
+                    errors.append(f"{rel}:{idx}: `{match.group()}` is replaced by the skill's invocation arguments in Claude Code")
+    return errors
+
+
 def check_shared_files_exist(base_dir: Path) -> list[str]:
     """Check that all expected shared template source files are present."""
     shared_dir = base_dir / "templates" / "skills" / "shared"
@@ -557,6 +579,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_stale_references(base_dir),
         "FAIL: Found stale references/ paths (should use ../shared/ instead).",
         "  No stale references found.",
+    )
+    failed |= _run_check(
+        "Checking skill bodies for tokens Claude Code replaces with invocation arguments...",
+        check_skill_argument_placeholders(base_dir),
+        "FAIL: Found $ARGUMENTS or $<digit> in a SKILL.md. Rewrite without the token (an escape reaches Codex and Vibe verbatim).",
+        "  No argument placeholders found.",
     )
     failed |= _run_check(
         "Checking all shared template files exist...",

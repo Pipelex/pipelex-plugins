@@ -14,6 +14,7 @@ from scripts.check import (
     check_matched_target_versions,
     check_no_templates_in_output,
     check_shared_files_exist,
+    check_skill_argument_placeholders,
     check_stale_references,
     check_target_plugin_versions,
     check_vibe_target_artifacts,
@@ -455,6 +456,73 @@ class TestStaleReferences:
         skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
         skill_md.write_text(VALID_FRONTMATTER + "\nSee [ref](../shared/mthds-reference.md)\n")
         assert check_stale_references(skill_tree) == []
+
+
+class TestSkillArgumentPlaceholders:
+    def test_clean_tree(self, skill_tree: Path) -> None:
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    @pytest.mark.parametrize(
+        ("line", "token"),
+        [
+            ('stop_tree() { kill -STOP "$1" 2>/dev/null; }', "$1"),
+            ("awk 'NR > 1 { print $9 }'", "$9"),
+            ('echo "$0"', "$0"),
+            ('set -- "$10"', "$10"),
+            ("Summarize $ARGUMENTS.", "$ARGUMENTS"),
+            ("Open $ARGUMENTS[0] first.", "$ARGUMENTS"),
+            (r'kill "\$1"', "$1"),
+            ('echo "$1x"', "$1"),
+        ],
+        ids=["quoted", "awk-field", "zero", "two-digits", "arguments", "indexed", "escaped", "word-suffix"],
+    )
+    def test_detects_placeholder(self, skill_tree: Path, line: str, token: str) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + f"\n```bash\n{line}\n```\n")
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert len(errors) == 1
+        assert errors[0].startswith("pipelex/skills/pipelex-test/SKILL.md:9: ")
+        assert f"`{token}`" in errors[0]
+
+    def test_reports_every_token_on_a_line(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + '\nfor child in $(pgrep -P "$1"); do stop_tree "$2"; done\n')
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert [error.split("`")[1] for error in errors] == ["$1", "$2"]
+
+    def test_ignores_shell_tokens_claude_code_leaves_alone(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(
+            VALID_FRONTMATTER
+            + "\n```bash\n"
+            + 'launcher=$!; echo $$ "$?" "$pid" "${APP_PORT:-4300}" "${5#APP_HOST=}" "$((n + 1))" "$(pwd)"\n'
+            + 'stop_tree() { local p; for p; do kill -STOP "$p"; done; }\n'
+            + "```\n"
+        )
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    def test_ignores_reference_files(self, skill_tree: Path) -> None:
+        """A tool reads references and shared files as they are, so Claude Code substitutes nothing in them."""
+        references = skill_tree / "pipelex" / "skills" / "pipelex-test" / "references"
+        references.mkdir()
+        (references / "recipes.md").write_text("Dollar amounts (`$100`) and `print $9`.\n")
+        (skill_tree / "pipelex" / "skills" / "shared" / "mthds-reference.md").write_text("Dollar amounts (`$100`).\n")
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    def test_scans_every_target(self, skill_tree: Path) -> None:
+        _write_target_configs(
+            skill_tree,
+            {
+                "prod": {"name": "pipelex", "version": "0.6.3", "source": "pipelex/"},
+                "codex": {"name": "pipelex", "version": "0.6.3", "source": "pipelex-codex/"},
+            },
+        )
+        codex_skill = skill_tree / "pipelex-codex" / "skills" / "pipelex-test"
+        codex_skill.mkdir(parents=True)
+        (codex_skill / "SKILL.md").write_text(VALID_FRONTMATTER + "\nRun it with $ARGUMENTS.\n")
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert len(errors) == 1
+        assert errors[0].startswith("pipelex-codex/skills/pipelex-test/SKILL.md:")
 
 
 class TestSharedFilesExist:

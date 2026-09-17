@@ -96,17 +96,17 @@ The template is one directory of the `pipelex-method-apps` repository, and a pro
 mkdir -p <dir> && dir=$(cd <dir> && pwd) || exit 1
 case "$(ls -A "$dir")" in ""|.git) ;; *) exit 1 ;; esac
 tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-method-apps-XXXXXX") || exit 1
-git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+trap 'rm -rf "$tmp"' EXIT; trap 'exit 130' INT; trap 'exit 143' TERM
+git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$tmp" || exit 1
 git -C "$tmp" rev-parse HEAD                     # the family SHA, for the commit message
 cat "$tmp/VERSION"                               # the family version, for the commit message
-[ -f "$tmp/webapp-js/package.json" ] || { echo "the default branch carries no webapp-js/" >&2; rm -rf "$tmp"; exit 1; }
-case "$(ls -A "$dir")" in ""|.git) ;; *) rm -rf "$tmp"; exit 1 ;; esac
-cp -R "$tmp/webapp-js"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
-rm -rf "$tmp"
+[ -f "$tmp/webapp-js/package.json" ] || { echo "the default branch carries no webapp-js/" >&2; exit 1; }
+case "$(ls -A "$dir")" in ""|.git) ;; *) exit 1 ;; esac
+cp -R "$tmp/webapp-js"/. "$dir"/ || exit 1
 [ -e "$dir/.git" ] || git -C "$dir" init -b main
 ```
 
-It is the starters' acquisition beside the directory, below, and the properties that make that one safe hold here for the reasons given there. The destination is resolved before its parent is taken, so a `<dir>` spelled `.` keeps the temporary path a sibling. No `rm -rf` addresses a path under `<dir>`. `cp -R "$tmp/webapp-js"/. "$dir"/` carries the entries beginning with a dot (`.gitignore`, `.env.example`, `.claude/`, `.husky/`). The directory is read once before anything is fetched and once more right before the copy, and anything but nothing or a lone `.git` stops the run with nothing copied and the temporary path removed. The chain goes out as one command. **The last line initializes only a directory with no repository of its own**, so a repository the user made goes on standing, and the pristine commit lands on their branch, as Step 3 says.
+It is the starters' acquisition beside the directory, below, and the properties that make that one safe hold here for the reasons given there. The destination is resolved before its parent is taken, so a `<dir>` spelled `.` keeps the temporary path a sibling. One trap removes the temporary path however the command ends, an interruption included. No `rm -rf` addresses a path under `<dir>`. `cp -R "$tmp/webapp-js"/. "$dir"/` carries the entries beginning with a dot (`.gitignore`, `.env.example`, `.claude/`, `.husky/`). The directory is read once before anything is fetched and once more right before the copy, and anything but nothing or a lone `.git` stops the run with nothing copied and the temporary path removed. The chain goes out as one command. **The last line initializes only a directory with no repository of its own**, so a repository the user made goes on standing, and the pristine commit lands on their branch, as Step 3 says.
 
 **The `webapp-js/` test is load-bearing.** The copy takes the default branch's head, and a head that does not carry the directory would otherwise copy nothing and report success. Stop there, say what the clone lacked, and do not fall back to the gallery or to another directory of the repository.
 
@@ -130,13 +130,13 @@ The clone's `.git` is removed on purpose: it is the template's history and remot
 ```bash
 dir=$(cd <dir> && pwd) || exit 1
 tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-starter-XXXXXX") || exit 1
-git clone --depth 1 https://github.com/Pipelex/<starter>.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+trap 'rm -rf "$tmp"' EXIT; trap 'exit 130' INT; trap 'exit 143' TERM
+git clone --depth 1 https://github.com/Pipelex/<starter>.git "$tmp" || exit 1
 git -C "$tmp" rev-parse HEAD                     # the template SHA, for the commit message
 # the template version: package.json "version" (JS) or pyproject.toml version (Python)
-rm -rf "$tmp/.git" || { rm -rf "$tmp"; exit 1; }
-[ "$(ls -A "$dir")" = ".git" ] || { rm -rf "$tmp"; exit 1; }
-cp -R "$tmp"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
-rm -rf "$tmp"
+rm -rf "$tmp/.git" || exit 1
+[ "$(ls -A "$dir")" = ".git" ] || exit 1
+cp -R "$tmp"/. "$dir"/ || exit 1
 ```
 
 **The first line resolves the destination, and that is what keeps the temporary path a sibling rather than a child.** `<dir>` is very often `.` here: `mkdir my-app && cd my-app && git init` is the "Where" rule's own account of how a user arrives at a directory holding nothing but `.git`, and they then ask for the project *here*. `dirname .` is `.`, so deriving the parent from the spelling would put the temporary directory **inside** the destination, where the `ls -A` line below finds it sitting beside `.git` and refuses — every time, on exactly the case this section exists to serve. Resolving to an absolute path first also pins the destination for the rest of the chain, so no later line can be re-read against a working directory that has moved, and it is what lets every mention below be quoted: a name with a space reaches `cp` whole instead of arriving as two arguments.
@@ -147,7 +147,9 @@ rm -rf "$tmp"
 
 **The `ls -A` line is the "Where" rule read again, against the copy.** It is not the decision — the "Where" question settled that — it is the last look before anything lands, put next to the copy so nothing can change between the two. It admits exactly one entry, `.git`, which the clone has not had since the line above: a collision is therefore impossible rather than merely unlikely, and the template can only add to the directory. Anything else — `.git` beside a file of the user's, a `.DS_Store`, a `README.md` they wrote — stops here with nothing copied, the temporary path removed and the directory as it was. A discarded shallow clone is the cheap half of that trade. Nothing of the user's is overwritten, moved or deleted to make room, here or anywhere.
 
-**The chain goes out as one command.** The guards hold only inside one shell — the same reason the `|| exit` above is load-bearing, stated in full in [references/starters.md](references/starters.md) — and split across separate calls this one loses its cleanup too, leaving the temporary directory beside the user's project with no line left to remove it.
+**The chain goes out as one command.** The guards hold only inside one shell — the same reason the `|| exit` above is load-bearing, stated in full in [references/starters.md](references/starters.md) — and split across separate calls this one loses its cleanup too, because a trap lasts only as long as the shell that set it.
+
+**One trap removes the temporary path, however the command ends.** It is set on the line after `mktemp`, before anything can fail, so a failed clone, a refusal, a success and an interrupted command all end the same way. The `INT` and `TERM` traps cover the interruption: Ctrl-C sends `INT`, a harness stopping a command sends `TERM` to its process group before anything harder, and each becomes an ordinary exit, which runs the `EXIT` trap. They are not redundant: bash runs an `EXIT` trap when a signal kills it, but zsh and dash do not. A temporary directory left beside a project makes the parent look worked on, and the next run finds a sibling it did not create. Only a `KILL`, which no shell can trap, still leaves one behind, and the failure table says what to do with it.
 
 **Nothing is initialized here.** The default recipe ends `git init -b main` because it has just deleted the only repository at that path. This one ends on the user's repository, their branch and their remote, which is the whole point of taking the long way round.
 
@@ -181,11 +183,14 @@ git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/<template
 log=$(mktemp "${TMPDIR:-/tmp}/pipelex-create-XXXXXX") || exit 1
 make -C <dir> create METHOD='<method>' > "$log" 2>&1; rc=$?
 tail -n 40 "$log"; echo "make create exited $rc; the whole log is $log"
+echo "its warnings:"; grep -E '^(warning: |! )' "$log" | LC_ALL=C sort -u | grep . || echo "none"
 ```
 
-`<method>` is what the user has. A bundle, whether a `.mthds` file or a directory of them, is **given as an absolute path**, because the gesture reads a relative path from the directory make runs in, which is `<dir>` and not where the user stood; the gesture copies it into the project. A catalog id is `mt_…`, and a package address is `github.com/<owner>/<repo>[/<package>][@<tag>]`. Add `NAME='…'`, `TITLE='…'` and `DESCRIPTION='…'` only when the conversation already holds them or the user asked for something other than what the method carries, since the gesture derives all three from the method. Add `AUTHOR_NAME`, `AUTHOR_EMAIL`, `REPO_URL` and `LICENSE` only when the user gave them, because nothing is invented. `METHOD_NAME`, `PIPE` and `LABEL` answer a refusal that names them. Every value goes in single quotes, with a quote inside one spelled `'\''`, because the shell reads the line before make does.
+`<method>` is what the user has. A bundle, whether a `.mthds` file or a directory of them, is **given as an absolute path**, because the gesture reads a relative path from the directory make runs in, which is `<dir>` and not where the user stood; the gesture copies it into the project. A catalog id is `mt_…`, and a package address is `github.com/<owner>/<repo>[/<package>][@<tag>]`. Add `NAME='…'`, `TITLE='…'` and `DESCRIPTION='…'` only when the conversation already holds them or the user asked for something other than what the method carries, since the gesture derives all three from the method. Add `AUTHOR_NAME`, `AUTHOR_EMAIL`, `REPO_URL`, `LICENSE`, `LICENSE_HOLDER` and `LICENSE_YEAR` only when the user gave them, because nothing is invented. `METHOD_NAME`, `PIPE` and `LABEL` answer a refusal that names them. Every value goes in single quotes, with a quote inside one spelled `'\''`, because the shell reads the line before make does.
 
 What the gesture does is the template's to say — `<dir>/docs/create.md`, until the gesture removes that document along with itself — and none of it is reimplemented here. It fetches the method once, scaffolds its slice, runs the template's bootstrap with the values it derived, writes `.env.local` with exactly one base-URL line, re-syncs the lock file, runs `make all`, and removes the bootstrap once that is green. It commits nothing. Give the command several minutes: on a fresh copy it installs the dependencies, and it ends with a production build. The gesture names variables and never prints their values, so the log's tail is safe to read. The `.env.local` it wrote is not: the rules of the env-file step below hold for it too.
+
+**The gesture's warnings are read from the whole log, not from its tail.** `make create` prints its own warnings as `! …` and the bootstrap's as `warning: …`, all before `make all`, whose output fills the tail. It also runs the bootstrap twice, a dry run and then the write, so the block's last line lists each distinct warning once. Every one goes into the report with what answers it. An MIT project whose user named no copyright holder always gets this one: `warning: LICENSE copyright line left untouched — pass --license-holder to claim it.` It means the project's `LICENSE` still names the template's copyright holder. The gesture refuses to run on a project it has already made, so after the run the answer is an edit of that line in `LICENSE`, by the user, or by you with the holder they name. In interactive mode the dry run shows the warning before anything is written, so a holder the user gives then goes into the real run as `LICENSE_HOLDER='…'`.
 
 - **A refusal in its read-only half** changes no tracked file, so the gesture can run again; the dependencies it installed first stay, and the next run skips that install. Relay the message, supply a value it asks for from the conversation or by asking the user once, and re-run. A refusal naming a capability the API does not serve means the plane the gesture ran against does not serve what codegen needs yet. Say so, point at the template README's line on which plane does, and stop there: never substitute a base URL the user did not declare, because a key is refused by every plane but the one that issued it.
 - **A failure after the scaffold** cannot be undone by running the gesture again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off.
@@ -254,7 +259,7 @@ dir=$(cd <dir> && env pwd -P) || exit 1
 log=$(mktemp "${TMPDIR:-/tmp}/pipelex-dev-XXXXXX") && page=$(mktemp "${TMPDIR:-/tmp}/pipelex-page-XXXXXX") || exit 1
 nohup make -C "$dir" dev APP_PORT=<port> APP_HOST=127.0.0.1 > "$log" 2>&1 &
 launcher=$!
-stop_tree() { kill -STOP "$1" 2>/dev/null || return 0; for child in $(pgrep -P "$1"); do stop_tree "$child"; done; kill -TERM "$1" 2>/dev/null; kill -CONT "$1" 2>/dev/null; }
+stop_tree() { local p; for p; do kill -STOP "$p" 2>/dev/null || continue; stop_tree $(pgrep -P "$p"); kill -TERM "$p" 2>/dev/null; kill -CONT "$p" 2>/dev/null; done; }
 n=0; until lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1 || ! kill -0 "$launcher" 2>/dev/null || [ "$n" -ge 300 ]; do sleep 0.2; n=$((n + 1)); done
 if ! lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1; then
   if kill -0 "$launcher" 2>/dev/null; then stop_tree "$launcher"; echo "nothing listens on port <port> yet, so the server this command started was stopped; server log: $log" >&2; exit 1; fi
@@ -262,7 +267,7 @@ if ! lsof -ti tcp:<port> -sTCP:LISTEN > /dev/null 2>&1; then
 fi
 for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do
   [ "$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)" = "$dir" ] || { echo "port <port> is held by pid $pid, which is not this project; server log: $log" >&2; exit 1; }
-  if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN | awk 'NR > 1 { print $9 }' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
+  if lsof -nP -a -p "$pid" -iTCP:<port> -sTCP:LISTEN -Fn | sed -n 's/^n//p' | grep -Evq '^(127\.0\.0\.1|\[::1\]):<port>$'; then
     kill "$pid"; echo "the server listened beyond this machine and was stopped; server log: $log" >&2; exit 1
   fi
 done
@@ -332,13 +337,14 @@ Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipele
 - the template it came from, `pipelex-method-apps`' `webapp-js/`, at which version and SHA;
 - that this skill made exactly one commit, and what it holds;
 - that `make create`'s changes are uncommitted for review (`git status`, `git diff`);
+- every warning the gesture printed, each with what answers it, and first, when the gesture left it in place, that `LICENSE` still names the template's copyright holder and that editing that line is how the user claims it;
 - which plane `.env.local` points at, named without printing the URL;
 - how to add a second method, and how to regenerate after editing the bundle;
 - the two lines below.
 
 The plane is the one the gesture ran against. When the shell exports a base URL, it is that one, read with the plane test of branch A's env-file step and never with an echo. When the user wrote `.env.local` themselves, say it was kept, and do not read it. Otherwise it is production. A second method is `make add-method METHOD=…`, which takes a bundle path, a catalog id or an address, and renders two methods as tabs. The regeneration after editing the bundle is `npm run codegen`.
 
-**Otherwise, say in this order**: what was created and where; which template or initializer it came from, at which version and SHA; that this skill made exactly one commit and what it holds; what the bootstrap changed and that those changes are uncommitted for review, in the bootstrap's own words (a starter); which env file was written, whether the key was filled from the environment or left for the user, and which plane the file points at, named without printing the URL as branch A's env-file step says; the demos the starter still carries and where the README's removal checklist is (a starter); and the hand-off.
+**Otherwise, say in this order**: what was created and where; which template or initializer it came from, at which version and SHA; that this skill made exactly one commit and what it holds; what the bootstrap changed and that those changes are uncommitted for review, in the bootstrap's own words and with every warning it printed (a starter); which env file was written, whether the key was filled from the environment or left for the user, and which plane the file points at, named without printing the URL as branch A's env-file step says; the demos the starter still carries and where the README's removal checklist is (a starter); and the hand-off.
 
 Two lines are easy to forget and matter:
 
@@ -352,6 +358,7 @@ Two lines are easy to forget and matter:
 | A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first check a version manager the machine already has (`nvm`, `fnm`, `volta`, `asdf`, `mise`) and use its runtime, saying so |
 | The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse. On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it, which git refuses outright |
 | `git clone` fails (network, permissions) | report git's error verbatim; nothing to clean up beyond an empty directory, and on an acquisition beside the directory the chain removes its own temporary path and copies nothing |
+| A `.pipelex-method-apps-…` or `.pipelex-starter-…` directory already sits beside the destination | an earlier run was killed before its trap could run. Leave it: this run's `mktemp` makes a path of its own and touches no other. Name it in the report so the user can remove it |
 | The method app's clone carries no `webapp-js/` | STOP: the chain copied nothing and removed its temporary path; say what the default branch lacked, and never fall back to the gallery or copy another directory |
 | `gh` is absent or not authenticated | fall back to the local copy; say the GitHub repository can be created later with `gh repo create --source .` |
 | The method app has no key for its gesture | before anything is created, say so and offer the two ways of Step 1 — a harness restarted from a shell that exports it, or an `.env.local` the user writes themselves before step 4; never ask for the key in the conversation |
