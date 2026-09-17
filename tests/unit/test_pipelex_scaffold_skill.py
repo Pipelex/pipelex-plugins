@@ -155,6 +155,45 @@ def _recipe(text: str, marker: str) -> str:
     return blocks[0]
 
 
+# The acquisition chains' cleanup: one trap, set on the line after `mktemp`.
+CLEANUP_TRAP = "trap 'rm -rf \"$tmp\"' EXIT; trap 'exit 130' INT; trap 'exit 143' TERM"
+
+
+def _hanging_clone_shim(shim_bin: Path) -> Path:
+    """A `git` whose `clone` starts writing its destination and never finishes; every other command is git's."""
+    real_git = shutil.which("git")
+    assert real_git is not None, "these tests already require git"
+    shim_bin.mkdir(exist_ok=True)
+    shim = shim_bin / "git"
+    shim.write_text(
+        f'#!/bin/sh\n[ "$1" = clone ] || exec "{real_git}" "$@"\nfor destination; do :; done\nmkdir -p "$destination/.git/objects"\nexec sleep 30\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    return shim_bin
+
+
+def _interrupt_during_clone(script: str, *, shell: list[str], shim_bin: Path, parent: Path, prefix: str, signal_number: int) -> int:
+    """Run an acquisition chain, signal its whole process group once the clone has begun, and return its exit status.
+
+    The group is signalled, not the shell alone, because that is how both interruptions arrive: Ctrl-C
+    sends `INT` to the foreground group, and a harness stopping a command sends `TERM` to its group.
+    """
+    environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}"}
+    process = subprocess.Popen([*shell, "-c", script], env=environment, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.monotonic() + 10
+        while not any((entry / ".git").is_dir() for entry in parent.iterdir() if entry.name.startswith(prefix)):
+            assert process.poll() is None, "the chain ended before its clone began"
+            assert time.monotonic() < deadline, "the clone never began"
+            time.sleep(0.05)
+        os.killpg(process.pid, signal_number)
+        return process.wait(timeout=20)
+    finally:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+
+
 class TestPipelexScaffoldSkill:
     """The skill is executable guidance, so these tests guard what a user's new
     project depends on: nothing is written into a non-empty directory, the skill
@@ -327,6 +366,10 @@ class TestPipelexScaffoldSkill:
             assert "Nothing of the user's is overwritten, moved or deleted to make room" in body
             # The guards and the cleanup hold only inside one shell.
             assert "**The chain goes out as one command.**" in body
+            # One trap cleans up however the chain ends, and a directory a killed run left is not this run's.
+            assert "**One trap removes the temporary path, however the command ends.**" in body
+            assert "bash runs an `EXIT` trap when a signal kills it, but zsh and dash do not" in body
+            assert "an earlier run was killed before its trap could run. Leave it" in body
             # The user's repository is not re-initialised; the pristine commit lands on their branch.
             assert "**Nothing is initialized here.**" in body
             assert "the commit lands on the user's branch, on top of their history" in body
@@ -342,6 +385,8 @@ class TestPipelexScaffoldSkill:
         assert '**`cp -R "$tmp"/. "$dir"/` carries the entries beginning with a dot**' in reference
         assert "**the `ls -A` line admits exactly one entry**" in reference
         assert "**The first line resolves `<dir>` to an absolute path before the parent is computed from it**" in reference
+        assert "**The trap on the line after `mktemp` removes the temporary path however the command ends**" in reference
+        assert CLEANUP_TRAP in _recipe(reference, ".pipelex-starter-XXXXXX")
 
     def test_every_acquisition_block_names_one_starter(self) -> None:
         """Round 2: the reference's blocks each carried both starters' URLs on consecutive lines.
@@ -1026,6 +1071,29 @@ class TestScaffoldAcquisitionRecipes:
         assert self._temporaries_beside(unreachable) == []
         assert self._entries(unreachable) == {".git"}
 
+    @pytest.mark.parametrize("signal_number", [signal.SIGINT, signal.SIGTERM], ids=["INT", "TERM"])
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_preserving_recipe_removes_its_temporary_path_when_interrupted(self, tmp_path: Path, shell: list[str], signal_number: int) -> None:
+        """Ctrl-C, or a harness stopping the command, while the clone runs.
+
+        The exit status is the trap's own `exit`, not a death by signal: zsh and dash run no `EXIT`
+        trap when a signal kills them, so without the `INT` and `TERM` traps the half-written clone
+        would stay beside the user's project.
+        """
+        assert self.preserving_recipe.index(CLEANUP_TRAP) < self.preserving_recipe.index("git clone")
+        target = tmp_path / "my-app"
+        self._make_repository(target, "main")
+        script = self.preserving_recipe.replace(STARTER_URL, f"file://{tmp_path / 'never-reached'}").replace("<dir>", str(target))
+        shim_bin = _hanging_clone_shim(tmp_path / "shim-bin")
+
+        returncode = _interrupt_during_clone(
+            script, shell=shell, shim_bin=shim_bin, parent=tmp_path, prefix=".pipelex-starter-", signal_number=signal_number
+        )
+
+        assert returncode == 128 + signal_number
+        assert self._temporaries_beside(target) == []
+        assert self._entries(target) == {".git"}
+
     @pytest.mark.parametrize("spelling", [".", "./"])
     def test_the_preserving_recipe_serves_the_destination_spelled_here(self, starter: Path, tmp_path: Path, spelling: str) -> None:
         """The destination is usually `.`, and the recipe has to survive being told so.
@@ -1128,6 +1196,9 @@ class TestMethodAppBranch:
             assert 'cp -R "$tmp/webapp-js"/. "$dir"/' in recipe
             assert recipe.count('case "$(ls -A "$dir")" in ""|.git)') == 2, "the directory is read before the fetch and again before the copy"
             assert '[ -f "$tmp/webapp-js/package.json" ]' in recipe
+            # One cleanup, the trap, set before anything can fail.
+            assert recipe.index(CLEANUP_TRAP) < recipe.index("git clone")
+            assert recipe.count('rm -rf "$tmp"') == 1
             # A repository the user made is never initialized over.
             assert recipe.rstrip().endswith('[ -e "$dir/.git" ] || git -C "$dir" init -b main')
             assert "**The `webapp-js/` test is load-bearing.**" in body
@@ -1146,6 +1217,16 @@ class TestMethodAppBranch:
             assert "none of it is reimplemented here" in body
             assert "never by editing `src/generated/`" in body
             assert "It commits nothing." in body
+            # The warnings are read off the whole log and relayed, the LICENSE holder first.
+            # Byte order, so that no locale's collation merges two warnings that differ only in punctuation.
+            assert "grep -E '^(warning: |! )' \"$log\" | LC_ALL=C sort -u" in create
+            assert "**The gesture's warnings are read from the whole log, not from its tail.**" in body
+            assert "`LICENSE_HOLDER='…'`" in body
+            assert "`LICENSE`, `LICENSE_HOLDER` and `LICENSE_YEAR` only when the user gave them" in body
+            assert (
+                "- every warning the gesture printed, each with what answers it, and first, when the gesture left it in place, "
+                "that `LICENSE` still names the template's copyright holder"
+            ) in body
             # The gesture installs the dependencies before its refusals, dry run included.
             assert "refuses before it changes a tracked file" in body
             assert "changes no tracked file, so the gesture can run again" in body
@@ -1490,6 +1571,25 @@ class TestMethodAppRecipes:
         assert self._temporaries_beside(target) == []
         assert self._entries(target) == set()
 
+    @pytest.mark.parametrize("signal_number", [signal.SIGINT, signal.SIGTERM], ids=["INT", "TERM"])
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_copy_removes_its_temporary_path_when_interrupted(self, tmp_path: Path, shell: list[str], signal_number: int) -> None:
+        """The second reading found an empty `.pipelex-method-apps-…` beside an empty project, left by a
+        session cleared while the chain ran. A harness sends `TERM` to the command's group first, and
+        the trap turns it into an exit that removes the half-written clone."""
+        assert self.recipe.index(CLEANUP_TRAP) < self.recipe.index("git clone")
+        target = tmp_path / "receipt-review"
+        script = self.recipe.replace(METHOD_APPS_URL, f"file://{tmp_path / 'never-reached'}").replace("<dir>", str(target))
+        shim_bin = _hanging_clone_shim(tmp_path / "shim-bin")
+
+        returncode = _interrupt_during_clone(
+            script, shell=shell, shim_bin=shim_bin, parent=tmp_path, prefix=".pipelex-method-apps-", signal_number=signal_number
+        )
+
+        assert returncode == 128 + signal_number
+        assert self._temporaries_beside(target) == []
+        assert self._entries(target) == set()
+
     def test_no_delete_in_the_copy_addresses_a_path_under_the_target(self, family: Path, tmp_path: Path) -> None:
         real_rm = shutil.which("rm")
         assert real_rm is not None, "these tests already require a POSIX userland"
@@ -1649,6 +1749,42 @@ class TestMethodAppRecipes:
         assert f"make create exited {exit_code};" in result.stdout
         # The path reaches make as one argument, space and all.
         assert arguments_log.read_text(encoding="utf-8").splitlines() == ["-C", str(target), "create", f"METHOD={bundle}"]
+        assert result.stdout.splitlines()[-2:] == ["its warnings:", "none"]
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    def test_the_create_block_lists_each_warning_the_gesture_printed_once(self, tmp_path: Path, shell: list[str]) -> None:
+        """The gesture's warnings come before `make all`, whose output fills the tail, and the bootstrap's come
+        twice, from its dry run and then from its write. The block lists each one once, whatever stream it was on."""
+        scope_warning = "! a method_id is scoped to your key's organization, so `npm run codegen` on this slice needs a key of that same org."
+        license_warning = "warning: LICENSE copyright line left untouched — pass --license-holder to claim it."
+        before = tmp_path / "before.log"
+        before.write_text(
+            f"create: Receipt Review\n\n{scope_warning}\ncreate: checking the project values with the bootstrap (--dry-run)\n", encoding="utf-8"
+        )
+        warned = tmp_path / "warned.log"
+        warned.write_text(f"{license_warning}\n", encoding="utf-8")
+        after = tmp_path / "after.log"
+        after.write_text("".join(f"make all: step {step}\n" for step in range(60)) + "npm warn deprecated glob@7.2.3\n", encoding="utf-8")
+        shim_bin = self._make_shim(
+            tmp_path / "shim-bin",
+            f'cat "{before}"\ncat "{warned}" >&2\n'
+            'echo "create: 2/6 run the bootstrap with the values above"\n'
+            f'cat "{warned}" >&2\ncat "{after}"\nexit 0\n',
+        )
+        target = tmp_path / "receipt-review"
+        target.mkdir()
+        block = _recipe(_render_skill("prod"), CREATE_MARKER).replace("<dir>", str(target)).replace("<method>", "mt_receipt")
+        environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}", "TMPDIR": str(tmp_path)}
+
+        result = subprocess.run([*shell, "-c", block], capture_output=True, text=True, encoding="utf-8", check=False, env=environment)
+
+        assert result.returncode == 0, result.stderr
+        lines = result.stdout.splitlines()
+        listed = lines[lines.index("its warnings:") + 1 :]
+        assert listed == [scope_warning, license_warning]
+        # The tail alone would have shown neither.
+        assert scope_warning not in lines[: lines.index("its warnings:")]
+        assert license_warning not in lines[: lines.index("its warnings:")]
 
     @pytest.mark.skipif(shutil.which("node") is None, reason="the guard reads package.json with node")
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)

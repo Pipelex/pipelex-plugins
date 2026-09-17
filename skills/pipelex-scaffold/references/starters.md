@@ -39,13 +39,13 @@ A project is a copy of `webapp-js/` alone, so the repository is cloned shallow b
 mkdir -p <dir> && dir=$(cd <dir> && pwd) || exit 1
 case "$(ls -A "$dir")" in ""|.git) ;; *) exit 1 ;; esac
 tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-method-apps-XXXXXX") || exit 1
-git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+trap 'rm -rf "$tmp"' EXIT; trap 'exit 130' INT; trap 'exit 143' TERM
+git clone --depth 1 https://github.com/Pipelex/pipelex-method-apps.git "$tmp" || exit 1
 git -C "$tmp" rev-parse HEAD                     # the family SHA, for the commit message
 cat "$tmp/VERSION"                               # the family version, for the commit message
-[ -f "$tmp/webapp-js/package.json" ] || { echo "the default branch carries no webapp-js/" >&2; rm -rf "$tmp"; exit 1; }
-case "$(ls -A "$dir")" in ""|.git) ;; *) rm -rf "$tmp"; exit 1 ;; esac
-cp -R "$tmp/webapp-js"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
-rm -rf "$tmp"
+[ -f "$tmp/webapp-js/package.json" ] || { echo "the default branch carries no webapp-js/" >&2; exit 1; }
+case "$(ls -A "$dir")" in ""|.git) ;; *) exit 1 ;; esac
+cp -R "$tmp/webapp-js"/. "$dir"/ || exit 1
 [ -e "$dir/.git" ] || git -C "$dir" init -b main
 ```
 
@@ -87,15 +87,15 @@ Into a directory whose only entry is `.git` — the one shape the "Where" rule r
 ```bash
 dir=$(cd <dir> && pwd) || exit 1
 tmp=$(mktemp -d "$(dirname "$dir")/.pipelex-starter-XXXXXX") || exit 1
-git clone --depth 1 https://github.com/Pipelex/<starter>.git "$tmp" || { rm -rf "$tmp"; exit 1; }
+trap 'rm -rf "$tmp"' EXIT; trap 'exit 130' INT; trap 'exit 143' TERM
+git clone --depth 1 https://github.com/Pipelex/<starter>.git "$tmp" || exit 1
 git -C "$tmp" rev-parse HEAD
-rm -rf "$tmp/.git" || { rm -rf "$tmp"; exit 1; }
-[ "$(ls -A "$dir")" = ".git" ] || { rm -rf "$tmp"; exit 1; }
-cp -R "$tmp"/. "$dir"/ || { rm -rf "$tmp"; exit 1; }
-rm -rf "$tmp"
+rm -rf "$tmp/.git" || exit 1
+[ "$(ls -A "$dir")" = ".git" ] || exit 1
+cp -R "$tmp"/. "$dir"/ || exit 1
 ```
 
-Every part of that chain is load-bearing, and `/pipelex-scaffold`'s Step 2 gives each in full. **The first line resolves `<dir>` to an absolute path before the parent is computed from it**, without which a destination spelled `.` — the ordinary spelling, since the user is usually standing in the directory they just `git init`-ed — puts the temporary directory inside the destination and the `ls -A` line then refuses every time. **No `rm -rf` in it addresses a path under `<dir>`**: the template's history is discarded while the clone is still at a path `mktemp` made for this command, before anything moves, so the guarded-deletion problem above does not arise here at all. **`cp -R "$tmp"/. "$dir"/` carries the entries beginning with a dot** — `.gitignore`, `.env.example`, `.github/`, `.claude/` — every one of which `mv "$tmp"/* "$dir"/` leaves behind while exiting `0`. And **the `ls -A` line admits exactly one entry**, `.git`, which the clone no longer has, so the template can only add to the directory and anything else stops the run with nothing copied and the temporary path removed. It is one chain and goes out as one command, for the reason the paragraph above gives.
+Every part of that chain is load-bearing, and `/pipelex-scaffold`'s Step 2 gives each in full. **The first line resolves `<dir>` to an absolute path before the parent is computed from it**, without which a destination spelled `.` — the ordinary spelling, since the user is usually standing in the directory they just `git init`-ed — puts the temporary directory inside the destination and the `ls -A` line then refuses every time. **No `rm -rf` in it addresses a path under `<dir>`**: the template's history is discarded while the clone is still at a path `mktemp` made for this command, before anything moves, so the guarded-deletion problem above does not arise here at all. **`cp -R "$tmp"/. "$dir"/` carries the entries beginning with a dot** — `.gitignore`, `.env.example`, `.github/`, `.claude/` — every one of which `mv "$tmp"/* "$dir"/` leaves behind while exiting `0`. And **the `ls -A` line admits exactly one entry**, `.git`, which the clone no longer has, so the template can only add to the directory and anything else stops the run with nothing copied and the temporary path removed. **The trap on the line after `mktemp` removes the temporary path however the command ends**, a Ctrl-C or a harness's `TERM` included, which the `INT` and `TERM` traps turn into an ordinary exit because zsh and dash do not run an `EXIT` trap when a signal kills them. It is one chain and goes out as one command, for the reason the paragraph above gives.
 
 GitHub repository, on request and after confirmation (visibility asked, default private; GitHub makes the initial commit, so no pristine commit of your own):
 
@@ -106,7 +106,7 @@ gh repo create <owner>/<name> --template Pipelex/<starter> --private --clone
 
 ## What makes a copy the user's
 
-**The method app: `make create`.** It is the template's own script, one-shot and non-interactive: a value it cannot derive is a refusal naming the flag, never a prompt. It fetches the method once and derives the package name, the title and the description from it (`NAME=`, `TITLE=`, `DESCRIPTION=` override them); author, repository URL and license are never invented. It then scaffolds the method, runs the bootstrap with the derived values and `--clean`, writes `.env.local`, re-syncs the lock file and runs `make all`, and removes the bootstrap once that is green. Nothing is committed, so the whole result is a diff against the pristine commit. `DRY_RUN=1` prints the plan and changes no tracked file; like every run on a fresh copy, it installs the dependencies first, which writes `node_modules/` and lets husky set the repository's `core.hooksPath`. A failure after the scaffold is finished by hand with the steps its message names, because the gesture refuses a copy that is already a project.
+**The method app: `make create`.** It is the template's own script, one-shot and non-interactive: a value it cannot derive is a refusal naming the flag, never a prompt. It fetches the method once and derives the package name, the title and the description from it (`NAME=`, `TITLE=`, `DESCRIPTION=` override them); author, repository URL and license are never invented. It then scaffolds the method, runs the bootstrap with the derived values and `--clean`, writes `.env.local`, re-syncs the lock file and runs `make all`, and removes the bootstrap once that is green. Nothing is committed, so the whole result is a diff against the pristine commit. `DRY_RUN=1` prints the plan and changes no tracked file; like every run on a fresh copy, it installs the dependencies first, which writes `node_modules/` and lets husky set the repository's `core.hooksPath`. A failure after the scaffold is finished by hand with the steps its message names, because the gesture refuses a copy that is already a project. Its own warnings print as `! …` and the bootstrap's as `warning: …`, all before `make all`. Without `LICENSE_HOLDER=` (and optionally `LICENSE_YEAR=`), an MIT project's `LICENSE` keeps the template's copyright line, and the bootstrap warns about it.
 
 **A starter: the clone's `bootstrap` skill.** Both starters carry `.claude/skills/bootstrap/SKILL.md` with a bundled script (`scripts/bootstrap.mjs` / `scripts/bootstrap.py`). Read the file in the clone and follow it; the shape is the same on both:
 
