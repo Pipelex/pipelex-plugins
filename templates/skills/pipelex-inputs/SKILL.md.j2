@@ -8,6 +8,7 @@ description: Prepare inputs for MTHDS methods. Use when user says "prepare input
   - mcp__plugin_pipelex_pipelex__mthds_run
   - mcp__plugin_pipelex_pipelex__mthds_run_status
   - mcp__plugin_pipelex_pipelex__mthds_run_results
+  - mcp__plugin_pipelex_pipelex__mthds_download_artifacts
 {%- endif %}
 ---
 
@@ -382,7 +383,7 @@ On acceptance:
    On a genuine mismatch of either kind, the method changed underneath you — stop, report which inputs drifted and how, and send the user back to `/pipelex-inputs` to re-prepare before spending credit on a run that won't match. Keys and shapes both match → proceed. (A swap between two concepts of the same JSON kind — `Text` to `Date`, both strings — is invisible to this check; the run's own validation is what catches that.)
 2. Call `mthds_run` with the same target as Step 2 — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method — and `inputs` set to the parsed content of the **prepared** `inputs.json`, verbatim. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
 3. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
-4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
+4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message). When that output references stored files — an image, a PDF or a document carried as a `pipelex-storage://` URI — call `mthds_download_artifacts` with the same run id to save them under the working directory, because the links embedded beside those references are presigned and expire within the hour.
 
 ---
 

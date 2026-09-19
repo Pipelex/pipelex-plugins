@@ -145,11 +145,13 @@ class TestPipelexIntegrateSkill:
 
     # The lowest `@pipelex/sdk` carrying everything the TypeScript output uses: the gate's three exports
     # arrived in 0.13.0, `method_id` runs in 0.14.0, `method_ref` runs in 0.16.0 (below it the option is typed
-    # `never`, so a by-ref call site does not compile), and `prepareInputs` by all three sources — the upload the
+    # `never`, so a by-ref call site does not compile), `prepareInputs` by all three sources — the upload the
     # call site's docstring points at — in 0.17.0, which also stopped it calling `/v1/build/inputs` and reading
-    # a text field merely named `url` from disk. Step 8 raises an older pin to it, and every place that names a
-    # TypeScript SDK version names this one.
-    TYPESCRIPT_SDK_FLOOR = "0.17.0"
+    # a text field merely named `url` from disk, and the run-results surface step 9's paragraphs name — the
+    # artifact operations, `summarizeUsage`, and `working_memory` and `graph_assembly_error` on `RunResults` —
+    # in 0.18.0. Step 8 raises an older pin to it, and every place that names a TypeScript SDK version names
+    # this one.
+    TYPESCRIPT_SDK_FLOOR = "0.18.0"
     VERSION = re.compile(r"\b\d+\.\d+(?:\.\d+)?\b")
 
     # A python-pydantic artifact body, stamped and locked by `stamped` and `write_python_project`.

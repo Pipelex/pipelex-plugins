@@ -40,7 +40,7 @@ const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".n
 // call site the skill writes uses. Naming the older release that first carried the exports would send the
 // user through a second upgrade.
 const SDK_EXPORTS = ["CodegenLockError", "isStampableArtifactPath", "runCodegenCheck"];
-const SDK_MINIMUM = "0.17.0";
+const SDK_MINIMUM = "0.18.0";
 
 // `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
 // artifact given a BOM would hash as its un-BOM'd self, match the lock, and report current while
