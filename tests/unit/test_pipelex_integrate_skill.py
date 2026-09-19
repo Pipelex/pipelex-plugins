@@ -658,11 +658,18 @@ class TestPipelexIntegrateSkill:
         assert "if not contents:" in python
         assert 'raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")' in python
 
-    def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
+    def test_method_id_warns_and_refresh_migrates_a_stale_call_site(self) -> None:
+        """The refresh used to edit the call site on two triggers, and a return-shape change fires
+        neither: returning the narrowed output alone still type-checks, and a return shape is not part
+        of the `pipe` record. A project integrated before step 9 returned the results beside the output
+        would therefore have had its pin raised to the floor and its call site left behind, on an SDK
+        whose whole run-results surface its own module does not hand back. Hence the third trigger.
+        """
         body = self.integrate
         assert "The catalog is unversioned" in body
         assert "proceed only on the user's say-so" in body
-        assert "**The call site is edited only if it no longer type-checks or the `pipe` record no longer matches the signature**" in body
+        assert "**The call site is edited if it no longer type-checks, if the `pipe` record no longer matches the signature**" in body
+        assert "**or if it still returns the output alone instead of the results beside it**" in body
         assert '"generator": "pipelex-integrate"' in body
 
     def test_the_python_consumer_gets_a_gate_and_never_the_runtime(self) -> None:
