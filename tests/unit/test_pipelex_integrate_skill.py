@@ -51,8 +51,13 @@ class TestPipelexIntegrateSkill:
         "**One lock-without-sidecar is this method's own, and relocating is the wrong answer for it**",
         # The harness keeps no sidecar by design, so step 4's rule cannot govern its layout.
         "**This is the one destination step 4's sidecar rule does not govern**",
-        # A list output arrives as an array and a single-object parser rejects it.
+        # A multiple output is a ListContent, so it arrives wrapped and a parser applied to
+        # main_stuff whole rejects it. Both halves are pinned: the rule to read multiplicity at
+        # all, and the envelope itself, which is the part a revert to "arrives as an array" would
+        # otherwise take with it while leaving the first assertion green.
         "**Narrow according to the output's `multiplicity`, which step 3 recorded**",
+        'arrives as the envelope `{"items": […]}`',
+        "Read `items` off the object and map the parser over its members",
     )
 
     # The closed set of ways an instruction to end the run can be written. The continuing regions —
