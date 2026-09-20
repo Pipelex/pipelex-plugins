@@ -1,6 +1,6 @@
 # Integrating into a TypeScript project
 
-Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.17.0, the floor the skill's step 8 installs, and move only when that package does.
+Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.18.0, the floor the skill's step 8 installs, and move only when that package does.
 
 ## Detecting the project
 
@@ -67,13 +67,18 @@ export type SummarizePdfInputs = {
   context?: string;
 };
 
-export async function summarizePdf(inputs: SummarizePdfInputs): Promise<DocumentSummary> {
+/** The narrowed output beside the whole results the run returned: `output` is what the method
+ *  produced, `results` is everything else the run carries — the run id, the usage, the graph,
+ *  and the references of any file it produced. A caller who wants only the output reads `.output`. */
+export type SummarizePdfRun = { output: DocumentSummary; results: RunResults };
+
+export async function summarizePdf(inputs: SummarizePdfInputs): Promise<SummarizePdfRun> {
   const results: RunResults = await getPipelexClient().startAndWaitForResult({
     pipe_code: PIPE_CODE,
     mthds_contents: await readBundle(),
     inputs,
   });
-  return parseDocumentSummary(results.main_stuff);
+  return { output: parseDocumentSummary(results.main_stuff), results };
 }
 ```
 
@@ -105,6 +110,20 @@ export function getPipelexClient(): PipelexApiClient {
 
 Parameter types from the signature: `string` for Text and Date (ISO 8601), `number` for Number, `boolean` for YesNo, `{ url: string }` for Image and Document, the generated type for a structured concept or a composite native, `T[]` for a list, `?` for a non-required input. Key names are the pipe's input names as declared, snake_case included.
 
+## What the results carry
+
+The module returns `RunResults` beside the narrowed output because everything below is already parsed on it, and a caller that needs one of these would otherwise have to edit the module or run the method a second time. Each field has its own section in `@pipelex/sdk`'s `docs/run-results.md` — point the user at that page rather than restating it, and write none of these into the project as a helper.
+
+**`results.pipeline_run_id` — the durable handle.** It outlives the process: persisted, it lets a later session read the same run back through the SDK's lifecycle calls, and it is what a `RunTimeoutError` leaves in hand while the run itself carries on server-side. The bare runner has no run store behind the id.
+
+**Produced files — a `pipelex-storage://` reference, and a signed link that expires.** A run that produces an image, a PDF or a document puts the file's durable reference in the content's `url`, beside a `public_url` the storage provider signed when the file was written. The reference is permanent and is what belongs in a record; the signed link is short-lived, so one persisted in a database or baked into a cached page stops working without warning. Bringing the bytes down is the SDK's job and not something to re-implement over `client.resolveStorageUrl`: `client.downloadArtifacts` saves everything a run produced under a directory, `client.resolveArtifacts` mints fresh links for a whole list of references, and `client.fetchArtifact` streams one within bounded limits. **Those three are methods on the client, not imports** — each one calls the API, so it needs the key the client holds — and the barrel exports only `collectArtifacts`, which lists a result's references without touching the network, and `artifactFilename`. There is no `@pipelex/sdk/artifacts` subpath, so `import { downloadArtifacts } from "@pipelex/sdk"` does not resolve. Their page is `docs/artifact-download.md`. In a framework with a client/server split, resolve on the server and hand the browser a link it uses immediately.
+
+**`summarizeUsage(results)` — what the run cost.** It folds the `tokens_usages` / `usage_assembly_error` pair into one run-level reading with a per-pipe rollup, applying the rules `docs/run-usage.md` states — an unrated cost is not a cost of zero, and a partial sum says so — and it is pure: no client, no network, no mutation of its argument. Never add the records up by hand.
+
+**`results.graph_spec` — the graph the run executed.** One node per pipe with its status, its timings and the models and cost attributed to it: the same document a local `pipelex` run writes as `graphspec.json`. The field is typed `unknown` because its canonical declaration is `GraphSpec` in `@pipelex/mthds-ui`, which also ships the viewer that renders it — a project that wants the graph on screen takes that package and loads the viewer client-side only, since it touches browser globals when its module evaluates. `results.graph_assembly_error` says why a graph is missing when one is — but only on the blocking path, which is what a bare runner answers on. The hosted results body carries no such field yet, so against the hosted API a missing graph currently explains itself nowhere.
+
+**`results.working_memory` — every named stuff of the run.** Root and aliases, the whole run rather than its output alone, which is what repopulates the inputs of a run read back later.
+
 ## The offline gate
 
 Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`, and never format or lint it: step 5 put it in the formatter and linter exclusions beside the generated directory. It imports only Node builtins and `@pipelex/sdk`, runs under plain `node` whatever the project's TypeScript build, and prints through `process.stdout` / `process.stderr` so a `no-console` rule does not fire. Register it and extend the existing gate:
@@ -118,11 +137,13 @@ Copy `references/codegen-check.mjs` verbatim to `scripts/codegen-check.mjs`, and
 }
 ```
 
-Add every method's directory to the `codegen:check` line as it is integrated, and on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. A refresh also re-copies the script when the project's copy differs from this reference, and installs it when the project has none, so a project integrated by an older version of the skill gets the current gate. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with the same recursive `readdir` the call site's `readBundle` uses — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. It runs from the project root because `sources.json` records its source paths and `bundle_dir` relative to it, and `bundle_dir` is the call site's `BUNDLE_DIR` expressed that way. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.17.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
+Add every method's directory to the `codegen:check` line as it is integrated, and on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. A refresh also re-copies the script when the project's copy differs from this reference, and installs it when the project has none, so a project integrated by an older version of the skill gets the current gate. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with the same recursive `readdir` the call site's `readBundle` uses — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. It runs from the project root because `sources.json` records its source paths and `bundle_dir` relative to it, and `bundle_dir` is the call site's `BUNDLE_DIR` expressed that way. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.18.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
 
 ## The Node-only boundary
 
 `readFile`, `node:path` and `process.cwd()` in the call site are server-side facts. In a framework with a client/server split (Next.js, Remix, SvelteKit), the module belongs on the server side — a Server Action, a route handler, a loader — and the JS starter marks such modules with `import "server-only"`. Never import it from a component that renders in the browser: the API key would leave the server.
+
+The key is not the only thing that must not cross. **`RunResults` is a server-side value: pick the fields the client needs rather than returning it whole.** A Server Action's return value is serialized to the browser, so `return { output, results }` from one ships `results.working_memory` — every named stuff of the run, which is the inputs it was given and every intermediate — along with `graph_spec` and the run's usage records, to anyone with the page open. Return the narrowed `output`, and beside it only what the UI actually renders: `results.pipeline_run_id` for a durable handle, `summarizeUsage(results)` folded on the server if the cost is shown, a resolved link for a produced file. Where the graph really is the feature, `graph_spec` crosses on its own and the rest does not.
 
 ## A project that owns a codegen harness
 

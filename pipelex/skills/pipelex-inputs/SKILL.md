@@ -14,6 +14,7 @@ allowed-tools:
   - mcp__plugin_pipelex_pipelex__mthds_run
   - mcp__plugin_pipelex_pipelex__mthds_run_status
   - mcp__plugin_pipelex_pipelex__mthds_run_results
+  - mcp__plugin_pipelex_pipelex__mthds_download_artifacts
 ---
 
 # Prepare Inputs for MTHDS methods
@@ -35,7 +36,7 @@ This skill extracts the method's input template through the **`mthds_inputs_temp
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently improvise a template.
 - The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 - **`mthds_prepare_inputs`** is also **required**, whenever the assembled inputs carry a file-ish value (Image, Document) that is not already an `http(s)` URL or a `pipelex-storage://` reference — a local path, a `data:` URL, or inline bytes. It uploads those assets to Pipelex storage and rewrites the values, which is what makes them runnable: see [Prepare the inputs for a run](#prepare-the-inputs-for-a-run). Same discipline as above — an absent tool or a `config`-class error stops the skill; never hand-fake a storage reference. When every file-ish value is already pass-through, the step has nothing to do and may be skipped.
-- The **run tools** (`mthds_run`, `mthds_run_status`, `mthds_run_results`) are optional — they only power the closing [offer to run](#offer-to-run). When they are absent from the session, finish without the offer; never stop for them.
+- The **run tools** (`mthds_run`, `mthds_run_status`, `mthds_run_results`, `mthds_download_artifacts`) are optional — they only power the closing [offer to run](#offer-to-run). When they are absent from the session, finish without the offer; never stop for them. `mthds_download_artifacts` is the one that goes missing on its own: it is absent wherever the workshop has no working directory to save into, which is the hosted console. Report the run's stored references as they came back and say the files were not downloaded — never stop a run that has already completed and been reported.
 
 ## Mode Selection
 
@@ -387,7 +388,7 @@ On acceptance:
    On a genuine mismatch of either kind, the method changed underneath you — stop, report which inputs drifted and how, and send the user back to `/pipelex-inputs` to re-prepare before spending credit on a run that won't match. Keys and shapes both match → proceed. (A swap between two concepts of the same JSON kind — `Text` to `Date`, both strings — is invisible to this check; the run's own validation is what catches that.)
 2. Call `mthds_run` with the same target as Step 2 — the whole-bundle `files` submission, or `method_id: "mt_…"` for a registered method — and `inputs` set to the parsed content of the **prepared** `inputs.json`, verbatim. Omit `pipe_code` to run the method's declared main pipe; pass a pipe's code only when the user targeted a different pipe in Step 2.
 3. The tool returns a durable `run_id` immediately and never blocks. Report the id, then check with `mthds_run_status`, honoring the summary's retry hint — don't poll in a tight loop.
-4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message).
+4. Once terminal, fetch `mthds_run_results` and report the main output (or the failure message). When that output references stored files — an image, a PDF or a document carried as a `pipelex-storage://` URI — call `mthds_download_artifacts` with the same run id to save them, because the links embedded beside those references are presigned and expire within the hour. It writes under **the workshop's own working directory** — wherever the harness launched the server, which is not necessarily the project you are in — so report the paths it returns rather than paths relative to the user's project.
 
 ---
 

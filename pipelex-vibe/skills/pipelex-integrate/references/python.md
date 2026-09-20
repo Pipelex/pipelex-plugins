@@ -62,10 +62,12 @@ values from an untrusted caller to it.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from pipelex_sdk.client import PipelexAPIClient
+from pipelex_sdk.runs import RunResults
 
 from <package>.generated.summarize_pdf.models import DocumentSummary
 
@@ -87,7 +89,20 @@ def _read_bundle() -> list[str]:
     return contents
 
 
-async def summarize_pdf(*, document: dict[str, Any], context: str | None = None) -> DocumentSummary:
+@dataclass(frozen=True)
+class SummarizePdfRun:
+    """The narrowed output beside the whole results the run returned.
+
+    ``output`` is what the method produced; ``results`` is everything else the run carries —
+    ``pipeline_run_id``, the usage pair, the graph, and the references of any file it produced.
+    A caller who wants only the output reads ``.output``.
+    """
+
+    output: DocumentSummary
+    results: RunResults
+
+
+async def summarize_pdf(*, document: dict[str, Any], context: str | None = None) -> SummarizePdfRun:
     inputs: dict[str, Any] = {"document": document}
     if context is not None:
         inputs["context"] = context
@@ -97,10 +112,10 @@ async def summarize_pdf(*, document: dict[str, Any], context: str | None = None)
             mthds_contents=_read_bundle(),
             inputs=inputs,
         )
-    return DocumentSummary.model_validate(results.main_stuff)
+    return SummarizePdfRun(output=DocumentSummary.model_validate(results.main_stuff), results=results)
 
 
-def summarize_pdf_sync(*, document: dict[str, Any], context: str | None = None) -> DocumentSummary:
+def summarize_pdf_sync(*, document: dict[str, Any], context: str | None = None) -> SummarizePdfRun:
     """The blocking wrapper for a synchronous caller."""
     return asyncio.run(summarize_pdf(document=document, context=context))
 ```
@@ -111,6 +126,8 @@ Variants by selector, replacing the `mthds_contents=` argument and dropping `BUN
 - **`method_id`**: `method_id="mt_…"`; the module docstring says the catalog is unversioned.
 
 Facts the module leans on: `PipelexAPIClient()` reads `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` (default `https://api.pipelex.com`) itself; it is async-only and used as an async context manager; there is **no barrel** in `pipelex_sdk` by design, so every import is a full module path (`pipelex_sdk.client`, `pipelex_sdk.runs`, `pipelex_sdk.errors`); `start_and_wait(...)` takes the durable path on the hosted API (default 2 s poll, 20 min budget, `wait_options=WaitForResultOptions(...)` to change them) and falls back to blocking on a bare runner, returning `RunResults` whose `main_stuff` is always present for a completed run. Let the typed errors from `pipelex_sdk.errors` propagate — `RunFailedError`, `RunTimeoutError` (the run keeps going; resume by `pipeline_run_id`), `ApiResponseError` (branch on `.code`), `ApiUnreachableError`, `MissingMainStuffError` — and add the project's own handling only where it already wraps its other clients.
+
+**The module returns the results beside the output.** The frozen dataclass keeps the narrowed output and the whole `RunResults` together, so a caller reaches `pipeline_run_id` — the durable handle a `RunTimeoutError` leaves in hand while the run carries on server-side — and the run's `tokens_usages` / `usage_assembly_error` pair without the module being edited or the method being run again. `pipelex-sdk`'s `docs/run-usage.md` is the page that states how to read that pair, including why an unrated cost is not a cost of zero. The artifact operations and the usage summary the TypeScript SDK carries have no Python twin yet, so claim neither here: a produced file arrives as a `pipelex-storage://` reference with a short-lived `public_url` beside it, and resolving it is `client.resolve_storage_url` one reference at a time.
 
 Parameters are keyword-only, typed from the signature: `str` for Text and Date (ISO 8601), `float` for Number, `bool` for YesNo, `dict[str, Any]` with a `url` key for Image and Document, the generated model for a structured concept or a composite native, `list[T]` for a list, `T | None = None` for a non-required input. Names are the pipe's input names as declared. A project that already constructs a `PipelexAPIClient` somewhere gets that construction reused instead of a fresh `async with` per call; an async-native project (FastAPI, an existing async codebase) gets the async function alone, without the `_sync` wrapper.
 

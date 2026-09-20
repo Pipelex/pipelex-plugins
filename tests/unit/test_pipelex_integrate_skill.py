@@ -145,11 +145,13 @@ class TestPipelexIntegrateSkill:
 
     # The lowest `@pipelex/sdk` carrying everything the TypeScript output uses: the gate's three exports
     # arrived in 0.13.0, `method_id` runs in 0.14.0, `method_ref` runs in 0.16.0 (below it the option is typed
-    # `never`, so a by-ref call site does not compile), and `prepareInputs` by all three sources — the upload the
+    # `never`, so a by-ref call site does not compile), `prepareInputs` by all three sources — the upload the
     # call site's docstring points at — in 0.17.0, which also stopped it calling `/v1/build/inputs` and reading
-    # a text field merely named `url` from disk. Step 8 raises an older pin to it, and every place that names a
-    # TypeScript SDK version names this one.
-    TYPESCRIPT_SDK_FLOOR = "0.17.0"
+    # a text field merely named `url` from disk, and the run-results surface step 9's paragraphs name — the
+    # artifact operations, `summarizeUsage`, and `working_memory` and `graph_assembly_error` on `RunResults` —
+    # in 0.18.0. Step 8 raises an older pin to it, and every place that names a TypeScript SDK version names
+    # this one.
+    TYPESCRIPT_SDK_FLOOR = "0.18.0"
     VERSION = re.compile(r"\b\d+\.\d+(?:\.\d+)?\b")
 
     # A python-pydantic artifact body, stamped and locked by `stamped` and `write_python_project`.
@@ -656,11 +658,18 @@ class TestPipelexIntegrateSkill:
         assert "if not contents:" in python
         assert 'raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")' in python
 
-    def test_method_id_warns_and_refresh_leaves_the_call_site_alone(self) -> None:
+    def test_method_id_warns_and_refresh_migrates_a_stale_call_site(self) -> None:
+        """The refresh used to edit the call site on two triggers, and a return-shape change fires
+        neither: returning the narrowed output alone still type-checks, and a return shape is not part
+        of the `pipe` record. A project integrated before step 9 returned the results beside the output
+        would therefore have had its pin raised to the floor and its call site left behind, on an SDK
+        whose whole run-results surface its own module does not hand back. Hence the third trigger.
+        """
         body = self.integrate
         assert "The catalog is unversioned" in body
         assert "proceed only on the user's say-so" in body
-        assert "**The call site is edited only if it no longer type-checks or the `pipe` record no longer matches the signature**" in body
+        assert "**The call site is edited if it no longer type-checks, if the `pipe` record no longer matches the signature**" in body
+        assert "**or if it still returns the output alone instead of the results beside it**" in body
         assert '"generator": "pipelex-integrate"' in body
 
     def test_the_python_consumer_gets_a_gate_and_never_the_runtime(self) -> None:
