@@ -1204,12 +1204,21 @@ class TestBundleHome:
         body = self._template("pipelex-design")
         assert "`summarize-pdf` in TypeScript, `summarize_pdf` in Python" in body
 
-    def test_no_skill_still_defaults_to_pipelex_wip(self) -> None:
+    def test_nothing_a_skill_ships_still_defaults_to_pipelex_wip(self) -> None:
         """It survives only as a directory a user may already have, never as the
-        default this plugin writes to nor as an example it teaches from."""
-        for skill in sorted(p.name for p in self.SKILLS.iterdir() if p.is_dir() and p.name != "shared"):
-            body = self._template(skill)
-            assert "pipelex-wip" not in body, f"{skill} still names pipelex-wip"
+        default this plugin writes to nor as an example it teaches from.
+
+        Every template under `templates/skills/` counts, shared partials included:
+        a partial is inlined into each skill that includes it, so a name
+        reintroduced there ships in several skills while appearing in none of
+        their sources. The static `skills/*/references/` documents count too —
+        they are copied verbatim into every target and are what the skills send
+        the model to read."""
+        shipped = sorted(self.SKILLS.rglob("*.j2")) + sorted((self.REPO_ROOT / "skills").rglob("*.md"))
+        assert shipped, "found nothing to check — the layout moved"
+        for path in shipped:
+            body = path.read_text(encoding="utf-8")
+            assert "pipelex-wip" not in body, f"{path.relative_to(self.REPO_ROOT)} still names pipelex-wip"
 
 
 class TestHookRendering:
