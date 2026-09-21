@@ -737,14 +737,23 @@ class TestSharedSkillIncludes:
 
     def test_the_pipefunc_warning_reaches_the_skills_that_ship_it(self) -> None:
         """An include nothing includes ships nowhere. The partial landed with the
-        shared-includes phase and was wired in here: design says it twice — once
-        while the contract is still the user's to change, once at delivery — and
-        explain says it when it meets one."""
+        shared-includes phase and is wired into every skill where a user meets a
+        `PipeFunc`: design says it twice — once while the contract is still the
+        user's to change, once at delivery — explain says it when it meets one,
+        and run says it beside the stops table, where a `PipeFunc` is named as a
+        suspect for a failure nothing upstream could have caught.
+
+        Run was the one that shipped late, because `pipelex-run` did not exist
+        when the partial landed, and in the meantime its table restated the
+        warning in its own words — the same drift this test caught in the
+        authoring reference, where two copies of one sentence were free to part."""
         include = "skills/shared/pipefunc-warning.md.j2"
         design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
         explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
+        run = (self.REPO_TEMPLATES / "skills" / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert design.count(include) == 2, "design warns in the contract line and again at delivery"
         assert include in explain
+        assert include in run
 
     def test_the_authoring_reference_carries_the_same_warning(self) -> None:
         """The reference is where a designer reads what a PipeFunc is; a warning
