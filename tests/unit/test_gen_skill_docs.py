@@ -1872,6 +1872,10 @@ class TestPublishedAddressTarget:
         body = self.run_skill
         assert "an address pairs with nothing" in body.lower()
         assert "complete run source" in body
+        # The stops table says what the body says: a second selector is a refusal, not a
+        # normalization the skill performs silently on the user's behalf.
+        assert "drops the extra one" not in body
+        assert "refused before anything runs" in body
 
     def test_a_published_method_is_not_routed_into_the_editing_skills(self) -> None:
         """Every other failing target in this skill routes to `/pipelex-design` or
@@ -1900,6 +1904,10 @@ class TestPublishedAddressTarget:
         assert "Provide MTHDS files or a method_id" in body
         assert "npx -y @pipelex/mcp@latest" in body
         assert "predates the selector" in body
+        # The refresh is not a cure on its own: the launcher decides what the NEXT spawn
+        # fetches, and a workshop that carries the selector has to exist to be fetched.
+        assert "restarts the server" in body
+        assert "leaving them refreshing in a loop" in body
 
     def test_the_address_config_refusal_names_the_gate_without_suppressing_the_credential(self) -> None:
         """Prepare resolves an address through the run route, so a published package

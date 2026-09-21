@@ -142,6 +142,6 @@ An unknown run id is reported in the tool's own words. Runs are scoped to the ke
 | the inputs drifted from the method's template | reports which and how, hands to `/pipelex-inputs`, spends nothing |
 | the run failed | reports `failure_message` verbatim, routes once, never bisects |
 | the failing method is a published address | reports the failure with the address, the tag and the resolved commit SHA; never routes it to `/pipelex-design` or `/pipelex-edit` |
-| a `files` submission or a `method_id` is in hand beside an address | drops the extra one — an address is a complete run source and pairs with nothing |
+| a `files` submission or a `method_id` is in hand beside an address | calls with the address alone and says which selector it left off — a second beside an address is refused before anything runs |
 | `mthds_download_artifacts` is absent | reports the stored references as they came back; the run still completed |
 | `mthds_download_artifacts` refuses the `dir` | calls again with no `dir`; a refused directory is not a failed download |
