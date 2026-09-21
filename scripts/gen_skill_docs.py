@@ -303,6 +303,14 @@ def render_templates(
     # Strict mode turns that into a build failure naming the template and the
     # attribute, at the use site — which is the only check that sees EVERY use, and
     # so the only one a second, correctly spelled occurrence cannot hide.
+    #
+    # It reaches every template, not only the floors, and that is the point: the
+    # hazard is the mechanism, not one variable. The consequence for an author is
+    # that a variable which may legitimately be absent must SAY so — `{% if x is
+    # defined %}`, or `{{ x | default(...) }}` — rather than leaning on an
+    # undefined name being falsy or empty. Every template rendered byte-identically
+    # when this was turned on, so nothing was migrated; the rule is for what comes
+    # next.
     env = Environment(
         loader=FileSystemLoader(str(templates_dir)),
         keep_trailing_newline=True,

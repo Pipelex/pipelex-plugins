@@ -100,6 +100,14 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
     ),
 ]
 
+# A number in a template that equals a floor and means something else entirely.
+# Empty today, and meant to stay nearly so: each entry names a template and the
+# literal it may contain, and adding one is a claim a reader should be able to
+# check from the sentence around the number. It is what keeps the template sweep
+# from being a rule with no way out — the failure mode of a correct check nobody
+# can satisfy is that somebody deletes it.
+TEMPLATE_FLOOR_LOOKALIKES: set[tuple[str, str]] = set()
+
 DEFAULTS_FILE = "defaults.toml"
 CLAUDE_MARKETPLACE_PATH = Path(".claude-plugin/marketplace.json")
 CODEX_MARKETPLACE_PATH = Path("packaging/codex-marketplace.json")
@@ -566,6 +574,15 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
     bump, and nothing else sees it: strict mode only fires on an expression that is
     present and misspelled, and the presence check reads every skill at once, so a
     second sentence still reading the table keeps the value present.
+
+    This one IS a numeric sweep, which the static-reference rule above deliberately
+    is not, and the difference is what each reads. `skills/` is prose about the whole
+    ecosystem, where `3.14` is a JSON example and `3.11` is matplotlib's version, so
+    a sweep there would be mostly false. `templates/` is ours, every floor in it
+    belongs in the table, and demanding an anchor per sentence would rebuild the same
+    hand-kept list whose omissions this rule exists to catch. The escape is
+    `TEMPLATE_FLOOR_LOOKALIKES` instead: a number that genuinely means something else
+    is named there once, with its reason.
     """
     errors: list[str] = []
     templates_dir = base_dir / "templates"
@@ -576,11 +593,14 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
         text = template.read_text(encoding="utf-8")
         rel = template.relative_to(base_dir)
         for key, value in sorted(floors.items()):
+            if (rel.as_posix(), value) in TEMPLATE_FLOOR_LOOKALIKES:
+                continue
             start = text.find(value)
             while start != -1:
                 line = text[:start].count("\n") + 1
                 errors.append(
-                    f"{rel}:{line}: spells floor `{key}` as the literal {value} — write `{{{{ floors.{key} }}}}` so the next bump reaches it"
+                    f"{rel}:{line}: spells floor `{key}` as the literal {value} — write `{{{{ floors.{key} }}}}` so the next bump reaches it, "
+                    "or name it in TEMPLATE_FLOOR_LOOKALIKES if it means something else here"
                 )
                 start = text.find(value, start + 1)
 
