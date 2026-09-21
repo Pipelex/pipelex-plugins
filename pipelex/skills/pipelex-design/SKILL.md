@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", "scaffold a method", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow". Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow". Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
 allowed-tools:
   - Bash
   - Read

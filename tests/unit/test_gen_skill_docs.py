@@ -1557,6 +1557,114 @@ class TestBundleHome:
             assert "pipelex-wip" not in body, f"{path.relative_to(self.REPO_ROOT)} still names pipelex-wip"
 
 
+class TestEditClassifiesFirstAndTriggersStopColliding:
+    """Box L of `wip/plugin-skills-gaps/design.md`.
+
+    Two things a description cannot say twice and a step order that decides who
+    pays for a verdict: `pipelex-edit` routes a structural change to
+    `/pipelex-design` before it validates anything, and the trigger phrases two
+    skills both claimed now belong to one each."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+
+    def _template(self, skill: str) -> str:
+        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def _description(self, skill: str) -> str:
+        for line in self._template(skill).splitlines():
+            if line.startswith("description:"):
+                return line
+        raise AssertionError(f"{skill} has no description line")
+
+    def test_edit_classifies_before_it_baselines(self) -> None:
+        """A request routed to design must not pay for a verdict here first.
+
+        Classification reads the files Step 1 already loaded and calls no tool,
+        so putting it after the baseline call bought nothing and cost a
+        validation on every structural request — which design then repeats when
+        it re-enters."""
+        body = self._template("pipelex-edit")
+        classify = body.index("### Step 2: Classify the change")
+        baseline = body.index("### Step 3: Baseline verdict")
+        assert classify < baseline
+        assert "hand off to `/pipelex-design` now, before any files change" in body
+        assert "### Step 3: Classify the change" not in body
+        assert "### Step 2: Baseline verdict" not in body
+
+    def test_edit_says_why_the_order_is_what_it_is(self) -> None:
+        body = self._template("pipelex-edit")
+        assert "calls no tool, so it comes before the baseline verdict on purpose" in body
+        assert "would otherwise have paid for two identical verdicts" in body
+
+    def test_edit_re_validates_against_the_step_that_holds_the_baseline(self) -> None:
+        """Step 5's back-reference moves with the step it names."""
+        body = self._template("pipelex-edit")
+        assert "Same whole-bundle `mthds_validate` call as Step 3." in body
+        assert "Same whole-bundle `mthds_validate` call as Step 2." not in body
+
+    @pytest.mark.parametrize("trigger", ['"add a step"', '"remove this pipe"', '"refactor this pipeline"'])
+    def test_the_structural_triggers_are_designs_alone(self, trigger: str) -> None:
+        """Edit cannot apply any of them, so recruiting it on the phrase only
+        buys a hand-off turn. Its Step 2 routing stays as the safety net for a
+        request that reaches it anyway."""
+        assert trigger not in self._description("pipelex-edit")
+
+    def test_design_still_claims_the_structural_work(self) -> None:
+        description = self._description("pipelex-design")
+        assert '"add a step", "rewire this pipeline"' in description
+        assert '"refactor the flow"' in description
+
+    def test_edit_still_routes_a_structural_request_that_reaches_it(self) -> None:
+        body = self._template("pipelex-edit")
+        assert '| "Add a step to do X" (open-ended) | structural → route to `/pipelex-design` |' in body
+        assert '| "Refactor this pipeline" (subjective) | structural → route to `/pipelex-design` |' in body
+
+    def test_scaffolding_is_the_scaffold_skills_word(self) -> None:
+        """`/pipelex-scaffold` starts a project; in every other skill here a
+        scaffold is a bundle with pending signatures. Design claimed the phrase
+        for neither meaning."""
+        assert '"scaffold a method"' not in self._description("pipelex-design")
+        assert '"bootstrap a Pipelex project"' in self._description("pipelex-scaffold")
+
+    def test_inputs_does_not_claim_the_bare_word_template(self) -> None:
+        """Too generic to recruit on: the word reaches this skill from a code
+        template, a project template and a prompt template alike."""
+        description = self._description("pipelex-inputs")
+        assert '"template"' not in description
+        assert '"prepare inputs"' in description
+
+    def test_inputs_keeps_the_word_as_a_strategy_signal(self) -> None:
+        """Dropping it from the description does not drop it from the table
+        that picks a strategy once the skill is already running."""
+        body = self._template("pipelex-inputs")
+        assert 'User says "template" / "schema" / "placeholder"' in body
+
+    def test_no_skill_explains_what_another_skill_defaults_to(self) -> None:
+        """The generic mode preamble told the reader that "each skill defines
+        its own default" — inside the one skill that carries it."""
+        for path in sorted(self.SKILLS.rglob("*.j2")):
+            body = path.read_text(encoding="utf-8")
+            assert "Each skill defines its own default" not in body, path.relative_to(self.REPO_ROOT)
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_platform_renders_the_modes_inputs_actually_has(self, target_name: str) -> None:
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-inputs"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
+        assert "**Default**: automatic — name the strategy and the assumptions it rests on in one line" in body
+        assert "**Go interactive** when the user asks for it" in body
+        assert "**Either mode can turn into the other mid-run**" in body
+        assert "### Mode behavior" not in body
+        assert "### Mode switching" not in body
+
+
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""

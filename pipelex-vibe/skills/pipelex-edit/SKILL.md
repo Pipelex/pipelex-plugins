@@ -1,6 +1,6 @@
 ---
 name: pipelex-edit
-description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "add a step", "remove this pipe", "refactor this pipeline", or wants any modification to an existing .mthds bundle. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
+description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", or wants any modification to an existing .mthds bundle. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
 
 ---
 
@@ -42,17 +42,19 @@ In interactive mode, present the planned edits and ask "Does this plan look righ
 
 Locate the bundle directory and read **every** `.mthds` file in it (the root — usually `main.mthds` — carries the `domain` header, `description`, and `main_pipe`; module files carry the pipes and concepts). Understand where the change lands before touching anything.
 
-### Step 2: Baseline verdict
+### Step 2: Classify the change
+
+Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds to the baseline.
+
+Classification reads the bundle you already have and calls no tool, so it comes before the baseline verdict on purpose: `/pipelex-design` validates its own baseline when it re-enters, and a request routed there from here would otherwise have paid for two identical verdicts.
+
+### Step 3: Baseline verdict
 
 Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change. Surface the `validation_errors[]` and the Markdown summary, and offer to repair first — never edit on a broken baseline, or your regressions and the pre-existing errors become indistinguishable.
 - `status: "error"` → no verdict: class `config` → stop per the Requirements above; class `input_domain` → fix the call; class `runtime` → report and retry once.
-
-### Step 3: Classify the change
-
-Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds.
 
 ### Step 4: Apply the edits
 
@@ -66,7 +68,7 @@ Use the Edit tool on the affected files. For renames, the edit is only done when
 
 ### Step 5: Re-validate
 
-Same whole-bundle `mthds_validate` call as Step 2. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable/scaffold state unchanged (a renamed pending signature legitimately renames its backlog entry — anything else in the pending set should be untouched). On `is_valid: false`, the failure is in your edit: use the summary's locators, fix, re-validate. If the same construct fails twice, pause and show the user instead of thrashing. On `status: "error"` (no verdict — e.g. the MCP connection dropped after the write), the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1 or to retry validation once the server is reachable again.
+Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable/scaffold state unchanged (a renamed pending signature legitimately renames its backlog entry — anything else in the pending set should be untouched). On `is_valid: false`, the failure is in your edit: use the summary's locators, fix, re-validate. If the same construct fails twice, pause and show the user instead of thrashing. On `status: "error"` (no verdict — e.g. the MCP connection dropped after the write), the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1 or to retry validation once the server is reachable again.
 
 ### Step 6: Inputs refresh check
 

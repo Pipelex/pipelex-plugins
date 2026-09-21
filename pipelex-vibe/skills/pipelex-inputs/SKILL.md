@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "template", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle or from a registered method's catalog id (mt_…) — also use when the user names a method id, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle or from a registered method's catalog id (mt_…) — also use when the user names a method id, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
 
 ---
 
@@ -28,38 +28,11 @@ This skill extracts the method's input template through the **`mthds_inputs_temp
 
 ## Mode Selection
 
-### How mode is determined
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the inputs through to run-ready without stopping, pausing only where a wrong guess would waste work.
 
-1. **Explicit override**: If the user states a preference, always honor it:
-   - Automatic signals: "just do it", "go ahead", "automatic", "quick", "don't ask"
-   - Interactive signals: "walk me through", "help me", "guide me", "step by step", "let me decide"
+**Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the request is too thin for the table below to pick a strategy from; stay automatic when they say "just do it" or "don't ask". In interactive mode, ask the additions listed under the table before filling anything, and show the assembled set before preparing it.
 
-2. **Skill default**: Each skill defines its own default based on the nature of the task.
-
-3. **Request analysis**: If no explicit signal and no strong skill default, assess the request:
-   - Detailed, specific requirements → automatic
-   - Brief, ambiguous, or subjective → interactive
-
-### Mode behavior
-
-**Automatic mode:**
-- State assumptions briefly before proceeding
-- Make reasonable decisions at each step
-- Present the result when done
-- Pause only if a critical ambiguity could lead to wasted work
-
-**Interactive mode:**
-- Ask clarifying questions at the start
-- Present options at decision points
-- Confirm before proceeding at checkpoints
-- Allow the user to steer direction
-
-### Mode switching
-
-- If in automatic mode and the user asks a question or gives feedback → switch to interactive for the current phase
-- If in interactive mode and the user says "looks good, go ahead" or similar → switch to automatic for remaining phases
-
-**Default**: Automatic.
+**Either mode can turn into the other mid-run**: a question or a correction makes the current step interactive, and "looks good, go ahead" makes the rest automatic.
 
 **Input strategy detection heuristics** (evaluated in order):
 
