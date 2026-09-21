@@ -610,6 +610,25 @@ class TestVersionFloors:
         errors = check_version_floors(tree)
         assert any("was reworded" in error and "typescript.md" in error for error in errors)
 
+    def test_a_template_that_spells_a_floor_instead_of_reading_it_is_caught(self, tmp_path: Path) -> None:
+        """The regression the first round of this branch fixed by hand, and the one drift
+        neither other part can see: strict rendering fires on an expression that is there
+        and misspelled, never on one somebody replaced with its own value, and the presence
+        check is satisfied by any other sentence that still reads the table."""
+        tree = self._tree(tmp_path)
+        template = tree / "templates" / "skills" / "pipelex-integrate"
+        template.mkdir(parents=True)
+        (template / "SKILL.md.j2").write_text("Install `@pipelex/sdk` 0.18.0 or later.\n")
+        errors = check_version_floors(tree)
+        assert any("SKILL.md.j2:1: spells floor `pipelex_sdk_js` as the literal 0.18.0" in error for error in errors)
+
+    def test_a_template_reading_the_table_is_not_a_hardcoded_floor(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        template = tree / "templates" / "skills" / "pipelex-integrate"
+        template.mkdir(parents=True)
+        (template / "SKILL.md.j2").write_text("Install `@pipelex/sdk` {{ floors.pipelex_sdk_js }} or later.\n")
+        assert [error for error in check_version_floors(tree) if "spells floor" in error] == []
+
     def test_an_empty_table_is_a_failure_rather_than_nothing_to_check(self, tmp_path: Path) -> None:
         tree = self._tree(tmp_path, floors='[vars]\nmarketplace_name = "pipelex-plugins"\n')
         errors = check_version_floors(tree)

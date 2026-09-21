@@ -505,10 +505,17 @@ def check_version_floors(base_dir: Path) -> list[str]:
     `StrictUndefined`, so `{{ floors.typo }}` fails the build naming the template
     and the attribute, at every use site, instead of rendering as the empty string.
 
-    What the first half still catches is a floor that reaches no generated skill at
+    What the first part still catches is a floor that reaches no generated skill at
     all — a table entry nothing states any more, or a sentence reworded until the
-    number fell out of it. The second half holds the verbatim-copied references
-    under `skills/` to the table, since nothing renders those.
+    number fell out of it. The second holds the verbatim-copied references under
+    `skills/` to the table, since nothing renders those.
+
+    The third is what neither of the others can see: a template that spells a floor
+    as a LITERAL instead of reading it. Strict mode fires on an expression that is
+    there and misspelled, never on one that was replaced by its own value, and the
+    presence check reads the whole built output at once — so another sentence still
+    reading the table keeps the value present while the hardcoded one waits to drift
+    at the next bump. Two rows in `pipelex-integrate` were exactly that.
     """
     errors: list[str] = []
     floors = load_version_floors(base_dir)
@@ -547,6 +554,35 @@ def check_version_floors(base_dir: Path) -> list[str]:
             if match.group(1) != expected:
                 line = text[: match.start()].count("\n") + 1
                 errors.append(f"{rel_path}:{line}: states {match.group(1)} for floor `{key}`, but [vars.floors] says {expected}")
+
+    errors.extend(_hardcoded_floors_in_templates(base_dir, floors))
+    return errors
+
+
+def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> list[str]:
+    """A template must READ a floor, never spell it.
+
+    A literal renders to the right number today and to the wrong one after the next
+    bump, and nothing else sees it: strict mode only fires on an expression that is
+    present and misspelled, and the presence check reads every skill at once, so a
+    second sentence still reading the table keeps the value present.
+    """
+    errors: list[str] = []
+    templates_dir = base_dir / "templates"
+    if not templates_dir.is_dir():
+        return errors
+
+    for template in sorted(templates_dir.rglob("*.j2")):
+        text = template.read_text(encoding="utf-8")
+        rel = template.relative_to(base_dir)
+        for key, value in sorted(floors.items()):
+            start = text.find(value)
+            while start != -1:
+                line = text[:start].count("\n") + 1
+                errors.append(
+                    f"{rel}:{line}: spells floor `{key}` as the literal {value} — write `{{{{ floors.{key} }}}}` so the next bump reaches it"
+                )
+                start = text.find(value, start + 1)
 
     return errors
 
