@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 from scripts.check import (
+    VERSION_FLOOR_STATIC_REFS,
     check_build_error_markers,
     check_codex_marketplace_plugins,
     check_codex_no_claude_artifacts,
@@ -20,6 +23,7 @@ from scripts.check import (
     check_target_plugin_versions,
     check_version_floors,
     check_vibe_target_artifacts,
+    load_version_floors,
     resolve_target_var,
 )
 
@@ -549,12 +553,12 @@ class TestVersionFloors:
     """The floors the skills state to the user live in one table, and this rule is what
     keeps a bump to that table from being a half-bump.
 
-    It guards two different drifts. A template reads a floor through Jinja, whose default
-    `Undefined` renders a misspelled key as the empty string — silently, past the build,
-    the freshness check and every other test — so the sentence would ship with a hole
-    where the number should be. And the static references under `skills/` are copied
-    verbatim into every target and never rendered, so nothing but this rule holds their
-    literals to the table.
+    A misspelled key is the renderer's to catch, not this rule's: the build runs under
+    `StrictUndefined`, so `{{ floors.typo }}` fails naming the template and the
+    attribute rather than rendering as the empty string. What is left here is drift of
+    two other kinds — a floor that reaches no built skill at all, and a static reference
+    under `skills/`, copied verbatim into every target and never rendered, whose literal
+    no longer matches the table.
     """
 
     FLOORS = '[vars]\nmarketplace_name = "pipelex-plugins"\n\n[vars.floors]\npipelex_sdk_js = "0.18.0"\nnode = "22.12"\n'
@@ -580,10 +584,10 @@ class TestVersionFloors:
         errors = [e for e in check_version_floors(tree) if "typescript.md" in e or "pipelex" in e]
         assert [e for e in errors if "0.18.0" in e or "22.12" in e] == []
 
-    def test_a_misspelled_floor_variable_is_caught_although_it_renders_clean(self, tmp_path: Path) -> None:
-        """`{{ floors.typo }}` renders as the empty string, so the built skill simply
-        loses the number and looks like well-formed prose. The floor reaching no skill
-        at all is the only evidence left."""
+    def test_a_floor_no_built_skill_states_any_more_is_caught(self, tmp_path: Path) -> None:
+        """A skill reworded until the number fell out of it still reads as well-formed
+        prose, and the table entry still reads as current. The floor reaching no built
+        skill at all is the only evidence left that the two have parted."""
         tree = self._tree(tmp_path)
         skill_md = tree / "pipelex" / "skills" / "pipelex-integrate" / "SKILL.md"
         skill_md.write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk`  on Node 22.12.\n")
@@ -611,6 +615,56 @@ class TestVersionFloors:
         errors = check_version_floors(tree)
         assert len(errors) == 1
         assert "[vars.floors] is missing or empty" in errors[0]
+
+    # Two numbers under `skills/` equal a floor and mean something else entirely. They
+    # are the reason the anchors are written against prose instead of swept numerically,
+    # and naming them here is what lets the sweep below refuse every other stray match.
+    UNRELATED_FLOOR_LOOKALIKES: ClassVar[set[tuple[str, str]]] = {
+        ("skills/pipelex-design/references/writing-mthds.md", "3.14"),
+        ("skills/pipelex-synthetic-inputs/references/png.md", "3.11"),
+    }
+
+    def test_every_static_statement_of_a_floor_is_anchored(self) -> None:
+        """The anchors are a hand-kept list, so the way this rule fails is by omission:
+        somebody states a floor in a file nothing renders, nobody adds the entry, and the
+        next bump moves the table while that sentence keeps the old number — with the
+        whole check still green, which is worse than not having it.
+
+        So sweep the static tree for each floor's literal value and require every
+        occurrence to be either anchored or listed above as meaning something else. A new
+        unrelated number fails this too, deliberately: somebody has to look.
+        """
+        repo_root = Path(__file__).parents[2]
+        floors = load_version_floors(repo_root)
+
+        unanchored: list[str] = []
+        for source in sorted((repo_root / "skills").rglob("*")):
+            if not source.is_file():
+                continue
+            rel = source.relative_to(repo_root).as_posix()
+            try:
+                text = source.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+
+            # The spans the anchors on this file actually capture. Occurrence level, not
+            # file level: `typescript.md` stated the JS floor in two places with only the
+            # first anchored, which a file-level sweep would have called covered.
+            captured = [
+                match.span(1) for rel_path, pattern, _key in VERSION_FLOOR_STATIC_REFS if rel_path == rel for match in re.finditer(pattern, text)
+            ]
+
+            for key, value in sorted(floors.items()):
+                if (rel, value) in self.UNRELATED_FLOOR_LOOKALIKES:
+                    continue
+                start = text.find(value)
+                while start != -1:
+                    if not any(span_start <= start and start + len(value) <= span_end for span_start, span_end in captured):
+                        line = text[:start].count("\n") + 1
+                        unanchored.append(f"{rel}:{line} states floor `{key}` = {value}, but no VERSION_FLOOR_STATIC_REFS entry captures it")
+                    start = text.find(value, start + 1)
+
+        assert unanchored == []
 
 
 class TestSharedFilesExist:

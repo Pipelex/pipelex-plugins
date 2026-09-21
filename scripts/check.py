@@ -27,14 +27,19 @@ TARGETS_DIR_NAME = "targets"
 
 # The version floors the skills state, and where a STATIC reference states one.
 #
-# Two kinds of drift are possible and the rule catches both. A template reads the
-# floor from `[vars.floors]` in `targets/defaults.toml`, so a bump reaches every
-# rendered skill — but a misspelled key renders as the empty string under Jinja's
-# default `Undefined`, silently and past every other gate, which is why the first
-# half below asserts each floor's value is actually present in the built output.
-# The static references under `skills/` are copied verbatim into every target and
-# are never rendered, so they keep their literals and the second half holds them
-# to the table.
+# A template reads its floor from `[vars.floors]` in `targets/defaults.toml`, so a
+# bump reaches every rendered skill on its own, and a misspelled key is caught at
+# build time — the renderer runs under `StrictUndefined`, which raises on the
+# misspelling itself rather than letting it render as the empty string. The first
+# half below is therefore no longer that guard: it asserts each floor still reaches
+# the built output at all, which is what catches a floor nobody states any more —
+# a dead table entry, or a sentence reworded until it dropped the number.
+#
+# The static references under `skills/` are the ones nothing renders: they are
+# copied verbatim into every target, so they keep their literals and only the
+# second half can hold them to the table. Every occurrence of a floor there needs
+# its own entry — the check reads the ones listed here and nothing else, so a
+# statement left off this list drifts silently on the next bump.
 #
 # Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
 # bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
@@ -50,8 +55,33 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
     ),
     (
         "skills/pipelex-integrate/references/typescript.md",
+        r"a too-old one is raised to (\d+\.\d+\.\d+) or later, the floor step 8 installs",
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/typescript.md",
         r"the SDK's own Node floor \(>= (\d+\.\d+)\)",
         "node",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen-check.mjs",
+        r'const SDK_MINIMUM = "(\d+\.\d+\.\d+)";',
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/python.md",
+        r"carried by `pipelex-sdk` from (\d+\.\d+\.\d+) on",
+        "pipelex_sdk_py",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen_check.py",
+        r"`pipelex-sdk` \((\d+\.\d+\.\d+) or later\)",
+        "pipelex_sdk_py",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen_check.py",
+        r"pipelex-sdk (\d+\.\d+\.\d+) or later is not importable",
+        "pipelex_sdk_py",
     ),
     (
         "skills/pipelex-scaffold/references/starters.md",
@@ -471,14 +501,14 @@ def check_version_floors(base_dir: Path) -> list[str]:
     """Check that every version floor reaches the built skills, and that the static
     references state the same numbers as the table.
 
-    The first half is the guard against a misspelled variable: `{{ floors.typo }}`
-    renders as the empty string under Jinja's default `Undefined`, so the sentence
-    stating the floor would ship with a hole in it and every other gate would stay
-    green. A floor whose value appears nowhere in a target's generated skills is
-    that hole.
+    The misspelled-variable case belongs to the renderer now: it builds under
+    `StrictUndefined`, so `{{ floors.typo }}` fails the build naming the template
+    and the attribute, at every use site, instead of rendering as the empty string.
 
-    The second half holds the verbatim-copied references under `skills/` to the
-    table, since nothing renders them.
+    What the first half still catches is a floor that reaches no generated skill at
+    all — a table entry nothing states any more, or a sentence reworded until the
+    number fell out of it. The second half holds the verbatim-copied references
+    under `skills/` to the table, since nothing renders those.
     """
     errors: list[str] = []
     floors = load_version_floors(base_dir)
@@ -490,7 +520,9 @@ def check_version_floors(base_dir: Path) -> list[str]:
         for key, value in sorted(floors.items()):
             if value not in rendered:
                 rel = output_dir.relative_to(base_dir)
-                errors.append(f"{rel}: floor `{key}` = {value} reaches no generated skill — a misspelled `floors.{key}` renders as the empty string")
+                errors.append(
+                    f"{rel}: floor `{key}` = {value} reaches no generated skill — no skill states it any more, or its sentence was reworded"
+                )
 
     for rel_path, pattern, key in VERSION_FLOOR_STATIC_REFS:
         path = base_dir / rel_path
