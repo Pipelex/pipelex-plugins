@@ -722,9 +722,17 @@ class TestSharedSkillIncludes:
 
     def test_the_authoring_reference_carries_the_same_warning(self) -> None:
         """The reference is where a designer reads what a PipeFunc is; a warning
-        absent there is a warning the author never meets."""
+        absent there is a warning the author never meets. It is a static asset
+        copied verbatim into every target and never rendered, so it cannot
+        include the partial — this test is what holds the two in step, and it
+        reads the partial rather than restating it, so that rewording the shared
+        sentence and leaving the reference behind fails here instead of shipping
+        a plugin whose skill and whose reference disagree."""
+        partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
+        warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
+        assert warning, "the partial rendered to nothing — its comment wrapper moved"
         reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
-        assert "**`PipeFunc` is experimental on the hosted plane.**" in reference
+        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
