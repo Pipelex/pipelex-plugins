@@ -1,10 +1,13 @@
 {#- Box G of `wip/plugin-skills-gaps/design.md`: `PipeFunc` is supported on the
-   hosted plane and warned about, never refused. One sentence, shared word for
-   word by every skill that emits, reads, runs or saves a `PipeFunc`, so the
-   warning says the same thing wherever the user meets it. No template includes
-   it yet: the skills that carry it, and the same sentence in the authoring
-   reference (`skills/pipelex-design/references/writing-mthds.md`, whose PipeFunc
-   section says nothing about the hosted plane today), come with box G.
+   hosted plane and warned about, never refused. One sentence, included word for
+   word wherever a user meets a `PipeFunc`, so the warning says the same thing
+   every time; `TestSharedSkillIncludes` holds the roster of skills that carry it.
+
+   The authoring reference `skills/pipelex-design/references/writing-mthds.md`
+   says it too and cannot include it: the repo-root `skills/` tree is copied
+   verbatim into each target and never rendered, so an include directive there
+   would ship to the user as literal text. That copy is instead held to this body
+   by the same test — reword one and reword the other in the same change.
 
    Strips its own trailing newline (the closing comment below) so it can be
    included mid-sentence as well as on a line of its own. -#}

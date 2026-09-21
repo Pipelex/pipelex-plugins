@@ -81,7 +81,7 @@ This skill extracts the method's input template through the **`mthds_inputs_temp
 
 ### Step 1: Identify the Target Method
 
-**Local bundle** (the usual case): determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `main.mthds` (e.g., `pipelex-wip/pipeline_01/`).
+**Local bundle** (the usual case): determine the `.mthds` bundle and its output directory (`<output_dir>`). This is usually the directory containing `main.mthds` (e.g., `methods/summarize_pdf/`).
 
 **Registered method**: when the user targets a catalog method by its `mt_…` id (and no local bundle is in play), there is no bundle directory — use the id as `method_id` in every MCP call instead of submitting `files`. `<output_dir>` is then a directory the user names, defaulting to a new `./<method_id>/` directory, and `inputs.json` goes there. A by-id call reads the method's **current stored content** from the org-scoped catalog, so it requires the API key.
 
@@ -414,7 +414,7 @@ Call `mthds_inputs_template` with the bundle files; the template comes back as:
 }
 ```
 
-Save it (with a placeholder or real theme) directly to `pipelex-wip/pipeline_01/inputs.json`.
+Save it (with a placeholder or real theme) directly to `methods/summarize_pdf/inputs.json`.
 
 ### Example 2: Synthetic data for an image analysis pipeline
 

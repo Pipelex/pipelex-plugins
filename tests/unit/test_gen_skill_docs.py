@@ -709,6 +709,31 @@ class TestSharedSkillIncludes:
         )
         assert carriers == [owner], f"{sentence!r} should live only in {owner}, found in {carriers}"
 
+    def test_the_pipefunc_warning_reaches_the_skills_that_ship_it(self) -> None:
+        """An include nothing includes ships nowhere. The partial landed with the
+        shared-includes phase and was wired in here: design says it twice — once
+        while the contract is still the user's to change, once at delivery — and
+        explain says it when it meets one."""
+        include = "skills/shared/pipefunc-warning.md.j2"
+        design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert design.count(include) == 2, "design warns in the contract line and again at delivery"
+        assert include in explain
+
+    def test_the_authoring_reference_carries_the_same_warning(self) -> None:
+        """The reference is where a designer reads what a PipeFunc is; a warning
+        absent there is a warning the author never meets. It is a static asset
+        copied verbatim into every target and never rendered, so it cannot
+        include the partial — this test is what holds the two in step, and it
+        reads the partial rather than restating it, so that rewording the shared
+        sentence and leaving the reference behind fails here instead of shipping
+        a plugin whose skill and whose reference disagree."""
+        partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
+        warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
+        assert warning, "the partial rendered to nothing — its comment wrapper moved"
+        reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
+        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
         body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -1335,6 +1360,54 @@ class TestPipelexExplainSkill:
         """Box F: it stays out of the tuple, which asserts a hard stop this skill
         does not have."""
         assert "pipelex-explain" not in MCP_SKILLS
+
+
+class TestBundleHome:
+    """A method's sources are loaded at runtime by the call site that runs them.
+
+    Writing them to a directory named "wip" meant every integration was either a
+    production call site loading from `pipelex-wip/`, or a copy whose original no
+    longer had a sidecar naming it — so a later edit of that original reported a
+    clean bill that was wrong."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+
+    def _template(self, skill: str) -> str:
+        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_design_resolves_the_home_before_it_writes(self) -> None:
+        body = self._template("pipelex-design")
+        assert "### Resolve the bundle home before writing" in body
+        assert "A path the user named" in body
+        assert "`<package>/methods/<name>/`" in body
+        assert "`<project root>/methods/<name>/`" in body
+        assert "`./methods/<name>/`" in body
+
+    def test_design_announces_the_home_with_the_contract(self) -> None:
+        """The user can only redirect the write while it has not happened."""
+        body = self._template("pipelex-design")
+        assert "with the bundle home resolved below in the same line" in body
+
+    def test_the_name_follows_the_project_language_casing(self) -> None:
+        body = self._template("pipelex-design")
+        assert "`summarize-pdf` in TypeScript, `summarize_pdf` in Python" in body
+
+    def test_nothing_a_skill_ships_still_defaults_to_pipelex_wip(self) -> None:
+        """It survives only as a directory a user may already have, never as the
+        default this plugin writes to nor as an example it teaches from.
+
+        Every template under `templates/skills/` counts, shared partials included:
+        a partial is inlined into each skill that includes it, so a name
+        reintroduced there ships in several skills while appearing in none of
+        their sources. The static `skills/*/references/` documents count too —
+        they are copied verbatim into every target and are what the skills send
+        the model to read."""
+        shipped = sorted(self.SKILLS.rglob("*.j2")) + sorted((self.REPO_ROOT / "skills").rglob("*.md"))
+        assert shipped, "found nothing to check — the layout moved"
+        for path in shipped:
+            body = path.read_text(encoding="utf-8")
+            assert "pipelex-wip" not in body, f"{path.relative_to(self.REPO_ROOT)} still names pipelex-wip"
 
 
 class TestHookRendering:
