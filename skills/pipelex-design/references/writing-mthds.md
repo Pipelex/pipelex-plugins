@@ -462,6 +462,8 @@ function_name = "my_package.text_utils.capitalize"
 
 Only use this when the user has a registered function. Otherwise prefer PipeCompose or PipeLLM.
 
+**`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The function must already be registered in the runtime that executes the method: a `function_name` naming something the plane cannot import fails at run time, not at validation.
+
 ### PipeSignature — a contract-only header (forward declaration)
 
 A `PipeSignature` declares a pipe by its **contract only** — `description`, `inputs`, `output`, and an optional `signature_for` hint — with **no implementation**. It is the C-style *forward declaration* that top-down design relies on: commit to what a pipe takes and returns before writing how it works.
