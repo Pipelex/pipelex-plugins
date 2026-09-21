@@ -39,6 +39,7 @@ Starting from the main pipe, trace the execution path:
 3. For **PipeParallel**: list all branches
 4. For **PipeCondition**: map condition → pipe for each branch
 5. For **PipeLLM / PipeExtract / PipeImgGen / PipeSearch / PipeFunc**: these are leaf operations
+6. For a **PipeFunc**, say one thing more, because reading the method is where a user learns it: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Name the pipe and its `function_name`; this skill reads and never edits, so it stops there.
 
 ### Step 4: Present Explanation
 

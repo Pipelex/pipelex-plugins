@@ -98,6 +98,8 @@ One project shape wants asking first: a method app carries its own `make add-met
 
 Bundles that already live elsewhere keep working: every skill here takes a directory, and nothing migrates anything.
 
+**If the design will emit a `PipeFunc`, say so in that same line.** **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Prefer `PipeCompose` or `PipeLLM` wherever either does the job, as the authoring reference already advises; a `PipeFunc` is emitted when the user has a registered function and means to use it, and then the warning is given rather than the pipe refused. The user hears it here, while the shape is still theirs to change, and again at delivery.
+
 ### Choose direct construction only when all boundaries are resolved
 
 Use direct construction when the complete graph can be authored without placeholders or speculative contracts. Observable signals:
@@ -210,7 +212,8 @@ After the gate:
 1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`. A converged stepwise result normally invokes it automatically because one-definition-per-file construction history and satisfied headers need regrouping. A naturally coherent result in either mode does not take an organization round trip solely for process compliance.
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
-4. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
+4. **Warn again for a `PipeFunc`.** When the delivered bundle holds one, repeat it in the report, naming the pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The contract line said it before the method existed; this is the last point before the user runs it.
+5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
