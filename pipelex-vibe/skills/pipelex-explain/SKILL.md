@@ -13,7 +13,7 @@ Read a method and say what it does, in plain language.
 ## What it takes
 
 - **A bundle directory** — every `.mthds` file beneath it, read as one library. A single file is the same job with one file in it, and is the normal shape of a simple method.
-- **A registered method's catalog id** (`mt_…`) or **a published address** (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) — explained at the level of its contract, through the workshop.
+- **A registered method's catalog id** (`mt_…`) or **a published address** (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) — explained at the level of its contract, through the workshop. **An address with no `@<tag>` floats**: it resolves to the default branch at its head, so the contract you explain is the one that happens to be there now and the same question can get a different answer tomorrow. Accept it, and say so in one line.
 
 ## Requirements — the workshop is optional here
 
@@ -50,7 +50,9 @@ One `mthds_validate` call over the same files. Prefer the path form `{path: <abs
 - **the verdict line** — whether the method is valid, whether it is runnable, and what is still pending;
 - **the main pipe's typed signature**, from the verdict's `main_pipe`: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
 
-Without the tool, explain from the source and **say the verdict was not checked**. Never report a verdict, a type or a pending list that did not come from the tool — a plausible guess about validity is the one thing this skill must not offer.
+Without the tool, explain from the source and **say the verdict was not checked**. Your own reading of the source is not a guess, and it is exactly what that path runs on — the pipe types, the concepts, and the backlog step 2 resolved are all yours to state. What must never happen is a tool answer being invented: do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer, and do not guess at validity. Say whose reading it is, and the distinction stays visible.
+
+**On a target that is not on disk there is no such fallback.** There is no source to read, so a missing tool answer leaves nothing to say in its place — see step 8.
 
 ## Step 4 — Open with what the method *is*
 
@@ -103,11 +105,16 @@ Output: final_output
 
 A **catalog id** and a **published address** are explained **at the level of their contract**, and the source never enters the conversation — that is the platform's design, not a limitation of this skill.
 
-- `mthds_validate` with `method_id` or `method_ref` in place of `files` gives the verdict and the `main_pipe` signature.
+- `mthds_validate` with `method_id` or `method_ref` in place of `files` gives the verdict and, **when the verdict carries one**, the `main_pipe` signature.
 - `mthds_inputs_template` with the same selector and `explicit: true` gives the input shapes.
 - Say plainly that the internals are not readable from here, so that the user knows they are getting the contract rather than a walkthrough and can ask for the bundle if they need one.
 
 Exactly one selector per call: files, an address, or an id, never two.
+
+**Two verdicts leave nothing to explain, and both are said rather than filled in.** A local bundle always has its source to fall back on; a remote target has none, so neither case is worked around here.
+
+- **The verdict is positive but carries no `main_pipe`.** The method settles no entry pipe, the contract did not come back whole, or the workshop predates the field — the same three causes `/pipelex-integrate` names, and the one-line signature in the text summary is missing in all three. Say the verdict was positive and that it carries no signature to describe the contract with, and name which of the three the tool's own message points to. Do not reconstruct a signature from the input template.
+- **The verdict is `is_valid: false`.** There is no `main_pipe` on an invalid verdict and `mthds_inputs_template` answers with `validation_errors[]` rather than shapes, so nothing about the method is readable. Report the errors as they came back and stop. **Do not route a remote target to `/pipelex-edit` or `/pipelex-design`**: a stored method is fixed where it is edited, and a published address is fixed in the repository it names — neither is on disk here.
 
 ---
 
@@ -120,7 +127,9 @@ Exactly one selector per call: files, an address, or an id, never two.
 | the workshop is absent, on an id or an address | stops per the Requirements above — there is nothing to read |
 | a selector call answers a no-verdict error | reports the error and its `hint` verbatim; hosted address and id resolution is not live everywhere yet |
 | the reading and `pending_signatures` disagree | reports both and gives the tool's list as the authority |
-| the bundle does not validate | explains it anyway, says what the verdict was, and routes a fix to `/pipelex-edit` or `/pipelex-design` |
+| a **local bundle** does not validate | explains it anyway from the source, says what the verdict was, and routes a fix to `/pipelex-edit` or `/pipelex-design` |
+| an **id or address** does not validate | reports `validation_errors[]` and stops — there is no source to explain and the fix is not on this disk |
+| the verdict carries no `main_pipe` | says the contract could not be described and which of the three causes the tool points to; never reconstructs one |
 | the user wants the method changed | routes: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one |
 
 ## Reference

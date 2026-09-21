@@ -205,7 +205,10 @@ class TestPipelexIntegrateSkill:
     def test_signature_comes_from_the_verdict_and_the_heuristic_is_absent(self) -> None:
         body = self.integrate
         assert "A valid verdict carries **`main_pipe`**" in body
-        assert "**`explicit: true`** — the one call in this plugin that wants the ceremonial" in body
+        # Two calls want the ceremonial envelope since `pipelex-explain` gained a
+        # contract-level read of a method whose source it cannot see; the count is
+        # asserted here because it is the sentence that goes stale when a third appears.
+        assert "**`explicit: true`** — one of the two calls in this plugin that want the ceremonial" in body
         # The by-elimination output-concept heuristic was designed, then made obsolete before it shipped.
         assert "candidate output concepts" not in body
         assert "minus the input concepts minus natives" not in body

@@ -1293,6 +1293,44 @@ class TestPipelexExplainSkill:
         for tool in ("  - Bash", "  - Read", "  - Write", "  - Edit", "  - Grep", "  - Glob"):
             assert tool in frontmatter, f"the default list lost {tool.strip()}"
 
+    def test_the_offline_path_may_state_its_own_reading(self) -> None:
+        """Round 1, cubic and Codex independently: the prohibition on reporting
+        an unverified verdict also banned the source-derived backlog that steps
+        2, 4 and 6 require when no workshop answered, so the skill both
+        mandated and forbade the same sentence."""
+        body = self.body()
+        assert "Your own reading of the source is not a guess" in body
+        assert "do not present a validation verdict, a typed signature or a pending list as the workshop's" in body
+
+    def test_the_offline_fallback_is_denied_to_a_remote_target(self) -> None:
+        """The same loosening must not reach a target with no source: there the
+        tool's answer is all there is, and guessing is what the rule forbids."""
+        assert "On a target that is not on disk there is no such fallback." in self.body()
+
+    def test_an_absent_main_pipe_is_named_and_never_reconstructed(self) -> None:
+        """Round 1, cubic: a positive verdict can carry no `main_pipe` — no entry
+        pipe, a contract that did not come back whole, or a workshop predating
+        the field — and a remote target has no source to fall back on."""
+        body = self.body()
+        assert "when the verdict carries one" in body
+        assert "Do not reconstruct a signature from the input template." in body
+
+    def test_an_invalid_remote_method_is_reported_and_not_routed_to_disk(self) -> None:
+        """Round 1, Codex: an invalid id or address projects no `main_pipe` and
+        answers `validation_errors[]` instead of shapes, so there is nothing to
+        explain — and `/pipelex-edit` cannot reach a method that is not on disk."""
+        body = self.body()
+        assert "Do not route a remote target to `/pipelex-edit` or `/pipelex-design`" in body
+        assert "a **local bundle** does not validate" in body, "the stops row must be scoped to disk"
+
+    def test_an_untagged_address_is_accepted_and_said_to_float(self) -> None:
+        """Box E as amended at ratification: every skill accepts an untagged
+        address and says in one line that it floats. This skill is where the
+        optional tag is advertised."""
+        body = self.body()
+        assert "An address with no `@<tag>` floats" in body
+        assert "Accept it, and say so in one line." in body
+
     def test_explain_is_not_an_mcp_backed_skill(self) -> None:
         """Box F: it stays out of the tuple, which asserts a hard stop this skill
         does not have."""
