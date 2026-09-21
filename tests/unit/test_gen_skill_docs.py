@@ -1604,16 +1604,22 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
         assert "Same whole-bundle `mthds_validate` call as Step 2." not in body
 
     @pytest.mark.parametrize("trigger", ['"add a step"', '"remove this pipe"', '"refactor this pipeline"'])
-    def test_the_structural_triggers_are_designs_alone(self, trigger: str) -> None:
+    def test_edit_stops_advertising_work_it_cannot_do(self, trigger: str) -> None:
         """Edit cannot apply any of them, so recruiting it on the phrase only
         buys a hand-off turn. Its Step 2 routing stays as the safety net for a
         request that reaches it anyway."""
         assert trigger not in self._description("pipelex-edit")
 
-    def test_design_still_claims_the_structural_work(self) -> None:
+    def test_design_carries_one_of_them_and_covers_the_rest_by_umbrella(self) -> None:
+        """Only "add a step" was ever design's verbatim trigger, and nothing was
+        added to its description to receive the other two — they fall under the
+        umbrella clause, which is the same wording edit's own scope split uses
+        for removing and refactoring. The record says so, so the test does."""
         description = self._description("pipelex-design")
         assert '"add a step", "rewire this pipeline"' in description
         assert '"refactor the flow"' in description
+        assert "or asks for a structural or contract change to an existing bundle" in description
+        assert "adding, removing, or rewiring steps" in self._template("pipelex-edit")
 
     def test_edit_still_routes_a_structural_request_that_reaches_it(self) -> None:
         body = self._template("pipelex-edit")
@@ -1659,7 +1665,9 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
         assert "**Default**: automatic — name the strategy and the assumptions it rests on in one line" in body
+        assert "carry the chosen strategy through to its own end without stopping" in body
         assert "**Go interactive** when the user asks for it" in body
+        assert "when the table below lands on its no-signal row" in body
         assert "**Either mode can turn into the other mid-run**" in body
         assert "### Mode behavior" not in body
         assert "### Mode switching" not in body
