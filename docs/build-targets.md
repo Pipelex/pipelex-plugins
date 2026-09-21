@@ -200,7 +200,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 
 | Partial | What it carries | Parameters the including template sets |
 | --- | --- | --- |
-| `frontmatter.md.j2` | the YAML frontmatter fields shared by every skill (Claude's `allowed-tools`) | none |
+| `frontmatter.md.j2` | the YAML frontmatter fields shared by every skill (Claude's `allowed-tools`) | `skill_tools` (the harness-native tools the skill pre-approves; defaults to the writing set) |
 | `mcp-requirements.md.j2` | the three bullets an MCP-backed skill opens with: the STOP on an absent tool, the STOP on a `config`-class error, and where the server gets its API key | `mcp_absent_lead` (`the tool is`, `the tools are`, `a tool is`), `mcp_absent_suffix`, `mcp_config_parenthetical`, `mcp_config_suffix`, `mcp_requirements_extra` (a bullet inserted before the credential one) |
 | `validate-call.md.j2` | how a local bundle is handed to the workshop: the path form of `files`, and the inline fallback the hosted console needs | none |
 | `formatting-hook.md.j2` | that the validation hook formats every `.mthds` write, so no skill hand-formats | `formatting_hook_write_clause` |

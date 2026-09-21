@@ -709,6 +709,31 @@ class TestSharedSkillIncludes:
         )
         assert carriers == [owner], f"{sentence!r} should live only in {owner}, found in {carriers}"
 
+    def test_the_pipefunc_warning_reaches_the_skills_that_ship_it(self) -> None:
+        """An include nothing includes ships nowhere. The partial landed with the
+        shared-includes phase and was wired in here: design says it twice — once
+        while the contract is still the user's to change, once at delivery — and
+        explain says it when it meets one."""
+        include = "skills/shared/pipefunc-warning.md.j2"
+        design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert design.count(include) == 2, "design warns in the contract line and again at delivery"
+        assert include in explain
+
+    def test_the_authoring_reference_carries_the_same_warning(self) -> None:
+        """The reference is where a designer reads what a PipeFunc is; a warning
+        absent there is a warning the author never meets. It is a static asset
+        copied verbatim into every target and never rendered, so it cannot
+        include the partial — this test is what holds the two in step, and it
+        reads the partial rather than restating it, so that rewording the shared
+        sentence and leaving the reference behind fails here instead of shipping
+        a plugin whose skill and whose reference disagree."""
+        partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
+        warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
+        assert warning, "the partial rendered to nothing — its comment wrapper moved"
+        reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
+        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
         body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -1318,6 +1343,218 @@ class TestSyntheticInputsSkill:
         shipped = tree / "pipelex" / "skills" / "pipelex-synthetic-inputs" / "references" / "png.md"
         shipped.write_text(shipped.read_text(encoding="utf-8") + "\nedited without a rebuild\n", encoding="utf-8")
         assert check_freshness(tree, "prod") == 1, "a stale reference copy must fail the freshness gate"
+
+
+class TestPipelexExplainSkill:
+    """Boxes F and M of `wip/plugin-skills-gaps/design.md`: explain is brought on
+    par with the main skills — a directory target, every pipe type named, the
+    workshop optional, a remote method at contract level — and it is strictly
+    read-only, which the tool list is made to match."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-explain" / "SKILL.md.j2"
+    RENDERED = REPO_ROOT / "pipelex" / "skills" / "pipelex-explain" / "SKILL.md"
+
+    # Every pipe type the authoring reference documents. The old skill named
+    # eight of them and left PipeCompose out entirely.
+    PIPE_TYPES: ClassVar[tuple[str, ...]] = (
+        "PipeLLM",
+        "PipeSequence",
+        "PipeBatch",
+        "PipeParallel",
+        "PipeCondition",
+        "PipeCompose",
+        "PipeExtract",
+        "PipeSearch",
+        "PipeImgGen",
+        "PipeFunc",
+        "PipeSignature",
+    )
+
+    def body(self) -> str:
+        return self.TEMPLATE.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("pipe_type", PIPE_TYPES)
+    def test_every_pipe_type_is_named(self, pipe_type: str) -> None:
+        """Box F: a reader who meets a pipe the skill cannot name learns nothing
+        from the passage about it."""
+        assert pipe_type in self.body(), f"{pipe_type} is never named"
+
+    def test_a_signature_is_pending_only_when_nothing_implements_it(self) -> None:
+        """Box F, as Louis precised it at ratification. Signature-driven design
+        leaves satisfied headers behind in the file that declared them, so a
+        header read on its own reports a gap the next file fills."""
+        assert "pending only when no concrete pipe of the same code exists anywhere in the files you read" in self.body()
+
+    def test_the_workshop_is_the_authority_on_pending_signatures(self) -> None:
+        """Box F: where the skill's own reading and the verdict disagree, the
+        verdict wins and the user is told, because a disagreement means a file
+        was missed or a code is spelled two ways."""
+        body = self.body()
+        assert "`pending_signatures` is the authority" in body
+        assert "disagree" in body
+
+    def test_the_explanation_opens_on_complete_or_scaffold(self) -> None:
+        """Box F: an accurate walkthrough of a half-built method, given without
+        saying it is half-built, misinforms."""
+        body = self.body()
+        assert "**complete**" in body
+        assert "**scaffold with a backlog**" in body
+
+    def test_the_workshop_is_optional_for_a_bundle_on_disk(self) -> None:
+        """Box F: the source is on disk, so the tool adds a verdict line and is
+        never what makes the explanation possible."""
+        body = self.body()
+        assert "Never refuse to explain a local bundle because the workshop is not connected." in body
+        assert "say the verdict was not checked" in body
+
+    def test_the_absent_workshop_stop_is_scoped_to_a_remote_target(self) -> None:
+        """The shared requirements block states a hard stop; this skill only has
+        one for a target that is not on disk, so both its bullets are scoped."""
+        body = self.body()
+        assert "mcp_absent_suffix" in body
+        assert "mcp_config_suffix" in body
+        assert "That stop is only for a target that lives on the platform" in body
+
+    def test_a_remote_method_is_explained_at_contract_level(self) -> None:
+        """Box F: no source enters the conversation for an id or an address, by
+        the platform's design — so the skill says so rather than implying it
+        read something."""
+        body = self.body()
+        assert "at the level of their contract" in body
+        assert "the internals are not readable from here" in body
+        assert "`explicit: true`" in body
+
+    def test_one_selector_per_call(self) -> None:
+        """`pipelex-mcp/SPEC.md`: the tooling tools take exactly one of files, an
+        address or an id; a second is a no-verdict located at the extra field."""
+        assert "never two" in self.body()
+
+    def test_the_skill_writes_nothing_and_says_so(self) -> None:
+        """Box F, amended at ratification: the first draft wrote a `README.md` on
+        request."""
+        body = self.body()
+        assert "strictly read-only" in body.lower()
+        assert "writes no file" in body
+
+    def test_the_description_no_longer_offers_to_document(self) -> None:
+        """Box F: "document this pipeline" leaves the description, because it is
+        the phrase that recruited the skill into writing files."""
+        assert "document this pipeline" not in self.body()
+
+    def test_the_pipefunc_warning_is_included_not_restated(self) -> None:
+        """Box G's sentence has one source; explain says it when it meets one."""
+        assert 'include "skills/shared/pipefunc-warning.md.j2"' in self.body()
+
+    def test_the_tool_list_pre_approves_no_writing_tool(self) -> None:
+        """Box M. `allowed-tools` pre-approves rather than restricts, so this is
+        what makes a write in a read-only skill stop for the user instead of
+        happening silently."""
+        rendered = self.RENDERED.read_text(encoding="utf-8")
+        frontmatter = rendered.split("---")[1]
+        assert "  - Read" in frontmatter
+        assert "  - Grep" in frontmatter
+        assert "  - Glob" in frontmatter
+        for writing_tool in ("  - Bash", "  - Write", "  - Edit"):
+            assert writing_tool not in frontmatter, f"a read-only skill pre-approves {writing_tool.strip()}"
+
+    def test_the_writing_skills_keep_the_default_tool_list(self) -> None:
+        """Box M: explain gets the narrow list, the other skills keep today's."""
+        design = (self.REPO_ROOT / "pipelex" / "skills" / "pipelex-design" / "SKILL.md").read_text(encoding="utf-8")
+        frontmatter = design.split("---")[1]
+        for tool in ("  - Bash", "  - Read", "  - Write", "  - Edit", "  - Grep", "  - Glob"):
+            assert tool in frontmatter, f"the default list lost {tool.strip()}"
+
+    def test_the_offline_path_may_state_its_own_reading(self) -> None:
+        """Round 1, cubic and Codex independently: the prohibition on reporting
+        an unverified verdict also banned the source-derived backlog that steps
+        2, 4 and 6 require when no workshop answered, so the skill both
+        mandated and forbade the same sentence."""
+        body = self.body()
+        assert "Your own reading of the source is not a guess" in body
+        assert "do not present a validation verdict, a typed signature or a pending list as the workshop's" in body
+
+    def test_the_offline_fallback_is_denied_to_a_remote_target(self) -> None:
+        """The same loosening must not reach a target with no source: there the
+        tool's answer is all there is, and guessing is what the rule forbids."""
+        assert "On a target that is not on disk there is no such fallback." in self.body()
+
+    def test_an_absent_main_pipe_is_named_and_never_reconstructed(self) -> None:
+        """Round 1, cubic: a positive verdict can carry no `main_pipe` — no entry
+        pipe, a contract that did not come back whole, or a workshop predating
+        the field — and a remote target has no source to fall back on."""
+        body = self.body()
+        assert "when the verdict carries one" in body
+        assert "Do not reconstruct a signature from the input template." in body
+
+    def test_an_invalid_remote_method_is_reported_and_not_routed_to_disk(self) -> None:
+        """Round 1, Codex: an invalid id or address projects no `main_pipe` and
+        answers `validation_errors[]` instead of shapes, so there is nothing to
+        explain — and `/pipelex-edit` cannot reach a method that is not on disk."""
+        body = self.body()
+        assert "Do not route a remote target to `/pipelex-edit` or `/pipelex-design`" in body
+        assert "a **local bundle** does not validate" in body, "the stops row must be scoped to disk"
+
+    def test_an_untagged_address_is_accepted_and_said_to_float(self) -> None:
+        """Box E as amended at ratification: every skill accepts an untagged
+        address and says in one line that it floats. This skill is where the
+        optional tag is advertised."""
+        body = self.body()
+        assert "An address with no `@<tag>` floats" in body
+        assert "Accept it, and say so in one line." in body
+
+    def test_explain_is_not_an_mcp_backed_skill(self) -> None:
+        """Box F: it stays out of the tuple, which asserts a hard stop this skill
+        does not have."""
+        assert "pipelex-explain" not in MCP_SKILLS
+
+
+class TestBundleHome:
+    """A method's sources are loaded at runtime by the call site that runs them.
+
+    Writing them to a directory named "wip" meant every integration was either a
+    production call site loading from `pipelex-wip/`, or a copy whose original no
+    longer had a sidecar naming it — so a later edit of that original reported a
+    clean bill that was wrong."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+
+    def _template(self, skill: str) -> str:
+        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_design_resolves_the_home_before_it_writes(self) -> None:
+        body = self._template("pipelex-design")
+        assert "### Resolve the bundle home before writing" in body
+        assert "A path the user named" in body
+        assert "`<package>/methods/<name>/`" in body
+        assert "`<project root>/methods/<name>/`" in body
+        assert "`./methods/<name>/`" in body
+
+    def test_design_announces_the_home_with_the_contract(self) -> None:
+        """The user can only redirect the write while it has not happened."""
+        body = self._template("pipelex-design")
+        assert "with the bundle home resolved below in the same line" in body
+
+    def test_the_name_follows_the_project_language_casing(self) -> None:
+        body = self._template("pipelex-design")
+        assert "`summarize-pdf` in TypeScript, `summarize_pdf` in Python" in body
+
+    def test_nothing_a_skill_ships_still_defaults_to_pipelex_wip(self) -> None:
+        """It survives only as a directory a user may already have, never as the
+        default this plugin writes to nor as an example it teaches from.
+
+        Every template under `templates/skills/` counts, shared partials included:
+        a partial is inlined into each skill that includes it, so a name
+        reintroduced there ships in several skills while appearing in none of
+        their sources. The static `skills/*/references/` documents count too —
+        they are copied verbatim into every target and are what the skills send
+        the model to read."""
+        shipped = sorted(self.SKILLS.rglob("*.j2")) + sorted((self.REPO_ROOT / "skills").rglob("*.md"))
+        assert shipped, "found nothing to check — the layout moved"
+        for path in shipped:
+            body = path.read_text(encoding="utf-8")
+            assert "pipelex-wip" not in body, f"{path.relative_to(self.REPO_ROOT)} still names pipelex-wip"
 
 
 class TestHookRendering:
