@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.check import load_version_floors
 from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
 
 
@@ -156,7 +157,10 @@ class TestPipelexIntegrateSkill:
     # artifact operations, `summarizeUsage`, and `working_memory` and `graph_assembly_error` on `RunResults` —
     # in 0.18.0. Step 8 raises an older pin to it, and every place that names a TypeScript SDK version names
     # this one.
-    TYPESCRIPT_SDK_FLOOR = "0.18.0"
+    # Read from the table rather than typed here, so that a bump cannot leave this suite asserting
+    # the old number — which would fail on the skill and pass on itself, pointing at the wrong file.
+    TYPESCRIPT_SDK_FLOOR = load_version_floors(REPO_ROOT)["pipelex_sdk_js"]
+    PYTHON_SDK_FLOOR = load_version_floors(REPO_ROOT)["pipelex_sdk_py"]
     VERSION = re.compile(r"\b\d+\.\d+(?:\.\d+)?\b")
 
     # A python-pydantic artifact body, stamped and locked by `stamped` and `write_python_project`.
@@ -758,7 +762,7 @@ class TestPipelexIntegrateSkill:
         check`, precisely so a hosted-API consumer has a gate without installing `pipelex`. Step 10 used
         to tell that consumer no gate existed; it now installs one shaped like the TypeScript branch.
         """
-        body = self.integrate
+        body = self.render("prod")  # rendered: step 8's floors are template variables
         python_branch = self.the_line(body, "- **Python, `python-pydantic`**:")
         assert "copy [references/codegen_check.py](references/codegen_check.py) **verbatim** to `scripts/codegen_check.py`" in python_branch
         assert "**extend the project's existing aggregate gate**" in python_branch
@@ -772,7 +776,7 @@ class TestPipelexIntegrateSkill:
         assert raised.startswith("| the TypeScript or the Python gate exits `2`"), raised
         assert "pipelex codegen check <dir>" in body
         # The gate runs the SDK's check, which the project's pin has to reach.
-        assert "at least `pipelex-sdk` 0.10.0 for a `python-pydantic` consumer" in body
+        assert f"at least `pipelex-sdk` {self.PYTHON_SDK_FLOOR} for a `python-pydantic` consumer" in body
         assert "where the drift gate was wired and the command that runs it" in self.the_line(
             body, "What was generated and where; the target and why;"
         )
@@ -1377,7 +1381,10 @@ class TestPipelexIntegrateSkill:
         every other place that names a TypeScript SDK version names the same one: the step 10 bullet, the failure
         row, refresh mode, the reference, the gate's `SDK_MINIMUM` and the changelog. A bump that updates one and
         misses another fails here, on the place it missed."""
-        body = self.integrate
+        # Rendered, not the template: the template spells `{{ floors.pipelex_sdk_js }}`, and what this
+        # test is about is the number a user reads. A floor that rendered as the empty string — Jinja's
+        # answer to a misspelled key — fails here as well as in `check_version_floors`.
+        body = self.render("prod")
         step_8 = self.the_line(body, "With the project's own package manager (read the lockfile):")
         clause = re.search(r"`zod` and `@pipelex/sdk` for TypeScript — at least `@pipelex/sdk` (\S+), (.*?); `pydantic`", step_8)
         assert clause, "step 8 names no @pipelex/sdk floor"

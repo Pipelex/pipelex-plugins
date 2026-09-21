@@ -224,6 +224,32 @@ class TestRenderTemplates:
         with pytest.raises(SystemExit, match="syntax error"):
             render_templates(templates_dir, tmp_path, DEFAULT_VARS)
 
+    def test_a_misspelled_variable_fails_the_build_instead_of_rendering_empty(self, tmp_path: Path) -> None:
+        """The hazard this repo keeps meeting: under Jinja's default `Undefined`,
+        `{{ floors.pipelex_sdk_jss }}` is not an error — it renders as the empty string,
+        so the skill ships a sentence with a hole where a version floor belongs and every
+        other gate stays green. The renderer builds under `StrictUndefined` for exactly
+        that reason, and this is the test that says so.
+        """
+        templates_dir = tmp_path / "templates"
+        skill_dir = templates_dir / "skills" / "pipelex-test"
+        skill_dir.mkdir(parents=True)
+        _create_shared_templates(templates_dir)
+        (skill_dir / "SKILL.md.j2").write_text("Install at least `@pipelex/sdk` {{ floors.pipelex_sdk_jss }}.\n")
+        with pytest.raises(SystemExit, match="undefined variable"):
+            render_templates(templates_dir, tmp_path, {**DEFAULT_VARS, "floors": {"pipelex_sdk_js": "0.18.0"}})
+
+    def test_an_undefined_top_level_variable_fails_the_build_too(self, tmp_path: Path) -> None:
+        """Not only attributes of a table: a bare name nobody defined is the same hazard
+        one level up, and it used to render as the empty string just as quietly."""
+        templates_dir = tmp_path / "templates"
+        skill_dir = templates_dir / "skills" / "pipelex-test"
+        skill_dir.mkdir(parents=True)
+        _create_shared_templates(templates_dir)
+        (skill_dir / "SKILL.md.j2").write_text("The marketplace is {{ marketplace_nam }}.\n")
+        with pytest.raises(SystemExit, match="undefined variable"):
+            render_templates(templates_dir, tmp_path, DEFAULT_VARS)
+
     def test_missing_shared_template_raises(self, tmp_path: Path) -> None:
         """A declared shared template that is absent fails loudly."""
         templates_dir = tmp_path / "templates"
