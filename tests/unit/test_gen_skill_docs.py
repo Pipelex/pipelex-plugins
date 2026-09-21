@@ -709,6 +709,31 @@ class TestSharedSkillIncludes:
         )
         assert carriers == [owner], f"{sentence!r} should live only in {owner}, found in {carriers}"
 
+    def test_the_pipefunc_warning_reaches_the_skills_that_ship_it(self) -> None:
+        """An include nothing includes ships nowhere. The partial landed with the
+        shared-includes phase and was wired in here: design says it twice — once
+        while the contract is still the user's to change, once at delivery — and
+        explain says it when it meets one."""
+        include = "skills/shared/pipefunc-warning.md.j2"
+        design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert design.count(include) == 2, "design warns in the contract line and again at delivery"
+        assert include in explain
+
+    def test_the_authoring_reference_carries_the_same_warning(self) -> None:
+        """The reference is where a designer reads what a PipeFunc is; a warning
+        absent there is a warning the author never meets. It is a static asset
+        copied verbatim into every target and never rendered, so it cannot
+        include the partial — this test is what holds the two in step, and it
+        reads the partial rather than restating it, so that rewording the shared
+        sentence and leaving the reference behind fails here instead of shipping
+        a plugin whose skill and whose reference disagree."""
+        partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
+        warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
+        assert warning, "the partial rendered to nothing — its comment wrapper moved"
+        reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
+        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
         body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
