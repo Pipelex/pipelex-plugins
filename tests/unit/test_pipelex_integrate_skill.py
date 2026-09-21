@@ -202,6 +202,16 @@ class TestPipelexIntegrateSkill:
         for rule in self.RULES:
             assert rule in body, f"missing rule: {rule}"
 
+    def test_an_untagged_address_is_accepted_and_said_to_float(self) -> None:
+        """Box E of `wip/plugin-skills-gaps/design.md`, as amended at ratification:
+        every skill accepts an untagged address and says in one line that it
+        floats. This skill used to refuse one outright for a committed
+        integration, which the amendment reversed."""
+        body = self.integrate
+        assert "**An address with no tag is accepted and floats**" in body
+        assert "the default branch at its head" in body
+        assert "refused for a committed integration" not in body, "the pre-amendment refusal is back"
+
     def test_signature_comes_from_the_verdict_and_the_heuristic_is_absent(self) -> None:
         body = self.integrate
         assert "A valid verdict carries **`main_pipe`**" in body
