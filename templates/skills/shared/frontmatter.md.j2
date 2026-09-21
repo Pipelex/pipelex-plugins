@@ -1,11 +1,19 @@
 {#- Shared frontmatter fields — included by all SKILL.md.j2 templates.
-   Place between the opening --- and closing --- of the YAML frontmatter. -#}
+   Place between the opening --- and closing --- of the YAML frontmatter.
+
+   `skill_tools` is the harness-native tool list the skill pre-approves on
+   Claude. It defaults to the writing set the authoring skills need; a skill
+   that writes nothing sets a narrower list with `{% set %}` before the include
+   (box M of `wip/plugin-skills-gaps/design.md`). The field pre-approves, it
+   does not restrict — an unlisted tool is still callable and simply asks
+   first — so a narrow list is what makes a write in a read-only skill stop for
+   the user rather than what makes it impossible.
+
+   MCP tools are never listed here: their names are per-platform, so each skill
+   appends its own after the include. -#}
 {% if platform == "claude" -%}
 allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
+{%- for tool in skill_tools | default(["Bash", "Read", "Write", "Edit", "Grep", "Glob"]) %}
+  - {{ tool }}
+{%- endfor %}
 {% endif -%}
