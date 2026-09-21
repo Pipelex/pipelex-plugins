@@ -1901,12 +1901,17 @@ class TestPublishedAddressTarget:
         assert "npx -y @pipelex/mcp@latest" in body
         assert "predates the selector" in body
 
-    def test_the_address_config_refusal_is_not_read_as_a_credential(self) -> None:
-        """Prepare resolves an address through the run route, which applies the
-        execution-locus gate — so a published package shipping in-process Python is a
-        403 there while the same address templates fine. It classifies `config`, and
-        `config` otherwise means "stop, check the credential", which is the one piece
-        of advice that cannot help here."""
+    def test_the_address_config_refusal_names_the_gate_without_suppressing_the_credential(self) -> None:
+        """Prepare resolves an address through the run route, so a published package
+        shipping in-process Python is refused there — in the same `config` arm, wearing
+        the deployment's authentication wording. Naming that cause is worth doing; the
+        first draft went further and told the agent the credential was fine, which the
+        round refuted: preparation uploads with the key and templating never exercises
+        that, so a template call that succeeded rules nothing out, and the arm also
+        covers a paywall, an unreachable API and a missing upload route. The credential
+        stays the first thing checked, because it is the one the user can act on."""
         body = self.inputs_skill
-        assert "the key is not what failed" in body
         assert "in-process Python" in body
+        assert "the credential first" in body
+        assert "rules nothing out" in body
+        assert "the key is not what failed" not in body

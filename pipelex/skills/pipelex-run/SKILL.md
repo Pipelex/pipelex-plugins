@@ -120,7 +120,7 @@ Give `failure_message` **verbatim** first. Then route once, and stop:
 | the method holds a `PipeFunc` | name it as a suspect — its Python runs in a network-blocked sandbox on the hosted plane |
 | the run stays `RUNNING` with no error and no progress | say what it is: a workflow task that failed out of sight. It is not a slow run |
 
-**A published address takes only the first destination.** The method is not the user's to repair, so the last three rows have nowhere to route: report the failure and step 5's provenance, and say the fix is upstream or another tag. Per-pipe bisection is not this skill's: it belongs to a debug-run skill that does not exist yet. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
+**For a published address, only the first row routes.** The method is not the user's to repair, so every row below the inputs one is reported rather than routed — the prompt-or-model row and the structure row included, which is where an address would otherwise be sent to `/pipelex-edit` for source the user does not have: give the failure and step 5's provenance, and say the fix is upstream or another tag. The `PipeFunc` row and the stuck-`RUNNING` row still say exactly what they say; they name a cause and send nobody anywhere. Per-pipe bisection is not this skill's: it belongs to a debug-run skill that does not exist yet. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 
 ---
 
