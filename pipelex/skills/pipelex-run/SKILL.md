@@ -1,6 +1,6 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", or "download the files from yesterday's run". Takes a local bundle directory or a registered method's catalog id (mt_…), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 allowed-tools:
   - Bash
   - Read
@@ -22,7 +22,7 @@ allowed-tools:
 
 This skill owns the run lifecycle, and only that. It has two entries and no third:
 
-- **[Start a run](#start-a-run)** — a target and inputs. The target is a **bundle directory** (its `.mthds` files, submitted as `files`) or a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id`).
+- **[Start a run](#start-a-run)** — a target and inputs. The target is a **bundle directory** (its `.mthds` files, submitted as `files`), a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id`), or a **published method** at its address (`method_ref`, e.g. `github.com/Pipelex/methods/documents@v0.1.0`).
 - **[Follow a run](#follow-a-run)** — a **run id** alone, with no method in hand: its status, its results, or the files it produced. A run id stays good long after the session that started it, so yesterday's run is a normal target here.
 
 What it does not do: prepare inputs (`/pipelex-inputs`), repair a method (`/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one), or bisect a failing pipeline pipe by pipe.
@@ -48,11 +48,15 @@ Automatic. The user asking for the run is the consent, and step 4 states what is
 
 ### Step 1 — Identify the target and the pipe
 
-A bundle directory, or an `mt_…` id. A saved method the user names without its id is resolved through `mthds_list_methods` when the tool is present — choose or disambiguate by name and description, then carry the returned id. Never stop for that tool's absence: ask for the id instead.
+A bundle directory, an `mt_…` id, or a published method's address — `github.com/<owner>/<repo>[/<selector>][@<tag>]`. A saved method the user names without its id is resolved through `mthds_list_methods` when the tool is present — choose or disambiguate by name and description, then carry the returned id. Never stop for that tool's absence: ask for the id instead.
+
+Whichever form step 1 settles on is the one every call in this skill takes, and **an address pairs with nothing**: `files` beside a `method_ref` and a `method_id` beside it are both refused before anything runs, because an address is a complete run source carrying its own provenance. **An address with no tag is accepted and it floats** — it resolves to the default branch at its head, so what runs is whatever that branch holds at the moment of the call, and a run tomorrow can execute different content under the same address. Say that in one line, recommend the tag, and start the run; step 5 is what records which content actually ran.
 
 The pipe is the method's declared main pipe unless the user named another, in which case carry that `pipe_ref` through every call in this skill — the drift check and the run must inspect the same contract.
 
 ### Step 2 — Find the inputs
+
+**Where they live, for a target that is not a bundle directory.** A registered method and a published address have no bundle beside them, so the inputs are in the directory `/pipelex-inputs` wrote them to: the one the user named, defaulting to `./<method_id>/` for a saved method and to the address's last path segment with its tag dropped for a published one. Read *beside the bundle* below as *in that directory* for those two.
 
 In this order, taking the first that applies:
 
@@ -61,7 +65,7 @@ In this order, taking the first that applies:
 3. **An `inputs.json` holding no local file value** — every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference. It is run-ready as it stands.
 4. **An empty object**, when the pipe declares no input at all.
 
-Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**. This answers "which inputs does the pipe declare" and catches drift in one call, for every target: a bundle edited after its `inputs.json` was written drifts exactly as a saved method does, since a run by id executes the method's **current stored content**. A renamed, added or dropped input changes the key set; a retyped or reshaped one does not, so also check per key that the JSON kind still matches and that a structured value's field names still match the template's.
+Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**. This answers "which inputs does the pipe declare" and catches drift in one call, for every target: a bundle edited after its `inputs.json` was written drifts exactly as a saved method does, since a run by id executes the method's **current stored content** and a run by an untagged address executes whatever its default branch holds at that moment. A renamed, added or dropped input changes the key set; a retyped or reshaped one does not, so also check per key that the JSON kind still matches and that a structured value's field names still match the template's.
 
 **One difference is expected and is not drift**: a file-ish input arrives in the template as a bare URL-or-path string while a prepared value is the content dict `{"url": "pipelex-storage://…"}`. That is the prepare rewrite, not a signature change.
 
@@ -73,6 +77,8 @@ For a **bundle directory**, one `mthds_validate` call over every `.mthds` file b
 
 - valid and runnable → go on;
 - `is_valid: false`, or a non-empty `pending_signatures` (a scaffold has nothing to run yet) → report the verdict and route to `/pipelex-design`, or `/pipelex-edit` when the fix is contract-preserving. Never run a method that did not pass.
+
+For a **published address**, the same call with `method_ref` in place of `files`, against the same bar — and the routing differs in exactly one way: the method belongs to whoever published it, so a verdict that fails is reported with the address and its tag and is not routed to `/pipelex-design` or `/pipelex-edit`. Another tag, or the publisher, is the fix.
 
 For an **`mt_…` id**, the same call with `method_id` in place of `files`, against the same bar. Step 2's template call does not stand in for it: `mthds_inputs_template` answers `is_valid` and nothing else, and a scaffold is a *valid* bundle — so a stored method with pending signatures passes the template call and would reach the run, spending credit on its implemented pipes before it stops at the one that is not. The routing is the same as for a bundle directory.
 
@@ -86,9 +92,11 @@ The user asking for the run is the consent; there is no second confirmation. **N
 
 ### Step 5 — `mthds_run`, and print the run id first
 
-Call `mthds_run` with the same target as step 2 — the whole-bundle `files` submission, or `method_id` — and `inputs` set to the values step 2 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; pass a pipe's code only when step 1 targeted another.
+Call `mthds_run` with the same target as step 2 — the whole-bundle `files` submission, `method_id`, or `method_ref` — and `inputs` set to the values step 2 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; pass a pipe's code only when step 1 targeted another. For an address the declared main pipe is the published package's manifest's, which can differ from the bundle's own declaration; `pipe_code` overrides it there exactly as it does anywhere else.
 
 The tool returns a durable `run_id` immediately and never blocks. **Report that id the moment it returns, before anything else.** It is the only handle a later session has on this run, and the whole of [Follow a run](#follow-a-run) rests on it.
+
+**For an address, report what was fetched in the same breath.** The acknowledgement carries `method_provenance` — the address, the tag and the **resolved commit SHA** — and that SHA is the only record of what actually ran: an untagged address floats, and even a tag can be moved. Nothing later recovers it, so it goes beside the run id rather than into the final report.
 
 ### Step 6 — Follow it to terminal
 
@@ -112,7 +120,7 @@ Give `failure_message` **verbatim** first. Then route once, and stop:
 | the method holds a `PipeFunc` | name it as a suspect — its Python runs in a network-blocked sandbox on the hosted plane |
 | the run stays `RUNNING` with no error and no progress | say what it is: a workflow task that failed out of sight. It is not a slow run |
 
-Per-pipe bisection is not this skill's: it belongs to a debug-run skill that does not exist yet. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
+**A published address takes only the first destination.** The method is not the user's to repair, so the last three rows have nowhere to route: report the failure and step 5's provenance, and say the fix is upstream or another tag. Per-pipe bisection is not this skill's: it belongs to a debug-run skill that does not exist yet. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 
 ---
 
@@ -138,5 +146,7 @@ An unknown run id is reported in the tool's own words. Runs are scoped to the ke
 | the bundle does not validate, or is a scaffold | reports the verdict, routes to `/pipelex-design` or `/pipelex-edit` |
 | the inputs drifted from the method's template | reports which and how, hands to `/pipelex-inputs`, spends nothing |
 | the run failed | reports `failure_message` verbatim, routes once, never bisects |
+| the failing method is a published address | reports the failure with the address, the tag and the resolved commit SHA; never routes it to `/pipelex-design` or `/pipelex-edit` |
+| a `files` submission or a `method_id` is in hand beside an address | drops the extra one — an address is a complete run source and pairs with nothing |
 | `mthds_download_artifacts` is absent | reports the stored references as they came back; the run still completed |
 | `mthds_download_artifacts` refuses the `dir` | calls again with no `dir`; a refused directory is not a failed download |

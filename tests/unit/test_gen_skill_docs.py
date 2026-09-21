@@ -1816,3 +1816,97 @@ class TestNoShippedSkillNamesAnAbsentSkill:
             unresolved += [f"{skill_md.parent.name} names {name}, which this target does not ship" for name in sorted(named - shipped)]
 
         assert not unresolved, f"{target_name}: dangling cross-skill references: " + "; ".join(unresolved)
+
+
+class TestPublishedAddressTarget:
+    """A published address is the third target form in `pipelex-inputs` and `pipelex-run`.
+
+    Box E of `wip/plugin-skills-gaps/design.md` at the workspace root, ratified
+    2026-09-21. An address is passed as `method_ref` exactly as a catalog id is
+    passed as `method_id`, so no step grows a special case — and what these pin
+    is the handful of places where an address is genuinely not like an id: it
+    has no directory of its own, it pairs with no other selector, an untagged
+    one floats, the method is not the user's to repair, and one refusal on the
+    way is about the workshop rather than the request."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATES = REPO_ROOT / "templates" / "skills"
+
+    @property
+    def inputs_skill(self) -> str:
+        return (self.TEMPLATES / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    @property
+    def run_skill(self) -> str:
+        return (self.TEMPLATES / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_both_skills_carry_the_address_as_a_third_target(self) -> None:
+        """The whole of box E rests on the selector reaching every call: a skill that
+        names the address in its prose and then templates or runs by `files` has
+        added a paragraph, not a target."""
+        assert "three forms" in self.inputs_skill
+        for body in (self.inputs_skill, self.run_skill):
+            assert "`method_ref`" in body
+            assert "github.com/<owner>/<repo>[/<selector>][@<tag>]" in body
+
+    def test_an_untagged_address_is_accepted_everywhere_and_said_to_float(self) -> None:
+        """Louis's amendment at ratification: no skill refuses an untagged address
+        until the catalog supports versioning. The line that it floats is what the
+        user gets instead of a refusal, so its absence is the failure mode."""
+        for body in (self.inputs_skill, self.run_skill):
+            assert "floats" in body
+            assert "default branch at its head" in body
+
+    def test_the_output_directory_of_an_address_drops_the_tag(self) -> None:
+        """An address has no directory of its own, so one is derived — and the tag has
+        to come off it, or `documents@v0.1.0` becomes a directory name carrying a
+        version the next run has no reason to keep."""
+        body = self.inputs_skill
+        assert "last path segment with its tag dropped" in body
+        assert "gives `./documents/`" in body
+
+    def test_an_address_pairs_with_no_other_selector(self) -> None:
+        """`mthds_run` takes `files` + `method_id` together — the files run and the id
+        is recorded as linkage — so "one selector per call" is not a rule an agent can
+        infer from the run tool it already knows. An address is the exception and says so."""
+        body = self.run_skill
+        assert "an address pairs with nothing" in body.lower()
+        assert "complete run source" in body
+
+    def test_a_published_method_is_not_routed_into_the_editing_skills(self) -> None:
+        """Every other failing target in this skill routes to `/pipelex-design` or
+        `/pipelex-edit`. A published method belongs to whoever published it, so the
+        same routing would send an agent to edit source the user does not have."""
+        body = self.run_skill
+        assert "belongs to whoever published it" in body
+        assert "is not routed to `/pipelex-design` or `/pipelex-edit`" in body
+
+    def test_an_address_run_reports_what_was_actually_fetched(self) -> None:
+        """A floating address and a moved tag both make "which content ran" unanswerable
+        after the fact. The resolved commit SHA rides the start acknowledgement and
+        nothing later recovers it, so it is reported beside the run id or lost."""
+        body = self.run_skill
+        assert "`method_provenance`" in body
+        assert "resolved commit SHA" in body
+
+    def test_the_stale_workshop_refusal_is_read_off_the_error_it_produces(self) -> None:
+        """The one thing in box E that needed checking against the workshop rather than
+        the design: `mthds_prepare_inputs` did not take `method_ref` before the release
+        that added it, and a host validating against the older tool schema drops the
+        argument before sending it — so the error arrives at `files` saying no selector
+        was supplied, NOT at `method_ref`. An agent told to look for the latter reads a
+        stale workshop as a missing bundle and goes hunting for files that do not exist."""
+        body = self.inputs_skill
+        assert "Provide MTHDS files or a method_id" in body
+        assert "npx -y @pipelex/mcp@latest" in body
+        assert "predates the selector" in body
+
+    def test_the_address_config_refusal_is_not_read_as_a_credential(self) -> None:
+        """Prepare resolves an address through the run route, which applies the
+        execution-locus gate — so a published package shipping in-process Python is a
+        403 there while the same address templates fine. It classifies `config`, and
+        `config` otherwise means "stop, check the credential", which is the one piece
+        of advice that cannot help here."""
+        body = self.inputs_skill
+        assert "the key is not what failed" in body
+        assert "in-process Python" in body
