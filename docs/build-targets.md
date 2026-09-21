@@ -188,7 +188,25 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
 | `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex. `mcp/vibe-mcp.toml.j2` renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
+| `floors` | `defaults.toml` (`[vars.floors]` table) | `pipelex-integrate` and `pipelex-scaffold`, which state the minimum versions to the user. See below |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
+
+### Version floors
+
+`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, the Python range and the method app's port. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
+
+These are **value substitutions**, which is why they do not contradict the trimmed-variable rule this repo inherited from `mthds-plugins`: nothing branches on a floor, it is only printed. The rule that bans dead switches bans variables a skill *reads to decide what to do*.
+
+**One floor is stated as a ceiling and is easy to misread.** `pipelex_mcp` is the last `@pipelex/mcp` that **predates** the main-pipe signature in a validate verdict, so `pipelex-integrate` says "`{{ floors.pipelex_mcp }}` and earlier". Bumping it therefore means the signature arrived in a *later* release than the one recorded, and the sentence naming it has to be re-read rather than renumbered.
+
+**The static references keep their literals**, because `skills/*/references/` is copied verbatim into every target and never rendered. `scripts/check.py`'s `check_version_floors` is what holds them to the table, and it guards two different drifts:
+
+- **A floor that reaches no generated skill.** Jinja's default `Undefined` renders `{{ floors.typo }}` as the empty string, so a misspelled key ships a sentence with a hole in it and looks like well-formed prose — past the build, past the freshness check, past every other test. A floor whose value appears in no target's skills is the only evidence left of that, and the check reports it as such. This is the `PIPELEX_BUILD_ERROR` guard's problem in another shape; a marker cannot be used here because the value is interpolated mid-sentence rather than selected by a branch.
+- **A static reference left behind by a bump.** `VERSION_FLOOR_STATIC_REFS` pins each reference sentence to a floor key with a regex capturing the number, and every occurrence is checked, not the first — `starters.md` states the Node floor once per template column.
+
+The patterns are **anchored on the prose around the number**, never on the number alone, and that is load-bearing: a bare numeric sweep reads `writing-mthds.md`'s JSON `"number"` example of `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python floor. The cost is that rewording a pinned sentence fails the check — which is the right way round. Re-anchor the pattern in the same change that rewords the sentence; a silent pass would mean nobody is holding that sentence to anything any more.
+
+So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make check` — and the check names every static reference still saying the old number.
 
 ### Shared template files
 

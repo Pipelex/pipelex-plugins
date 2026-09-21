@@ -38,6 +38,11 @@ DEV_SERVER_MARKER = 'nohup make -C "$dir" dev APP_PORT=<port> APP_HOST=127.0.0.1
 LOOPBACK_GUARD_MARKER = "node -e 'const dev = "
 OWN_REPOSITORY_MARKER = "rev-parse --show-prefix"
 PORT_CHECK_COMMAND = "make -C <dir> port-check APP_PORT=4300"
+# The port is a version floor now (`[vars.floors].method_app_port`), so the TEMPLATE spells the
+# variable and only a RENDER spells the number. Both spellings are asserted, each where it belongs:
+# a template asserted on the rendered form would fail for the right reason and read as a regression,
+# and a render asserted on the templated form would pass while the floor rendered as the empty string.
+PORT_CHECK_COMMAND_TEMPLATED = "make -C <dir> port-check APP_PORT={{ floors.method_app_port }}"
 STOP_COMMAND = 'for pid in $(lsof -ti tcp:<port> -sTCP:LISTEN); do kill "$pid"; done'
 RESTART_COMMAND = "make dev APP_PORT=<port> APP_HOST=127.0.0.1"
 PRISTINE_METHOD_APP_COMMIT = (
@@ -1271,7 +1276,8 @@ class TestMethodAppBranch:
     def test_the_method_app_ends_with_the_page_answering_and_the_url_first(self) -> None:
         for body in self.bodies():
             assert "The one server it starts is the method app's own dev server" in body
-            assert PORT_CHECK_COMMAND in body
+            expected = PORT_CHECK_COMMAND_TEMPLATED if body == SKILL_TEMPLATE.read_text(encoding="utf-8") else PORT_CHECK_COMMAND
+            assert expected in body
             dev = _recipe(body, DEV_SERVER_MARKER)
             assert "--retry-connrefused" in dev
             # A per-attempt limit alone lets a hanging server hold the command for as long as the retries last.

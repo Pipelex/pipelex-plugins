@@ -24,6 +24,52 @@ BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
 TARGETS_DIR_NAME = "targets"
+
+# The version floors the skills state, and where a STATIC reference states one.
+#
+# Two kinds of drift are possible and the rule catches both. A template reads the
+# floor from `[vars.floors]` in `targets/defaults.toml`, so a bump reaches every
+# rendered skill — but a misspelled key renders as the empty string under Jinja's
+# default `Undefined`, silently and past every other gate, which is why the first
+# half below asserts each floor's value is actually present in the built output.
+# The static references under `skills/` are copied verbatim into every target and
+# are never rendered, so they keep their literals and the second half holds them
+# to the table.
+#
+# Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
+# bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
+# `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python
+# floor. A reworded reference fails this check instead of passing silently, which
+# is the right way round — re-anchor the pattern in the same change that rewords
+# the sentence.
+VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
+    (
+        "skills/pipelex-integrate/references/typescript.md",
+        r"`@pipelex/sdk` (\d+\.\d+\.\d+), the floor the skill's step 8 installs",
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/typescript.md",
+        r"the SDK's own Node floor \(>= (\d+\.\d+)\)",
+        "node",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "Node \u2265 the `engines\\.node` field of `package\\.json` \\((\\d+\\.\\d+) at writing\\)",
+        "node",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "a Python inside `requires-python` of `pyproject\\.toml` \\((\\d+\\.\\d+)\u2013\\d+\\.\\d+ at writing\\)",
+        "python_min",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "a Python inside `requires-python` of `pyproject\\.toml` \\(\\d+\\.\\d+\u2013(\\d+\\.\\d+) at writing\\)",
+        "python_max",
+    ),
+]
+
 DEFAULTS_FILE = "defaults.toml"
 CLAUDE_MARKETPLACE_PATH = Path(".claude-plugin/marketplace.json")
 CODEX_MARKETPLACE_PATH = Path("packaging/codex-marketplace.json")
@@ -413,6 +459,66 @@ def check_build_error_markers(base_dir: Path) -> list[str]:
     return errors
 
 
+def load_version_floors(base_dir: Path) -> dict[str, str]:
+    """Read `[vars.floors]` from the target defaults."""
+    defaults_path = base_dir / TARGETS_DIR_NAME / DEFAULTS_FILE
+    raw = tomllib.loads(defaults_path.read_text(encoding="utf-8"))
+    floors = raw.get("vars", {}).get("floors", {})
+    return {str(key): str(value) for key, value in floors.items()}
+
+
+def check_version_floors(base_dir: Path) -> list[str]:
+    """Check that every version floor reaches the built skills, and that the static
+    references state the same numbers as the table.
+
+    The first half is the guard against a misspelled variable: `{{ floors.typo }}`
+    renders as the empty string under Jinja's default `Undefined`, so the sentence
+    stating the floor would ship with a hole in it and every other gate would stay
+    green. A floor whose value appears nowhere in a target's generated skills is
+    that hole.
+
+    The second half holds the verbatim-copied references under `skills/` to the
+    table, since nothing renders them.
+    """
+    errors: list[str] = []
+    floors = load_version_floors(base_dir)
+    if not floors:
+        return [f"{TARGETS_DIR_NAME}/{DEFAULTS_FILE}: [vars.floors] is missing or empty"]
+
+    for output_dir in _collect_output_dirs(base_dir):
+        rendered = "\n".join(skill_md.read_text(encoding="utf-8") for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")))
+        for key, value in sorted(floors.items()):
+            if value not in rendered:
+                rel = output_dir.relative_to(base_dir)
+                errors.append(f"{rel}: floor `{key}` = {value} reaches no generated skill — a misspelled `floors.{key}` renders as the empty string")
+
+    for rel_path, pattern, key in VERSION_FLOOR_STATIC_REFS:
+        path = base_dir / rel_path
+        if not path.is_file():
+            errors.append(f"{rel_path}: static reference is missing, but a version floor is pinned to it")
+            continue
+        expected = floors.get(key)
+        if expected is None:
+            errors.append(f"{rel_path}: pinned to floor `{key}`, which [vars.floors] does not define")
+            continue
+        text = path.read_text(encoding="utf-8")
+        matches = list(re.finditer(pattern, text))
+        if not matches:
+            errors.append(
+                f"{rel_path}: the sentence stating the `{key}` floor was reworded — re-anchor VERSION_FLOOR_STATIC_REFS in this same change"
+            )
+            continue
+        # Every occurrence, not the first: `starters.md` states the Node floor once per
+        # template column, so a second one left behind by a bump is exactly the drift
+        # this rule exists to catch.
+        for match in matches:
+            if match.group(1) != expected:
+                line = text[: match.start()].count("\n") + 1
+                errors.append(f"{rel_path}:{line}: states {match.group(1)} for floor `{key}`, but [vars.floors] says {expected}")
+
+    return errors
+
+
 def check_shared_files_exist(base_dir: Path) -> list[str]:
     """Check that all expected shared template source files are present."""
     shared_dir = base_dir / "templates" / "skills" / "shared"
@@ -594,6 +700,13 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_matched_target_versions(base_dir),
         "FAIL: Target versions have drifted — bump all of them together.",
         "  All target versions match.",
+    )
+
+    failed |= _run_check(
+        "Checking version floors against targets/defaults.toml...",
+        check_version_floors(base_dir),
+        "FAIL: A version floor drifted from [vars.floors], or did not reach the built skills.",
+        "  Version floors match [vars.floors] and reach every target.",
     )
 
     failed |= _run_check(

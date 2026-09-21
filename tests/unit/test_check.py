@@ -18,6 +18,7 @@ from scripts.check import (
     check_skill_argument_placeholders,
     check_stale_references,
     check_target_plugin_versions,
+    check_version_floors,
     check_vibe_target_artifacts,
     resolve_target_var,
 )
@@ -542,6 +543,74 @@ class TestSkillArgumentPlaceholders:
         errors = check_skill_argument_placeholders(skill_tree)
         assert len(errors) == 1
         assert errors[0].startswith("pipelex-codex/skills/pipelex-test/SKILL.md:")
+
+
+class TestVersionFloors:
+    """The floors the skills state to the user live in one table, and this rule is what
+    keeps a bump to that table from being a half-bump.
+
+    It guards two different drifts. A template reads a floor through Jinja, whose default
+    `Undefined` renders a misspelled key as the empty string — silently, past the build,
+    the freshness check and every other test — so the sentence would ship with a hole
+    where the number should be. And the static references under `skills/` are copied
+    verbatim into every target and never rendered, so nothing but this rule holds their
+    literals to the table.
+    """
+
+    FLOORS = '[vars]\nmarketplace_name = "pipelex-plugins"\n\n[vars.floors]\npipelex_sdk_js = "0.18.0"\nnode = "22.12"\n'
+
+    def _tree(self, tmp_path: Path, *, floors: str | None = None, typescript: str | None = None) -> Path:
+        _write_target_configs(tmp_path, {"prod": {"name": "pipelex", "version": "0.6.3", "source": "pipelex/"}})
+        (tmp_path / "targets" / "defaults.toml").write_text(self.FLOORS if floors is None else floors)
+        skill_dir = tmp_path / "pipelex" / "skills" / "pipelex-integrate"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk` 0.18.0 on Node 22.12.\n")
+        reference = tmp_path / "skills" / "pipelex-integrate" / "references"
+        reference.mkdir(parents=True)
+        body = (
+            typescript
+            if typescript is not None
+            else "the SDK facts were checked against `@pipelex/sdk` 0.18.0, the floor the skill's step 8 installs\n"
+        )
+        (reference / "typescript.md").write_text(body)
+        return tmp_path
+
+    def test_a_floor_that_reaches_the_output_and_its_reference_passes(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        errors = [e for e in check_version_floors(tree) if "typescript.md" in e or "pipelex" in e]
+        assert [e for e in errors if "0.18.0" in e or "22.12" in e] == []
+
+    def test_a_misspelled_floor_variable_is_caught_although_it_renders_clean(self, tmp_path: Path) -> None:
+        """`{{ floors.typo }}` renders as the empty string, so the built skill simply
+        loses the number and looks like well-formed prose. The floor reaching no skill
+        at all is the only evidence left."""
+        tree = self._tree(tmp_path)
+        skill_md = tree / "pipelex" / "skills" / "pipelex-integrate" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk`  on Node 22.12.\n")
+        errors = check_version_floors(tree)
+        assert any("floor `pipelex_sdk_js` = 0.18.0 reaches no generated skill" in error for error in errors)
+
+    def test_a_static_reference_left_behind_by_a_bump_is_named_with_its_line(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        floors = self.FLOORS.replace('pipelex_sdk_js = "0.18.0"', 'pipelex_sdk_js = "0.19.0"')
+        (tree / "targets" / "defaults.toml").write_text(floors)
+        skill_md = tree / "pipelex" / "skills" / "pipelex-integrate" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk` 0.19.0 on Node 22.12.\n")
+        errors = check_version_floors(tree)
+        assert any("typescript.md:1: states 0.18.0 for floor `pipelex_sdk_js`, but [vars.floors] says 0.19.0" in error for error in errors)
+
+    def test_a_reworded_reference_fails_rather_than_passing_silently(self, tmp_path: Path) -> None:
+        """A pattern that no longer matches means nobody is holding that sentence to the
+        table any more, which must not read as a clean check."""
+        tree = self._tree(tmp_path, typescript="the SDK facts were checked against version 0.18.0 of the SDK\n")
+        errors = check_version_floors(tree)
+        assert any("was reworded" in error and "typescript.md" in error for error in errors)
+
+    def test_an_empty_table_is_a_failure_rather_than_nothing_to_check(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path, floors='[vars]\nmarketplace_name = "pipelex-plugins"\n')
+        errors = check_version_floors(tree)
+        assert len(errors) == 1
+        assert "[vars.floors] is missing or empty" in errors[0]
 
 
 class TestSharedFilesExist:
