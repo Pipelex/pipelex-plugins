@@ -301,6 +301,22 @@ Box L of `wip/plugin-skills-gaps/design.md`.
 
 **`pipelex-inputs` had a generic mode preamble instead of its own.** Thirty lines of mode vocabulary, shared with nothing — no other skill here carries it — and stating as a rule that "each skill defines its own default" inside the single skill defining one. Three lines replace it: the automatic default and how it behaves, when to go interactive and what to ask that the strategy table cannot answer, and the mid-run switch either way. The strategy table and the interactive additions below it were already this skill's own and are untouched.
 
+## A published address without a tag is accepted, never refused (2026-09-21)
+
+Box E of `wip/plugin-skills-gaps/design.md`, as amended at ratification.
+
+`pipelex-integrate` refused a `method_ref` with no tag for a committed integration and asked for the tag. The reason to stop refusing is a scope one, and it is Louis's: this release of the plugin and of the workshop is not restrictive about versions when integrating a method, and that holds until the platform's catalog supports versioning, which is out of scope here. A skill that refuses the only address form a user has is a skill that cannot be used at all, while the same user with a warning in hand can decide for themselves.
+
+So the address is accepted and the consequence is said in one line at the entry — it resolves to the default branch at its head, so the committed types are the ones it resolved to that day — and then carried to the three places where a reader could otherwise conclude the opposite:
+
+- **The sidecar records the address exactly as passed, absent tag included.** Resolving it into the tag or commit it happened to land on would write a pin into `sources.json` that the integration does not have, and the next refresh would follow that pin instead of the branch the user asked for. A sidecar naming an untagged address *is* the record that this tree floats.
+- **The offline drift gate neither refuses an untagged address nor can see one move.** Both gate scripts read the sidecar's `sources` and `bundle_dir` and never its `method`, so a by-ref integration takes the "records no sources" branch whether or not there is a tag. What the gate still proves is that the generated tree matches its own lock. An upstream that moved under a floating address is invisible there by construction, which is why the skill says it in words instead of implying a check that does not exist.
+- **The report says the types follow what the address resolved to that day**, beside the sentence it already carries for a `method_id` source about the catalog being unversioned. The remedy offered is the tag, or re-running the skill.
+
+The call-site templates in both language references spell the tag as optional to match; a reference showing `@<tag>` as mandatory would reinstate the refusal in the one place a user copies from.
+
+Commit-SHA pins are the neighbouring work (`L-260916-a3fe05` in the workspace ledger) and are not changed by this: nothing here records a resolved commit, precisely so that the pin remains that work's to define.
+
 ## License & distribution
 
 **Apache 2.0**; repo made public when ready (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.

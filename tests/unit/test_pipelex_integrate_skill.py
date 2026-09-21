@@ -202,6 +202,79 @@ class TestPipelexIntegrateSkill:
         for rule in self.RULES:
             assert rule in body, f"missing rule: {rule}"
 
+    def test_an_untagged_address_is_accepted_and_said_to_float(self) -> None:
+        """Box E of `wip/plugin-skills-gaps/design.md`, as amended at ratification:
+        every skill accepts an untagged address and says in one line that it
+        floats. This skill used to refuse one outright for a committed
+        integration, which the amendment reversed."""
+        body = self.integrate
+        assert "**An address with no tag is accepted and floats**" in body
+        assert "the default branch at its head" in body
+        assert "refused for a committed integration" not in body, "the pre-amendment refusal is back"
+
+    def test_the_sidecar_records_an_address_untagged_and_never_resolves_it(self) -> None:
+        """An untagged address must reach the sidecar as it was passed. Resolving
+        it into the tag or commit it landed on would record a pin the integration
+        does not have, and the next refresh would stop following the branch the
+        user asked for."""
+        body = self.integrate
+        assert "**A `method_ref` is recorded exactly as it was passed, an absent tag included**" in body
+        assert "never\nresolves a floating address" in body or "never resolves a floating address" in body
+
+    def test_the_offline_gate_neither_refuses_an_untagged_address_nor_sees_it_move(self) -> None:
+        """The gate scripts read `sources` and `bundle_dir` and never `method`, so a
+        by-ref integration takes the "records no sources" branch whether or not the
+        address carries a tag. The skill must say so where it wires the gate, because
+        a reader who expects the gate to catch a moved upstream gets no warning from it."""
+        body = self.integrate
+        assert "**None of the three refuses an address without a tag, and none of them can see one move.**" in body
+        for script in ("codegen-check.mjs", "codegen_check.py"):
+            source = (self.REFERENCES_DIR / script).read_text(encoding="utf-8")
+            assert "method_ref" not in source, f"{script} reads the address, so the skill's claim about the gate is wrong"
+
+    def test_the_report_says_the_types_follow_what_the_address_resolved_to(self) -> None:
+        """The third clause of the box: the user is told, at the moment they read the
+        report, that a floating address committed the types of that day."""
+        body = self.integrate
+        assert (
+            "**for a `method_ref` with no tag, that the types committed here are the ones the address resolved to on the day they were generated**"
+            in body
+        )
+
+    def test_the_call_site_references_spell_the_tag_as_optional(self) -> None:
+        """A reference that shows `@<tag>` as mandatory refuses the untagged address
+        in the one place the user copies from, which is the refusal this item removed."""
+        for reference in ("typescript.md", "python.md"):
+            source = (self.REFERENCES_DIR / reference).read_text(encoding="utf-8")
+            assert "[/<selector>][@<tag>]" in source, f"{reference} still spells the tag as mandatory"
+            # Keyed on the closing bracket rather than on one placeholder name: every mandatory
+            # spelling ends `]@<tag>` whatever sits inside the brackets, and the optional one never
+            # does. `python.md` carries a second address grammar under `<package>`, in the hand-typed
+            # `method.json` the harness path tells the user to write themselves, which a rule naming
+            # `<selector>` alone leaves free to regress.
+            assert "]@<tag>" not in source, f"{reference} still spells the tag as mandatory"
+        python_source = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "[/<package>][@<tag>]" in python_source, "the method.json example lost its address grammar"
+
+    def test_the_module_header_says_an_untagged_address_floats(self) -> None:
+        """The consequence reaches the sidecar, the gate and the report — all read
+        in the session — but the call-site module is the one file a maintainer opens
+        months later, where a bare `github.com/…` string says nothing on its own.
+        The `method_id` bullet already prescribes such a line for the unversioned
+        catalog; this is its twin."""
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        assert "when the address carries no tag, the module's header says it floats" in typescript
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "when the address carries no tag, the module docstring says it floats" in python
+
+    def test_the_harness_manifest_takes_the_address_unresolved_too(self) -> None:
+        """Step 7's non-resolution rule is written about the sidecar, and a project
+        that owns a codegen harness skips step 7 and writes the selector into its own
+        manifest by hand — which is precisely where nothing is left to stop an agent
+        resolving a floating address into the tag it landed on."""
+        body = self.integrate
+        assert "**A `method_ref` written into that manifest goes in exactly as it was passed, an absent tag included**" in body
+
     def test_signature_comes_from_the_verdict_and_the_heuristic_is_absent(self) -> None:
         body = self.integrate
         assert "A valid verdict carries **`main_pipe`**" in body
