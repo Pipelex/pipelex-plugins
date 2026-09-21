@@ -73,7 +73,22 @@ Determine the three things that are the client requirement:
 
 Specify every boundary concept fully now. Decide whether each boundary and intermediate concept is simple or structured from all known consumers: if any consumer field-reads it (`$x.field`, or a construct `from = "x.field"`), it must be structured; if every consumer uses it whole (`@x` or wholesale mapping), it can stay simple. Declare each concept exactly once, owned by the root boundary or by the controller that introduces the intermediate value.
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics) before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+
+### Resolve the bundle home before writing
+
+A method's sources are loaded at runtime by the call site that runs them, so they belong beside that code from the moment they are written rather than being moved there later. Resolve the home before writing anything, taking the first that applies:
+
+- **A path the user named** — it wins over everything below.
+- **A packaged Python project, or one that owns a codegen harness** — `<package>/methods/<name>/`. This is what `references/python.md` already requires of an integrated bundle: a wheel ships the sources only when they sit inside the import package, beside the call site that loads them.
+- **Any other project**, found the way `/pipelex-integrate` finds one — the nearest `package.json` or `pyproject.toml` at or above the working directory — `<project root>/methods/<name>/`.
+- **No project** — `./methods/<name>/`, in the working directory.
+
+`<name>` is the bundle's `domain` in the project language's casing, as integrate already spells it: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project.
+
+> `summarize_pdf`: a PDF in, a structured summary out — extracts the text, then summarizes it. Writing to `src/methods/summarize-pdf/`.
+
+Bundles that already live elsewhere keep working: every skill here takes a directory, and nothing migrates anything.
 
 ### Choose direct construction only when all boundaries are resolved
 
@@ -112,7 +127,7 @@ Design in memory:
 - the concrete main operator/controller and every concrete leaf;
 - all controller steps, branches, mappings, and ownership.
 
-The normal target is `pipelex-wip/<bundle_dir>/main.mthds`, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
+The normal target is `main.mthds` in the bundle home resolved above, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
 
 ### Step D2 — Write once as a coherent runnable candidate
 
@@ -139,7 +154,7 @@ This mode preserves the additive, breadth-first construction loop and valid inte
 
 ### Step S1 — Write and validate the root scaffold
 
-Write `pipelex-wip/<bundle_dir>/main.mthds` (unless the user asks for another root name) with:
+Write `main.mthds` in the bundle home resolved above (unless the user asks for another root name) with:
 
 - `domain`, `description`, `main_pipe`, optional `system_prompt`;
 - the fully specified boundary concepts;

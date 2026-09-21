@@ -1173,6 +1173,45 @@ class TestSyntheticInputsSkill:
         assert check_freshness(tree, "prod") == 1, "a stale reference copy must fail the freshness gate"
 
 
+class TestBundleHome:
+    """A method's sources are loaded at runtime by the call site that runs them.
+
+    Writing them to a directory named "wip" meant every integration was either a
+    production call site loading from `pipelex-wip/`, or a copy whose original no
+    longer had a sidecar naming it — so a later edit of that original reported a
+    clean bill that was wrong."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    SKILLS = REPO_ROOT / "templates" / "skills"
+
+    def _template(self, skill: str) -> str:
+        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_design_resolves_the_home_before_it_writes(self) -> None:
+        body = self._template("pipelex-design")
+        assert "### Resolve the bundle home before writing" in body
+        assert "A path the user named" in body
+        assert "`<package>/methods/<name>/`" in body
+        assert "`<project root>/methods/<name>/`" in body
+        assert "`./methods/<name>/`" in body
+
+    def test_design_announces_the_home_with_the_contract(self) -> None:
+        """The user can only redirect the write while it has not happened."""
+        body = self._template("pipelex-design")
+        assert "with the bundle home resolved below in the same line" in body
+
+    def test_the_name_follows_the_project_language_casing(self) -> None:
+        body = self._template("pipelex-design")
+        assert "`summarize-pdf` in TypeScript, `summarize_pdf` in Python" in body
+
+    def test_no_skill_still_defaults_to_pipelex_wip(self) -> None:
+        """It survives only as a directory a user may already have, never as the
+        default this plugin writes to nor as an example it teaches from."""
+        for skill in sorted(p.name for p in self.SKILLS.iterdir() if p.is_dir() and p.name != "shared"):
+            body = self._template(skill)
+            assert "pipelex-wip" not in body, f"{skill} still names pipelex-wip"
+
+
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
         """Each platform declares its own hook template set."""
