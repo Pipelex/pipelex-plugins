@@ -38,6 +38,10 @@ DEFAULT_VARS: dict[str, str | bool] = {"marketplace_name": "pipelex-plugins", "p
 # templates {% include %}, but which is NOT in SHARED_TEMPLATES (not rendered
 # standalone).
 FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
+
+# The skills that stop when the workshop is absent. A skill that works without it
+# — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold — stays out.
+MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
@@ -606,8 +610,6 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
-    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
-
     @pytest.mark.parametrize(
         "target_name, manifest_spawns",
         [
@@ -626,10 +628,10 @@ class TestSkillFailureDiscipline:
             repo_root / "templates",
             repo_root,
             config.template_vars,
-            include_skills=list(self.MCP_SKILLS),
+            include_skills=list(MCP_SKILLS),
             target_name=config.name,
         )
-        for skill in self.MCP_SKILLS:
+        for skill in MCP_SKILLS:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
             if manifest_spawns:
@@ -659,10 +661,10 @@ class TestSkillFailureDiscipline:
             repo_root / "templates",
             repo_root,
             config.template_vars,
-            include_skills=list(self.MCP_SKILLS),
+            include_skills=list(MCP_SKILLS),
             target_name=config.name,
         )
-        for skill in self.MCP_SKILLS:
+        for skill in MCP_SKILLS:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
             if target_name == "prod":
@@ -689,8 +691,6 @@ class TestSharedSkillIncludes:
     skill that pastes a block instead of including it fails here."""
 
     REPO_TEMPLATES = Path(__file__).parents[2] / "templates"
-
-    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
 
     # A sentence from each shared block, and the include that owns it.
     SHARED_BLOCK_OWNERS: ClassVar[dict[str, str]] = {
@@ -1030,7 +1030,7 @@ class TestSyntheticInputsSkill:
         absent from the MCP-backed skill set the STOP-posture tests cover."""
         body = self.synthetic
         assert "mcp__" not in body
-        assert "pipelex-synthetic-inputs" not in TestSkillFailureDiscipline.MCP_SKILLS
+        assert "pipelex-synthetic-inputs" not in MCP_SKILLS
 
     def test_inputs_delegates_instead_of_generating(self) -> None:
         inputs = (self.SKILLS / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")

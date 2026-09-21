@@ -16,6 +16,10 @@ from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
 STALE_REF_PATTERN = re.compile(r"references/(?:" + "|".join(re.escape(stem) for stem in _SHARED_STEMS) + r")")
+# A shared include whose variant parameter is unset or misspelled emits this marker instead of
+# rendering as the empty string: Jinja's default `Undefined` compares unequal without raising, so
+# a typo would otherwise ship a skill with a whole block silently missing.
+BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
@@ -391,6 +395,24 @@ def check_skill_argument_placeholders(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_build_error_markers(base_dir: Path) -> list[str]:
+    """Check that no generated file carries a shared include's build-error marker.
+
+    A shared partial that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
+    including template set no variant or misspelled one. Without it the branch would render as the
+    empty string, and the block would vanish from the shipped skill with the build, the freshness
+    check and the tests all green.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            for idx, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
+                if BUILD_ERROR_MARKER in line:
+                    rel = skill_md.relative_to(base_dir)
+                    errors.append(f"{rel}:{idx}: {line.strip()}")
+    return errors
+
+
 def check_shared_files_exist(base_dir: Path) -> list[str]:
     """Check that all expected shared template source files are present."""
     shared_dir = base_dir / "templates" / "skills" / "shared"
@@ -585,6 +607,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_skill_argument_placeholders(base_dir),
         "FAIL: Found $ARGUMENTS or $<digit> in a SKILL.md. Rewrite without the token (an escape reaches Codex and Vibe verbatim).",
         "  No argument placeholders found.",
+    )
+    failed |= _run_check(
+        "Checking for unresolved shared-include variants...",
+        check_build_error_markers(base_dir),
+        "FAIL: A shared include rendered its build-error branch (the including template set no variant, or misspelled one).",
+        "  Every shared include resolved its variant.",
     )
     failed |= _run_check(
         "Checking all shared template files exist...",

@@ -110,7 +110,7 @@ Variables are defined in `targets/defaults.toml`, overridable per-target in `tar
 - `marketplace_name` — `pipelex-plugins`
 - `platform` — Claude / Codex / Vibe
 - `harness_name` — display name of the harness
-- `mcp_server` — a table (`[vars.mcp_server]`: `command`, `args`, `env_vars`, plus `user_config` sub-tables) describing the local workshop launcher that the Claude and Codex manifests and the Vibe `mcp/vibe-mcp.toml` fragment bake; `env_vars` lists the variable *names* Codex forwards into the spawn, and `user_config` becomes the Claude manifest's `userConfig` (enable-time prompt for the API key / base URL, injected straight into the MCP spawn env as `PIPELEX_*` and delivered to the hook as `CLAUDE_PLUGIN_OPTION_*`)
+- `mcp_server` — a table (`[vars.mcp_server]`: `command`, `args`, `env_vars`, plus `user_config` sub-tables) describing the local workshop launcher that the Claude and Codex manifests and the Vibe `mcp/vibe-mcp.toml` fragment bake; `env_vars` lists the variable *names* Codex forwards into the spawn, and `user_config` becomes the Claude manifest's `userConfig` (enable-time prompt for the API key / base URL, injected into the MCP spawn env as `PIPELEX_PLUGIN_*` — which the `launch-pipelex-mcp.sh` wrapper promotes to `PIPELEX_*` only when non-empty, so an unfilled option never shadows a shell-exported key — and delivered to the hook as `CLAUDE_PLUGIN_OPTION_*`)
 
 Deliberately **not** carried over from `mthds-plugins`: `min_mthds_version`, `env_check`, `can_run_methods`, `session_start_hook`, and all `*_install_cmd` / `*_upgrade_cmd` variables. Reintroduce a variable only when a skill or hook actually branches on it. Don't port dead switches.
 
