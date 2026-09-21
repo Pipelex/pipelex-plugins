@@ -45,7 +45,7 @@ This skill validates through the **`mthds_validate`** tool and projects input sc
 
 - **If the tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* Do not write `.mthds` files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently skip validation.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
 
 > **No backend setup needed**: designing and validating never run the method, so no inference backends are required.
 

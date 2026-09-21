@@ -8,7 +8,7 @@ import re
 import shutil
 import tomllib
 from pathlib import Path
-from typing import cast
+from typing import ClassVar, cast
 
 import pytest
 
@@ -38,6 +38,10 @@ DEFAULT_VARS: dict[str, str | bool] = {"marketplace_name": "pipelex-plugins", "p
 # templates {% include %}, but which is NOT in SHARED_TEMPLATES (not rendered
 # standalone).
 FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
+
+# The skills that stop when the workshop is absent. A skill that works without it
+# — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold — stays out.
+MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
@@ -606,8 +610,6 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
-    MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
-
     @pytest.mark.parametrize(
         "target_name, manifest_spawns",
         [
@@ -626,22 +628,99 @@ class TestSkillFailureDiscipline:
             repo_root / "templates",
             repo_root,
             config.template_vars,
-            include_skills=list(self.MCP_SKILLS),
+            include_skills=list(MCP_SKILLS),
             target_name=config.name,
         )
-        for skill in self.MCP_SKILLS:
+        for skill in MCP_SKILLS:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
             if manifest_spawns:
                 assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
-                assert "from the session environment —" in body, f"{target_name}/{skill}: the manifest-spawned server reads the session environment"
             else:
                 assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
                 assert "`mcp/vibe-mcp.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must point at the shipped MCP fragment"
                 assert "`env` table" in body, f"{target_name}/{skill}: Vibe STOP message must say where the key goes"
                 assert "to the end of `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must say to append the entry"
                 assert "`mcp_servers = []`" in body, f"{target_name}/{skill}: Vibe STOP message must say to delete the inline empty array"
-                assert "from the session environment —" not in body, f"{target_name}/{skill}: Vibe passes no shell env to the server"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_credential_sentence_names_the_platform_channel(self, target_name: str) -> None:
+        """Where the workshop gets its API key from differs per harness, so the
+        sentence differs per harness — it used to be shared by Claude and Codex.
+
+        On Claude the canonical channel is the plugin configuration, whose value
+        the launcher promotes into the spawn environment, and on Claude Desktop
+        it is the only channel: a GUI launch carries no shell environment, so an
+        agent that advises exporting a shell variable there advises something
+        that cannot work. Codex forwards the session environment by name. Vibe
+        spawns with a minimal environment and reads the server entry's own `env`
+        table."""
+        repo_root = Path(__file__).parents[2]
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(
+            repo_root / "templates",
+            repo_root,
+            config.template_vars,
+            include_skills=list(MCP_SKILLS),
+            target_name=config.name,
+        )
+        for skill in MCP_SKILLS:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
+            if target_name == "prod":
+                assert "from the **plugin configuration**" in body, f"{target_name}/{skill}: Claude's canonical channel is the plugin configuration"
+                assert "OS keychain" in body, f"{target_name}/{skill}: say where the configured key is kept"
+                assert "Claude Desktop" in body, f"{target_name}/{skill}: name the host where the shell environment does not exist"
+                assert session_env_claim not in body, f"{target_name}/{skill}: the session environment is Claude's fallback, not its channel"
+            elif target_name == "codex":
+                assert session_env_claim in body, f"{target_name}/{skill}: Codex forwards the session environment"
+                assert "plugin configuration" not in body, f"{target_name}/{skill}: Codex has no plugin configuration prompt"
+            else:
+                assert "`env` table in `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe reads the server entry's own env table"
+                assert "never from the session environment" in body, f"{target_name}/{skill}: Vibe passes no shell env to the server"
+                assert "plugin configuration" not in body, f"{target_name}/{skill}: Vibe has no plugin manifest to configure"
+
+
+class TestSharedSkillIncludes:
+    """Box J of `wip/plugin-skills-gaps/design.md`: the blocks the MCP-backed
+    skills used to copy live in `templates/skills/shared/` and are included.
+
+    The cost of the copies was concrete — the wrong Claude credential sentence
+    (`L-260912-65d6fc`) sat in five templates — so these tests pin the property
+    that made it expensive: each shared block has exactly one source. A new
+    skill that pastes a block instead of including it fails here."""
+
+    REPO_TEMPLATES = Path(__file__).parents[2] / "templates"
+
+    # A sentence from each shared block, and the include that owns it.
+    SHARED_BLOCK_OWNERS: ClassVar[dict[str, str]] = {
+        "The Pipelex MCP server isn't connected —": "skills/shared/mcp-requirements.md.j2",
+        "The server authenticates to the API with": "skills/shared/mcp-requirements.md.j2",
+        "**Formatting is automatic.**": "skills/shared/formatting-hook.md.j2",
+        "Prefer the path form ": "skills/shared/validate-call.md.j2",
+        "now stale and offer": "skills/shared/stale-types-notice.md.j2",
+        "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
+    }
+
+    @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
+    def test_shared_block_has_exactly_one_source(self, sentence: str, owner: str) -> None:
+        carriers = sorted(
+            str(path.relative_to(self.REPO_TEMPLATES)) for path in self.REPO_TEMPLATES.rglob("*.j2") if sentence in path.read_text(encoding="utf-8")
+        )
+        assert carriers == [owner], f"{sentence!r} should live only in {owner}, found in {carriers}"
+
+    @pytest.mark.parametrize("skill", MCP_SKILLS)
+    def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
+        body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert 'include "skills/shared/mcp-requirements.md.j2"' in body
+
+    def test_pipefunc_warning_states_the_sandbox_the_experiment_and_the_risk(self) -> None:
+        """Box G: PipeFunc is warned about, never refused. The warning is written
+        before any skill includes it, so the later phases only add the include."""
+        body = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
+        assert "sandbox with no network access" in body
+        assert "still in development" in body
+        assert "validates can still fail when it runs" in body
 
 
 class TestVibeMcpFragment:
@@ -951,7 +1030,7 @@ class TestSyntheticInputsSkill:
         absent from the MCP-backed skill set the STOP-posture tests cover."""
         body = self.synthetic
         assert "mcp__" not in body
-        assert "pipelex-synthetic-inputs" not in TestSkillFailureDiscipline.MCP_SKILLS
+        assert "pipelex-synthetic-inputs" not in MCP_SKILLS
 
     def test_inputs_delegates_instead_of_generating(self) -> None:
         inputs = (self.SKILLS / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")

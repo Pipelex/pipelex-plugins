@@ -9,7 +9,7 @@ This is the **CLI-free** plugin generation. Unlike the `mthds-plugins` predecess
 ```
 templates/                      source of truth (all .j2 files)
 ├── skills/*/SKILL.md.j2        skill templates
-├── skills/shared/*.md.j2       shared language references (+ the include-only frontmatter partial)
+├── skills/shared/*.md.j2       shared language references + the include-only partials
 ├── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
 └── mcp/vibe-mcp.toml.j2         the workshop launcher as a Vibe [[mcp_servers]] fragment
        |
@@ -192,6 +192,28 @@ All targets share the same version string in lockstep — `make check` fails on 
 
 ### Shared template files
 
-The files in `templates/skills/shared/` listed in `SHARED_TEMPLATES` (`gen_skill_docs.py`) — the MTHDS language references — are rendered per target and written to `skills/shared/`. `frontmatter.md.j2` is a deliberate exception: it is an **include-only partial** ({% include %}-d by skill templates for their YAML frontmatter), so it is not listed in `SHARED_TEMPLATES` and is never rendered standalone.
+`templates/skills/shared/` holds two kinds of file, told apart by the `SHARED_TEMPLATES` list in `gen_skill_docs.py`.
+
+**Rendered standalone.** The files listed there — the MTHDS language references — are rendered per target and written to `skills/shared/`, where a skill body links to them.
+
+**Include-only partials.** Every other file there is `{% include %}`-d by the skill templates and never rendered on its own, so it ships as part of whichever skills include it and nowhere else. They exist so that a block several skills say word for word has one source: the credential sentence used to sit in five templates, and correcting it meant five edits and a test that asserted two of them were identical.
+
+| Partial | What it carries | Parameters the including template sets |
+| --- | --- | --- |
+| `frontmatter.md.j2` | the YAML frontmatter fields shared by every skill (Claude's `allowed-tools`) | none |
+| `mcp-requirements.md.j2` | the three bullets an MCP-backed skill opens with: the STOP on an absent tool, the STOP on a `config`-class error, and where the server gets its API key | `mcp_absent_lead` (`the tool is`, `the tools are`, `a tool is`), `mcp_absent_suffix`, `mcp_config_parenthetical`, `mcp_config_suffix`, `mcp_requirements_extra` (a bullet inserted before the credential one) |
+| `validate-call.md.j2` | how a local bundle is handed to the workshop: the path form of `files`, and the inline fallback the hosted console needs | none |
+| `formatting-hook.md.j2` | that the validation hook formats every `.mthds` write, so no skill hand-formats | `formatting_hook_write_clause` |
+| `stale-types-notice.md.j2` | the notice that a bundle change may have outdated a generated tree, in the three wordings its call sites use | `stale_types_variant` (`edit`, `design`, `organize`) |
+| `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
+
+Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
+
+```jinja
+{% set mcp_config_suffix %} Never silently skip validation.{% endset -%}
+{% include "skills/shared/mcp-requirements.md.j2" %}
+```
+
+A parameter left unset falls back to the partial's own default, so a skill sets only what it says differently. `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a skill pastes one of these blocks instead of including it.
 
 Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.

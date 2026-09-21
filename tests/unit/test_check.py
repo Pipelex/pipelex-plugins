@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts.check import (
+    check_build_error_markers,
     check_codex_marketplace_plugins,
     check_codex_no_claude_artifacts,
     check_marketplace_plugins,
@@ -456,6 +457,24 @@ class TestStaleReferences:
         skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
         skill_md.write_text(VALID_FRONTMATTER + "\nSee [ref](../shared/mthds-reference.md)\n")
         assert check_stale_references(skill_tree) == []
+
+
+class TestBuildErrorMarkers:
+    """A shared include that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
+    including template set no variant or misspelled one. Jinja's default `Undefined` compares unequal
+    to everything without raising, so without the marker the block would render as the empty string
+    and the skill would ship with it silently missing — build, freshness check and tests all green."""
+
+    def test_clean_tree(self, skill_tree: Path) -> None:
+        assert check_build_error_markers(skill_tree) == []
+
+    def test_reports_the_marker_with_its_line(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + '\nPIPELEX_BUILD_ERROR: stale_types_variant must be one of edit, design, organize — got "edti"\n')
+        errors = check_build_error_markers(skill_tree)
+        assert len(errors) == 1
+        assert "SKILL.md:8" in errors[0]
+        assert "edti" in errors[0]
 
 
 class TestSkillArgumentPlaceholders:
