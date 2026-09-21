@@ -343,7 +343,7 @@ In **interactive mode**, wait for the user to confirm. In **automatic mode**, st
 4. **Keep the prepared file out of git.** When `<output_dir>` is inside a git repository whose ignore rules do not already cover it, add `inputs.prepared.json` to the nearest `.gitignore` and say so in the report: the references are scoped to one organization on one API plane, so a committed one is unusable by a teammate and unusable after a move between planes.
 5. **Report it in one line**, e.g. *"2 files uploaded to Pipelex storage; `inputs.prepared.json` written beside `inputs.json`, which is unchanged."*
 
-**When no input is a local file** there is nothing to upload, no prepared file is written, and a run reads `inputs.json` directly.
+**When every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference** there is nothing to upload, no prepared file is written, and a run reads `inputs.json` directly. A local path, a `data:` URL and inline bytes each still need preparing, so none of them reaches that branch.
 
 **How long it stays usable.** `pipelex-storage://` references pass through both prepare and run unchanged, so the prepared file stays runnable until the sources it was made from move on. `/pipelex-run` is what decides that, by comparing the two files and the timestamps of the local files `inputs.json` names. One case escapes the comparison, and it is accepted rather than worked around here: a file moved over the original keeps its old timestamp, so an older document replacing a newer one goes unnoticed. Closing it takes an upload key named after the hash of its bytes, which is asked of the platform; until then, prepare again whenever a file was replaced in place.
 
@@ -367,9 +367,9 @@ Offer only when all of these hold. They are statements about the inputs, which i
 
 - No placeholders remain — a Template-strategy result has nothing to run yet.
 - **Every input the template asked for is filled.** A [file the factory could not make](#generate-file-inputs) leaves its input absent, which is neither a placeholder nor a prepare failure, so it passes every other check here while guaranteeing the run fails on submission. Don't offer: report which input is waiting on the user, and why.
-- The inputs are **run-ready**: [prepare](#prepare-the-inputs-for-a-run) succeeded and wrote `inputs.prepared.json`, or was legitimately skipped because no value was a local file. Local paths, `data:` URLs and inline bytes are perfectly fine going *into* prepare — they just must not be what a run is handed. If prepare failed, don't offer: report the failure and what it would take to fix it.
+- The inputs are **run-ready**: [prepare](#prepare-the-inputs-for-a-run) succeeded and wrote `inputs.prepared.json`, or was legitimately skipped because every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference. Local paths, `data:` URLs and inline bytes are perfectly fine going *into* prepare — they just must not be what a run is handed. If prepare failed, don't offer: report the failure and what it would take to fix it.
 
-The offer names the file the run will read:
+The offer names the file the run will read — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped:
 
 > The inputs are ready. `/pipelex-run` runs the method from `inputs.prepared.json` — say the word and I'll start it.
 
@@ -450,14 +450,14 @@ User says: "Use my file `~/documents/invoice_march.pdf`"
   "instructions": "Extract all line items, totals, and vendor information from this invoice."
 }
 ```
-7. Prepare: `invoice` is a local path, so call `mthds_prepare_inputs` with the same bundle `files` and these `inputs`. It uploads the PDF and returns the run-ready set, which is written back over `inputs.json`:
+7. Prepare: `invoice` is a local path, so call `mthds_prepare_inputs` with the same bundle `files` and these `inputs`. It uploads the PDF and returns the run-ready set, which is written to `inputs.prepared.json` beside an unchanged `inputs.json`:
 ```json
 {
   "invoice": {"url": "pipelex-storage://user/assets/1.pdf"},
   "instructions": "Extract all line items, totals, and vendor information from this invoice."
 }
 ```
-   `uploads` lists that one new uri; `inputs/invoice.pdf` stays on disk untouched. The method is now runnable — offer it.
+   That block is `inputs.prepared.json`; `inputs.json` still reads `"invoice": "inputs/invoice.pdf"`. `uploads` lists that one new uri; `inputs/invoice.pdf` stays on disk untouched. The method is now runnable — offer it.
 
 ### Example 4: Folder of images for batch processing
 

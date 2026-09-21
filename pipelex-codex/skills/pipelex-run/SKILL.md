@@ -42,7 +42,7 @@ The pipe is the method's declared main pipe unless the user named another, in wh
 
 In this order, taking the first that applies:
 
-1. **Values the user gave in the request.** Assemble them and go on.
+1. **Values the user gave in the request**, laid over a current `inputs.prepared.json` where one exists: take the prepared set and replace only the keys the user named. Restating one input of a filled set is an ordinary thing to say, and it must not cost the whole set. Where no prepared file is beside the bundle, the request's values are the whole set.
 2. **A current `inputs.prepared.json`** beside the bundle — a plain inputs object whose file values are already `pipelex-storage://` references. **Current** means, key by key, every value that is not a file is equal in both files, and neither `inputs.json` nor any local file it names is newer than `inputs.prepared.json`. Not current is not run-ready: hand to `/pipelex-inputs`.
 3. **An `inputs.json` holding no local file value** — every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference. It is run-ready as it stands.
 4. **An empty object**, when the pipe declares no input at all.
@@ -53,14 +53,14 @@ Then call **`mthds_inputs_template`** once, with the same target and `explicit: 
 
 Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a real drift — is not run-ready. Say which input is at fault and hand to `/pipelex-inputs`; there is no cross-skill invocation on Codex, so open that skill's `SKILL.md` beside this one and follow it. Do not prepare inputs here.
 
-### Step 3 — Prove a files source before spending credit
+### Step 3 — Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over every `.mthds` file beneath it. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
+For a **bundle directory**, one `mthds_validate` call over every `.mthds` file beneath it, **except anything under a `runs/` directory** — that is where step 7 saves a completed run's artifacts, and a method that emits or echoes a `.mthds` file would otherwise have its own output submitted back as part of its source. The same exclusion holds for the `files` submission in step 5. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
 
 - valid and runnable → go on;
 - `is_valid: false`, or a non-empty `pending_signatures` (a scaffold has nothing to run yet) → report the verdict and route to `/pipelex-design`, or `/pipelex-edit` when the fix is contract-preserving. Never run a method that did not pass.
 
-For an **`mt_…` id** there is no second call: step 2's template call already carried a validity verdict for the stored content.
+For an **`mt_…` id**, the same call with `method_id` in place of `files`, against the same bar. Step 2's template call does not stand in for it: `mthds_inputs_template` answers `is_valid` and nothing else, and a scaffold is a *valid* bundle — so a stored method with pending signatures passes the template call and would reach the run, spending credit on its implemented pipes before it stops at the one that is not. The routing is the same as for a bundle directory.
 
 ### Step 4 — Say what is about to run, then run it
 
@@ -84,7 +84,7 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 `mthds_run_results`, then report the main output. When the output references stored files — an image, a PDF or a document carried as a `pipelex-storage://` URI — call `mthds_download_artifacts` with the same run id, because the links beside those references are presigned and expire within the hour.
 
-Save them under **`<bundle_dir>/runs/<run_id>/`** when that directory is under the workshop's own working directory, and under the workshop's default otherwise. Either way, **report the paths the tool returns** rather than paths relative to the user's project: the workshop writes where the harness launched it, which is not necessarily where the user is standing.
+`dir` is **relative to the workshop's own working directory**, and an absolute path is refused before the run is read at all — so pass **`runs/<run_id>`**, never the absolute `<bundle_dir>/runs/<run_id>/` form every other call in this skill takes. A refused `dir` is not a failed download: call again with no `dir` and let the workshop save where it defaults to. Either way, **report the paths the tool returns** rather than paths relative to the user's project: the workshop writes where the harness launched it, which is not necessarily where the user is standing.
 
 ### Step 8 — A failed run is reported, then routed, never bisected
 
@@ -125,3 +125,4 @@ An unknown run id is reported in the tool's own words. Runs are scoped to the ke
 | the inputs drifted from the method's template | reports which and how, hands to `/pipelex-inputs`, spends nothing |
 | the run failed | reports `failure_message` verbatim, routes once, never bisects |
 | `mthds_download_artifacts` is absent | reports the stored references as they came back; the run still completed |
+| `mthds_download_artifacts` refuses the `dir` | calls again with no `dir`; a refused directory is not a failed download |

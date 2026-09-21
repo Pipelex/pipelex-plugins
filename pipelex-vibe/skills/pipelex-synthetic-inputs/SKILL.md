@@ -8,7 +8,7 @@ description: Generate synthetic input files for MTHDS methods from code, without
 
 Make the files a method needs to run when the user has none: a PDF for a `native.Document` input, a PNG for a `native.Image` input, a Word or Excel file when the method asks for one. Everything is rendered by Python code this skill writes and runs — no image-generation model, no hosted method, no image API — from packages whose licences are compatible with MIT.
 
-This skill is the plugin's file factory. `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it directly for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never starts a run — those belong to `/pipelex-inputs`.
+This skill is the plugin's file factory. `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it directly for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never starts a run — the first two belong to `/pipelex-inputs`, the run to `/pipelex-run`.
 
 ## What this skill makes, and what it refuses
 

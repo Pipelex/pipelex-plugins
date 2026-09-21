@@ -753,11 +753,61 @@ class TestPipelexRunSkill:
         body = self.run_skill
         assert "**Report that id the moment it returns, before anything else.**" in body
 
-    def test_a_files_target_is_validated_before_credit_is_spent(self) -> None:
+    def test_either_target_is_validated_before_credit_is_spent(self) -> None:
+        """A scaffold is a *valid* bundle and `mthds_inputs_template` answers validity
+        alone, so the template call cannot stand in for validation on the by-id path:
+        a stored method with pending signatures would reach the run and burn its
+        implemented pipes before stopping at the one that is not."""
         body = self.run_skill
-        assert "Prove a files source before spending credit" in body
+        assert "Prove the target before spending credit" in body
         assert "Never run a method that did not pass." in body
-        assert "there is no second call" in body, "a by-id target must not pay for a redundant validate"
+        assert "the same call with `method_id` in place of `files`" in body
+        assert "a scaffold is a *valid* bundle" in body
+
+    def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
+        """Step 7 saves under `runs/`, an artifact keeps its filename extension, and
+        the submission gathers every `.mthds` file beneath the bundle — so without an
+        exclusion a method that emits or echoes one submits its own output as source."""
+        body = self.run_skill
+        assert "except anything under a `runs/` directory" in body
+
+    def test_the_artifact_directory_is_relative_and_a_refusal_is_retried(self) -> None:
+        """`dir` is relative to the workshop's own working directory and an absolute
+        path is refused before the run is read, so an absolute bundle path would make
+        a completed run read as a failed download."""
+        body = self.run_skill
+        assert "relative to the workshop's own working directory" in body
+        assert "A refused `dir` is not a failed download" in body
+
+    def test_user_values_are_laid_over_a_prepared_set(self) -> None:
+        """Restating one input of a filled set is ordinary; without the merge it drops
+        every other key and fails the template check as drift."""
+        body = self.run_skill
+        assert "laid over a current `inputs.prepared.json`" in body
+        assert "replace only the keys the user named" in body
+
+    def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
+        """The example is the most-copied part of a skill: one that still overwrites
+        `inputs.json` destroys the source form this change exists to preserve."""
+        body = self.inputs_skill
+        assert "written back over `inputs.json`" not in body
+        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in body
+
+    def test_preparation_is_skipped_only_for_values_already_remote(self) -> None:
+        """`data:` URLs and inline bytes are not local files but still need uploading,
+        so a skip condition phrased as "no local file" blesses a set that
+        `/pipelex-run` then refuses."""
+        body = self.inputs_skill
+        assert "**When every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**" in body
+        assert "every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference" in body
+        assert "no input is a local file" not in body
+        assert "no value was a local file" not in body
+
+    def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
+        """No prepared file is written when nothing needed uploading, so an offer that
+        hard-codes `inputs.prepared.json` names a file that is not there."""
+        body = self.inputs_skill
+        assert "`inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped" in body
 
     def test_it_routes_a_failure_and_never_bisects(self) -> None:
         body = self.run_skill
