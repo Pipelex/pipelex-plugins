@@ -41,7 +41,7 @@ FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
 
 # The skills that stop when the workshop is absent. A skill that works without it
 # — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold — stays out.
-MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate")
+MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate", "pipelex-run")
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
@@ -748,6 +748,153 @@ class TestSharedSkillIncludes:
         assert "validates can still fail when it runs" in body
 
 
+class TestPipelexRunSkill:
+    """`pipelex-run` owns the run lifecycle, and the boundary is what these pin.
+
+    A run spends the user's inference credit, so the expensive mistakes are all
+    boundary mistakes: preparing inputs here instead of routing, running a
+    method that was never validated, re-running a failure to see what happens,
+    or losing the run id — the only handle a later session has on the run."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATES = REPO_ROOT / "templates" / "skills"
+
+    @property
+    def run_skill(self) -> str:
+        return (self.TEMPLATES / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    @property
+    def inputs_skill(self) -> str:
+        return (self.TEMPLATES / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_it_has_two_entries_and_names_them(self) -> None:
+        body = self.run_skill
+        assert "## Start a run" in body
+        assert "## Follow a run" in body
+
+    def test_the_run_id_is_reported_before_anything_else(self) -> None:
+        """The id is the only durable handle on the run: a session that loses it
+        before the run finishes has paid for a result nobody can fetch."""
+        body = self.run_skill
+        assert "**Report that id the moment it returns, before anything else.**" in body
+
+    def test_either_target_is_validated_before_credit_is_spent(self) -> None:
+        """A scaffold is a *valid* bundle and `mthds_inputs_template` answers validity
+        alone, so the template call cannot stand in for validation on the by-id path:
+        a stored method with pending signatures would reach the run and burn its
+        implemented pipes before stopping at the one that is not."""
+        body = self.run_skill
+        assert "Prove the target before spending credit" in body
+        assert "Never run a method that did not pass." in body
+        assert "the same call with `method_id` in place of `files`" in body
+        assert "a scaffold is a *valid* bundle" in body
+
+    def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
+        """Step 7 saves under `runs/`, an artifact keeps its filename extension, and
+        the submission gathers every `.mthds` file beneath the bundle — so without an
+        exclusion a method that emits or echoes one submits its own output as source."""
+        body = self.run_skill
+        assert "except anything under a `runs/` directory" in body
+
+    def test_the_artifact_directory_is_relative_and_a_refusal_is_retried(self) -> None:
+        """`dir` is relative to the workshop's own working directory and an absolute
+        path is refused before the run is read, so an absolute bundle path would make
+        a completed run read as a failed download."""
+        body = self.run_skill
+        assert "relative to the workshop's own working directory" in body
+        assert "A refused `dir` is not a failed download" in body
+
+    def test_user_values_are_laid_over_a_prepared_set(self) -> None:
+        """Restating one input of a filled set is ordinary; without the merge it drops
+        every other key and fails the template check as drift."""
+        body = self.run_skill
+        assert "laid over a current `inputs.prepared.json`" in body
+        assert "replace only the keys the user named" in body
+
+    def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
+        """The example is the most-copied part of a skill: one that still overwrites
+        `inputs.json` destroys the source form this change exists to preserve."""
+        body = self.inputs_skill
+        assert "written back over `inputs.json`" not in body
+        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in body
+
+    def test_preparation_is_skipped_only_for_values_already_remote(self) -> None:
+        """`data:` URLs and inline bytes are not local files but still need uploading,
+        so a skip condition phrased as "no local file" blesses a set that
+        `/pipelex-run` then refuses."""
+        body = self.inputs_skill
+        assert "**When every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**" in body
+        assert "every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference" in body
+        assert "no input is a local file" not in body
+        assert "no value was a local file" not in body
+
+    def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
+        """No prepared file is written when nothing needed uploading, so an offer that
+        hard-codes `inputs.prepared.json` names a file that is not there."""
+        body = self.inputs_skill
+        assert "`inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped" in body
+
+    def test_it_routes_a_failure_and_never_bisects(self) -> None:
+        body = self.run_skill
+        assert "never bisected" in body or "never bisects" in body
+        assert "Per-pipe bisection is not this skill's" in body
+        assert "Do not re-run a failed method with altered inputs" in body
+        assert "`failure_message` **verbatim**" in body
+
+    def test_a_stuck_run_is_named_rather_than_waited_on(self) -> None:
+        """A durable run sitting in RUNNING with no error is a workflow task that
+        failed out of sight, not a slow run — the distinction cost a project hours."""
+        body = self.run_skill
+        assert "a workflow task that failed out of sight" in body
+        assert "It is not a slow run" in body
+
+    def test_it_prepares_nothing_and_routes_instead(self) -> None:
+        body = self.run_skill
+        assert "Do not prepare inputs here." in body
+        assert "inputs.prepared.json" in body, "the run reads the prepared file; it does not write one"
+
+    def test_artifacts_land_beside_the_bundle_when_the_workshop_can_reach_it(self) -> None:
+        body = self.run_skill
+        assert "`<bundle_dir>/runs/<run_id>/`" in body
+        assert "report the paths the tool returns" in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_run_tools_left_pipelex_inputs(self, target_name: str) -> None:
+        """The four run tools are pipelex-run's. A rendered pipelex-inputs that
+        still declares them would let it run a method behind the hand-off."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-inputs", "pipelex-run"],
+            target_name=config.name,
+        )
+        inputs = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
+        run = next(content for path, content in rendered.items() if path.match("skills/pipelex-run/SKILL.md"))
+        for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
+            assert f"mcp__plugin_pipelex_pipelex__{tool}" not in inputs, f"{target_name}: pipelex-inputs still declares {tool}"
+        assert "/pipelex-run" in inputs, f"{target_name}: pipelex-inputs must hand the run over"
+        if target_name == "prod":
+            for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
+                assert f"mcp__plugin_pipelex_pipelex__{tool}" in run, f"{target_name}: pipelex-run must declare {tool}"
+
+    def test_prepare_writes_a_separate_file_and_never_rewrites_the_source(self) -> None:
+        """The in-place rewrite destroyed the source form: the storage references
+        are scoped to one org on one plane, so the committed file was unusable by
+        a teammate and after a move between planes."""
+        body = self.inputs_skill
+        assert "leave `inputs.json` exactly as it is" in body
+        assert "prepare never rewrites it" in body
+        assert "no envelope, no hash and no sidecar" in body
+        assert "add `inputs.prepared.json` to the nearest `.gitignore`" in body
+
+    def test_design_points_at_the_run_without_running(self) -> None:
+        design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "`/pipelex-run` runs the method" in design
+        assert "mcp__plugin_pipelex_pipelex__mthds_run" not in design
+
+
 class TestVibeMcpFragment:
     """The Vibe target bakes the workshop launcher as a `[[mcp_servers]]` fragment.
 
@@ -843,8 +990,8 @@ class TestPipelexInputsSizeLimitDiscipline:
         "Do not replace it with synthetic data, a public sample, another local file, or any derived file",
         "Never retry preparation with altered or substitute content to evade a storage limit",
         "this is a terminal branch for the current preparation attempt",
-        "the method will not be offered or submitted for a run",
-        "Do not transform or substitute the asset, do not retry `mthds_prepare_inputs` with altered content, and do not call `mthds_run`",
+        "no run will be offered",
+        "Do not transform or substitute the asset and do not retry `mthds_prepare_inputs` with altered content",
     )
 
     @property
@@ -861,7 +1008,7 @@ class TestPipelexInputsSizeLimitDiscipline:
         assert "actual file size and the allowed limit whenever the response provides them" in size_branch
         assert "preparation failed, the inputs are not run-ready" in size_branch
         assert "preserve the user's original file" in size_branch
-        assert "the local-path form of `<output_dir>/inputs.json` unchanged" in size_branch
+        assert "`inputs.json` keeps its local-path form because prepare never rewrites it" in size_branch
         assert "resolve its path to absolute" not in size_branch
         assert "surface both and fix *that value*" not in body
 
