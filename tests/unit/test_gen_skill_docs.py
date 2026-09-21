@@ -1876,6 +1876,10 @@ class TestPublishedAddressTarget:
         # normalization the skill performs silently on the user's behalf.
         assert "drops the extra one" not in body
         assert "refused before anything runs" in body
+        # And the skill does not resolve the ambiguity itself: a run is paid, so two
+        # targets in hand is a question for the user, not a selector to quietly omit.
+        assert "asks which target is meant" in body
+        assert "ask which one is meant" in body
 
     def test_a_published_method_is_not_routed_into_the_editing_skills(self) -> None:
         """Every other failing target in this skill routes to `/pipelex-design` or

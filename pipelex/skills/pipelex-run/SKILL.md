@@ -50,7 +50,7 @@ Automatic. The user asking for the run is the consent, and step 4 states what is
 
 A bundle directory, an `mt_…` id, or a published method's address — `github.com/<owner>/<repo>[/<selector>][@<tag>]`. A saved method the user names without its id is resolved through `mthds_list_methods` when the tool is present — choose or disambiguate by name and description, then carry the returned id. Never stop for that tool's absence: ask for the id instead.
 
-Whichever form step 1 settles on is the one every call in this skill takes, and **an address pairs with nothing**: `files` beside a `method_ref` and a `method_id` beside it are both refused before anything runs, because an address is a complete run source carrying its own provenance. **An address with no tag is accepted and it floats** — it resolves to the default branch at its head, so what runs is whatever that branch holds at the moment of the call, and a run tomorrow can execute different content under the same address. Say that in one line, recommend the tag, and start the run; step 5 is what records which content actually ran.
+Whichever form step 1 settles on is the one every call in this skill takes, and **an address pairs with nothing**: `files` beside a `method_ref` and a `method_id` beside it are both refused before anything runs, because an address is a complete run source carrying its own provenance. Where two of them are in hand, ask which one is meant: a run is paid, so picking one yourself risks spending it on a method the user did not name. **An address with no tag is accepted and it floats** — it resolves to the default branch at its head, so what runs is whatever that branch holds at the moment of the call, and a run tomorrow can execute different content under the same address. Say that in one line, recommend the tag, and start the run; step 5 is what records which content actually ran.
 
 The pipe is the method's declared main pipe unless the user named another, in which case carry that `pipe_ref` through every call in this skill — the drift check and the run must inspect the same contract.
 
@@ -147,6 +147,6 @@ An unknown run id is reported in the tool's own words. Runs are scoped to the ke
 | the inputs drifted from the method's template | reports which and how, hands to `/pipelex-inputs`, spends nothing |
 | the run failed | reports `failure_message` verbatim, routes once, never bisects |
 | the failing method is a published address | reports the failure with the address, the tag and the resolved commit SHA; never routes it to `/pipelex-design` or `/pipelex-edit` |
-| a `files` submission or a `method_id` is in hand beside an address | calls with the address alone and says which selector it left off — a second beside an address is refused before anything runs |
+| a `files` submission or a `method_id` is in hand beside an address | asks which target is meant and spends nothing — a run is paid, and picking one is not the skill's to do |
 | `mthds_download_artifacts` is absent | reports the stored references as they came back; the run still completed |
 | `mthds_download_artifacts` refuses the `dir` | calls again with no `dir`; a refused directory is not a failed download |
