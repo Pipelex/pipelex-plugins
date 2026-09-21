@@ -66,7 +66,7 @@ Within every file: satisfied signature headers are dropped; a still-pending sign
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `pipelex-wip/<bundle_dir>/`).
+1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
 2. Call `mthds_validate` with `files` for every file. {% include "skills/shared/validate-call.md.j2" %}
 3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
 

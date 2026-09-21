@@ -68,7 +68,26 @@ Determine the three things that are the client requirement:
 
 Specify every boundary concept fully now. Decide whether each boundary and intermediate concept is simple or structured from all known consumers: if any consumer field-reads it (`$x.field`, or a construct `from = "x.field"`), it must be structured; if every consumer uses it whole (`@x` or wholesale mapping), it can stay simple. Declare each concept exactly once, owned by the root boundary or by the controller that introduces the intermediate value.
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics) before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+
+### Resolve the bundle home before writing
+
+A method's sources are loaded at runtime by the call site that runs them, so they belong beside that code from the moment they are written rather than being moved there later. Resolve the home before writing anything, taking the first that applies:
+
+- **A path the user named** — it wins over everything below.
+- **A packaged Python project, or a Python project that owns a codegen harness** — `<package>/methods/<name>/`. This is what [`../pipelex-integrate/references/python.md`](../pipelex-integrate/references/python.md) already requires of an integrated bundle: a wheel ships the sources only when they sit inside the import package, beside the call site that loads them.
+- **Any other project**, TypeScript harness projects included — `<project root>/methods/<name>/`. The method app and `pipelex-starter-js` own a codegen harness and have no import package at all; both read `methods/*` from the project root, so that is where a bundle goes. The project is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory — the same four markers `/pipelex-integrate` looks for, so that both skills agree on where the project starts.
+- **No project** — `./methods/<name>/`, in the working directory.
+
+`<name>` is the bundle's `domain` in the project language's casing, as integrate already spells it: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project. A `domain` may carry dots (`legal.contracts`), and a dot becomes that same separator — `legal-contracts`, `legal_contracts` — never a nested directory and never a literal dot, because Python derives an import path from this name and `generated.legal.contracts` would not resolve.
+
+So, at the root of a TypeScript project:
+
+> `summarize_pdf`: a PDF in, a structured summary out — extracts the text, then summarizes it. Writing to `methods/summarize-pdf/`.
+
+One project shape wants asking first: a method app carries its own `make add-method`, which copies a bundle into `methods/<name>/` and never overwrites, and which also writes the action trio, the narrower and the registry entry around it. Writing straight into that directory would leave those unwritten, so on a method app say so and let the user choose between the gesture and a plain write.
+
+Bundles that already live elsewhere keep working: every skill here takes a directory, and nothing migrates anything.
 
 **If the design will emit a `PipeFunc`, say so in that same line.** **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Prefer `PipeCompose` or `PipeLLM` wherever either does the job, as the authoring reference already advises; a `PipeFunc` is emitted when the user has a registered function and means to use it, and then the warning is given rather than the pipe refused. The user hears it here, while the shape is still theirs to change, and again at delivery.
 
@@ -109,7 +128,7 @@ Design in memory:
 - the concrete main operator/controller and every concrete leaf;
 - all controller steps, branches, mappings, and ownership.
 
-The normal target is `pipelex-wip/<bundle_dir>/main.mthds`, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
+The normal target is `main.mthds` in the bundle home resolved above, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
 
 ### Step D2 — Write once as a coherent runnable candidate
 
@@ -136,7 +155,7 @@ This mode preserves the additive, breadth-first construction loop and valid inte
 
 ### Step S1 — Write and validate the root scaffold
 
-Write `pipelex-wip/<bundle_dir>/main.mthds` (unless the user asks for another root name) with:
+Write `main.mthds` in the bundle home resolved above (unless the user asks for another root name) with:
 
 - `domain`, `description`, `main_pipe`, optional `system_prompt`;
 - the fully specified boundary concepts;
