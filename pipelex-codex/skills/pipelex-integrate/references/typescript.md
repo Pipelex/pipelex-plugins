@@ -88,7 +88,7 @@ export async function summarizePdf(inputs: SummarizePdfInputs): Promise<Summariz
 
 Variants by selector, replacing the `mthds_contents` line and dropping `BUNDLE_DIR` and `readBundle`:
 
-- **`method_ref`**, a published address: `{ method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]", pipe_code: PIPE_CODE, inputs }` — omit `pipe_code` to run the package's declared pipe. The tag is optional and is the pin; without one the address resolves to the default branch at its head on every run, so the call site can run a method the committed types were never generated from.
+- **`method_ref`**, a published address: `{ method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]", pipe_code: PIPE_CODE, inputs }` — omit `pipe_code` to run the package's declared pipe. The tag is optional and is the pin; without one the address resolves to the default branch at its head on every run, so the call site can run a method the committed types were never generated from; when the address carries no tag, the module's header says it floats.
 - **`method_id`**: `{ method_id: "mt_…", inputs }` — the catalog resolves the stored method; the module's header says the catalog is unversioned.
 
 The shared client helper, created once per project and reused by every method (if the project already constructs a `PipelexApiClient` somewhere, import that instead):

@@ -247,7 +247,33 @@ class TestPipelexIntegrateSkill:
         for reference in ("typescript.md", "python.md"):
             source = (self.REFERENCES_DIR / reference).read_text(encoding="utf-8")
             assert "[/<selector>][@<tag>]" in source, f"{reference} still spells the tag as mandatory"
-            assert "[/<selector>]@<tag>" not in source, f"{reference} still spells the tag as mandatory"
+            # Keyed on the closing bracket rather than on one placeholder name: every mandatory
+            # spelling ends `]@<tag>` whatever sits inside the brackets, and the optional one never
+            # does. `python.md` carries a second address grammar under `<package>`, in the hand-typed
+            # `method.json` the harness path tells the user to write themselves, which a rule naming
+            # `<selector>` alone leaves free to regress.
+            assert "]@<tag>" not in source, f"{reference} still spells the tag as mandatory"
+        python_source = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "[/<package>][@<tag>]" in python_source, "the method.json example lost its address grammar"
+
+    def test_the_module_header_says_an_untagged_address_floats(self) -> None:
+        """The consequence reaches the sidecar, the gate and the report — all read
+        in the session — but the call-site module is the one file a maintainer opens
+        months later, where a bare `github.com/…` string says nothing on its own.
+        The `method_id` bullet already prescribes such a line for the unversioned
+        catalog; this is its twin."""
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        assert "when the address carries no tag, the module's header says it floats" in typescript
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert "when the address carries no tag, the module docstring says it floats" in python
+
+    def test_the_harness_manifest_takes_the_address_unresolved_too(self) -> None:
+        """Step 7's non-resolution rule is written about the sidecar, and a project
+        that owns a codegen harness skips step 7 and writes the selector into its own
+        manifest by hand — which is precisely where nothing is left to stop an agent
+        resolving a floating address into the tag it landed on."""
+        body = self.integrate
+        assert "**A `method_ref` written into that manifest goes in exactly as it was passed, an absent tag included**" in body
 
     def test_signature_comes_from_the_verdict_and_the_heuristic_is_absent(self) -> None:
         body = self.integrate
