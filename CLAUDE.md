@@ -37,10 +37,15 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   ├── pipelex-synthetic-inputs/SKILL.md.j2  # File factory: render PDFs/PNGs/Office files from code, no AI (no MCP dependency)
 │   ├── pipelex-integrate/SKILL.md.j2 # Wire a method into a TS/Python codebase: codegen write arm, exclusions, sidecar, gate, typed call site (MCP-backed)
 │   ├── pipelex-scaffold/SKILL.md.j2  # Front door to a new project: the method-app template through its own `make create`, left running; a starter through its own bootstrap; or the ecosystem's initializer (no MCP dependency)
-│   └── shared/
-│       ├── frontmatter.md.j2          # Common YAML frontmatter (included by templates)
+│   └── shared/                       # Two kinds: rendered per target, or include-only partials
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
-│       └── native-content-types.md.j2 # Native content-type documentation
+│       ├── native-content-types.md.j2 # Native content-type documentation (rendered per target)
+│       ├── frontmatter.md.j2          # Common YAML frontmatter (include-only)
+│       ├── mcp-requirements.md.j2     # The MCP-backed skills' three opening bullets, credential sentence included (include-only)
+│       ├── validate-call.md.j2        # How a bundle is submitted: the path form of `files` (include-only)
+│       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only)
+│       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in its three wordings (include-only)
+│       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
 ├── hooks/
 │   ├── hooks.json.j2                # Claude PostToolUse hook config
 │   ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)
@@ -93,6 +98,8 @@ make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 1. Edit `.j2` files in `templates/` (never edit generated `pipelex*/` outputs directly — they're regenerated).
 2. Run `make build` to regenerate all targets.
 3. Run `make check` (or `make agent-check`) to validate.
+
+**A block several skills say word for word lives in one include.** The MCP requirements bullets, the `files` path-form sentence, the formatting-hook sentence, the stale-types notice and the PipeFunc warning are include-only partials under `templates/skills/shared/`; a skill sets what it words differently with `{% set %}` and includes the rest. Never paste one of those blocks into a new skill — `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a block has more than one source. The partials, their parameters and the two whitespace mechanics are in `docs/build-targets.md`.
 
 CI repeats the read-only half of that loop on every pull request — `make check` and `make agent-test` — with the branch-flow guard and the release-only version and changelog gates beside them. `docs/ci.md` says which workflow runs when, what each check means, and which of them is not reporting yet.
 

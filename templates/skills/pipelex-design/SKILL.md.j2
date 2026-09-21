@@ -38,18 +38,19 @@ See [writing-mthds.md](references/writing-mthds.md) for the supported syntax, op
 
 This skill validates through the **`mthds_validate`** tool and projects input schemas through the **`mthds_inputs_template`** tool, both served by the plugin's `pipelex` MCP server. They are required — this skill never guesses at validity.
 
-- **If the tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected —{% if platform == "mistral-vibe" %} on {{ harness_name }} the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`) is not auto-spawned: append the `[[mcp_servers]]` entry from `mcp/vibe-mcp.toml` in the `pipelex-vibe` bundle (beside its `skills/` directory) to the end of `~/.vibe/config.toml`, after deleting any `mcp_servers = []` line and any hand-registered `pipelex` entry there, write your `PIPELEX_API_KEY` into its `env` table, then retry.{% else %} the plugin manifest spawns the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection{% if platform == "claude" %} (`/mcp`){% endif %}.{% endif %}"* Do not write `.mthds` files without validation available.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently skip validation.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`**{% if platform == "mistral-vibe" %} from its `env` table in `~/.vibe/config.toml`, never from the session environment: {{ harness_name }} passes no shell variables to a stdio MCP server, so an exported key reaches the plugin's validation hook but not the server{% else %} from the session environment — the same variable the plugin's validation hook documents{% endif %}.
+{% set mcp_absent_lead %}the tools are{% endset -%}
+{% set mcp_absent_suffix %} Do not write `.mthds` files without validation available.{% endset -%}
+{% set mcp_config_suffix %} Never silently skip validation.{% endset -%}
+{% include "skills/shared/mcp-requirements.md.j2" %}
 
 > **No backend setup needed**: designing and validating never run the method, so no inference backends are required.
 
-**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
+{% include "skills/shared/formatting-hook.md.j2" %}
 
 ### How to validate
 
 1. Gather **all** `.mthds` files in the bundle directory (the whole library — a broken sibling fails the verdict too, and the report names it).
-2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+2. Call `mthds_validate` with `files` for every file. {% include "skills/shared/validate-call.md.j2" %}
 3. Branch on the **structured verdict**, never on transport:
    - `status: "ok"`, `is_valid: true`, `pending_signatures` non-empty → valid stepwise design scaffold, not yet runnable. The Markdown summary's `## Pending signatures` section is the backlog.
    - `status: "ok"`, `is_valid: true`, `is_runnable: true`, `pending_signatures` empty → the method is complete and runnable.
@@ -211,7 +212,8 @@ Structural changes to an existing method — adding, removing, or rewiring steps
    - Do not predeclare deeper descendants while their parent is only a signature. Introduce those child signatures when that parent receives its concrete controller definition, keeping every pending signature reachable.
    - Validate the atomic scaffold, then drain its structured backlog with Step S2.
 5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
-6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle — and for each one whose `sources` name a bundle file this re-entry changed or removed, **or whose `bundle_dir` holds a `.mthds` file this re-entry created** — signature-driven refinement adds files, a new file is in no `sources` map, and the call site loads every `.mthds` file under that directory — say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them.
+{% set stale_types_variant %}design{% endset -%}
+6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. {% include "skills/shared/stale-types-notice.md.j2" %}
 
 ---
 
