@@ -769,6 +769,25 @@ class TestSharedSkillIncludes:
         reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
         assert warning in reference, "reword the shared warning and the authoring reference in the same change"
 
+    def test_no_skill_restates_the_sandbox_beside_a_pipefunc(self) -> None:
+        """The one-source test proves a block has one source; it is blind to a
+        restatement, which is how `pipelex-run`'s failure table came to say "its
+        Python runs in a network-blocked sandbox" in its own words for a phase,
+        beside no include at all — the skill was written against a `dev` that
+        had no partial to include. The sandbox is the partial's fact: a skill
+        template that names `PipeFunc` and the sandbox on one line is restating
+        it, whatever the words, and the fact reaches a skill through the include
+        or not at all. `pipelex-inputs` names the sandbox in its by-address
+        refusal reading, beside in-process Python and never beside `PipeFunc`,
+        and stays clear."""
+        offenders = [
+            f"{path.relative_to(self.REPO_TEMPLATES)}:{number}"
+            for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+            if "PipeFunc" in line and "sandbox" in line
+        ]
+        assert offenders == [], f"the sandbox fact reaches a skill through the include or not at all: {offenders}"
+
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
         body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
