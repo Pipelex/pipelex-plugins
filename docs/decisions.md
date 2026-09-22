@@ -247,7 +247,7 @@ The second dogfood reading found two more gaps in the method app's path.
 
 That verdict is exactly why the warning is worded the way it is — "a method that validates can still fail when it runs" is not a hedge, it is the observed behaviour.
 
-Where it is given: `pipelex-design` says it twice, once in the line that announces the contract — while the shape is still the user's to change — and again in the delivery report, naming the pipes; `pipelex-explain` says it when it meets one, and stops there, since that skill reads and never edits; and `skills/pipelex-design/references/writing-mthds.md` carries it in its `PipeFunc` section, which is where a designer reads what the pipe is. Design continues to prefer `PipeCompose` or `PipeLLM` wherever either does the job.
+Where it is given: `pipelex-design` says it twice, once in the line that announces the contract — while the shape is still the user's to change — and again in the delivery report, naming the pipes; `pipelex-explain` says it when it meets one, and stops there, since that skill reads and never edits; `pipelex-run` says it under its failure table, where a `PipeFunc` is named as a suspect for a failure nothing upstream of the run could have caught, since validation never resolves the function; and `skills/pipelex-design/references/writing-mthds.md` carries it in its `PipeFunc` section, which is where a designer reads what the pipe is. Design continues to prefer `PipeCompose` or `PipeLLM` wherever either does the job.
 
 ## A bundle is written where it will be run from (2026-09-21)
 

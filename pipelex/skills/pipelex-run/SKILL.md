@@ -117,8 +117,10 @@ Give `failure_message` **verbatim** first. Then route once, and stop:
 | an input is missing, malformed or unreadable | `/pipelex-inputs` |
 | a pipe's prompt, model or operator settings are at fault | `/pipelex-edit` |
 | the method's structure or a contract is at fault | `/pipelex-design` |
-| the method holds a `PipeFunc` | name it as a suspect — its Python runs in a network-blocked sandbox on the hosted plane |
+| the method holds a `PipeFunc` | name it as a suspect, for the reason stated under this table |
 | the run stays `RUNNING` with no error and no progress | say what it is: a workflow task that failed out of sight. It is not a slow run |
+
+**`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. That is why a `PipeFunc` is named as a suspect on a failure rather than cleared: nothing upstream of the run could have caught it, because validation never resolves the function.
 
 **For a published address, only the first row routes.** The method is not the user's to repair, so every row below the inputs one is reported rather than routed — the prompt-or-model row and the structure row included, which is where an address would otherwise be sent to `/pipelex-edit` for source the user does not have: give the failure and step 5's provenance, and say the fix is upstream or another tag. The `PipeFunc` row and the stuck-`RUNNING` row still say exactly what they say; they name a cause and send nobody anywhere. Per-pipe bisection is not this skill's: it belongs to a debug-run skill that does not exist yet. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 

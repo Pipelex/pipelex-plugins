@@ -737,14 +737,23 @@ class TestSharedSkillIncludes:
 
     def test_the_pipefunc_warning_reaches_the_skills_that_ship_it(self) -> None:
         """An include nothing includes ships nowhere. The partial landed with the
-        shared-includes phase and was wired in here: design says it twice — once
-        while the contract is still the user's to change, once at delivery — and
-        explain says it when it meets one."""
+        shared-includes phase and is wired into every skill where a user meets a
+        `PipeFunc`: design says it twice — once while the contract is still the
+        user's to change, once at delivery — explain says it when it meets one,
+        and run says it beside the stops table, where a `PipeFunc` is named as a
+        suspect for a failure nothing upstream could have caught.
+
+        Run was the one that shipped late, because `pipelex-run` did not exist
+        when the partial landed, and in the meantime its table restated the
+        warning in its own words — the same drift this test caught in the
+        authoring reference, where two copies of one sentence were free to part."""
         include = "skills/shared/pipefunc-warning.md.j2"
         design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
         explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
+        run = (self.REPO_TEMPLATES / "skills" / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert design.count(include) == 2, "design warns in the contract line and again at delivery"
         assert include in explain
+        assert include in run
 
     def test_the_authoring_reference_carries_the_same_warning(self) -> None:
         """The reference is where a designer reads what a PipeFunc is; a warning
@@ -759,6 +768,25 @@ class TestSharedSkillIncludes:
         assert warning, "the partial rendered to nothing — its comment wrapper moved"
         reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
         assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+
+    def test_no_skill_restates_the_sandbox_beside_a_pipefunc(self) -> None:
+        """The one-source test proves a block has one source; it is blind to a
+        restatement, which is how `pipelex-run`'s failure table came to say "its
+        Python runs in a network-blocked sandbox" in its own words for a phase,
+        beside no include at all — the skill was written against a `dev` that
+        had no partial to include. The sandbox is the partial's fact: a skill
+        template that names `PipeFunc` and the sandbox on one line is restating
+        it, whatever the words, and the fact reaches a skill through the include
+        or not at all. `pipelex-inputs` names the sandbox in its by-address
+        refusal reading, beside in-process Python and never beside `PipeFunc`,
+        and stays clear."""
+        offenders = [
+            f"{path.relative_to(self.REPO_TEMPLATES)}:{number}"
+            for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+            if "PipeFunc" in line and "sandbox" in line
+        ]
+        assert offenders == [], f"the sandbox fact reaches a skill through the include or not at all: {offenders}"
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
