@@ -41,7 +41,7 @@ FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
 
 # The skills that stop when the workshop is absent. A skill that works without it
 # — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold — stays out.
-MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate", "pipelex-run")
+MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate", "pipelex-run", "pipelex-catalog")
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
 
@@ -947,6 +947,228 @@ class TestPipelexRunSkill:
         design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "`/pipelex-run` runs the method" in design
         assert "mcp__plugin_pipelex_pipelex__mthds_run" not in design
+
+
+class TestPipelexCatalogSkill:
+    """`pipelex-catalog` owns every gesture between a bundle directory and the
+    organization's catalog, and the expensive mistakes are all irreversible ones.
+
+    An update rewrites the whole catalog row with no earlier version kept, and
+    every caller of the id runs the new content from its next call — so a save
+    made on the skill's own initiative, one made over a change it never saw, or
+    one carrying a `.py` file that is not the method's cannot be taken back. The
+    pull is the same hazard pointing the other way: it writes into a directory
+    the user is standing in."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATES = REPO_ROOT / "templates" / "skills"
+
+    @property
+    def catalog_skill(self) -> str:
+        return (self.TEMPLATES / "pipelex-catalog" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    def test_it_has_the_three_gestures_and_names_them(self) -> None:
+        body = self.catalog_skill
+        assert "## List and find" in body
+        assert "## Save" in body
+        assert "## Pull" in body
+
+    def test_the_update_line_says_an_update_is_a_deployment(self) -> None:
+        """Box Q's one non-optional sentence. An update reaches production call
+        sites on their next call, and the catalog keeps no earlier version, so a
+        user who was not told that cannot have consented to it."""
+        body = self.catalog_skill
+        assert "This is a deployment: every caller of that id, a production call site included, runs the new content from its next call." in body
+        assert "the user's request is the consent" in body
+
+    def test_it_never_saves_on_its_own_initiative(self) -> None:
+        body = self.catalog_skill
+        assert "**A save is never proposed as a side effect of other work**" in body
+        assert "never saves on its own initiative" in body, "the description must carry it too — that is what a host reads before the body"
+
+    def test_it_does_not_validate_on_the_way_to_a_save(self) -> None:
+        """`mthds_save_method` reads, validates and saves in one call precisely so
+        that the saved bytes are provably the validated ones. A skill that took its
+        own verdict first would read the files twice and pay twice for it."""
+        body = self.catalog_skill
+        assert "Never call it on the way to a save" in body
+        assert "reads the files, validates them and saves those same bytes in one call" in body
+
+    def test_an_invalid_bundle_is_a_verdict_and_not_an_error(self) -> None:
+        body = self.catalog_skill
+        assert "is a **produced verdict**, not an error" in body
+        assert "A **valid bundle with pending signatures is saved**" in body
+
+    def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
+        """`/pipelex-run` saves artifacts under `runs/` and an artifact keeps its
+        extension, so a method that emits or echoes a `.mthds` file would otherwise
+        have its own output saved to the catalog as part of its source."""
+        body = self.catalog_skill
+        assert "except anything under a `runs/` directory" in body
+        assert "root file first" in body
+
+    def test_python_is_chosen_and_never_swept(self) -> None:
+        """The workshop gates on the `.py` extension and on bundle containment and
+        nothing else, so which files are the method's is this skill's judgement —
+        and a file sent by mistake is uploaded to the organization's catalog."""
+        body = self.catalog_skill
+        assert "which `.py` files are the method's is this skill's judgement, not the tool's**" in body
+        assert "**A bundle with no `PipeFunc` sends no `python` at all**" in body
+        assert "do not sweep the directory" in body
+        assert "sending `[]` clears them" in body
+
+    def test_a_conflict_stops_with_both_timestamps_and_picks_neither_way(self) -> None:
+        body = self.catalog_skill
+        assert "**Never choose between them:**" in body
+        assert "both timestamps" in body
+        assert "on an explicit yes and nothing less" in body
+
+    def test_the_pull_refusals_are_relayed_and_overwrite_needs_a_yes(self) -> None:
+        """The link records no hashes, so a pull into a linked directory cannot tell
+        whose change it is looking at. `overwrite: true` is the caller's assertion
+        that the user was asked, and nothing else makes it true."""
+        body = self.catalog_skill
+        assert "**Ask the user**, showing both timestamps, and only on an explicit yes call again with `overwrite: true`" in body
+        assert "the difference is local work this directory never saved" in body
+        assert "every refusal writes nothing at all" in body
+
+    def test_the_pull_uses_the_written_arm_and_leaves_the_inline_one_to_explain(self) -> None:
+        body = self.catalog_skill
+        assert "Always use the **written arm**" in body
+        assert "/pipelex-explain" in body
+
+    def test_unmanaged_files_are_named_and_never_deleted(self) -> None:
+        """A pull writes what the catalog holds now; it does not make the directory
+        match it. Nothing on hand tells a file the catalog dropped from one the user
+        keeps beside the method, and deleting on that guess is unrecoverable."""
+        body = self.catalog_skill
+        assert "**delete nothing**" in body
+        assert "`unmanaged_truncated`" in body
+
+    def test_a_create_is_never_retried_after_a_transport_fault(self) -> None:
+        """`POST /v1/methods` honours an idempotency key that the SDK cannot send
+        yet, so a retry whose first response was lost mints a second method — and
+        delete is admin-only, so nobody can remove it."""
+        body = self.catalog_skill
+        assert "**does not retry.**" in body
+        assert "list the catalog first" in body
+
+    def test_it_writes_no_file_itself(self) -> None:
+        """The link file is the workshop's, because the workshop is the only party
+        that knows which API host it talks to. A hand-written one records the wrong
+        host and makes an unknown id undiagnosable."""
+        body = self.catalog_skill
+        assert "**This skill writes no file itself.**" in body
+        assert "Never hand-write or hand-edit a link file." in body
+
+    def test_delete_is_named_as_the_webapp_s_gesture(self) -> None:
+        body = self.catalog_skill
+        assert "deletion is admin-only on the platform and erases every run the method produced" in body
+
+    def test_design_and_edit_point_at_it_without_gaining_catalog_tools(self) -> None:
+        """Box Q: the catalog logic lives in one skill and the others gain a
+        sentence. A design or edit that declared a catalog tool could save."""
+        for skill in ("pipelex-design", "pipelex-edit"):
+            body = (self.TEMPLATES / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+            assert "/pipelex-catalog" in body, f"{skill} must point at the catalog skill"
+            assert "mthds_save_method" not in body, f"{skill} must not declare the save tool"
+            assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
+
+    def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
+        """`function_name` is a key in the runtime's flat function registry — by
+        default the decorated function's own name — so nothing in the bundle says
+        which module defines it. A skill told otherwise sends one file, and since
+        `python` replaces rather than merges, that deletes the helpers beside it."""
+        body = self.catalog_skill
+        assert "**A `function_name` does not name a file.**" in body
+        assert "flat, process-wide function registry" in body
+        assert "my_package.text_utils" not in body, "the dotted-path claim is wrong and must not come back"
+
+    def test_an_input_domain_error_at_method_id_is_not_read_as_an_unknown_id(self) -> None:
+        """A rejected payload, an organization-context failure and the workshop's own
+        refusal when the link names another method all land at `method_id`. Reading
+        the location alone removes a good `pipelex-method.json` and mints a duplicate
+        nothing in this plugin can delete."""
+        body = self.catalog_skill
+        assert "the location alone never tells them apart**" in body
+        assert "only the not-found answer names `pipelex-method.json` and the `api_host`" in body
+
+    def test_the_landing_path_is_stated_relative_to_the_workshop(self) -> None:
+        """`output_dir` resolves against the workshop's working directory, not the
+        session's, and a path inside the workshop is legal wherever it points — so
+        the rule has to name the root it is measured from."""
+        body = self.catalog_skill
+        assert "relative to the workshop's own working directory**" in body
+
+    def test_the_catalog_name_becomes_one_directory_segment(self) -> None:
+        """A catalog name is unvalidated free text at every layer. Spelled into
+        `methods/<name>/` verbatim, `../../src` resolves inside the workshop root,
+        where the containment check still passes."""
+        body = self.catalog_skill
+        assert "**A name never contributes a path**" in body
+        assert "ask the user for the directory name" in body
+
+    def test_the_pull_stops_on_a_method_app(self) -> None:
+        """`make add-method` writes the action trio, the narrower and the registry
+        entry around the bundle, so a plain write leaves the app unable to see it.
+        The pull mirrors the stop `/pipelex-design` already makes."""
+        body = self.catalog_skill
+        assert "make add-method" in body
+        design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "make add-method" in design, "the pull mirrors design's stop, so design must still carry it"
+
+    def test_a_failed_link_write_is_never_reported_as_unlinked(self) -> None:
+        """The workshop distinguishes linked-but-stale from genuinely-unlinked, and
+        telling a still-linked directory it is unlinked advises passing a `method_id`
+        by hand — which is how the wrong method gets overwritten."""
+        body = self.catalog_skill
+        assert "**Never tell this directory it is unlinked**" in body
+        assert "**Linked but stale**" in body
+        assert "**Genuinely unlinked**" in body
+
+    def test_the_forced_overwrite_says_the_name_goes_with_it(self) -> None:
+        """An update rewrites the row's `name` from the call and the link's copy was
+        taken at the last sync, so a forced save reverts a rename made since — and
+        the refusal that led there carries timestamps only."""
+        body = self.catalog_skill
+        assert "**The name goes with it**" in body
+
+    def test_it_does_not_route_a_publish_request_at_integrate(self) -> None:
+        """`/pipelex-integrate` consumes an address and recommends publishing one;
+        no skill here performs that act, so a user who asks to publish must not be
+        sent to a skill that will ask them for the address instead."""
+        body = self.catalog_skill
+        assert "`/pipelex-integrate` publishes" not in body
+        integrate = (self.TEMPLATES / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "publishing an address" in integrate, "integrate recommends publishing; it does not do it"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_catalog_tools_are_declared_and_nothing_that_writes_files_is(self, target_name: str) -> None:
+        """Pre-approval, not restriction: an unlisted tool still asks, so the narrow
+        set is what makes a write in this skill stop for the user. A bare `Bash`
+        defeats that on its own — `cat > pipelex-method.json` needs no `Write` — so
+        the only command pre-approved here is the read-only one the skill runs
+        unprompted."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=["pipelex-catalog"],
+            target_name=config.name,
+        )
+        body = next(content for path, content in rendered.items() if path.match("skills/pipelex-catalog/SKILL.md"))
+        if target_name == "prod":
+            for tool in ("mthds_list_methods", "mthds_save_method", "mthds_get_method", "mthds_validate"):
+                assert f"mcp__plugin_pipelex_pipelex__{tool}" in body, f"{target_name}: pipelex-catalog must declare {tool}"
+            frontmatter = body.split("---")[1]
+            assert "- Write" not in frontmatter, "a skill that writes no file pre-approves no writer"
+            assert "- Edit" not in frontmatter, "a skill that writes no file pre-approves no editor"
+            assert "- Bash(git status:*)" in frontmatter, "the one command the skill runs unprompted is the only Bash it pre-approves"
+            assert "- Bash\n" not in frontmatter, "a bare Bash entry pre-approves the very write this skill promises will stop"
+            assert "- Read" in frontmatter
+        else:
+            assert "allowed-tools" not in body, f"{target_name}: allowed-tools is a Claude field"
 
 
 class TestVibeMcpFragment:
