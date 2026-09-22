@@ -795,7 +795,7 @@ class TestPipelexIntegrateSkill:
         assert "Their page is `docs/artifact-download.md`." in python
         assert "https://github.com/Pipelex/pipelex-sdk-python/blob/main/docs/<page>.md" in python
         assert "The Python SDK does not carry" not in body
-        assert f"has its Python twin from `pipelex-sdk` {self.PYTHON_SDK_FLOOR} on" in body
+        assert f"has its Python twin in the `pipelex-sdk` {self.PYTHON_SDK_FLOOR} step 8 installs" in body
 
         # Every place that told a Python consumer it has no gate, swept together: this skill, its
         # reference, the sibling skills that repeated the claim, and the repo's own account of itself.
