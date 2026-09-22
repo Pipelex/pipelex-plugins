@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow". Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
 allowed-tools:
   - Bash
   - Read
@@ -213,7 +213,7 @@ After the gate:
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
 4. **Warn again for a `PipeFunc`.** When the delivered bundle holds one, repeat it in the report, naming the pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The contract line said it before the method existed; this is the last point before the user runs it.
-5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
+5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Say too that `/pipelex-catalog` saves the method to the Pipelex catalog, where it gets an `mt_…` id anything can call. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
@@ -222,6 +222,22 @@ After the gate:
 ## Editing an existing method (adaptive re-entry)
 
 Structural changes to an existing method — adding, removing, or rewiring steps; changing a pipe contract; reshaping a concept — are design work (contract-preserving tweaks belong to `/pipelex-edit`, which routes structural requests here).
+
+### The target of a re-entry — a bundle directory, or a catalog id
+
+New construction resolves a bundle home above and has nothing to look up. A re-entry has a method already, and it may be named by a catalog id rather than by a directory.
+
+This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
+
+1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to **step 1** below.
+2. **Several hits are the user's choice, never yours.** More than one directory can legitimately hold the same link: `/pipelex-catalog`'s conflict path tells the user to pull a comparison copy into a sibling directory, and that copy carries the same link and is meant for reading, not for editing. Name the directories and ask which one is the work.
+3. **No hit — hand the pull to `/pipelex-catalog`**. It brings the method's sources to disk and the workshop writes the link beside them; then carry on with that directory. The search only sees the working directory and below, so a bundle linked somewhere else reads as no hit — if the user knows where it is, ask for the path rather than pulling a second copy.
+
+**What the search proves, and what it does not.** It answers where this method lives locally and nothing else. A linked directory can be behind the catalog, ahead of it, or both at once, and the link records no hashes to tell them apart — so do not present the local files as the saved method's current content. `/pipelex-catalog` is what compares the two, and it is also the only way the work done here reaches the saved copy.
+
+**A published address is not a target for this skill.** `github.com/<owner>/<repo>[/<selector>][@<tag>]` names somebody else's published package: nothing of it is on disk, and there is nowhere to write a change back. Say so and point at `/pipelex-explain`, which reads such an address at the level of its contract.
+
+### The re-entry procedure
 
 1. **Baseline before every edit.** Read every `.mthds` file and validate the whole bundle. Record whether it is runnable or a scaffold and its exact pending set. If it is invalid, repair the baseline first; never redesign on a broken baseline. Retain the original contents until the final verdict is restored.
 2. **Map the full affected region.**
@@ -239,6 +255,8 @@ Structural changes to an existing method — adding, removing, or rewiring steps
    - Validate the atomic scaffold, then drain its structured backlog with Step S2.
 5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
 6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle — and for each one whose `sources` name a bundle file this re-entry changed or removed, **or whose `bundle_dir` holds a `.mthds` file this re-entry created** — signature-driven refinement adds files, a new file is in no `sources` map, and the call site loads every `.mthds` file under that directory — say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them.
+
+**The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 
 ---
 

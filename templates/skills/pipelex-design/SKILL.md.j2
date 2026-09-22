@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow". Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
 {% include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -209,7 +209,7 @@ After the gate:
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
 4. **Warn again for a `PipeFunc`.** When the delivered bundle holds one, repeat it in the report, naming the pipes: {% include "skills/shared/pipefunc-warning.md.j2" %} The contract line said it before the method existed; this is the last point before the user runs it.
-5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
+5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Say too that `/pipelex-catalog` saves the method to the Pipelex catalog, where it gets an `mt_…` id anything can call. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
@@ -218,6 +218,15 @@ After the gate:
 ## Editing an existing method (adaptive re-entry)
 
 Structural changes to an existing method — adding, removing, or rewiring steps; changing a pipe contract; reshaping a concept — are design work (contract-preserving tweaks belong to `/pipelex-edit`, which routes structural requests here).
+
+### The target of a re-entry — a bundle directory, or a catalog id
+
+New construction resolves a bundle home above and has nothing to look up. A re-entry has a method already, and it may be named by a catalog id rather than by a directory.
+
+{% set catalog_id_bridge_resume %}**step 1** below{% endset -%}
+{% include "skills/shared/catalog-id-bridge.md.j2" %}
+
+### The re-entry procedure
 
 1. **Baseline before every edit.** Read every `.mthds` file and validate the whole bundle. Record whether it is runnable or a scaffold and its exact pending set. If it is invalid, repair the baseline first; never redesign on a broken baseline. Retain the original contents until the final verdict is restored.
 2. **Map the full affected region.**
@@ -236,6 +245,8 @@ Structural changes to an existing method — adding, removing, or rewiring steps
 5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
 {% set stale_types_variant %}design{% endset -%}
 6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. {% include "skills/shared/stale-types-notice.md.j2" %}
+
+{% include "skills/shared/saved-copy-notice.md.j2" %}
 
 ---
 

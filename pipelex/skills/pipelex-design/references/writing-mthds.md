@@ -457,10 +457,12 @@ type          = "PipeFunc"
 description   = "Uppercase the input text"
 inputs        = { text = "Text" }
 output        = "Text"
-function_name = "my_package.text_utils.capitalize"
+function_name = "capitalize"
 ```
 
 Only use this when the user has a registered function. Otherwise prefer PipeCompose or PipeLLM.
+
+**`function_name` is a registry key, not an import path.** It names an entry in the runtime's flat, process-wide function registry — by default the decorated function's own name, and otherwise whatever string `@pipe_func(name=…)` was given — and resolution is a lookup with no import. So nothing in a bundle says which module defines a registered function, a dotted name is just a key that happens to contain dots, and on the hosted plane the stored `.py` files are flat importable module names beside each other. Name the function, not a path to it.
 
 **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The function must already be registered in the runtime that executes the method: a `function_name` naming something the plane cannot import fails at run time, not at validation.
 

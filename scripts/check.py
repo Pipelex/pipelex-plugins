@@ -70,7 +70,7 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
     ),
     (
         "skills/pipelex-integrate/references/python.md",
-        r"carried by `pipelex-sdk` from (\d+\.\d+\.\d+) on",
+        r"present in the `pipelex-sdk` (\d+\.\d+\.\d+) that step 8 installs",
         "pipelex_sdk_py",
     ),
     (

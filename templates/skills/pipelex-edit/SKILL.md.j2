@@ -1,6 +1,6 @@
 ---
 name: pipelex-edit
-description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", or wants any modification to an existing .mthds bundle. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
+description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
 {% include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -23,6 +23,11 @@ This skill proves every edit with the **`mthds_validate`** tool, served by the p
 {% include "skills/shared/mcp-requirements.md.j2" %}
 
 {% include "skills/shared/formatting-hook.md.j2" %}
+
+## The target — a bundle directory, or a catalog id
+
+{% set catalog_id_bridge_resume %}**Step 1** below{% endset -%}
+{% include "skills/shared/catalog-id-bridge.md.j2" %}
 
 ## Mode Selection
 
@@ -78,10 +83,12 @@ When the edit could have changed the input template — a renamed main-pipe inpu
 
 ### Step 7: Report
 
-State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs, and `/pipelex-run` when they want to run the method.
+State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs, `/pipelex-run` when they want to run the method, and `/pipelex-catalog` when the edit should reach the saved method this directory is linked to.
 
 {% set stale_types_variant %}edit{% endset -%}
 **Generated types may now be stale.** {% include "skills/shared/stale-types-notice.md.j2" %}
+
+{% include "skills/shared/saved-copy-notice.md.j2" %}
 
 ## Reference
 
