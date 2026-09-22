@@ -12,7 +12,7 @@ This skill owns every gesture between a bundle directory and the organization's 
 - **[Save](#save)** — a bundle directory becomes a new method, or updates the one it is already linked to. A rename is a save with a new name.
 - **[Pull](#pull)** — a saved method's files come back to disk, into a directory that is then linked to it.
 
-What it does not do: author or repair a method (`/pipelex-design`, `/pipelex-edit`), run one (`/pipelex-run`), give a method a public address (`/pipelex-integrate` publishes), or **delete** a saved method — deletion is admin-only on the platform and erases every run the method produced, so it stays a gesture of the Pipelex webapp. Say that rather than looking for a tool.
+What it does not do: author or repair a method (`/pipelex-design`, `/pipelex-edit`), run one (`/pipelex-run`), give a method a public address — that is committing the bundle to a git repository, which no skill here does for the user, and `/pipelex-integrate` only *consumes* such an address once it exists — or **delete** a saved method — deletion is admin-only on the platform and erases every run the method produced, so it stays a gesture of the Pipelex webapp. Say that rather than looking for a tool.
 
 **This skill writes no file itself.** Every byte that lands on disk — the pulled sources, and `pipelex-method.json` — is written by the workshop, which is the only party that knows which API host it talks to. Never hand-write or hand-edit a link file.
 
@@ -49,7 +49,7 @@ Gather every `.mthds` file beneath the directory **except anything under a `runs
 
 Then read `pipelex-method.json` beside that root file:
 
-- **It is there** → this is an **update** of the method it names. Pass its `method_id`, and its `synced_updated_at` as `expected_updated_at`. Leave `name` as the stored one unless the user is renaming.
+- **It is there** → this is an **update** of the method it names. Pass its `method_id`, and its `synced_updated_at` as `expected_updated_at`. Leave `name` as the one the link records unless the user is renaming — but know that the link's copy was taken at the last sync, so somebody else's rename since then is not in it, and an update rewrites the catalog's name from whatever this call sends.
 - **It is not there** → this is a **creation**. Ask the user for the name, proposing one: the bundle's `description` shortened to a few words, or its `domain` in plain words (`summarize_pdf` → *Summarize PDF*). `name` is required on both arms — the save rewrites the whole catalog row, so an update that omitted it would blank it.
 
 Never pass `link_dir`: omitted, the link file goes beside the root file, which is where it belongs.
@@ -58,7 +58,7 @@ Never pass `link_dir`: omitted, the link file goes beside the root file, which i
 
 `python` replaces the method's Python **as a set**: omitting it preserves whatever is stored, sending files replaces them all, and sending `[]` clears them. It is never merged. The workshop gates only on the `.py` extension and on the file really living under the bundle directory — **which `.py` files are the method's is this skill's judgement, not the tool's**, and a file sent by mistake is uploaded to the organization's catalog where nothing validates it.
 
-So: send only the files a `PipeFunc` in this bundle reaches. A `PipeFunc`'s `function_name` is a dotted path (`my_package.text_utils.capitalize`) and the file providing that module is the one to send. **A bundle with no `PipeFunc` sends no `python` at all** — that preserves the stored set and cannot erase anything. When the bundle holds a `PipeFunc` and it is not clear which files implement it, ask; do not sweep the directory. Send `[]` only when the user has asked for the stored Python to be cleared.
+So: send only the files that implement this bundle's `PipeFunc` steps. **A `function_name` does not name a file.** It is a key in the runtime's flat, process-wide function registry — by default the decorated function's own name (`capitalize`), and any other string the author passed to `@pipe_func(name=…)` — so nothing in the bundle says which module defines it, and a dotted name is a registry key too, never an import path. Read the directory's `.py` files and send every one that a registered function needs: the file defining it, and the bundle files it imports from. The catalog stores them as flat, importable module names beside each other, so a helper left out of the set is a helper the runner cannot import — and since `python` replaces rather than merges, leaving it out also deletes the copy the catalog held. **A bundle with no `PipeFunc` sends no `python` at all** — that preserves the stored set and cannot erase anything. When it is not clear which files a `PipeFunc` needs, ask; do not sweep the directory. Send `[]` only when the user has asked for the stored Python to be cleared.
 
 When the bundle holds a `PipeFunc`, say so in the same breath as the save line: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
 
@@ -78,7 +78,10 @@ Then call `mthds_save_method`. There is no second confirmation — the user's re
 
 The result says `saved`: `created`, `updated`, or `renamed` (an update whose `name` differs from the stored one). Report it with the `method_id`, the new `updated_at` and the `api_host`.
 
-Then relay `link_file` **as the tool reports it**, because it distinguishes three states the skill cannot re-derive: linked and refreshed, linked but stale, or genuinely unlinked. On a fresh link, tell the user to **commit `pipelex-method.json`** — that is what makes a teammate's next save an update of this method instead of a second one. On `written: false`, give the reason: the method is saved, and the next save would create a duplicate unless the id is passed by hand.
+Then relay `link_file` **as the tool reports it**, because it distinguishes three states the skill cannot re-derive: linked and refreshed, linked but stale, or genuinely unlinked. On a fresh link, tell the user to **commit `pipelex-method.json`** — that is what makes a teammate's next save an update of this method instead of a second one. On `written: false`, give the tool's own reason *and* its own state, and never collapse the two failing ones into one answer:
+
+- **Linked but stale** — a link is there, it names this method, and only its `synced_updated_at` could not be refreshed. A save from here still updates this same method; the cure is to fix whatever blocked the write and save again. **Never tell this directory it is unlinked**: the advice that answer carries — pass a `method_id` by hand — is how somebody else's method gets overwritten.
+- **Genuinely unlinked** — no link survives. Only here does the next save risk a second method, and even then the workshop refuses a create into a directory a link claims rather than minting one silently.
 
 **A rename** is this same call with a new `name`. It renames the method in the catalog and moves nothing on disk; renaming the bundle directory is the user's to do and the catalog does not care either way.
 
@@ -94,7 +97,13 @@ A **valid bundle with pending signatures is saved**, because the catalog holds d
 
 An `mt_…` id, or a name resolved through [List and find](#list-and-find) first. Always use the **written arm** — `mthds_get_method` with `output_dir` — so no source passes through the conversation. The inline arm is for reading a method that is not on disk, which is `/pipelex-explain`'s job, not this skill's.
 
-**Where it lands**, taking the first that applies: a path the user named; otherwise `methods/<name>/` under the project root — the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory, and `<package>/methods/<name>/` in a packaged Python project — otherwise `./methods/<name>/`. `<name>` is the catalog name in the project language's casing: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project.
+**Where it lands**, taking the first that applies: a path the user named; otherwise `methods/<name>/` under the project root — the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory, and `<package>/methods/<name>/` in a packaged Python project — otherwise `./methods/<name>/`.
+
+`output_dir` is **relative to the workshop's own working directory**, which is the directory the harness was launched in and not necessarily where the user is standing; an absolute path is accepted only while it resolves inside that directory. So resolve the landing path by the rule above, then express it relative to the workshop's root — and when the project root the rule found is outside that root, say so and stop, because a path inside the workshop is legal wherever it points and nothing downstream will notice that the files went somewhere the rule did not choose.
+
+**`<name>` is the catalog name turned into one directory segment**, in the project language's casing: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project. A catalog name is free text, so the transformation is not cosmetic: fold every run of spaces and punctuation into that separator, drop whatever is neither a letter, a digit nor the separator, and lowercase the rest — *Summarize PDF v2* becomes `summarize-pdf-v2` or `summarize_pdf_v2`. **A name never contributes a path**: a `/`, a `\` or a `..` segment is spent by this same rule and never survives into `output_dir`, because the workshop bounds the write to its own root and would happily accept a path that climbs out of `methods/` and into the project's source tree. If nothing usable survives, ask the user for the directory name.
+
+One project shape wants asking first: a **method app** carries its own `make add-method`, which takes a catalog id directly (`make add-method METHOD=mt_…`), copies the bundle into `methods/<name>/` and writes the action trio, the narrower and the registry entry around it. Pulling straight into that directory leaves those unwritten, so on a method app say so and let the user choose between the gesture and a plain write. This is the same stop `/pipelex-design` makes before writing a bundle there.
 
 **The tool refuses rather than overwrite, and every refusal writes nothing at all.** Relay the refusal and stop:
 
@@ -120,13 +129,15 @@ The save is refused with an `input_domain` error at `expected_updated_at` carryi
 Stop and give the user both timestamps and two ways forward. **Never choose between them:**
 
 1. **Compare first.** Pull the saved version into a **new** sibling directory — one that does not exist yet, since the pull refuses a directory that already holds a bundle. That copy gets its own `pipelex-method.json` and is therefore linked to the same method, so it is for reading: remove it once the comparison is done, and do not save from it.
-2. **Save over it**, on an explicit yes and nothing less: the same call with `expected_updated_at` omitted. Say what that costs — whatever the other writer saved is replaced, and the catalog keeps no earlier version to give back.
+2. **Save over it**, on an explicit yes and nothing less: the same call with `expected_updated_at` omitted. Say what that costs — whatever the other writer saved is replaced, and the catalog keeps no earlier version to give back. **The name goes with it**: an update rewrites the catalog row's `name` from this call, and the refusal carries timestamps only, so if the other writer also renamed the method, sending the link's copy reverts their rename. Read the current name with [List and find](#list-and-find) before this call and carry that one, unless the user is deliberately renaming.
 
 The check is best-effort by construction: the tool reads the stored method and then writes, and the platform accepts no compare-and-swap, so a save landing inside that window is still overwritten. That narrows the race rather than closing it, and it is worth one line when the user is choosing option 2.
 
 ## When the link names an id the plane does not know
 
-An unknown `method_id` comes back as an `input_domain` error at `method_id`, and it reads exactly like a method belonging to another organization. Report it **with the `api_host` the link file records** — that is what makes it diagnosable: the link was made against another plane, or with another organization's key.
+An unknown `method_id` comes back as an `input_domain` error at `method_id`. **So do several other faults, and the location alone never tells them apart** — a payload the platform rejected, an organization-context failure, and the workshop's own refusal when this directory's link names a *different* method from the id being saved all arrive at that same location. Read the message and the hint before doing anything: only the not-found answer names `pipelex-method.json` and the `api_host` and explains that the catalog is org-scoped, so a method from another organization reads exactly like a miss. Anything else is a different fault, the link is not dead, and it stays where it is — fix the call instead.
+
+When the hint does say the id is not visible, report it **with the `api_host` the link file records** — that is what makes it diagnosable: the link was made against another plane, or with another organization's key.
 
 Then offer to save the directory as a **new** method. That needs the stale link gone first: the workshop refuses a create into a directory another link claims, rather than minting a duplicate nobody can delete. So ask, and on a yes remove `pipelex-method.json` and run the create, which writes a fresh link. Removing a dead link is the one thing this skill ever takes off disk, and it is never done without asking.
 
@@ -140,7 +151,11 @@ Then offer to save the directory as a **new** method. That needs the stale link 
 | the bundle does not validate | reports the verdict, routes to `/pipelex-edit` or `/pipelex-design`; nothing was saved |
 | the bundle is a scaffold (pending signatures) | saves it, and says the method does not run yet |
 | the saved method moved since this directory synced | stops with both timestamps and two ways forward; never picks one |
+| an `input_domain` error lands at `method_id` | reads the message and the hint before concluding anything — a rejected payload and a link naming another method arrive at that same location, and only a real miss names `pipelex-method.json` and the `api_host` |
 | the link names an id this plane does not know | reports it with the link's `api_host`, offers a new method, removes the dead link only on a yes |
+| the pull's landing path falls outside the workshop's working directory | says so and stops; the workshop writes only under its own root, and a path inside it is legal wherever it points |
+| the pull targets a method app | names `make add-method`, which also writes the action trio, the narrower and the registry entry, and lets the user choose |
+| the catalog name yields no usable directory segment | asks for the directory name; a name never contributes a path |
 | a create fails on a timeout or a transport fault | **does not retry.** A create cannot carry an idempotency key yet, so a retry mints a second method: list the catalog first and see whether the first one landed |
 | the pull would overwrite local work | stops; offers the save or a comparison copy instead |
 | the pull would overwrite files after the saved method moved | asks the user, and passes `overwrite: true` only on an explicit yes |

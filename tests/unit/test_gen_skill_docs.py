@@ -1046,11 +1046,81 @@ class TestPipelexCatalogSkill:
             assert "mthds_save_method" not in body, f"{skill} must not declare the save tool"
             assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
 
+    def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
+        """`function_name` is a key in the runtime's flat function registry — by
+        default the decorated function's own name — so nothing in the bundle says
+        which module defines it. A skill told otherwise sends one file, and since
+        `python` replaces rather than merges, that deletes the helpers beside it."""
+        body = self.catalog_skill
+        assert "**A `function_name` does not name a file.**" in body
+        assert "flat, process-wide function registry" in body
+        assert "my_package.text_utils" not in body, "the dotted-path claim is wrong and must not come back"
+
+    def test_an_input_domain_error_at_method_id_is_not_read_as_an_unknown_id(self) -> None:
+        """A rejected payload, an organization-context failure and the workshop's own
+        refusal when the link names another method all land at `method_id`. Reading
+        the location alone removes a good `pipelex-method.json` and mints a duplicate
+        nothing in this plugin can delete."""
+        body = self.catalog_skill
+        assert "the location alone never tells them apart**" in body
+        assert "only the not-found answer names `pipelex-method.json` and the `api_host`" in body
+
+    def test_the_landing_path_is_stated_relative_to_the_workshop(self) -> None:
+        """`output_dir` resolves against the workshop's working directory, not the
+        session's, and a path inside the workshop is legal wherever it points — so
+        the rule has to name the root it is measured from."""
+        body = self.catalog_skill
+        assert "relative to the workshop's own working directory**" in body
+
+    def test_the_catalog_name_becomes_one_directory_segment(self) -> None:
+        """A catalog name is unvalidated free text at every layer. Spelled into
+        `methods/<name>/` verbatim, `../../src` resolves inside the workshop root,
+        where the containment check still passes."""
+        body = self.catalog_skill
+        assert "**A name never contributes a path**" in body
+        assert "ask the user for the directory name" in body
+
+    def test_the_pull_stops_on_a_method_app(self) -> None:
+        """`make add-method` writes the action trio, the narrower and the registry
+        entry around the bundle, so a plain write leaves the app unable to see it.
+        The pull mirrors the stop `/pipelex-design` already makes."""
+        body = self.catalog_skill
+        assert "make add-method" in body
+        design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "make add-method" in design, "the pull mirrors design's stop, so design must still carry it"
+
+    def test_a_failed_link_write_is_never_reported_as_unlinked(self) -> None:
+        """The workshop distinguishes linked-but-stale from genuinely-unlinked, and
+        telling a still-linked directory it is unlinked advises passing a `method_id`
+        by hand — which is how the wrong method gets overwritten."""
+        body = self.catalog_skill
+        assert "**Never tell this directory it is unlinked**" in body
+        assert "**Linked but stale**" in body
+        assert "**Genuinely unlinked**" in body
+
+    def test_the_forced_overwrite_says_the_name_goes_with_it(self) -> None:
+        """An update rewrites the row's `name` from the call and the link's copy was
+        taken at the last sync, so a forced save reverts a rename made since — and
+        the refusal that led there carries timestamps only."""
+        body = self.catalog_skill
+        assert "**The name goes with it**" in body
+
+    def test_it_does_not_route_a_publish_request_at_integrate(self) -> None:
+        """`/pipelex-integrate` consumes an address and recommends publishing one;
+        no skill here performs that act, so a user who asks to publish must not be
+        sent to a skill that will ask them for the address instead."""
+        body = self.catalog_skill
+        assert "`/pipelex-integrate` publishes" not in body
+        integrate = (self.TEMPLATES / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert "publishing an address" in integrate, "integrate recommends publishing; it does not do it"
+
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_catalog_tools_are_declared_and_nothing_that_writes_files_is(self, target_name: str) -> None:
-        """Pre-approval, not restriction: the narrow set is what makes a write in
-        this skill stop for the user, which is the guarantee the prose claims when
-        it says every byte on disk is the workshop's."""
+        """Pre-approval, not restriction: an unlisted tool still asks, so the narrow
+        set is what makes a write in this skill stop for the user. A bare `Bash`
+        defeats that on its own — `cat > pipelex-method.json` needs no `Write` — so
+        the only command pre-approved here is the read-only one the skill runs
+        unprompted."""
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
         rendered = render_templates(
             self.REPO_ROOT / "templates",
@@ -1066,6 +1136,8 @@ class TestPipelexCatalogSkill:
             frontmatter = body.split("---")[1]
             assert "- Write" not in frontmatter, "a skill that writes no file pre-approves no writer"
             assert "- Edit" not in frontmatter, "a skill that writes no file pre-approves no editor"
+            assert "- Bash(git status:*)" in frontmatter, "the one command the skill runs unprompted is the only Bash it pre-approves"
+            assert "- Bash\n" not in frontmatter, "a bare Bash entry pre-approves the very write this skill promises will stop"
             assert "- Read" in frontmatter
         else:
             assert "allowed-tools" not in body, f"{target_name}: allowed-tools is a Claude field"
