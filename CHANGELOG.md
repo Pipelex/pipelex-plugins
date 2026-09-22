@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex-design`, `pipelex-edit` and `pipelex-organize` take a registered method's catalog id.** They work on files, so an `mt_…` id is resolved to a directory first: one search over the `pipelex-method.json` link files finds the directory already linked to that method, and where there is none the pull is handed to `/pipelex-catalog`. Two hits are the user's choice rather than the first match, since a comparison copy carries the same link, and a published address is refused with a pointer to `/pipelex-explain`, there being nowhere to write a change back.
+- **The three file-based skills say when the saved copy has fallen behind.** A report from a directory carrying a link now names the linked method and says the catalog still holds what it held before the change, so every caller of that id goes on running the old content. It offers `/pipelex-catalog` and never saves: a save is a deployment, and no skill but that one makes it.
+- **A run of a linked bundle directory is filed under its saved method.** `pipelex-run` reads the link and sends its `method_id` beside the `files`, so the run appears in that method's history in the webapp — the files are what ran, which the report says plainly. A linkage id the plane does not know refuses the run before anything executes, reported with the host the link records and with the offer of the same run without the id.
+
+### Changed
+
+- **`pipelex-explain` reads a saved method's source instead of describing its contract.** A catalog id names the organization's own method, so the skill fetches its files through the workshop's inline read — never the arm that writes to disk — and explains them exactly as a bundle on disk, the stored Python included. A bounded read makes the explanation partial rather than the library incomplete, and where that tool is not served the id falls back to contract level, which is a narrower explanation and not a stop. A published address is unchanged: its internals stay in the repository it names.
+- **`pipelex-run` names a missing `PipeFunc` implementation as the cause of a failure rather than a suspect.** A `files` submission carries `.mthds` only, and a linked run resolves nothing from the catalog, so a bundle whose `PipeFunc` names a function the hosted plane does not already have registered has no channel for its Python on any run from files. The cure the skill gives is `/pipelex-catalog`: a saved method run by its id alone has its `.mthds` and `.py` assembled into the run bundle server-side.
+
 ## [0.6.0] - 2026-09-22
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 name: pipelex-edit
-description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", or wants any modification to an existing .mthds bundle. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
+description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
 
 ---
 
@@ -21,6 +21,18 @@ This skill proves every edit with the **`mthds_validate`** tool, served by the p
 - The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
+
+## The target — a bundle directory, or a catalog id
+
+This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
+
+1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to **Step 1** below.
+2. **Several hits are the user's choice, never yours.** More than one directory can legitimately hold the same link: `/pipelex-catalog`'s conflict path tells the user to pull a comparison copy into a sibling directory, and that copy carries the same link and is meant for reading, not for editing. Name the directories and ask which one is the work.
+3. **No hit — hand the pull to `/pipelex-catalog`**; there is no cross-skill invocation on Codex, so open that skill's `SKILL.md` beside this one and follow it. It brings the method's sources to disk and the workshop writes the link beside them; then carry on with that directory. The search only sees the working directory and below, so a bundle linked somewhere else reads as no hit — if the user knows where it is, ask for the path rather than pulling a second copy.
+
+**What the search proves, and what it does not.** It answers where this method lives locally and nothing else. A linked directory can be behind the catalog, ahead of it, or both at once, and the link records no hashes to tell them apart — so do not present the local files as the saved method's current content. `/pipelex-catalog` is what compares the two, and it is also the only way the work done here reaches the saved copy.
+
+**A published address is not a target for this skill.** `github.com/<owner>/<repo>[/<selector>][@<tag>]` names somebody else's published package: nothing of it is on disk, and there is nowhere to write a change back. Say so and point at `/pipelex-explain`, which reads such an address at the level of its contract.
 
 ## Mode Selection
 
@@ -79,6 +91,8 @@ When the edit could have changed the input template — a renamed main-pipe inpu
 State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs, `/pipelex-run` when they want to run the method, and `/pipelex-catalog` when the edit should reach the saved method this directory is linked to.
 
 **Generated types may now be stale.** Search the **whole project** for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — and keep the ones whose `sources` name a file this edit changed or removed, **or whose `bundle_dir` holds a `.mthds` file this edit created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory, so matching on `sources` alone misses exactly the edit that adds a file. The sidecar sits beside the **generated tree**, never beside the bundle: `src/generated/<method>/` or `<package>/generated/<method>/`. Looking only next to the `.mthds` file finds nothing and reports a clean bill that is wrong. For each, say that the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it. This notice is the guard that speaks at edit time, before the drift gate `/pipelex-integrate` wires into the project fails in CI, so do not skip it.
+
+**The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 
 ## Reference
 

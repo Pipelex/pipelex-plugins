@@ -1,6 +1,6 @@
 ---
 name: pipelex-organize
-description: Reorganize a designed method bundle into a clear, browsable layout. Use when signature-driven construction left one .mthds file per refinement, when any existing layout needs regrouping into coherent modules (or one simple file), or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Automatically follows converged /pipelex-design runs only when their construction-shaped layout needs it. Pure reorganization — never changes what the method does.
+description: Reorganize a designed method bundle into a clear, browsable layout. Use when signature-driven construction left one .mthds file per refinement, when any existing layout needs regrouping into coherent modules (or one simple file), or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Automatically follows converged /pipelex-design runs only when their construction-shaped layout needs it. Pure reorganization — never changes what the method does.
 {% include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -25,6 +25,13 @@ Equivalence is checked through the **`mthds_validate`** tool, served by the plug
 
 {% set formatting_hook_write_clause %}Don't hand-format{% endset -%}
 {% include "skills/shared/formatting-hook.md.j2" %}
+
+---
+
+## The target — a bundle directory, or a catalog id
+
+{% set catalog_id_bridge_resume %}**Step 1** of the procedure below{% endset -%}
+{% include "skills/shared/catalog-id-bridge.md.j2" %}
 
 ---
 
@@ -102,6 +109,8 @@ Only after the candidate verdict matches:
 
 {% set stale_types_variant %}organize{% endset -%}
 One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), {% include "skills/shared/stale-types-notice.md.j2" %} No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+
+**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries this notice too), say it here as well. {% include "skills/shared/saved-copy-notice.md.j2" %} A reorganization is exactly the change this notice exists for: the verdict is identical, so nothing about the method's behaviour moved, and yet every file in this directory was renamed, rewritten or removed.
 
 ---
 
