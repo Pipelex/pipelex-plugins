@@ -787,6 +787,15 @@ class TestPipelexIntegrateSkill:
         assert "Run it from the project root with **the project's own environment**" in python
         assert "Do not add `pipelex` as a dependency to get a gate" in python
         assert "there is **no barrel** in `pipelex_sdk` by design" in python
+        # The Python extras are documented one paragraph each, from the Python SDK's own pages, and the
+        # sentence that once said they had no twin is gone from the reference and the rendered skill.
+        assert "have no Python twin yet" not in python
+        assert "**`summarize_usage(results)` — what the run cost.**" in python
+        assert "**`results.working_memory` — every named stuff of the run.**" in python
+        assert "Their page is `docs/artifact-download.md`." in python
+        assert "https://github.com/Pipelex/pipelex-sdk-python/blob/main/docs/<page>.md" in python
+        assert "The Python SDK does not carry" not in body
+        assert f"has its Python twin from `pipelex-sdk` {self.PYTHON_SDK_FLOOR} on" in body
 
         # Every place that told a Python consumer it has no gate, swept together: this skill, its
         # reference, the sibling skills that repeated the claim, and the repo's own account of itself.
@@ -1179,7 +1188,7 @@ class TestPipelexIntegrateSkill:
         self.write_python_project(tmp_path)
         result = self.run_python_gate(tmp_path, "generated/summarize", without_site_packages=True)
         assert result.returncode == 2, self.explain(result)
-        assert "pipelex-sdk 0.10.0 or later is not importable" in result.stderr
+        assert f"pipelex-sdk {self.PYTHON_SDK_FLOOR} or later is not importable" in result.stderr
         assert "uv run python scripts/codegen_check.py" in result.stderr
 
     @pytest.mark.parametrize(
