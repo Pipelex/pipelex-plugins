@@ -7,15 +7,16 @@
    three and only the step it hands back to differs; that step is named by
    `catalog_id_bridge_resume`, which every including skill sets.
 
-   Jinja's default `Undefined` compares unequal to everything without raising,
-   so an unset or misspelled `catalog_id_bridge_resume` would render as the
-   empty string and pass the build, the freshness check and the tests — the
-   bridge would ship telling the agent to carry on with nothing named. The
-   `{% else %}` branch emits `PIPELEX_BUILD_ERROR` instead, which
-   `scripts/check.py` refuses in any generated file. -#}
+   The parameter is interpolated bare on purpose. The renderer runs under
+   `StrictUndefined`, so an unset or misspelled `catalog_id_bridge_resume`
+   raises at render time and `_render_or_die` names this template and the
+   variable — an earlier and more precise failure than a marker only
+   `scripts/check.py` would catch later. An `{% if catalog_id_bridge_resume is
+   defined %}` guard would suppress exactly that failure, and the parameter is
+   never legitimately absent: all three including skills set it. -#}
 This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
 
-1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to {% if catalog_id_bridge_resume is defined %}{{ catalog_id_bridge_resume }}{% else %}PIPELEX_BUILD_ERROR: catalog_id_bridge_resume must name the step this skill resumes at{% endif %}.
+1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to {{ catalog_id_bridge_resume }}.
 2. **Several hits are the user's choice, never yours.** More than one directory can legitimately hold the same link: `/pipelex-catalog`'s conflict path tells the user to pull a comparison copy into a sibling directory, and that copy carries the same link and is meant for reading, not for editing. Name the directories and ask which one is the work.
 3. **No hit — hand the pull to `/pipelex-catalog`**{% if platform == "claude" %}{% else %}; there is no cross-skill invocation on {{ harness_name }}, so open that skill's `SKILL.md` beside this one and follow it{% endif %}. It brings the method's sources to disk and the workshop writes the link beside them; then carry on with that directory. The search only sees the working directory and below, so a bundle linked somewhere else reads as no hit — if the user knows where it is, ask for the path rather than pulling a second copy.
 
