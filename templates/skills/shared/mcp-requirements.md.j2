@@ -1,0 +1,24 @@
+{#- The Pipelex MCP requirements bullets, shared by every MCP-backed skill.
+
+   The including template sets what it changes with `{% set %}` before the
+   include; anything it leaves alone falls back to the common wording:
+
+     mcp_absent_lead          — "the tool is" (default), "the tools are", "a tool is"
+     mcp_absent_suffix        — a sentence appended to the absent-tool bullet
+     mcp_config_parenthetical — the aside between the `config` class and the comma
+     mcp_config_suffix        — a sentence appended to the config-error bullet
+     mcp_requirements_extra   — a bullet rendered between the config-error bullet
+                                and the credential bullet, for a skill whose own
+                                tool note sits there
+
+   The fragment strips its own trailing newline (the closing comment below), so
+   it can be included inline as well as on a line of its own.
+
+   The credential bullet branches three ways because the credential channel
+   differs per harness: the plugin configuration on Claude, the session
+   environment on Codex, the server entry's own `env` table on Vibe. -#}
+- **If {{ mcp_absent_lead | default("the tool is") }} absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected —{% if platform == "mistral-vibe" %} on {{ harness_name }} the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`) is not auto-spawned: append the `[[mcp_servers]]` entry from `mcp/vibe-mcp.toml` in the `pipelex-vibe` bundle (beside its `skills/` directory) to the end of `~/.vibe/config.toml`, after deleting any `mcp_servers = []` line and any hand-registered `pipelex` entry there, write your `PIPELEX_API_KEY` into its `env` table, then retry.{% else %} the plugin manifest spawns the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection{% if platform == "claude" %} (`/mcp`){% endif %}.{% endif %}"*{{ mcp_absent_suffix | default("") }}
+- **If a call returns `status: "error"` with an error of class `config`**{{ mcp_config_parenthetical | default(" (missing or rejected `PIPELEX_API_KEY`, unreachable API)") }}, STOP the same way and surface the error's `hint` verbatim.{{ mcp_config_suffix | default("") }}
+{% if mcp_requirements_extra is defined %}{{ mcp_requirements_extra }}
+{% endif %}- The server authenticates to the API with **`PIPELEX_API_KEY`**{% if platform == "mistral-vibe" %} from its `env` table in `~/.vibe/config.toml`, never from the session environment: {{ harness_name }} passes no shell variables to a stdio MCP server, so an exported key reaches the plugin's validation hook but not the server{% elif platform == "claude" %} from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable{% else %} from the session environment — the same variable the plugin's validation hook documents{% endif %}.
+{#- -#}

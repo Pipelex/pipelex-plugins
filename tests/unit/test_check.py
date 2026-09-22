@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 from scripts.check import (
+    VERSION_FLOOR_STATIC_REFS,
+    check_build_error_markers,
     check_codex_marketplace_plugins,
     check_codex_no_claude_artifacts,
     check_marketplace_plugins,
     check_matched_target_versions,
     check_no_templates_in_output,
     check_shared_files_exist,
+    check_skill_argument_placeholders,
     check_stale_references,
     check_target_plugin_versions,
+    check_version_floors,
     check_vibe_target_artifacts,
+    load_version_floors,
     resolve_target_var,
 )
 
@@ -317,6 +324,8 @@ class TestVibeTargetArtifacts:
         hooks_dir.mkdir(parents=True)
         return hooks_dir
 
+    VALID_MCP_FRAGMENT = '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\n'
+
     def _write_valid_hooks(self, hooks_dir: Path) -> None:
         (hooks_dir / "vibe-hooks.toml").write_text(
             '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
@@ -324,6 +333,12 @@ class TestVibeTargetArtifacts:
         hook_script = hooks_dir / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
         hook_script.chmod(0o755)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT)
+
+    def _write_mcp_fragment(self, hooks_dir: Path, body: str) -> None:
+        mcp_dir = hooks_dir.parent / "mcp"
+        mcp_dir.mkdir(parents=True, exist_ok=True)
+        (mcp_dir / "vibe-mcp.toml").write_text(body)
 
     def test_matching(self, tmp_path: Path) -> None:
         self._write_valid_hooks(self._vibe_targets(tmp_path))
@@ -369,6 +384,42 @@ class TestVibeTargetArtifacts:
         errors = check_vibe_target_artifacts(tmp_path)
         assert any("not a Vibe artifact" in error for error in errors)
 
+    def test_missing_mcp_fragment(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        (hooks_dir.parent / "mcp" / "vibe-mcp.toml").unlink()
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("mcp/vibe-mcp.toml missing" in error for error in errors)
+
+    def test_mcp_fragment_must_be_stdio(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, '[[mcp_servers]]\nname = "pipelex"\ntransport = "streamable-http"\nurl = "https://example.com/mcp"\n')
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any('transport = "stdio"' in error for error in errors)
+        assert any("must set a command" in error for error in errors)
+
+    def test_mcp_fragment_keeps_the_server_name(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT.replace('"pipelex"', '"pipelex-local"'))
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any('must name the server "pipelex"' in error for error in errors)
+
+    def test_mcp_fragment_declares_exactly_one_server(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT * 2)
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("exactly one [[mcp_servers]] entry" in error for error in errors)
+
+    def test_mcp_fragment_must_parse(self, tmp_path: Path) -> None:
+        hooks_dir = self._vibe_targets(tmp_path)
+        self._write_valid_hooks(hooks_dir)
+        self._write_mcp_fragment(hooks_dir, "[[mcp_servers]\nname = \n")
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert any("not valid TOML" in error for error in errors)
+
 
 class TestResolveTargetVar:
     def test_default_value(self, skill_tree: Path) -> None:
@@ -411,6 +462,228 @@ class TestStaleReferences:
         skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
         skill_md.write_text(VALID_FRONTMATTER + "\nSee [ref](../shared/mthds-reference.md)\n")
         assert check_stale_references(skill_tree) == []
+
+
+class TestBuildErrorMarkers:
+    """A shared include that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
+    including template set no variant or misspelled one. Jinja's default `Undefined` compares unequal
+    to everything without raising, so without the marker the block would render as the empty string
+    and the skill would ship with it silently missing — build, freshness check and tests all green."""
+
+    def test_clean_tree(self, skill_tree: Path) -> None:
+        assert check_build_error_markers(skill_tree) == []
+
+    def test_reports_the_marker_with_its_line(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + '\nPIPELEX_BUILD_ERROR: stale_types_variant must be one of edit, design, organize — got "edti"\n')
+        errors = check_build_error_markers(skill_tree)
+        assert len(errors) == 1
+        assert "SKILL.md:8" in errors[0]
+        assert "edti" in errors[0]
+
+
+class TestSkillArgumentPlaceholders:
+    def test_clean_tree(self, skill_tree: Path) -> None:
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    @pytest.mark.parametrize(
+        ("line", "token"),
+        [
+            ('stop_tree() { kill -STOP "$1" 2>/dev/null; }', "$1"),
+            ("awk 'NR > 1 { print $9 }'", "$9"),
+            ('echo "$0"', "$0"),
+            ('set -- "$10"', "$10"),
+            ("Summarize $ARGUMENTS.", "$ARGUMENTS"),
+            ("Open $ARGUMENTS[0] first.", "$ARGUMENTS"),
+            (r'kill "\$1"', "$1"),
+            ('echo "$1x"', "$1"),
+        ],
+        ids=["quoted", "awk-field", "zero", "two-digits", "arguments", "indexed", "escaped", "word-suffix"],
+    )
+    def test_detects_placeholder(self, skill_tree: Path, line: str, token: str) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + f"\n```bash\n{line}\n```\n")
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert len(errors) == 1
+        assert errors[0].startswith("pipelex/skills/pipelex-test/SKILL.md:9: ")
+        assert f"`{token}`" in errors[0]
+
+    def test_reports_every_token_on_a_line(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + '\nfor child in $(pgrep -P "$1"); do stop_tree "$2"; done\n')
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert [error.split("`")[1] for error in errors] == ["$1", "$2"]
+
+    def test_ignores_shell_tokens_claude_code_leaves_alone(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(
+            VALID_FRONTMATTER
+            + "\n```bash\n"
+            + 'launcher=$!; echo $$ "$?" "$pid" "${APP_PORT:-4300}" "${5#APP_HOST=}" "$((n + 1))" "$(pwd)"\n'
+            + 'stop_tree() { local p; for p; do kill -STOP "$p"; done; }\n'
+            + "```\n"
+        )
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    def test_ignores_reference_files(self, skill_tree: Path) -> None:
+        """A tool reads references and shared files as they are, so Claude Code substitutes nothing in them."""
+        references = skill_tree / "pipelex" / "skills" / "pipelex-test" / "references"
+        references.mkdir()
+        (references / "recipes.md").write_text("Dollar amounts (`$100`) and `print $9`.\n")
+        (skill_tree / "pipelex" / "skills" / "shared" / "mthds-reference.md").write_text("Dollar amounts (`$100`).\n")
+        assert check_skill_argument_placeholders(skill_tree) == []
+
+    def test_scans_every_target(self, skill_tree: Path) -> None:
+        _write_target_configs(
+            skill_tree,
+            {
+                "prod": {"name": "pipelex", "version": "0.6.3", "source": "pipelex/"},
+                "codex": {"name": "pipelex", "version": "0.6.3", "source": "pipelex-codex/"},
+            },
+        )
+        codex_skill = skill_tree / "pipelex-codex" / "skills" / "pipelex-test"
+        codex_skill.mkdir(parents=True)
+        (codex_skill / "SKILL.md").write_text(VALID_FRONTMATTER + "\nRun it with $ARGUMENTS.\n")
+        errors = check_skill_argument_placeholders(skill_tree)
+        assert len(errors) == 1
+        assert errors[0].startswith("pipelex-codex/skills/pipelex-test/SKILL.md:")
+
+
+class TestVersionFloors:
+    """The floors the skills state to the user live in one table, and this rule is what
+    keeps a bump to that table from being a half-bump.
+
+    A misspelled key is the renderer's to catch, not this rule's: the build runs under
+    `StrictUndefined`, so `{{ floors.typo }}` fails naming the template and the
+    attribute rather than rendering as the empty string. What is left here is drift of
+    two other kinds — a floor that reaches no built skill at all, and a static reference
+    under `skills/`, copied verbatim into every target and never rendered, whose literal
+    no longer matches the table.
+    """
+
+    FLOORS = '[vars]\nmarketplace_name = "pipelex-plugins"\n\n[vars.floors]\npipelex_sdk_js = "0.18.0"\nnode = "22.12"\n'
+
+    def _tree(self, tmp_path: Path, *, floors: str | None = None, typescript: str | None = None) -> Path:
+        _write_target_configs(tmp_path, {"prod": {"name": "pipelex", "version": "0.6.3", "source": "pipelex/"}})
+        (tmp_path / "targets" / "defaults.toml").write_text(self.FLOORS if floors is None else floors)
+        skill_dir = tmp_path / "pipelex" / "skills" / "pipelex-integrate"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk` 0.18.0 on Node 22.12.\n")
+        reference = tmp_path / "skills" / "pipelex-integrate" / "references"
+        reference.mkdir(parents=True)
+        body = (
+            typescript
+            if typescript is not None
+            else "the SDK facts were checked against `@pipelex/sdk` 0.18.0, the floor the skill's step 8 installs\n"
+        )
+        (reference / "typescript.md").write_text(body)
+        return tmp_path
+
+    def test_a_floor_that_reaches_the_output_and_its_reference_passes(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        errors = [e for e in check_version_floors(tree) if "typescript.md" in e or "pipelex" in e]
+        assert [e for e in errors if "0.18.0" in e or "22.12" in e] == []
+
+    def test_a_floor_no_built_skill_states_any_more_is_caught(self, tmp_path: Path) -> None:
+        """A skill reworded until the number fell out of it still reads as well-formed
+        prose, and the table entry still reads as current. The floor reaching no built
+        skill at all is the only evidence left that the two have parted."""
+        tree = self._tree(tmp_path)
+        skill_md = tree / "pipelex" / "skills" / "pipelex-integrate" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk`  on Node 22.12.\n")
+        errors = check_version_floors(tree)
+        assert any("floor `pipelex_sdk_js` = 0.18.0 reaches no generated skill" in error for error in errors)
+
+    def test_a_static_reference_left_behind_by_a_bump_is_named_with_its_line(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        floors = self.FLOORS.replace('pipelex_sdk_js = "0.18.0"', 'pipelex_sdk_js = "0.19.0"')
+        (tree / "targets" / "defaults.toml").write_text(floors)
+        skill_md = tree / "pipelex" / "skills" / "pipelex-integrate" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "\nAt least `@pipelex/sdk` 0.19.0 on Node 22.12.\n")
+        errors = check_version_floors(tree)
+        assert any("typescript.md:1: states 0.18.0 for floor `pipelex_sdk_js`, but [vars.floors] says 0.19.0" in error for error in errors)
+
+    def test_a_reworded_reference_fails_rather_than_passing_silently(self, tmp_path: Path) -> None:
+        """A pattern that no longer matches means nobody is holding that sentence to the
+        table any more, which must not read as a clean check."""
+        tree = self._tree(tmp_path, typescript="the SDK facts were checked against version 0.18.0 of the SDK\n")
+        errors = check_version_floors(tree)
+        assert any("was reworded" in error and "typescript.md" in error for error in errors)
+
+    def test_a_template_that_spells_a_floor_instead_of_reading_it_is_caught(self, tmp_path: Path) -> None:
+        """The regression the first round of this branch fixed by hand, and the one drift
+        neither other part can see: strict rendering fires on an expression that is there
+        and misspelled, never on one somebody replaced with its own value, and the presence
+        check is satisfied by any other sentence that still reads the table."""
+        tree = self._tree(tmp_path)
+        template = tree / "templates" / "skills" / "pipelex-integrate"
+        template.mkdir(parents=True)
+        (template / "SKILL.md.j2").write_text("Install `@pipelex/sdk` 0.18.0 or later.\n")
+        errors = check_version_floors(tree)
+        assert any("SKILL.md.j2:1: spells floor `pipelex_sdk_js` as the literal 0.18.0" in error for error in errors)
+
+    def test_a_template_reading_the_table_is_not_a_hardcoded_floor(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path)
+        template = tree / "templates" / "skills" / "pipelex-integrate"
+        template.mkdir(parents=True)
+        (template / "SKILL.md.j2").write_text("Install `@pipelex/sdk` {{ floors.pipelex_sdk_js }} or later.\n")
+        assert [error for error in check_version_floors(tree) if "spells floor" in error] == []
+
+    def test_an_empty_table_is_a_failure_rather_than_nothing_to_check(self, tmp_path: Path) -> None:
+        tree = self._tree(tmp_path, floors='[vars]\nmarketplace_name = "pipelex-plugins"\n')
+        errors = check_version_floors(tree)
+        assert len(errors) == 1
+        assert "[vars.floors] is missing or empty" in errors[0]
+
+    # Two numbers under `skills/` equal a floor and mean something else entirely. They
+    # are the reason the anchors are written against prose instead of swept numerically,
+    # and naming them here is what lets the sweep below refuse every other stray match.
+    UNRELATED_FLOOR_LOOKALIKES: ClassVar[set[tuple[str, str]]] = {
+        ("skills/pipelex-design/references/writing-mthds.md", "3.14"),
+        ("skills/pipelex-synthetic-inputs/references/png.md", "3.11"),
+    }
+
+    def test_every_static_statement_of_a_floor_is_anchored(self) -> None:
+        """The anchors are a hand-kept list, so the way this rule fails is by omission:
+        somebody states a floor in a file nothing renders, nobody adds the entry, and the
+        next bump moves the table while that sentence keeps the old number — with the
+        whole check still green, which is worse than not having it.
+
+        So sweep the static tree for each floor's literal value and require every
+        occurrence to be either anchored or listed above as meaning something else. A new
+        unrelated number fails this too, deliberately: somebody has to look.
+        """
+        repo_root = Path(__file__).parents[2]
+        floors = load_version_floors(repo_root)
+
+        unanchored: list[str] = []
+        for source in sorted((repo_root / "skills").rglob("*")):
+            if not source.is_file():
+                continue
+            rel = source.relative_to(repo_root).as_posix()
+            try:
+                text = source.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+
+            # The spans the anchors on this file actually capture. Occurrence level, not
+            # file level: `typescript.md` stated the JS floor in two places with only the
+            # first anchored, which a file-level sweep would have called covered.
+            captured = [
+                match.span(1) for rel_path, pattern, _key in VERSION_FLOOR_STATIC_REFS if rel_path == rel for match in re.finditer(pattern, text)
+            ]
+
+            for key, value in sorted(floors.items()):
+                if (rel, value) in self.UNRELATED_FLOOR_LOOKALIKES:
+                    continue
+                start = text.find(value)
+                while start != -1:
+                    if not any(span_start <= start and start + len(value) <= span_end for span_start, span_end in captured):
+                        line = text[:start].count("\n") + 1
+                        unanchored.append(f"{rel}:{line} states floor `{key}` = {value}, but no VERSION_FLOOR_STATIC_REFS entry captures it")
+                    start = text.find(value, start + 1)
+
+        assert unanchored == []
 
 
 class TestSharedFilesExist:

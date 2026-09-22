@@ -9,8 +9,9 @@ This is the **CLI-free** plugin generation. Unlike the `mthds-plugins` predecess
 ```
 templates/                      source of truth (all .j2 files)
 ├── skills/*/SKILL.md.j2        skill templates
-├── skills/shared/*.md.j2       shared language references (+ the include-only frontmatter partial)
-└── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
+├── skills/shared/*.md.j2       shared language references + the include-only partials
+├── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
+└── mcp/vibe-mcp.toml.j2         the workshop launcher as a Vibe [[mcp_servers]] fragment
        |
        v
 targets/defaults.toml          common variable defaults
@@ -30,6 +31,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
        +---> pipelex-codex/.codex-plugin/plugin.json   (generated: plugin-base.json + target overrides)
        +---> pipelex-vibe/skills/*/SKILL.md            (Mistral Vibe target, output — manifestless)
        +---> pipelex-vibe/hooks/{vibe-hooks.toml,check-mthds-vibe.sh}  (Vibe post_tool hook)
+       +---> pipelex-vibe/mcp/vibe-mcp.toml            (Vibe [[mcp_servers]] fragment — the workshop launcher)
        +---> .agents/plugins/marketplace.json          (verbatim copy of packaging/codex-marketplace.json)
 ```
 
@@ -37,7 +39,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
 
 **`templates/`** holds all `.j2` source files. Never edit files in `pipelex/`, `pipelex-codex/`, or `pipelex-vibe/` directly — they are generated output.
 
-**`skills/`** at the repo root (if present) holds only static per-skill assets (`references/` subdirectories) that are copied into every target. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
+**`skills/`** at the repo root (if present) holds only static per-skill assets (`references/` subdirectories) that are copied into every target. Several skills use it — `pipelex-design`, `pipelex-synthetic-inputs`, `pipelex-integrate`, `pipelex-scaffold` — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs` and `codegen_check.py`, the scripts the skill copies verbatim into TypeScript and Python projects, so a reference edit is followed by `make build` and, for a script, by running it — `tests/unit/test_pipelex_integrate_skill.py` executes both, and pyright type-checks the Python one against the real `pipelex-sdk`. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
 
 ## Target configuration
 
@@ -68,7 +70,7 @@ title = "Pipelex API base URL"
 description = "..."
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
@@ -93,7 +95,7 @@ The target platform is selected with `[vars].platform`:
 
 - `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
-- `mistral-vibe`: renders skills and the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`), with no Claude/Codex plugin manifest.
+- `mistral-vibe`: renders skills, the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`) and the workshop launcher as the `mcp/vibe-mcp.toml` config fragment, with no Claude/Codex plugin manifest.
 
 ### Variable resolution
 
@@ -126,7 +128,7 @@ pipelex/                       (prod target)
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.
 
-The Mistral Vibe target is manifestless: it emits skills plus the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]` plus a `hooks.toml` entry.
+The Mistral Vibe target is manifestless: it emits skills, the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and the MCP fragment (`mcp/vibe-mcp.toml`), and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]`, a `hooks.toml` entry, and the fragment's `[[mcp_servers]]` entry appended to the end of `~/.vibe/config.toml`, once the `mcp_servers = []` line a new Vibe config carries is deleted, with the API key written into its `env` table (Vibe forwards no shell environment into a stdio spawn — see [decisions.md](decisions.md) "Vibe target bakes the launcher as a config fragment").
 
 ## Codex marketplace discovery
 
@@ -185,11 +187,58 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
-| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex |
+| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex. `mcp/vibe-mcp.toml.j2` renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
+| `floors` | `defaults.toml` (`[vars.floors]` table) | `pipelex-integrate` and `pipelex-scaffold`, which state the minimum versions to the user. See below |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
+
+### Version floors
+
+`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, the Python range and the method app's port. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
+
+These are **value substitutions**, which is why they do not contradict the trimmed-variable rule this repo inherited from `mthds-plugins`: nothing branches on a floor, it is only printed. The rule that bans dead switches bans variables a skill *reads to decide what to do*.
+
+**One floor is stated as a ceiling and is easy to misread.** `pipelex_mcp` is the last `@pipelex/mcp` that **predates** the main-pipe signature in a validate verdict, so `pipelex-integrate` says "`{{ floors.pipelex_mcp }}` and earlier". Bumping it therefore means the signature arrived in a *later* release than the one recorded, and the sentence naming it has to be re-read rather than renumbered.
+
+**A misspelled key fails the build.** The renderer's Jinja environment uses `StrictUndefined`, so `{{ floors.typo }}` raises with the template and the attribute named, and `_render_or_die` turns that into a clean build failure. This reaches **every** template and every variable, not only the floors, because the hazard is the mechanism rather than one table — so a variable that may legitimately be absent must now say so, with `{% if x is defined %}` or `{{ x | default(…) }}`, instead of leaning on an undefined name being falsy. Every template rendered byte-identically when it was turned on, so nothing needed migrating; the rule is for what comes next. Under Jinja's default `Undefined` it would instead render as the empty string: a sentence shipped with a hole where the version floor belongs, looking like well-formed prose, past the build, past the freshness check, past every other test. This is the `PIPELEX_BUILD_ERROR` guard's problem in another shape — a marker cannot be used here, because the value is interpolated mid-sentence rather than selected by a branch, and strict mode is the answer that needs no marker at all.
+
+Strict mode is also the only guard that sees **every** use site. A check over the built output asks whether a floor's value is present, which a second, correctly spelled occurrence answers yes to while the misspelled one ships empty — `starters.md` states the Node floor once per template column, so that is the normal case, not a corner.
+
+**The static references keep their literals**, because `skills/*/references/` is copied verbatim into every target and never rendered. `scripts/check.py`'s `check_version_floors` is what holds them to the table, and it guards two remaining drifts:
+
+- **A floor that reaches no generated skill at all.** Not the misspelling any more — a table entry nothing states, or a sentence reworded until the number fell out of it. Either way the table and the skills have parted, and nothing else would say so.
+- **A static reference left behind by a bump.** `VERSION_FLOOR_STATIC_REFS` pins each reference sentence to a floor key with a regex capturing the number, and every occurrence is checked, not the first — `starters.md` states the Node floor once per template column.
+- **A template that spells a floor instead of reading it.** No `.j2` may contain a floor's literal value: strict rendering fires on an expression that is present and misspelled, never on one somebody replaced with its own value, and the presence check above is satisfied by any other sentence that still reads the table — so a hardcoded row renders correctly today and drifts silently at the next bump. Two rows of `pipelex-integrate`'s troubleshooting table were exactly that. The check names the template and the line, and the cure is to write `{{ floors.<key> }}`.
+
+**The anchor list is hand-kept, so the way it fails is by omission**: a floor stated in a static file that nobody adds an entry for drifts silently on the next bump, with the whole check still green. `tests/unit/test_check.py::TestVersionFloors::test_every_static_statement_of_a_floor_is_anchored` sweeps the static tree for each floor's literal and requires every occurrence to be captured by an anchor, or listed in that test as a number meaning something else — which today is `writing-mthds.md`'s `3.14` and `png.md`'s matplotlib `3.11`. Adding a static statement of a floor means adding its anchor in the same change.
+
+The patterns are **anchored on the prose around the number**, never on the number alone, and that is load-bearing: a bare numeric sweep reads `writing-mthds.md`'s JSON `"number"` example of `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python floor. The cost is that rewording a pinned sentence fails the check — which is the right way round. Re-anchor the pattern in the same change that rewords the sentence; a silent pass would mean nobody is holding that sentence to anything any more.
+
+So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make check` — and the check names every static reference still saying the old number.
 
 ### Shared template files
 
-The files in `templates/skills/shared/` listed in `SHARED_TEMPLATES` (`gen_skill_docs.py`) — the MTHDS language references — are rendered per target and written to `skills/shared/`. `frontmatter.md.j2` is a deliberate exception: it is an **include-only partial** ({% include %}-d by skill templates for their YAML frontmatter), so it is not listed in `SHARED_TEMPLATES` and is never rendered standalone.
+`templates/skills/shared/` holds two kinds of file, told apart by the `SHARED_TEMPLATES` list in `gen_skill_docs.py`.
+
+**Rendered standalone.** The files listed there — the MTHDS language references — are rendered per target and written to `skills/shared/`, where a skill body links to them.
+
+**Include-only partials.** Every other file there is `{% include %}`-d by the skill templates and never rendered on its own, so it ships as part of whichever skills include it and nowhere else. They exist so that a block several skills say word for word has one source: the credential sentence used to sit in five templates, and correcting it meant five edits and a test that asserted two of them were identical.
+
+| Partial | What it carries | Parameters the including template sets |
+| --- | --- | --- |
+| `frontmatter.md.j2` | the YAML frontmatter fields shared by every skill (Claude's `allowed-tools`) | `skill_tools` (the harness-native tools the skill pre-approves; defaults to the writing set) |
+| `mcp-requirements.md.j2` | the three bullets an MCP-backed skill opens with: the STOP on an absent tool, the STOP on a `config`-class error, and where the server gets its API key | `mcp_absent_lead` (`the tool is`, `the tools are`, `a tool is`), `mcp_absent_suffix`, `mcp_config_parenthetical`, `mcp_config_suffix`, `mcp_requirements_extra` (a bullet inserted before the credential one) |
+| `validate-call.md.j2` | how a local bundle is handed to the workshop: the path form of `files`, and the inline fallback the hosted console needs | none |
+| `formatting-hook.md.j2` | that the validation hook formats every `.mthds` write, so no skill hand-formats | `formatting_hook_write_clause` |
+| `stale-types-notice.md.j2` | the notice that a bundle change may have outdated a generated tree, in the three wordings its call sites use | `stale_types_variant` (`edit`, `design`, `organize`) |
+| `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
+
+Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
+
+```jinja
+{% set mcp_config_suffix %} Never silently skip validation.{% endset -%}
+{% include "skills/shared/mcp-requirements.md.j2" %}
+```
+
+A parameter left unset falls back to the partial's own default, so a skill sets only what it says differently. `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a skill pastes one of these blocks instead of including it.
 
 Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.

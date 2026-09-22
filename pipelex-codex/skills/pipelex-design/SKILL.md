@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle top-down with a construction workflow matched to its complexity — build a fully understood shallow graph directly as a coherent runnable bundle, or use validated signature-driven stepwise refinement for deep, uncertain, staged, or resumable work. Re-enters existing methods with the same adaptive choice for structural and contract changes.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow". Construction is complexity-adaptive: a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
 
 ---
 
@@ -36,7 +36,7 @@ This skill validates through the **`mthds_validate`** tool and projects input sc
 
 - **If the tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."* Do not write `.mthds` files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently skip validation.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+- The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 
 > **No backend setup needed**: designing and validating never run the method, so no inference backends are required.
 
@@ -68,7 +68,28 @@ Determine the three things that are the client requirement:
 
 Specify every boundary concept fully now. Decide whether each boundary and intermediate concept is simple or structured from all known consumers: if any consumer field-reads it (`$x.field`, or a construct `from = "x.field"`), it must be structured; if every consumer uses it whole (`@x` or wholesale mapping), it can stay simple. Declare each concept exactly once, owned by the root boundary or by the controller that introduces the intermediate value.
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics) before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+
+### Resolve the bundle home before writing
+
+A method's sources are loaded at runtime by the call site that runs them, so they belong beside that code from the moment they are written rather than being moved there later. Resolve the home before writing anything, taking the first that applies:
+
+- **A path the user named** — it wins over everything below.
+- **A packaged Python project, or a Python project that owns a codegen harness** — `<package>/methods/<name>/`. This is what [`../pipelex-integrate/references/python.md`](../pipelex-integrate/references/python.md) already requires of an integrated bundle: a wheel ships the sources only when they sit inside the import package, beside the call site that loads them.
+- **Any other project**, TypeScript harness projects included — `<project root>/methods/<name>/`. The method app and `pipelex-starter-js` own a codegen harness and have no import package at all; both read `methods/*` from the project root, so that is where a bundle goes. The project is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory — the same four markers `/pipelex-integrate` looks for, so that both skills agree on where the project starts.
+- **No project** — `./methods/<name>/`, in the working directory.
+
+`<name>` is the bundle's `domain` in the project language's casing, as integrate already spells it: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project. A `domain` may carry dots (`legal.contracts`), and a dot becomes that same separator — `legal-contracts`, `legal_contracts` — never a nested directory and never a literal dot, because Python derives an import path from this name and `generated.legal.contracts` would not resolve.
+
+So, at the root of a TypeScript project:
+
+> `summarize_pdf`: a PDF in, a structured summary out — extracts the text, then summarizes it. Writing to `methods/summarize-pdf/`.
+
+One project shape wants asking first: a method app carries its own `make add-method`, which copies a bundle into `methods/<name>/` and never overwrites, and which also writes the action trio, the narrower and the registry entry around it. Writing straight into that directory would leave those unwritten, so on a method app say so and let the user choose between the gesture and a plain write.
+
+Bundles that already live elsewhere keep working: every skill here takes a directory, and nothing migrates anything.
+
+**If the design will emit a `PipeFunc`, say so in that same line.** **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Prefer `PipeCompose` or `PipeLLM` wherever either does the job, as the authoring reference already advises; a `PipeFunc` is emitted when the user has a registered function and means to use it, and then the warning is given rather than the pipe refused. The user hears it here, while the shape is still theirs to change, and again at delivery.
 
 ### Choose direct construction only when all boundaries are resolved
 
@@ -107,7 +128,7 @@ Design in memory:
 - the concrete main operator/controller and every concrete leaf;
 - all controller steps, branches, mappings, and ownership.
 
-The normal target is `pipelex-wip/<bundle_dir>/main.mthds`, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
+The normal target is `main.mthds` in the bundle home resolved above, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
 
 ### Step D2 — Write once as a coherent runnable candidate
 
@@ -134,7 +155,7 @@ This mode preserves the additive, breadth-first construction loop and valid inte
 
 ### Step S1 — Write and validate the root scaffold
 
-Write `pipelex-wip/<bundle_dir>/main.mthds` (unless the user asks for another root name) with:
+Write `main.mthds` in the bundle home resolved above (unless the user asks for another root name) with:
 
 - `domain`, `description`, `main_pipe`, optional `system_prompt`;
 - the fully specified boundary concepts;
@@ -182,7 +203,8 @@ After the gate:
 1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`. A converged stepwise result normally invokes it automatically because one-definition-per-file construction history and satisfied headers need regrouping. A naturally coherent result in either mode does not take an organization round trip solely for process compliance.
 2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
 3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
-4. **Hand off inputs.** Suggest preparing real inputs with `/pipelex-inputs`.
+4. **Warn again for a `PipeFunc`.** When the delivered bundle holds one, repeat it in the report, naming the pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The contract line said it before the method existed; this is the last point before the user runs it.
+5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
 
 > **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
 
@@ -207,7 +229,7 @@ Structural changes to an existing method — adding, removing, or rewiring steps
    - Do not predeclare deeper descendants while their parent is only a signature. Introduce those child signatures when that parent receives its concrete controller definition, keeping every pending signature reachable.
    - Validate the atomic scaffold, then drain its structured backlog with Step S2.
 5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
-6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`.
+6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle — and for each one whose `sources` name a bundle file this re-entry changed or removed, **or whose `bundle_dir` holds a `.mthds` file this re-entry created** — signature-driven refinement adds files, a new file is in no `sources` map, and the call site loads every `.mthds` file under that directory — say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them.
 
 ---
 

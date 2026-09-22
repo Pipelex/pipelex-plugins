@@ -1,0 +1,49 @@
+# The unit suite on every pull request.
+#
+# Follows ../mthds-plugins/.github/workflows/tests.yml, which calls that repo's
+# `make gha-tests`. This repo has no such target — it was removed so CI would
+# call `make agent-test` instead, which is quiet unless something fails and so
+# keeps a green run to a few lines.
+#
+# `pyproject.toml`'s `addopts = "-m 'not recipes'"` deselects the recipe suite,
+# which downloads packages on a cold uv cache; `recipes.yml` runs that one.
+name: Tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      # `uv sync` re-locks when pyproject.toml has moved, which would have CI
+      # test a dependency set the committed uv.lock does not describe. Assert
+      # instead: a pull request that edits dependencies must carry the lock.
+      UV_LOCKED: "1"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Run tests
+        run: make agent-test

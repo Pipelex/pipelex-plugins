@@ -1,0 +1,5 @@
+{#- How a bundle is handed to the workshop: the path form of `files`, and the
+   inline fallback. Included mid-sentence by every skill that submits a local
+   bundle, so it strips its own trailing newline (the closing comment below). -#}
+Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+{#- -#}

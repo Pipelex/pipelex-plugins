@@ -1,0 +1,71 @@
+# On a pull request into main, requires that CHANGELOG.md carries an entry for
+# the version being shipped. The merge to main IS the publish here — install is
+# a marketplace add against this repository's default branch — so this is the
+# last moment a release can be stopped for having no changelog entry.
+#
+# The version is read from `targets/prod.toml`'s `[plugin].version`, the repo's
+# source of truth, and `version-check.yml` is what ties that number to the
+# release branch's name.
+#
+# Follows ../pipelex-sdk-js/.github/workflows/changelog-check.yml and
+# ../pipelex/.github/workflows/changelog-check.yml, with one deliberate
+# departure: this repo's changelog headings carry no `v` (`## [0.5.0] - …`), so
+# the pattern matched here is `## [X.Y.Z] -` rather than `## [vX.Y.Z] -`.
+name: Changelog Version Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    # `edited` is what a retarget emits — see version-check.yml.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-changelog:
+    name: Changelog entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Check Changelog Version
+        run: |
+          VERSION=$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("targets/prod.toml").read_text())["plugin"]["version"])')
+          echo "Version from targets/prod.toml: $VERSION"
+
+          # The version is read from a file on the pull request's head and then
+          # becomes part of a regular expression, so it is validated first —
+          # the same guard `version-check.yml` applies to the same value. Escaping
+          # the dots is not enough on its own: a version that is itself a pattern,
+          # `[0-9]+[.][0-9]+[.][0-9]+`, survives the escaping as a live regex and
+          # matches whatever heading the changelog already carries, passing this
+          # gate against somebody else's release. This is the last gate before the
+          # merge that publishes, so it answers for its own question rather than
+          # leaning on the version job beside it.
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::targets/prod.toml [plugin].version is not an X.Y.Z version: $VERSION"
+            exit 1
+          fi
+
+          # Anchored, and the version's dots escaped: unanchored `0.5.0` would
+          # match `0x5x0` in the middle of a paragraph and pass a release with
+          # no heading at all.
+          if ! grep -qE "^## \[${VERSION//./\\.}\] - " CHANGELOG.md; then
+            echo "::error::No changelog entry found for version $VERSION"
+            echo ""
+            echo "The following versions are in the changelog:"
+            grep -E "^## \[[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md | head -10
+            echo ""
+            echo "Please add a changelog entry: ## [$VERSION] - YYYY-MM-DD"
+            exit 1
+          fi
+          echo "Changelog entry found for version $VERSION"

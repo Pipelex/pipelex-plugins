@@ -12,11 +12,48 @@ marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
 
+# Version floors the skills state to the user. One table, so a bump is one edit
+# rather than a hunt through prose. These are VALUE substitutions — the kind the
+# trimmed-variable rule allows — not switches a skill branches on: nothing reads
+# a floor to decide what to do, only to say what it is.
+#
+# The static references under `skills/` are copied verbatim into every target and
+# are never rendered, so they keep their literals; `scripts/check.py`'s
+# `check_version_floors` holds them to this table and names the file and line when
+# one drifts. Bump here, run `make build`, and the check tells you which static
+# references still say the old number.
+#
+# Each floor's meaning, because "the first release carrying X" is what makes a
+# floor a fact rather than a preference:
+#   pipelex_sdk_js   the first @pipelex/sdk with everything pipelex-integrate's
+#                    call site and offline gate use (the run-results surface the
+#                    call site hands back is the last of it to arrive)
+#   pipelex_sdk_py   the first pipelex-sdk with everything pipelex-integrate's
+#                    call site and offline gate use (the run-results surface —
+#                    the artifact stack, summarize_usage, working_memory — is
+#                    the last of it to arrive, after the offline codegen check)
+#   pipelex_mcp      the last @pipelex/mcp that PREDATES the main-pipe signature
+#                    in a validate verdict — the one floor stated as "and earlier",
+#                    so a bump here means the signature arrived in a later release
+#                    than this one and the sentence naming it has to be re-read
+#   node             the Node the JS templates' `engines.node` names
+#   python_min/max   the range the Python starter's `requires-python` names
+#   method_app_port  the port pipelex-method-apps' webapp-js template serves on
+[vars.floors]
+pipelex_sdk_js = "0.18.0"
+pipelex_sdk_py = "0.10.1"
+pipelex_mcp = "0.13.0"
+node = "22.12"
+python_min = "3.11"
+python_max = "3.14"
+method_app_port = "4300"
+
 # The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
 # (stdio) — definitive, not a BYOK workaround: builders authoring local files
 # are the plugin's audience, and the hosted console is a connector users add
-# in their host's own UI, never a plugin declaration (rationale:
-# ../pipelex-mcp/wip/plugin-reconciliation.md §8). The workshop authenticates
+# in their host's own UI, never a plugin declaration (rationale: the Pipelex
+# workspace's wip/history/mcp-dual-deployment/pipelex-mcp-plugin-reconciliation.md
+# §8). The workshop authenticates
 # with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
 # - Claude: the `user_config` tables below become the manifest's `userConfig`
 #   (Claude prompts for them when the plugin is enabled; sensitive values go
@@ -31,6 +68,10 @@ harness_name = "Claude Code"
 #   MCP-backed skill (regressed in 0.3.1 — see docs/decisions.md).
 # - Codex: `env_vars` names the variables Codex forwards into the spawn
 #   (Codex whitelist-filters MCP spawn env; terminal sessions carry them).
+# - Mistral Vibe: no manifest. mcp/vibe-mcp.toml renders command/args as a
+#   [[mcp_servers]] stdio entry the user copies into ~/.vibe/config.toml, and
+#   each env_vars name becomes an empty `env` key they fill in, because Vibe
+#   forwards no shell env into the spawn and expands no variables.
 # Dev override: point command/args at a local checkout
 # (e.g. command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) +
 # `make build` on Claude; a same-named [mcp_servers.pipelex] entry in

@@ -26,7 +26,7 @@ Equivalence is checked through the **`mthds_validate`** tool, served by the plug
 
 - **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* Do not touch the bundle files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never reorganize unvalidated.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Don't hand-format, and re-read a file before editing it again after the hook reformatted it.
 
@@ -70,7 +70,7 @@ Within every file: satisfied signature headers are dropped; a still-pending sign
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `pipelex-wip/<bundle_dir>/`).
+1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
 2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
 
@@ -104,7 +104,7 @@ Only after the candidate verdict matches:
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree, never beside the bundle — and for each one whose `sources` name a file in this directory, or whose `bundle_dir` is this directory or holds it, say the generated types there are now stale and offer `/pipelex-integrate` to refresh them: an equivalent verdict leaves the concept set as it was, but the new layout removes, rewrites and adds the very files the sidecar hashed, so that project's drift gate reports each of them as `stale-source` until a refresh records the new layout. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
 
 ---
 

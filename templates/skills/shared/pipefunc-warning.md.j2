@@ -1,0 +1,15 @@
+{#- Box G of `wip/plugin-skills-gaps/design.md`: `PipeFunc` is supported on the
+   hosted plane and warned about, never refused. One sentence, included word for
+   word wherever a user meets a `PipeFunc`, so the warning says the same thing
+   every time; `TestSharedSkillIncludes` holds the roster of skills that carry it.
+
+   The authoring reference `skills/pipelex-design/references/writing-mthds.md`
+   says it too and cannot include it: the repo-root `skills/` tree is copied
+   verbatim into each target and never rendered, so an include directive there
+   would ship to the user as literal text. That copy is instead held to this body
+   by the same test — reword one and reword the other in the same change.
+
+   Strips its own trailing newline (the closing comment below) so it can be
+   included mid-sentence as well as on a line of its own. -#}
+**`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
+{#- -#}

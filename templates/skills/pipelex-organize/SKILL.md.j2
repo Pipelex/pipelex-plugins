@@ -19,11 +19,12 @@ It is a **content-preserving transformation** — the method's semantics never c
 
 Equivalence is checked through the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — this skill never reorganizes without proving the verdict is preserved.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected —{% if platform == "mistral-vibe" %} on {{ harness_name }} the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`) is not auto-spawned: register it in Vibe's MCP configuration with `PIPELEX_API_KEY` in its environment, then retry.{% else %} the plugin manifest spawns the local workshop (`{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection{% if platform == "claude" %} (`/mcp`){% endif %}.{% endif %}"* Do not touch the bundle files without validation available.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never reorganize unvalidated.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+{% set mcp_absent_suffix %} Do not touch the bundle files without validation available.{% endset -%}
+{% set mcp_config_suffix %} Never reorganize unvalidated.{% endset -%}
+{% include "skills/shared/mcp-requirements.md.j2" %}
 
-**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Don't hand-format, and re-read a file before editing it again after the hook reformatted it.
+{% set formatting_hook_write_clause %}Don't hand-format{% endset -%}
+{% include "skills/shared/formatting-hook.md.j2" %}
 
 ---
 
@@ -65,8 +66,8 @@ Within every file: satisfied signature headers are dropped; a still-pending sign
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `pipelex-wip/<bundle_dir>/`).
-2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
+2. Call `mthds_validate` with `files` for every file. {% include "skills/shared/validate-call.md.j2" %}
 3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
 
 Branch on the structured verdict:
@@ -99,7 +100,8 @@ Only after the candidate verdict matches:
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+{% set stale_types_variant %}organize{% endset -%}
+One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), {% include "skills/shared/stale-types-notice.md.j2" %} No approval prompts — by the time you report, the bundle is organized and proven equivalent.
 
 ---
 

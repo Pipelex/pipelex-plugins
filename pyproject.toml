@@ -9,11 +9,15 @@ requires-python = ">=3.13"
 dev = [
   "jinja2>=3.1.4",
   "mypy>=1.11.2",
+  # Not imported by the tooling: `tests/unit` runs `pipelex-integrate`'s shipped Python drift gate
+  # (`skills/pipelex-integrate/references/codegen_check.py`) against the real offline check, and
+  # pyright type-checks that script against the real SDK (see `[tool.pyright] include`).
+  "pipelex-sdk>=0.10.0",
   "pyright>=1.1.410",
   "pytest>=8.0.0,<9.0.0",
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
-  "ruff>=0.6.8",
+  "ruff==0.16.4",
 ]
 
 [build-system]
@@ -23,6 +27,12 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+# The recipe suite executes the shipped synthetic-inputs recipes, which downloads
+# packages on a cold uv cache. Opt in with `make test-recipes` or `pytest -m recipes`.
+addopts = "-m 'not recipes'"
+markers = [
+  "recipes: executes the pipelex-synthetic-inputs recipe blocks (runs uv, downloads packages)",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
@@ -38,7 +48,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.pyright]
-include = ["scripts", "tests"]
+include = ["scripts", "tests", "skills/pipelex-integrate/references"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true

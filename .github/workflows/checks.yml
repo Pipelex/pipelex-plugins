@@ -1,0 +1,53 @@
+# `make check` on every pull request — template freshness first of all.
+#
+# The generated plugin trees (`pipelex/`, `pipelex-codex/`, `pipelex-vibe/`) are
+# checked in, so a template edited without `make build` ships a plugin that
+# disagrees with its own source, and `scripts/gen_skill_docs.py --check` is the
+# only thing that catches it. `make check` also runs the Claude and Codex
+# marketplace consistency checks, ruff format, ruff lint, the unused-import pass
+# the lint config otherwise ignores, pyright and mypy.
+#
+# Follows ../mthds-plugins/.github/workflows/checks.yml, with the cached uv
+# install taken from pipelex/.github/workflows/lint-check.yml. `make agent-check`
+# is deliberately NOT what runs here: it rewrites files (fix-unused-imports,
+# ruff format, ruff check --fix), and a check must report rather than repair.
+name: Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      # `uv sync` re-locks when pyproject.toml has moved, which would have CI
+      # test a dependency set the committed uv.lock does not describe. Assert
+      # instead: a pull request that edits dependencies must carry the lock.
+      UV_LOCKED: "1"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Run checks
+        run: make check

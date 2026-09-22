@@ -273,7 +273,7 @@ output = "Page[]"
 model = "@default-extract-web-page"
 ```
 
-Output is `Page[]` (a list of pages with `text_and_images` and `page_view`).
+Output is `Page[]` (a list of pages with `text_and_images`, plus a `page_view` image of each page only when the pipe sets `page_views = true`, which works on PDFs only). The other optional fields are `page_views_dpi`, `max_page_images` (`0` keeps no embedded images), `page_image_captions`, and, for web pages only, `render_js` and `include_raw_html`.
 
 > **Note**: Use `Document` for PDFs, other document formats, and web page URLs. For web pages, use `@default-extract-web-page` as the model. `Image` for images. "PDF" and "URL" are formats, not native concepts.
 

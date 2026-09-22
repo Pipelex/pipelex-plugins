@@ -35,7 +35,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TypeAlias, cast
 
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound, TemplateSyntaxError, UndefinedError
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound, TemplateSyntaxError, UndefinedError
 
 
 class Platform(StrEnum):
@@ -92,13 +92,16 @@ HOOK_TEMPLATES = [
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
+# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper, plus
+#   mcp/vibe-mcp.toml, the workshop launcher as a [[mcp_servers]] config
+#   fragment: Vibe has no plugin manifest to declare the server in, so the user
+#   copies the fragment into ~/.vibe/config.toml, as with vibe-hooks.toml.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
     Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
-    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
+    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2", "mcp/vibe-mcp.toml.j2"],
 }
 
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
@@ -294,9 +297,24 @@ def render_templates(
         msg = f"Templates directory not found: {templates_dir}"
         raise SystemExit(msg)
 
+    # `StrictUndefined`, because the default `Undefined` renders a misspelled key as
+    # the empty string without raising: `{{ floors.pipelex_sdk_jss }}` would ship a
+    # sentence with a hole where the version floor belongs, past every other gate.
+    # Strict mode turns that into a build failure naming the template and the
+    # attribute, at the use site — which is the only check that sees EVERY use, and
+    # so the only one a second, correctly spelled occurrence cannot hide.
+    #
+    # It reaches every template, not only the floors, and that is the point: the
+    # hazard is the mechanism, not one variable. The consequence for an author is
+    # that a variable which may legitimately be absent must SAY so — `{% if x is
+    # defined %}`, or `{{ x | default(...) }}` — rather than leaning on an
+    # undefined name being falsy or empty. Every template rendered byte-identically
+    # when this was turned on, so nothing was migrated; the rule is for what comes
+    # next.
     env = Environment(
         loader=FileSystemLoader(str(templates_dir)),
         keep_trailing_newline=True,
+        undefined=StrictUndefined,
     )
 
     # Collect shared templates (must all exist — fail loudly if missing)
@@ -418,9 +436,10 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) in
     # targets/defaults.toml + `make build` on Claude; a same-named
     # [mcp_servers.pipelex] entry in ~/.codex/config.toml outranks the plugin
-    # tier on Codex. Vibe gets no entry (no manifest; docs point at manual
-    # launcher registration). Skipped when the target defines no mcp_server
-    # block.
+    # tier on Codex. Vibe gets no manifest entry because it has no manifest:
+    # its target renders the same launcher as the mcp/vibe-mcp.toml config
+    # fragment instead (see HOOK_TEMPLATES_BY_PLATFORM). Skipped when the
+    # target defines no mcp_server block.
     mcp_server = config.template_vars.get("mcp_server")
     if isinstance(mcp_server, dict):
         raw_command = mcp_server.get("command", "")
@@ -467,6 +486,16 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     return base
 
 
+def _remove(path: Path) -> None:
+    """Delete whatever is at `path`, without following a symlink to its target."""
+    # is_symlink() must be checked before is_dir(): a symlink-to-dir is both, and
+    # rmtree would chase the link and delete its target.
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def _refresh_copy(src: Path, dst: Path) -> None:
     """Replace whatever exists at dst with a fresh copy of src's contents.
 
@@ -474,12 +503,7 @@ def _refresh_copy(src: Path, dst: Path) -> None:
     before copytree runs. Plain files/dirs are removed too so the build is
     idempotent.
     """
-    # is_symlink() must be checked before is_dir(): a symlink-to-dir is both,
-    # and rmtree would chase the link and delete its target.
-    if dst.is_symlink() or dst.is_file():
-        dst.unlink()
-    elif dst.is_dir():
-        shutil.rmtree(dst)
+    _remove(dst)
     shutil.copytree(src, dst)
 
 
@@ -512,6 +536,72 @@ def setup_static_assets(
         refs_dst = skill_output / "references"
         if refs_src.is_dir():
             _refresh_copy(refs_src, refs_dst)
+        elif refs_dst.is_dir() or refs_dst.is_symlink():
+            # A retired source directory must take its copies with it. Without this the
+            # build leaves stale references shipping in every target and `--check`
+            # reports an ORPHAN no rebuild can clear.
+            _remove(refs_dst)
+
+
+def static_asset_mismatches(
+    base_dir: Path,
+    output_dir: Path,
+    templates_dir: Path,
+    include_skills: list[str] | None,
+) -> list[str]:
+    """Compare the copied per-skill `references/` against their source.
+
+    `setup_static_assets` copies rather than renders, so these files never enter
+    a BuildResult and freshness checking used to skip them entirely — a source
+    reference edited without `make build` shipped stale while `--check` reported
+    everything fresh. The references are executable know-how, so a stale copy is
+    a plugin whose recipes differ from the ones the test suite ran.
+    """
+    if output_dir == base_dir:
+        return []  # root target: source and destination are the same tree
+
+    if include_skills is not None:
+        skill_names = include_skills
+    else:
+        skill_names = sorted(path.parent.name for path in templates_dir.glob("skills/*/SKILL.md.j2"))
+
+    def label(path: Path) -> str:
+        """Repo-relative when it can be, absolute otherwise — a caller may point
+        the comparison at a directory outside the repo."""
+        try:
+            return str(path.relative_to(base_dir))
+        except ValueError:
+            return str(path)
+
+    problems: list[str] = []
+    for skill_name in skill_names:
+        refs_src = base_dir / "skills" / skill_name / "references"
+        refs_dst = output_dir / "skills" / skill_name / "references"
+        if not refs_src.is_dir():
+            if refs_dst.is_dir():
+                problems.append(f"  ORPHAN: {label(refs_dst)} (no source in skills/{skill_name}/references)")
+            continue
+
+        expected: set[Path] = {path.relative_to(refs_src) for path in refs_src.rglob("*") if path.is_file()}
+        actual: set[Path] = set()
+        if refs_dst.is_dir():
+            actual = {path.relative_to(refs_dst) for path in refs_dst.rglob("*") if path.is_file()}
+
+        for rel in sorted(expected - actual):
+            problems.append(f"  MISSING: {label(refs_dst / rel)}")
+        for rel in sorted(actual - expected):
+            problems.append(f"  ORPHAN: {label(refs_dst / rel)} (no matching source file)")
+        for rel in sorted(expected & actual):
+            # An unreadable file is a finding, not a traceback: check_freshness runs
+            # under `make check`, where an OSError escaping here kills the whole gate.
+            try:
+                differs = (refs_src / rel).read_bytes() != (refs_dst / rel).read_bytes()
+            except OSError as exc:
+                problems.append(f"  UNREADABLE: {label(refs_dst / rel)} ({exc.strerror})")
+                continue
+            if differs:
+                problems.append(f"  STALE: {label(refs_dst / rel)}")
+    return problems
 
 
 def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False) -> BuildResult:
@@ -683,6 +773,10 @@ def check_freshness(base_dir: Path, target_name: str = "prod") -> int:
                 if skill_md.parent not in rendered_skill_parents:
                     rel = skill_md.relative_to(base_dir)
                     all_stale.append(f"  ORPHAN: {rel} (no corresponding .j2 template)")
+
+        # Copied static assets (per-skill references/) are not rendered, so they
+        # need their own comparison — see static_asset_mismatches.
+        all_stale.extend(static_asset_mismatches(base_dir, output_dir, base_dir / TEMPLATES_DIR_NAME, config.include_skills))
 
         # Detect leaked .j2 files in output directories (should only be in templates/)
         if output_skills_dir.is_dir():

@@ -16,7 +16,7 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 	help env check-uv install lock li \
 	gen-skill-docs build vendor-hook check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
-	test agent-test gha-tests tp \
+	test agent-test test-recipes tp \
 	cleanderived cleanenv cleanall reinstall ri \
 	codex-use-local codex-use-official codex-refresh codex-status
 
@@ -106,6 +106,10 @@ check-shared: install ## Verify shared refs + target versions + template freshne
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all --check
 	@$(VENV_RUFF) format --check .
 	@$(VENV_RUFF) check .
+# `ignore = ["F401"]` in pyproject hides unused imports from the line above;
+# `--select` on the command line overrides it. Reported here, never fixed,
+# because `agent-check` is the target that repairs and this one only reports.
+	@$(VENV_RUFF) check --select=F401 --no-fix .
 	@$(MAKE) --no-print-directory pyright mypy
 
 check-claude: install ## Verify Claude marketplace packaging consistency
@@ -134,8 +138,8 @@ tp: install ## Run tests with prints (TEST=name to filter)
 		$(VENV_PYTEST) tests/ -s -v; \
 	fi
 
-gha-tests: install ## Run tests for GitHub Actions (exit on first failure, quiet)
-	@$(VENV_PYTEST) --exitfirst --quiet
+test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
+	@$(VENV_PYTEST) tests/recipes -m recipes -v
 
 agent-test: install ## Run unit tests quietly (output only on failure)
 	@echo "• Running unit tests..."

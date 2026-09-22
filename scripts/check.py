@@ -11,13 +11,103 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
-from scripts.gen_skill_docs import SHARED_TEMPLATES, Platform
+from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
 STALE_REF_PATTERN = re.compile(r"references/(?:" + "|".join(re.escape(stem) for stem in _SHARED_STEMS) + r")")
+# A shared include whose variant parameter is unset or misspelled emits this marker instead of
+# rendering as the empty string: Jinja's default `Undefined` compares unequal without raising, so
+# a typo would otherwise ship a skill with a whole block silently missing.
+BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
+# Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
+ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
 TARGETS_DIR_NAME = "targets"
+
+# The version floors the skills state, and where a STATIC reference states one.
+#
+# A template reads its floor from `[vars.floors]` in `targets/defaults.toml`, so a
+# bump reaches every rendered skill on its own, and a misspelled key is caught at
+# build time — the renderer runs under `StrictUndefined`, which raises on the
+# misspelling itself rather than letting it render as the empty string. The first
+# half below is therefore no longer that guard: it asserts each floor still reaches
+# the built output at all, which is what catches a floor nobody states any more —
+# a dead table entry, or a sentence reworded until it dropped the number.
+#
+# The static references under `skills/` are the ones nothing renders: they are
+# copied verbatim into every target, so they keep their literals and only the
+# second half can hold them to the table. Every occurrence of a floor there needs
+# its own entry — the check reads the ones listed here and nothing else, so a
+# statement left off this list drifts silently on the next bump.
+#
+# Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
+# bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
+# `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python
+# floor. A reworded reference fails this check instead of passing silently, which
+# is the right way round — re-anchor the pattern in the same change that rewords
+# the sentence.
+VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
+    (
+        "skills/pipelex-integrate/references/typescript.md",
+        r"`@pipelex/sdk` (\d+\.\d+\.\d+), the floor the skill's step 8 installs",
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/typescript.md",
+        r"a too-old one is raised to (\d+\.\d+\.\d+) or later, the floor step 8 installs",
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/typescript.md",
+        r"the SDK's own Node floor \(>= (\d+\.\d+)\)",
+        "node",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen-check.mjs",
+        r'const SDK_MINIMUM = "(\d+\.\d+\.\d+)";',
+        "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/python.md",
+        r"carried by `pipelex-sdk` from (\d+\.\d+\.\d+) on",
+        "pipelex_sdk_py",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen_check.py",
+        r"`pipelex-sdk` \((\d+\.\d+\.\d+) or later\)",
+        "pipelex_sdk_py",
+    ),
+    (
+        "skills/pipelex-integrate/references/codegen_check.py",
+        r"pipelex-sdk (\d+\.\d+\.\d+) or later is not importable",
+        "pipelex_sdk_py",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "Node \u2265 the `engines\\.node` field of `package\\.json` \\((\\d+\\.\\d+) at writing\\)",
+        "node",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "a Python inside `requires-python` of `pyproject\\.toml` \\((\\d+\\.\\d+)\u2013\\d+\\.\\d+ at writing\\)",
+        "python_min",
+    ),
+    (
+        "skills/pipelex-scaffold/references/starters.md",
+        "a Python inside `requires-python` of `pyproject\\.toml` \\(\\d+\\.\\d+\u2013(\\d+\\.\\d+) at writing\\)",
+        "python_max",
+    ),
+]
+
+# A number in a template that equals a floor and means something else entirely.
+# Empty today, and meant to stay nearly so: each entry names a template and the
+# literal it may contain, and adding one is a claim a reader should be able to
+# check from the sentence around the number. It is what keeps the template sweep
+# from being a rule with no way out — the failure mode of a correct check nobody
+# can satisfy is that somebody deletes it.
+TEMPLATE_FLOOR_LOOKALIKES: set[tuple[str, str]] = set()
+
 DEFAULTS_FILE = "defaults.toml"
 CLAUDE_MARKETPLACE_PATH = Path(".claude-plugin/marketplace.json")
 CODEX_MARKETPLACE_PATH = Path("packaging/codex-marketplace.json")
@@ -369,6 +459,154 @@ def check_stale_references(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_skill_argument_placeholders(base_dir: Path) -> list[str]:
+    """Check that no generated SKILL.md carries a token Claude Code replaces with the invocation's arguments.
+
+    Before the model reads a skill body, Claude Code substitutes `$ARGUMENTS` with the whole argument
+    string and `$0`, `$1`, … with its whitespace-separated words, so shell code holding `"$1"` or
+    `awk '{ print $9 }'` reaches the model as a different command whenever the skill was invoked with
+    enough words. The pattern is wider than Claude Code's own, which spares `$1x` and leaves `$N` alone
+    when there are too few words: a guard should not depend on either detail. Every target is scanned
+    because the body is shared, and reference files are not, because a tool reads them unsubstituted.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            for idx, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
+                for match in ARGUMENT_PLACEHOLDER_PATTERN.finditer(line):
+                    rel = skill_md.relative_to(base_dir)
+                    errors.append(f"{rel}:{idx}: `{match.group()}` is replaced by the skill's invocation arguments in Claude Code")
+    return errors
+
+
+def check_build_error_markers(base_dir: Path) -> list[str]:
+    """Check that no generated file carries a shared include's build-error marker.
+
+    A shared partial that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
+    including template set no variant or misspelled one. Without it the branch would render as the
+    empty string, and the block would vanish from the shipped skill with the build, the freshness
+    check and the tests all green.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            for idx, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
+                if BUILD_ERROR_MARKER in line:
+                    rel = skill_md.relative_to(base_dir)
+                    errors.append(f"{rel}:{idx}: {line.strip()}")
+    return errors
+
+
+def load_version_floors(base_dir: Path) -> dict[str, str]:
+    """Read `[vars.floors]` from the target defaults."""
+    defaults_path = base_dir / TARGETS_DIR_NAME / DEFAULTS_FILE
+    raw = tomllib.loads(defaults_path.read_text(encoding="utf-8"))
+    floors = raw.get("vars", {}).get("floors", {})
+    return {str(key): str(value) for key, value in floors.items()}
+
+
+def check_version_floors(base_dir: Path) -> list[str]:
+    """Check that every version floor reaches the built skills, and that the static
+    references state the same numbers as the table.
+
+    The misspelled-variable case belongs to the renderer now: it builds under
+    `StrictUndefined`, so `{{ floors.typo }}` fails the build naming the template
+    and the attribute, at every use site, instead of rendering as the empty string.
+
+    What the first part still catches is a floor that reaches no generated skill at
+    all — a table entry nothing states any more, or a sentence reworded until the
+    number fell out of it. The second holds the verbatim-copied references under
+    `skills/` to the table, since nothing renders those.
+
+    The third is what neither of the others can see: a template that spells a floor
+    as a LITERAL instead of reading it. Strict mode fires on an expression that is
+    there and misspelled, never on one that was replaced by its own value, and the
+    presence check reads the whole built output at once — so another sentence still
+    reading the table keeps the value present while the hardcoded one waits to drift
+    at the next bump. Two rows in `pipelex-integrate` were exactly that.
+    """
+    errors: list[str] = []
+    floors = load_version_floors(base_dir)
+    if not floors:
+        return [f"{TARGETS_DIR_NAME}/{DEFAULTS_FILE}: [vars.floors] is missing or empty"]
+
+    for output_dir in _collect_output_dirs(base_dir):
+        rendered = "\n".join(skill_md.read_text(encoding="utf-8") for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")))
+        for key, value in sorted(floors.items()):
+            if value not in rendered:
+                rel = output_dir.relative_to(base_dir)
+                errors.append(
+                    f"{rel}: floor `{key}` = {value} reaches no generated skill — no skill states it any more, or its sentence was reworded"
+                )
+
+    for rel_path, pattern, key in VERSION_FLOOR_STATIC_REFS:
+        path = base_dir / rel_path
+        if not path.is_file():
+            errors.append(f"{rel_path}: static reference is missing, but a version floor is pinned to it")
+            continue
+        expected = floors.get(key)
+        if expected is None:
+            errors.append(f"{rel_path}: pinned to floor `{key}`, which [vars.floors] does not define")
+            continue
+        text = path.read_text(encoding="utf-8")
+        matches = list(re.finditer(pattern, text))
+        if not matches:
+            errors.append(
+                f"{rel_path}: the sentence stating the `{key}` floor was reworded — re-anchor VERSION_FLOOR_STATIC_REFS in this same change"
+            )
+            continue
+        # Every occurrence, not the first: `starters.md` states the Node floor once per
+        # template column, so a second one left behind by a bump is exactly the drift
+        # this rule exists to catch.
+        for match in matches:
+            if match.group(1) != expected:
+                line = text[: match.start()].count("\n") + 1
+                errors.append(f"{rel_path}:{line}: states {match.group(1)} for floor `{key}`, but [vars.floors] says {expected}")
+
+    errors.extend(_hardcoded_floors_in_templates(base_dir, floors))
+    return errors
+
+
+def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> list[str]:
+    """A template must READ a floor, never spell it.
+
+    A literal renders to the right number today and to the wrong one after the next
+    bump, and nothing else sees it: strict mode only fires on an expression that is
+    present and misspelled, and the presence check reads every skill at once, so a
+    second sentence still reading the table keeps the value present.
+
+    This one IS a numeric sweep, which the static-reference rule above deliberately
+    is not, and the difference is what each reads. `skills/` is prose about the whole
+    ecosystem, where `3.14` is a JSON example and `3.11` is matplotlib's version, so
+    a sweep there would be mostly false. `templates/` is ours, every floor in it
+    belongs in the table, and demanding an anchor per sentence would rebuild the same
+    hand-kept list whose omissions this rule exists to catch. The escape is
+    `TEMPLATE_FLOOR_LOOKALIKES` instead: a number that genuinely means something else
+    is named there once, with its reason.
+    """
+    errors: list[str] = []
+    templates_dir = base_dir / "templates"
+    if not templates_dir.is_dir():
+        return errors
+
+    for template in sorted(templates_dir.rglob("*.j2")):
+        text = template.read_text(encoding="utf-8")
+        rel = template.relative_to(base_dir)
+        for key, value in sorted(floors.items()):
+            if (rel.as_posix(), value) in TEMPLATE_FLOOR_LOOKALIKES:
+                continue
+            start = text.find(value)
+            while start != -1:
+                line = text[:start].count("\n") + 1
+                errors.append(
+                    f"{rel}:{line}: spells floor `{key}` as the literal {value} — write `{{{{ floors.{key} }}}}` so the next bump reaches it, "
+                    "or name it in TEMPLATE_FLOOR_LOOKALIKES if it means something else here"
+                )
+                start = text.find(value, start + 1)
+
+    return errors
+
+
 def check_shared_files_exist(base_dir: Path) -> list[str]:
     """Check that all expected shared template source files are present."""
     shared_dir = base_dir / "templates" / "skills" / "shared"
@@ -425,12 +663,43 @@ def check_codex_no_claude_artifacts(base_dir: Path) -> list[str]:
     return errors
 
 
-def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
-    """Check that Mistral Vibe targets emit Vibe-only hook artifacts.
+def _vibe_mcp_fragment_errors(target_name: str, fragment: Path) -> list[str]:
+    """Check that the Vibe MCP fragment declares the workshop launcher Vibe can load.
 
-    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths
-    and hooks from hooks.toml. The generated target must therefore not carry a
-    plugin manifest, and it must render the post_tool hook config/script pair.
+    The fragment must parse as TOML and hold exactly one `[[mcp_servers]]` entry:
+    the `pipelex` server over stdio with a command, which is the only shape that
+    keeps tool names stable (`pipelex_mthds_validate` on Vibe) and spawns locally.
+    """
+    rel = "mcp/vibe-mcp.toml"
+    try:
+        data = tomllib.loads(fragment.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        return [f"[{target_name}] {rel} is not valid TOML: {exc}"]
+    servers: object = data.get("mcp_servers")
+    if not isinstance(servers, list) or len(cast("list[object]", servers)) != 1:
+        return [f"[{target_name}] {rel} must declare exactly one [[mcp_servers]] entry"]
+    server: object = cast("list[object]", servers)[0]
+    if not isinstance(server, dict):
+        return [f"[{target_name}] {rel} [[mcp_servers]] entry is not a table"]
+    entry = cast("dict[str, object]", server)
+    errors: list[str] = []
+    if entry.get("name") != MCP_SERVER_NAME:
+        errors.append(f'[{target_name}] {rel} must name the server "{MCP_SERVER_NAME}"')
+    if entry.get("transport") != "stdio":
+        errors.append(f'[{target_name}] {rel} must use transport = "stdio"')
+    if not entry.get("command"):
+        errors.append(f"[{target_name}] {rel} must set a command")
+    return errors
+
+
+def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
+    """Check that Mistral Vibe targets emit Vibe-only hook and MCP artifacts.
+
+    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths,
+    hooks from hooks.toml, and MCP servers from config.toml. The generated target
+    must therefore not carry a plugin manifest, it must render the post_tool hook
+    config/script pair, and it must render the workshop launcher as the
+    `mcp/vibe-mcp.toml` config fragment.
     """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
@@ -462,6 +731,12 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh missing")
         elif not hook_script.stat().st_mode & 0o111:
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh is not executable")
+
+        mcp_fragment = output_dir / "mcp" / "vibe-mcp.toml"
+        if not mcp_fragment.is_file():
+            errors.append(f"[{target_name}] mcp/vibe-mcp.toml missing")
+        else:
+            errors.extend(_vibe_mcp_fragment_errors(target_name, mcp_fragment))
 
         for filename in ("hooks.json", "codex-hooks.json", "check-mthds.sh", "check-mthds-codex.sh"):
             if (output_dir / "hooks" / filename).exists():
@@ -516,10 +791,29 @@ def run_shared_checks(base_dir: Path) -> bool:
     )
 
     failed |= _run_check(
+        "Checking version floors against targets/defaults.toml...",
+        check_version_floors(base_dir),
+        "FAIL: A version floor drifted from [vars.floors], or did not reach the built skills.",
+        "  Version floors match [vars.floors] and reach every target.",
+    )
+
+    failed |= _run_check(
         "Checking for stale references/ paths to shared files...",
         check_stale_references(base_dir),
         "FAIL: Found stale references/ paths (should use ../shared/ instead).",
         "  No stale references found.",
+    )
+    failed |= _run_check(
+        "Checking skill bodies for tokens Claude Code replaces with invocation arguments...",
+        check_skill_argument_placeholders(base_dir),
+        "FAIL: Found $ARGUMENTS or $<digit> in a SKILL.md. Rewrite without the token (an escape reaches Codex and Vibe verbatim).",
+        "  No argument placeholders found.",
+    )
+    failed |= _run_check(
+        "Checking for unresolved shared-include variants...",
+        check_build_error_markers(base_dir),
+        "FAIL: A shared include rendered its build-error branch (the including template set no variant, or misspelled one).",
+        "  Every shared include resolved its variant.",
     )
     failed |= _run_check(
         "Checking all shared template files exist...",

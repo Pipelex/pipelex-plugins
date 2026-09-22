@@ -16,9 +16,9 @@ It is a **content-preserving transformation** — the method's semantics never c
 
 Equivalence is checked through the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — this skill never reorganizes without proving the verdict is preserved.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — on Mistral Vibe the local workshop (`npx -y @pipelex/mcp@latest`) is not auto-spawned: register it in Vibe's MCP configuration with `PIPELEX_API_KEY` in its environment, then retry."* Do not touch the bundle files without validation available.
+- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — on Mistral Vibe the local workshop (`npx -y @pipelex/mcp@latest`) is not auto-spawned: append the `[[mcp_servers]]` entry from `mcp/vibe-mcp.toml` in the `pipelex-vibe` bundle (beside its `skills/` directory) to the end of `~/.vibe/config.toml`, after deleting any `mcp_servers = []` line and any hand-registered `pipelex` entry there, write your `PIPELEX_API_KEY` into its `env` table, then retry."* Do not touch the bundle files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never reorganize unvalidated.
-- The server authenticates to the validation API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+- The server authenticates to the API with **`PIPELEX_API_KEY`** from its `env` table in `~/.vibe/config.toml`, never from the session environment: Mistral Vibe passes no shell variables to a stdio MCP server, so an exported key reaches the plugin's validation hook but not the server.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Don't hand-format, and re-read a file before editing it again after the hook reformatted it.
 
@@ -62,7 +62,7 @@ Within every file: satisfied signature headers are dropped; a still-pending sign
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `pipelex-wip/<bundle_dir>/`).
+1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
 2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
 
@@ -96,7 +96,7 @@ Only after the candidate verdict matches:
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree, never beside the bundle — and for each one whose `sources` name a file in this directory, or whose `bundle_dir` is this directory or holds it, say the generated types there are now stale and offer `/pipelex-integrate` to refresh them: an equivalent verdict leaves the concept set as it was, but the new layout removes, rewrites and adds the very files the sidecar hashed, so that project's drift gate reports each of them as `stale-source` until a refresh records the new layout. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
 
 ---
 
