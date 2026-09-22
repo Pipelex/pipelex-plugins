@@ -726,6 +726,8 @@ class TestSharedSkillIncludes:
         "Prefer the path form ": "skills/shared/validate-call.md.j2",
         "now stale and offer": "skills/shared/stale-types-notice.md.j2",
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
+        "**The saved method is now behind this directory.**": "skills/shared/saved-copy-notice.md.j2",
+        "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -1692,14 +1694,22 @@ class TestPipelexExplainSkill:
         assert "mcp_config_suffix" in body
         assert "That stop is only for a target that lives on the platform" in body
 
-    def test_a_remote_method_is_explained_at_contract_level(self) -> None:
-        """Box F: no source enters the conversation for an id or an address, by
-        the platform's design — so the skill says so rather than implying it
-        read something."""
+    def test_a_published_address_is_explained_at_contract_level(self) -> None:
+        """Box F: a published address's internals ride a channel only views see,
+        so the skill describes its contract and says so rather than implying it
+        read something.
+
+        This held for a **catalog id** too until `mthds_get_method` shipped in
+        `@pipelex/mcp` 0.16.0 — box F.4's own caveat, that an id is explained at
+        contract level "until the release that carries" the tool. Box H's phase
+        spends that caveat: an id names the user's own organization's method, so
+        it is now read in full, and only the address is bounded by design. The
+        fallback for an id where the tool is absent is asserted beside it."""
         body = self.body()
-        assert "at the level of their contract" in body
+        assert "explained at the level of its contract, through the workshop; the source stays in the repository it names" in body
         assert "the internals are not readable from here" in body
         assert "`explicit: true`" in body
+        assert "at the level of their contract" not in body, "the id and the address no longer share one reading"
 
     def test_one_selector_per_call(self) -> None:
         """`pipelex-mcp/SPEC.md`: the tooling tools take exactly one of files, an
@@ -2177,3 +2187,173 @@ class TestPublishedAddressTarget:
         assert "the credential first" in body
         assert "rules nothing out" in body
         assert "the key is not what failed" not in body
+
+
+class TestCatalogIdInEverySkill:
+    """Box H of `wip/plugin-skills-gaps/design.md`, with box A step 5, box F.4
+    and box R's notice: a catalog id is a target every skill accepts.
+
+    The three file-based skills reach a saved method through a directory — the
+    one already linked to it, or the one `/pipelex-catalog` pulls it into — and
+    say when the saved copy has fallen behind. `pipelex-run` files a run of a
+    linked directory under its method. `pipelex-explain` reads a saved method's
+    source in full.
+
+    What these guard is the pair of claims that are cheap to get wrong and
+    expensive to ship wrong: that the file-based skills never save on the tail
+    of an edit, and that `pipelex-explain` stays read-only while gaining a tool
+    whose other arm writes to disk."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    TEMPLATES = REPO_ROOT / "templates" / "skills"
+
+    BRIDGED: ClassVar[tuple[str, ...]] = ("pipelex-design", "pipelex-edit", "pipelex-organize")
+
+    def skill(self, name: str) -> str:
+        return (self.TEMPLATES / name / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("skill", BRIDGED)
+    def test_the_file_based_skills_bridge_an_id_to_a_directory(self, skill: str) -> None:
+        body = self.skill(skill)
+        assert 'include "skills/shared/catalog-id-bridge.md.j2"' in body
+        assert "catalog_id_bridge_resume" in body, "the include's resume step is set by the including skill"
+
+    @pytest.mark.parametrize("skill", BRIDGED)
+    def test_the_file_based_skills_say_when_the_saved_copy_fell_behind(self, skill: str) -> None:
+        body = self.skill(skill)
+        assert 'include "skills/shared/saved-copy-notice.md.j2"' in body
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_bridge_resumes_at_a_named_step_on_every_target(self, target_name: str) -> None:
+        """`catalog_id_bridge_resume` is interpolated mid-sentence, so an unset
+        or misspelled name renders the empty string and ships a bridge that
+        tells the agent to carry on with nothing named. The include's `{% else %}`
+        emits the marker `scripts/check.py` refuses; this asserts the rendered
+        text on every target rather than trusting the build to have run."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        rendered = render_templates(
+            self.REPO_ROOT / "templates",
+            self.REPO_ROOT,
+            config.template_vars,
+            include_skills=list(self.BRIDGED),
+            target_name=config.name,
+        )
+        for skill in self.BRIDGED:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert "PIPELEX_BUILD_ERROR" not in body, f"{target_name}/{skill}: the bridge's resume step did not resolve"
+            assert "say which one, and go to **" in body, f"{target_name}/{skill}: the bridge names no step to resume at"
+
+    def test_the_bridge_never_picks_between_two_linked_directories(self) -> None:
+        """`/pipelex-catalog`'s conflict path deliberately creates a second
+        directory carrying the same link — a comparison copy, meant for reading
+        and explicitly not for saving from. A bridge that took the first grep
+        hit would edit that copy about as often as it edited the work."""
+        body = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
+        assert "never yours" in body
+        assert "comparison copy" in body
+        assert "ask which one is the work" in body
+
+    def test_the_bridge_does_not_claim_the_local_files_are_the_saved_content(self) -> None:
+        """The link records no hashes, so a grep hit proves where the method
+        lives locally and nothing about whether it matches the catalog."""
+        body = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
+        assert "records no hashes" in body
+        assert "do not present the local files as the saved method's current content" in body
+
+    def test_the_notice_offers_the_save_and_never_makes_it(self) -> None:
+        """A save is a deployment: `pipelex-mcp/SPEC.md`'s catalog write scope
+        and `/pipelex-catalog` both hold that no other skill saves at all. The
+        notice is the one place three skills mention the catalog right after
+        writing files, which is exactly where an autonomous save would creep
+        in."""
+        body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
+        assert "**Offer that; never do it.**" in body
+        assert "deployment" in body
+        assert "Never write or edit `pipelex-method.json`" in body
+
+    def test_a_linked_run_sends_the_id_beside_the_files(self) -> None:
+        """Box A step 5. `files` + `method_id` is the one legal selector pair
+        (`pipelex-mcp/SPEC.md`'s Method Selectors): the files run and the id is
+        run-history linkage."""
+        body = self.skill("pipelex-run")
+        assert "pipelex-method.json" in body
+        assert "the files are what run" in body
+        assert "filed under that method" in body
+
+    def test_a_linked_run_does_not_read_as_the_saved_method_having_run(self) -> None:
+        """The run appears under the method in the webapp's history while the
+        content that ran is the directory's. Reporting the filing without that
+        distinction tells the user the catalog's method ran, which is the one
+        thing the pair does not mean."""
+        body = self.skill("pipelex-run")
+        assert "do not let the filing read as the saved method having run" in body
+
+    def test_a_linked_run_carries_no_stored_python(self) -> None:
+        """Verified in `pipelex-server`: a caller-supplied source takes
+        precedence and the stored method is resolved only when no files were
+        sent at all, so the assembled `.mthds` + `.py` run bundle is reached on
+        the id-only path alone. A `files` submission is `.mthds`-only, so a
+        custom `PipeFunc` has no channel on any files run — the skill has to say
+        so, or it routes a user to bisect a failure whose cause is structural."""
+        body = self.skill("pipelex-run")
+        assert "no channel for its Python on any files run" in body
+        assert "assembled into the run bundle server-side" in body
+
+    def test_an_unknown_linkage_id_is_read_off_a_location_that_discriminates(self) -> None:
+        """`RUN_START_MIXED_ERROR_OPTIONS` splits the locations deliberately: a
+        rejected payload and a refused execution locus land at `files`, and only
+        the unknown-method arm lands at `method_id`. That is the opposite of
+        `/pipelex-catalog`'s save, where one location carries several causes —
+        so the reason is stated, and an agent does not carry either rule to the
+        other place."""
+        body = self.skill("pipelex-run")
+        assert "that location is the discriminator rather than a coincidence" in body
+        assert "api_host` the link file records" in body
+        assert "without** the id" in body
+
+    def test_explain_reads_a_saved_method_and_writes_none_of_it(self) -> None:
+        """Box F.4 amended. `mthds_get_method`'s other arm writes the sources
+        and a link file to disk, so the one guard that matters for a strictly
+        read-only skill is that it never passes `output_dir`."""
+        body = self.skill("pipelex-explain")
+        assert "mthds_get_method" in body
+        assert "no `output_dir`" in body
+        assert "Do not pass it, not even to a temporary directory." in body
+
+    def test_explain_declares_only_the_read_half_of_the_catalog(self) -> None:
+        """A read-only skill gains a catalog tool; the write ones stay out."""
+        body = self.skill("pipelex-explain")
+        assert "mcp__plugin_pipelex_pipelex__mthds_get_method" in body
+        assert "mthds_save_method" not in body
+        assert "mthds_list_methods" not in body
+
+    def test_explain_says_a_bounded_read_is_partial(self) -> None:
+        """The inline arm withholds whole files above its budget, carrying the
+        name and byte size with no content. Explaining the rest as the whole
+        library is step 1's own hazard, reached through a tool instead of
+        through a missed file."""
+        body = self.skill("pipelex-explain")
+        assert "truncated" in body
+        assert "the explanation is partial" in body
+        assert "Never describe a withheld file's pipes as absent." in body
+
+    def test_explain_keeps_an_empty_stored_source_distinct_from_an_unknown_id(self) -> None:
+        """Both are `input_domain` at `method_id`; one is somebody's draft and
+        the other is a wrong id, and collapsing them sends the user hunting for
+        a typo in an id that is correct."""
+        body = self.skill("pipelex-explain")
+        assert "different answers" in body
+        assert "not a wrong id" in body
+
+    def test_explain_falls_back_to_the_contract_where_the_read_tool_is_absent(self) -> None:
+        """`mthds_get_method` is the local workshop's alone — the hosted console
+        serves neither catalog-write tool — so an id there is explained at
+        contract level. A narrower explanation, never a stop: explain's whole
+        posture is that the workshop is optional."""
+        body = self.skill("pipelex-explain")
+        assert "narrower explanation, not a stop" in body
+
+    def test_explain_stays_out_of_the_hard_stop_roster(self) -> None:
+        """`MCP_SKILLS` asserts a skill that stops without the workshop. Explain
+        gained a third tool and still explains local source without any."""
+        assert "pipelex-explain" not in MCP_SKILLS

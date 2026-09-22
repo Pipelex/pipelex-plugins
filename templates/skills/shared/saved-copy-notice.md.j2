@@ -1,0 +1,18 @@
+{#- Box R of `wip/plugin-skills-gaps/design.md`: the three file-based skills
+   (design, edit, organize) end their report by saying that the saved copy has
+   fallen behind the directory they just changed, and that `/pipelex-catalog`
+   is what updates it.
+
+   It sits beside `stale-types-notice.md.j2` rather than inside it: the two
+   notices answer different questions from different evidence — a generated
+   tree somewhere else in the project against a sidecar, this one the link file
+   in the directory itself — and the stale-types `{% if %}` chain selects
+   between three wordings of one notice, which this is not one of. One include,
+   no variant: all three skills say it the same way.
+
+   It names a skill rather than invoking one, so it needs no platform branch.
+
+   Strips its own trailing newline (the closing comment below), so it can be
+   included inline as well as on a line of its own. -#}
+**The saved method is now behind this directory.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that the catalog still holds whatever it held before this change, so every caller of that id goes on running the old content. `/pipelex-catalog` is what updates it. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
+{#- -#}

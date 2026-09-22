@@ -230,6 +230,8 @@ So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make chec
 | `validate-call.md.j2` | how a local bundle is handed to the workshop: the path form of `files`, and the inline fallback the hosted console needs | none |
 | `formatting-hook.md.j2` | that the validation hook formats every `.mthds` write, so no skill hand-formats | `formatting_hook_write_clause` |
 | `stale-types-notice.md.j2` | the notice that a bundle change may have outdated a generated tree, in the three wordings its call sites use | `stale_types_variant` (`edit`, `design`, `organize`) |
+| `saved-copy-notice.md.j2` | the notice that the linked saved method has fallen behind this directory, offering `/pipelex-catalog` and never saving | none |
+| `catalog-id-bridge.md.j2` | how a file-based skill reaches a catalog id: the search over the link files, the several-hits question, the pull, and the refusal of a published address | `catalog_id_bridge_resume` (the step the skill resumes at, interpolated mid-sentence) |
 | `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
 
 Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
@@ -240,5 +242,7 @@ Two mechanics matter when writing one. A partial that may be included **mid-sent
 ```
 
 A parameter left unset falls back to the partial's own default, so a skill sets only what it says differently. `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a skill pastes one of these blocks instead of including it.
+
+**A parameter with no default takes a build-error branch, and the two in this table are not the same kind.** Jinja's default `Undefined` compares unequal to everything without raising, so an unset or misspelled name renders as the empty string and passes the build, the freshness check and the tests. `stale_types_variant` selects a whole block, so leaving it unset would drop the notice entirely; `catalog_id_bridge_resume` is interpolated mid-sentence, so it would ship a bridge telling the agent to carry on with nothing named. Both answer it the same way: an `{% else %}` emitting `PIPELEX_BUILD_ERROR`, which `scripts/check.py` refuses in any generated file. Any later parameter that has no sensible default takes the same branch.
 
 Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
