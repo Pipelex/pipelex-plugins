@@ -47,7 +47,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │       ├── validate-call.md.j2        # How a bundle is submitted: the path form of `files` (include-only)
 │       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only)
 │       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in its three wordings (include-only)
-│       ├── saved-copy-notice.md.j2    # The linked saved method has fallen behind this directory; `/pipelex-catalog` updates it (include-only)
+│       ├── saved-copy-notice.md.j2    # The linked saved method does not have this change; `/pipelex-catalog` compares the two and updates it (include-only)
 │       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only)
 │       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
 ├── hooks/

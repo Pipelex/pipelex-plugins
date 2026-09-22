@@ -12,7 +12,12 @@
 
    It names a skill rather than invoking one, so it needs no platform branch.
 
+   It asserts no ordering between the two copies, because the link records
+   none: all it knows is that this directory changed and the catalog has not
+   seen that change. A teammate's save may have put the catalog ahead in the
+   meantime, which `/pipelex-catalog` is what compares.
+
    Strips its own trailing newline (the closing comment below), so it can be
    included inline as well as on a line of its own. -#}
-**The saved method is now behind this directory.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that the catalog still holds whatever it held before this change, so every caller of that id goes on running the old content. `/pipelex-catalog` is what updates it. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
+**The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 {#- -#}

@@ -1,6 +1,6 @@
 ---
 name: pipelex-explain
-description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose source it reads in full — or a published method's address, explained at the level of its contract. Strictly read-only — it explains in the conversation and writes nothing.
+description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose stored source it reads — or a published method's address, explained at the level of its contract. Strictly read-only — it explains in the conversation and writes nothing.
 {% set skill_tools = ["Read", "Grep", "Glob"] -%}
 {% include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
@@ -28,7 +28,7 @@ Read a method and say what it does, in plain language.
 
 A **catalog id** and a **published address** are the opposite case: nothing is on disk, so the workshop is the only way to learn anything about them at all.
 
-**`mthds_get_method` is the local workshop's alone**, and it is what turns a catalog id from a contract into a readable method. Where it is absent while the other tools answer — the hosted console, which reads no files and therefore serves neither catalog-write tool — a catalog id is explained at contract level, exactly as an address is, and the explanation says which of the two readings it is. That is a narrower explanation, not a stop.
+**`mthds_get_method` is the local workshop's alone**, and it is what turns a catalog id from a contract into a readable method. Where it is absent while the other tools answer, a catalog id is explained at contract level, exactly as an address is, and the explanation says which of the two readings it is. **Two causes present identically from here, so say both rather than picking one**: the hosted console, which reads no files and therefore serves neither catalog-write tool, and a local workshop that predates the tool, which `npx -y @pipelex/mcp@latest` refreshes. Naming only the console tells a workshop user to go looking for a host they are not on. That is a narrower explanation, not a stop.
 
 {% set mcp_absent_lead %}the workshop is{% endset -%}
 {% set mcp_absent_suffix %} That stop is only for a target that lives on the platform — a bundle directory on disk is still explained from its source, with the verdict line left out.{% endset -%}
@@ -152,14 +152,15 @@ An id explained at contract level — the hosted console, where `mthds_get_metho
 | the user asks for the explanation in a file | explains in the conversation and says it writes nothing; naming the skill that does |
 | the workshop is absent, on a local bundle | explains from the source and says the verdict was not checked |
 | the workshop is absent, on an id or an address | stops per the Requirements above — there is nothing to read |
-| `mthds_get_method` is absent while the other tools answer | explains the id at contract level and says the source was not read; the hosted console serves no catalog read |
+| `mthds_get_method` is absent while the other tools answer | explains the id at contract level and says the source was not read; names both causes — the hosted console, which serves no catalog read, and a workshop that predates the tool |
 | a catalog id's source comes back `truncated` | names the files it could not read and says the explanation is partial; never reads a withheld file's pipes as absent |
 | a catalog id holds no stored source | gives that answer, which is not the unknown-id answer |
 | the user wants the saved method's files on disk | names `/pipelex-catalog`; this skill reads the source and writes none of it |
 | a selector call answers a no-verdict error | reports the error and its `hint` verbatim; hosted address and id resolution is not live everywhere yet |
 | the reading and `pending_signatures` disagree | reports both and gives the tool's list as the authority |
 | a **local bundle** does not validate | explains it anyway from the source, says what the verdict was, and routes a fix to `/pipelex-edit` or `/pipelex-design` |
-| an **id or address** does not validate | reports `validation_errors[]` and stops — there is no source to explain and the fix is not on this disk |
+| a **catalog id** does not validate | explains it from the source read above with `validation_errors[]` beside it, and says the fix is not on this disk |
+| a published **address** does not validate | reports `validation_errors[]` and stops — there is no source to explain and the fix is upstream |
 | the verdict carries no `main_pipe` | says the contract could not be described and which of the three causes the tool points to; never reconstructs one |
 | the user wants the method changed | routes: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one |
 

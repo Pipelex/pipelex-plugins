@@ -726,7 +726,7 @@ class TestSharedSkillIncludes:
         "Prefer the path form ": "skills/shared/validate-call.md.j2",
         "now stale and offer": "skills/shared/stale-types-notice.md.j2",
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
-        "**The saved method is now behind this directory.**": "skills/shared/saved-copy-notice.md.j2",
+        "**The saved method does not have this change.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
     }
 
@@ -2225,11 +2225,12 @@ class TestCatalogIdInEverySkill:
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_bridge_resumes_at_a_named_step_on_every_target(self, target_name: str) -> None:
-        """`catalog_id_bridge_resume` is interpolated mid-sentence, so an unset
-        or misspelled name renders the empty string and ships a bridge that
-        tells the agent to carry on with nothing named. The include's `{% else %}`
-        emits the marker `scripts/check.py` refuses; this asserts the rendered
-        text on every target rather than trusting the build to have run."""
+        """`catalog_id_bridge_resume` is interpolated bare, and `StrictUndefined`
+        is what fails the render when a skill forgets to set it — a guard around
+        it would suppress that failure rather than add to it. This asserts the
+        other half: that the step reaches the rendered text on every target and
+        carries no build-error marker, rather than trusting the build to have
+        run."""
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
         rendered = render_templates(
             self.REPO_ROOT / "templates",
@@ -2271,6 +2272,25 @@ class TestCatalogIdInEverySkill:
         assert "deployment" in body
         assert "Never write or edit `pipelex-method.json`" in body
 
+    def test_the_notice_asserts_no_ordering_between_the_two_copies(self) -> None:
+        """The link file records no hashes, which the bridge says in as many
+        words, so the notice may claim only that this directory changed and the
+        catalog has not seen it. A teammate's save since the last sync puts the
+        catalog *ahead*, and calling the saved copy old there tells the user
+        callers are running content they are not."""
+        body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
+        assert "may equally be behind the catalog" in body
+        assert "asserts an ordering nothing here can read" in body
+        assert "what compares the two" in body
+
+    def test_organize_leaves_the_notice_to_design_when_design_called_it(self) -> None:
+        """`/pipelex-design`'s delivery step invokes `/pipelex-organize` and
+        carries the same notice, so an unguarded include says it twice in one
+        flow. The stale-types notice in organize's very same report sentence
+        already carries this guard."""
+        body = self.skill("pipelex-organize")
+        assert "**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries this notice too)" in body
+
     def test_a_linked_run_sends_the_id_beside_the_files(self) -> None:
         """Box A step 5. `files` + `method_id` is the one legal selector pair
         (`pipelex-mcp/SPEC.md`'s Method Selectors): the files run and the id is
@@ -2287,6 +2307,17 @@ class TestCatalogIdInEverySkill:
         thing the pair does not mean."""
         body = self.skill("pipelex-run")
         assert "do not let the filing read as the saved method having run" in body
+
+    def test_a_files_run_blames_the_pipefunc_only_when_the_failure_does(self) -> None:
+        """Step 8's standing rule is to route once from `failure_message`.
+        Holding a `PipeFunc` is not evidence that one failed: a run that dies on
+        a missing input upstream of the custom pipe would otherwise be declared
+        a registration failure and sent to `/pipelex-catalog`, which is a
+        deployment gesture and no cure for a missing input."""
+        body = self.skill("pipelex-run")
+        assert "Where `failure_message` implicates resolving or registering that function" in body
+        assert "**Where it says anything else, route on what it says**" in body
+        assert "not evidence that it is what failed" in body
 
     def test_a_linked_run_carries_no_stored_python(self) -> None:
         """Verified in `pipelex-server`: a caller-supplied source takes
@@ -2352,6 +2383,28 @@ class TestCatalogIdInEverySkill:
         posture is that the workshop is optional."""
         body = self.skill("pipelex-explain")
         assert "narrower explanation, not a stop" in body
+
+    def test_explain_names_both_causes_of_an_absent_read_tool(self) -> None:
+        """A workshop older than the release carrying `mthds_get_method`
+        presents exactly as the hosted console does — the tool is simply not in
+        the list — so naming only the console sends a workshop user looking for
+        a host they are not on. The cure is stated without a version, because
+        `floors.pipelex_mcp` is a ceiling about the main-pipe signature and
+        quoting it here would name the wrong release."""
+        body = self.skill("pipelex-explain")
+        assert "a local workshop that predates the tool" in body
+        assert "npx -y @pipelex/mcp@latest" in body
+        assert "say both rather than picking one" in body
+
+    def test_explain_still_reads_an_invalid_catalog_id_from_its_source(self) -> None:
+        """The stops table is titled for where the skill stops, so an agent
+        reads it as the authority. A row collapsing an id with an address there
+        — no source to explain, stop — discards the source this phase taught the
+        skill to read."""
+        body = self.skill("pipelex-explain")
+        assert "| a **catalog id** does not validate | explains it from the source read above" in body
+        assert "| a published **address** does not validate |" in body
+        assert "an **id or address** does not validate" not in body
 
     def test_explain_stays_out_of_the_hard_stop_roster(self) -> None:
         """`MCP_SKILLS` asserts a skill that stops without the workshop. Explain
