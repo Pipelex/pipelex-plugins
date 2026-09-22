@@ -28,10 +28,17 @@ harness_name = "Claude Code"
 #   pipelex_sdk_js   the first @pipelex/sdk with everything pipelex-integrate's
 #                    call site and offline gate use (the run-results surface the
 #                    call site hands back is the last of it to arrive)
-#   pipelex_sdk_py   the first pipelex-sdk with everything pipelex-integrate's
-#                    call site and offline gate use (the run-results surface —
-#                    the artifact stack, summarize_usage, working_memory — is
-#                    the last of it to arrive, after the offline codegen check)
+#   pipelex_sdk_py   the pipelex-sdk pipelex-integrate installs, which is the
+#                    higher of two facts rather than one. Everything the call
+#                    site and the offline gate use had arrived by 0.10.1 (the
+#                    run-results surface — the artifact stack, summarize_usage,
+#                    working_memory — last of it, after the offline codegen
+#                    check), and above that sits whatever pipelex-starter-python
+#                    declares, because it is the reference project the skill's
+#                    Python arm points at and a project set up below its pin
+#                    cannot copy the code read from it. It is the starter that
+#                    carries this floor today: its blocking mode reads a run
+#                    through results_from_execute, which the SDK made public
 #   pipelex_mcp      the last @pipelex/mcp that PREDATES the main-pipe signature
 #                    in a validate verdict — the one floor stated as "and earlier",
 #                    so a bump here means the signature arrived in a later release
@@ -41,7 +48,7 @@ harness_name = "Claude Code"
 #   method_app_port  the port pipelex-method-apps' webapp-js template serves on
 [vars.floors]
 pipelex_sdk_js = "0.18.0"
-pipelex_sdk_py = "0.10.1"
+pipelex_sdk_py = "0.10.2"
 pipelex_mcp = "0.13.0"
 node = "22.12"
 python_min = "3.11"
