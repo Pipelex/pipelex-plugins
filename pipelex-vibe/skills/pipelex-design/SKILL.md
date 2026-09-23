@@ -5,280 +5,83 @@ description: Design a MTHDS method bundle (.mthds files) top-down, contract-firs
 
 # Design a MTHDS bundle top-down at the right depth
 
-Design a `.mthds` method **contract-first**, then use the lightest construction workflow that preserves confidence. A fully understood shallow graph is written directly as a coherent runnable bundle. A deep, uncertain, intentionally staged, or resumable graph is developed through `PipeSignature` checkpoints and stepwise refinement. Both modes fix the client contract before implementation, preserve the same concept-shape and wiring rules, validate through the Pipelex MCP tools, and finish at the same runnable verdict.
+Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
 
-## Scope (what this skill can emit)
+## Requirements
 
-- Bundle headers: `domain`, `description`, `main_pipe`, `system_prompt`.
-- Concepts: simple, refining, structured (field types `text`, `integer`, `boolean`, `number`, `date`, `concept`, `list`).
-- Pipes: `PipeSignature` (contract-only header), `PipeLLM`, `PipeCompose`, `PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeFunc`.
-
-**Outside this skill's scope:** `dict` field types, `PipeStructure`, inline `templating_style` blocks, and other advanced features. When the user asks for those, write the closest in-scope equivalent and call out the deviation; do not silently emit unsupported constructs.
-
----
-
-## How it works — read this first
-
-- **The artifact is a library, not necessarily one file.** A directory of same-domain `.mthds` files is validated as one submission. The runtime merges them into one domain; pipes and concepts reference each other across files by bare code. A direct design normally has one coherent `main.mthds`; a larger result may have natural module files.
-- **Top-down reasoning does not require signatures.** In both modes, determine the root inputs, output, semantics, full boundary concept shapes, graph, wiring, and concept ownership before materializing the construction artifacts that are justified.
-- **Direct mode writes the complete graph.** It contains concrete pipes only, declares each concept once, and is validated after the coherent write. It never creates temporary signatures or construction-only definition files.
-- **Stepwise mode materializes uncertainty.** Every not-yet-designed pipe is a reachable `PipeSignature`. Each refinement adds one concrete definition file, may introduce child signatures, and is validated immediately. The pending-signature verdict is the resumable backlog.
-- **Completed means runnable in either mode.** Delivery requires `is_valid: true`, `is_runnable: true`, and no `pending_signatures`.
-
-See [writing-mthds.md](references/writing-mthds.md) for the supported syntax, operator/controller rules, `PipeSignature`, `signature_for`, and all pipe-type fields. It is the syntax source of truth.
-
----
-
-## Requirements — the Pipelex MCP tools
-
-This skill validates through the **`mthds_validate`** tool and projects input schemas through the **`mthds_inputs_template`** tool, both served by the plugin's `pipelex` MCP server. They are required — this skill never guesses at validity.
-
+- **`mthds_validate`** and **`mthds_inputs_template`** are required: this skill never guesses at validity.
 - **If the tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe. Do not write `.mthds` files without validation available.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently skip validation.
 
-> **No backend setup needed**: designing and validating never run the method, so no inference backends are required.
+## Guards
 
-**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
+- **Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**
+- **Never write `inputs.json`.** When the user provides files or paths, or wants to run with real data, invoke `/pipelex-inputs`.
+- **This skill never runs a method**: a run needs inputs and spends inference credit.
 
-### How to validate
+## Process
 
-1. Gather **all** `.mthds` files in the bundle directory, none under a `runs/` directory (the whole library — a broken sibling fails the verdict too, and the report names it).
-2. Call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
-3. Branch on the **structured verdict**, never on transport:
-   - `status: "ok"`, `is_valid: true`, `pending_signatures` non-empty → valid stepwise design scaffold, not yet runnable. The Markdown summary's `## Pending signatures` section is the backlog.
-   - `status: "ok"`, `is_valid: true`, `is_runnable: true`, `pending_signatures` empty → the method is complete and runnable.
-   - `status: "ok"`, `is_valid: false` → a produced failure verdict: read `validation_errors[]` and the Markdown summary (it carries locators and names the offending file), fix, re-validate.
-   - `status: "error"` → no verdict was produced: class `input_domain` means the submission is malformed (fix the call); class `config` → stop per the rule above; class `runtime` → report it and retry once before stopping.
+### 1. Capture the contract
 
-The Markdown summary in the tool's text output is written for you — read the verdict line and any backlog from it directly. Where the host renders MCP views (e.g. claude.ai), an interactive method graph accompanies valid verdicts (`available_view_specs: ["dry_run_graph"]`); in terminal hosts there is no visible graph — the summary is the review surface.
+Read [writing-mthds.md](references/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks, other advanced features), write the closest in-scope equivalent and call out the deviation.
 
----
+Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
-## Before writing — capture the contract and choose the workflow
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Discuss only genuine ambiguity, or when the user asks to collaborate.
 
-Read [writing-mthds.md](references/writing-mthds.md) **before writing**.
+### 2. Resolve the bundle home before writing
 
-Determine the three things that are the client requirement:
+**A path the user named** wins over the rest, which apply in order: `<package>/methods/<name>/` in a packaged Python project, or a Python project that owns a codegen harness; `<project root>/methods/<name>/` in any other project, TypeScript harness projects included, the project being the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory; otherwise `./methods/<name>/`. `<name>` is the `domain` in the project language's casing — `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project — a dot becoming that separator, never a nested directory or a literal dot. **On a method app, ask first**: its `make add-method` never overwrites and also writes the action trio, narrower and registry entry a plain write leaves out; let the user choose. A bundle that already lives elsewhere stays there.
 
-- **Input concept(s)** — what the client provides.
-- **Output concept** — what the client gets back.
-- **Description** — the semantics, in prose precise enough to implement against.
+### 3. Infer the construction mode
 
-Specify every boundary concept fully now. Decide whether each boundary and intermediate concept is simple or structured from all known consumers: if any consumer field-reads it (`$x.field`, or a construct `from = "x.field"`), it must be structured; if every consumer uses it whole (`@x` or wholesale mapping), it can stay simple. Declare each concept exactly once, owned by the root boundary or by the controller that introduces the intermediate value.
+**Never ask the user to choose the workflow.**
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. Infer the construction mode automatically; do not ask the user to choose a strategy.
+- **Direct** when the complete graph can be authored without placeholders or speculative contracts: the graph is one concrete operator; or one top-level controller whose children are concrete leaf operators; no child is a controller unless the whole nested graph and every contract is fixed and a direct layout is still clearly safer; every branch, iteration, mapping and intermediate owner is decided; every concept shape can be fixed from its consumers; every pipe can be concrete in the first coherent artifact. One controller is a strong fast-path signal, not a rule. Pipe count is secondary: cross-branch concept dependencies, uncertain ownership, or unresolved child contracts make even a lone controller stepwise.
+- **Stepwise** otherwise, for a large graph that benefits from independently valid review checkpoints, or on an explicit request for a scaffold, partial design, staged work, or a resumable intermediate result: read [stepwise.md](references/stepwise.md) before writing any file.
 
-### Resolve the bundle home before writing
+When borderline, take the simplest path that can be written **completely** and validated confidently.
 
-A method's sources are loaded at runtime by the call site that runs them, so they belong beside that code from the moment they are written rather than being moved there later. Resolve the home before writing anything, taking the first that applies:
+### 4. Direct construction
 
-- **A path the user named** — it wins over everything below.
-- **A packaged Python project, or a Python project that owns a codegen harness** — `<package>/methods/<name>/`. This is what [`../pipelex-integrate/references/python.md`](../pipelex-integrate/references/python.md) already requires of an integrated bundle: a wheel ships the sources only when they sit inside the import package, beside the call site that loads them.
-- **Any other project**, TypeScript harness projects included — `<project root>/methods/<name>/`. The method app and `pipelex-starter-js` own a codegen harness and have no import package at all; both read `methods/*` from the project root, so that is where a bundle goes. The project is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory.
-- **No project** — `./methods/<name>/`, in the working directory.
+Design the whole graph in memory, then write `main.mthds` in the bundle home, top-down — metadata, concepts, the concrete main pipe, its leaves — with concept codes checked library-wide and explicit `inputs` and `output` on every pipe. More than one file only at a natural module boundary, never one per pipe. Include **no temporary `PipeSignature` declarations**. **If the design would need a placeholder or a guessed contract, or writing or validation exposes an unresolved structural boundary**, stop extending the draft and read [stepwise.md](references/stepwise.md) before changing any file.
 
-`<name>` is the bundle's `domain` in the project language's casing, as integrate already spells it: `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project. A `domain` may carry dots (`legal.contracts`), and a dot becomes that same separator — `legal-contracts`, `legal_contracts` — never a nested directory and never a literal dot, because Python derives an import path from this name and `generated.legal.contracts` would not resolve.
+### 5. Validate
 
-So, at the root of a TypeScript project:
+Gather the bundle's files as the convention below says, the whole library, and call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
-> `summarize_pdf`: a PDF in, a structured summary out — extracts the text, then summarizes it. Writing to `methods/summarize-pdf/`.
+Branch on the **structured verdict** from its Markdown summary, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `validation_errors[]` and the summary's locators, which name the offending file, then re-validate.
 
-One project shape wants asking first: a method app carries its own `make add-method`, which copies a bundle into `methods/<name>/` and never overwrites, and which also writes the action trio, the narrower and the registry entry around it. Writing straight into that directory would leave those unwritten, so on a method app say so and let the user choose between the gesture and a plain write.
+### 6. The runnable gate and delivery
 
-Bundles that already live elsewhere keep working: every skill here takes a directory, and nothing migrates anything.
+Re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. Then:
 
-**If the design will emit a `PipeFunc`, say so in that same line.** **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Prefer `PipeCompose` or `PipeLLM` wherever either does the job, as the authoring reference already advises; a `PipeFunc` is emitted when the user has a registered function and means to use it, and then the warning is given rather than the pipe refused. The user hears it here, while the shape is still theirs to change, and again at delivery.
-
-### Choose direct construction only when all boundaries are resolved
-
-Use direct construction when the complete graph can be authored without placeholders or speculative contracts. Observable signals:
-
-- the graph is one concrete operator; or one top-level controller whose children are concrete leaf operators;
-- no child is itself a controller, unless the entire nested graph and every contract is already fixed and a direct coherent layout is still clearly safer;
-- every branch, iteration, input mapping, output mapping, and intermediate owner is decided before writing;
-- every boundary and intermediate concept shape can be fixed from its consumers;
-- every pipe can be concrete in the first coherent artifact.
-
-One controller is a strong fast-path signal, not a rule. Pipe count is secondary: a controller with cross-branch concept dependencies, uncertain ownership, or unresolved child contracts belongs in stepwise mode even if it is the only controller.
-
-### Choose signature-driven stepwise refinement when it buys confidence
-
-Use stepwise refinement when any useful boundary remains unresolved or a resumable scaffold is part of the request. Observable signals:
-
-- nested controllers or multiple structural layers whose child contracts are not all fixed;
-- uncertain sub-pipe contracts, intermediate concept ownership, branching, iteration, or wiring;
-- shared concepts whose shapes depend on consumers in different branches;
-- a large graph that benefits from independently valid review checkpoints;
-- an explicit request for a scaffold, partial design, staged work, or a resumable intermediate result.
-
-If classification is borderline, use the simplest path that can be written **completely** and validated confidently. The moment direct design would need a placeholder or guessed contract, switch to the stepwise workflow.
-
----
-
-## Direct construction — complete shallow graph
-
-### Step D1 — Design the coherent artifact before writing
-
-Design in memory:
-
-- bundle `domain`, `description`, `main_pipe`, and optional `system_prompt`;
-- fully specified boundary and intermediate concepts;
-- the concrete main operator/controller and every concrete leaf;
-- all controller steps, branches, mappings, and ownership.
-
-The normal target is `main.mthds` in the bundle home resolved above, containing the metadata, boundary concepts, intermediate concepts, concrete main pipe, and concrete leaves in top-down reading order. Use more than one file only when the graph already has a natural coherent module boundary; never create one file per pipe merely to mimic refinement history. Include **no temporary `PipeSignature` declarations**.
-
-### Step D2 — Write once as a coherent runnable candidate
-
-Create the bundle directory and write the complete candidate file set. Because the graph was designed together, concept codes are checked library-wide before the write, each concept shape is final, and every concrete pipe carries explicit `inputs` and `output`.
-
-Validate the whole bundle. Fix ordinary syntax, contract, or semantic errors in the coherent files and re-validate. The direct path is complete only when the common runnable gate passes.
-
-### Step D3 — Graduate cleanly if hidden complexity appears
-
-If writing or validation exposes an unresolved structural boundary, stop extending the direct draft and transition to stepwise refinement:
-
-1. Keep the announced root contract and boundary concept shapes stable unless the evidence shows the client requirement itself was wrong.
-2. Compose the replacement scaffold in memory. Its root keeps bundle metadata and boundary concepts, replaces the main concrete graph with one root `PipeSignature`, and removes abandoned direct-only intermediate concepts and concrete child definitions that the refinement files will own.
-3. Replace the candidate file set as one consistent layout. Do **not** append signatures beside the abandoned concrete definitions. Re-gather the directory and confirm every pipe/concept code is declared only where the stepwise model permits it: one root header, then one later concrete per pending code; each concept exactly once.
-4. Validate the root scaffold before adding definitions. It must be valid with the root pipe in `pending_signatures`; then continue at Step S2.
-
-This replacement is the construction-mode transition, not an additive refinement. Keeping both drafts would create duplicate concepts, conflicting concrete pipes, or falsely satisfied signatures.
-
----
-
-## Signature-driven construction — validated stepwise refinement
-
-This mode preserves the additive, breadth-first construction loop and valid intermediate checkpoints.
-
-### Step S1 — Write and validate the root scaffold
-
-Write `main.mthds` in the bundle home resolved above (unless the user asks for another root name) with:
-
-- `domain`, `description`, `main_pipe`, optional `system_prompt`;
-- the fully specified boundary concepts;
-- the top pipe as one `PipeSignature` whose code is `main_pipe`, with its precise `description`, explicit `inputs`, `output`, and `signature_for`.
-
-The root is written once for this construction mode. Validate it: the one-signature library must pass with the top pipe listed as pending. An explicit partial-scaffold request may stop after any later valid checkpoint, but never before this first passing verdict.
-
-### Step S2 — Refine layer by layer
-
-Drain the signature backlog breadth-first, **serially** (one signature at a time — no parallel workers in this version):
-
-1. Validate and read `pending_signatures[]` (the summary's `## Pending signatures` list). This verdict is the bundle's own todo list.
-2. Expand each current pending signature one at a time. Every expansion adds exactly one new `<code>.mthds` definition file and never edits an existing construction file.
-3. Re-validate after each expansion, recompute the backlog, and repeat until it is empty.
-
-#### Expand one signature
-
-Given pending signature `S` with frozen `inputs`, `output`, `description`, and `signature_for`:
-
-1. Decide operator or controller. A single cognitive/IO step is an operator; multiple steps, iteration, branching, or parallelism require a controller.
-2. Add `<code>.mthds`, using `S`'s **bare** pipe code. The verdict names signatures as `domain.code`, but a namespaced `[pipe.domain.code]` would define a different pipe and never satisfy the header. A non-root file carries only `domain = "<same_domain>"` for membership. If the code is literally `main`, use a non-colliding filename such as `main_pipe.mthds`; filenames do not define pipe identity.
-3. For a leaf, write the concrete operator (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`) with all type-specific fields. For a controller (`PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`), wire one structural level, declare only intermediate concepts not already owned by the assembled library, and forward-declare every not-yet-designed child as a new `PipeSignature` in the same file. During re-entry, a reshaped concept may already be retained in the scaffold/common owner so signatures can validate; reference it from the new definition instead of redeclaring it.
-4. Repeat `S`'s explicit `inputs` and `output` on the concrete definition. Contracts reconcile by concept identity (bare/qualified spellings and native equivalents), not textual coincidence.
-5. Before introducing an intermediate concept, check its code across the assembled library. Derive a unique parent-based code if needed. Declare it once, in the controller that logically introduces it or in the re-entry scaffold that must freeze its changed contract, with a shape fixed from every wired consumer. If consumers in different branches field-read it, the common parent owns and structures it. Never duplicate a concept already retained by a direct→stepwise transition or signature-driven re-entry.
-
-#### If validation fails after an expansion
-
-The new file bounds the ordinary fix:
-
-- **Contract mismatch:** conform the definition to the frozen header. If the header itself is wrong, that is a propagating contract change; pause and revise the parent region deliberately rather than silently changing the header.
-- **Other semantic errors:** use `validation_errors[]`, the Markdown locators, and the relevant `writing-mthds.md` section; fix the added file and re-validate.
-
-### Step S3 — Early-stop scaffold
-
-Early stopping exists only in stepwise mode. When the user requested a partial scaffold or interrupts before convergence, confirm `is_valid: true`, report the exact pending-signature backlog, and explain that resuming means expanding those signatures. Do not claim it is runnable and do not auto-organize it; offer `/pipelex-organize` only if the user wants the valid scaffold regrouped.
-
----
-
-## Common runnable gate and delivery
-
-For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**. There is no separate strict-validation call; this structured verdict is the runnable gate. Fix whole-bundle semantic errors and re-validate until it passes.
-
-After the gate:
-
-1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`. A converged stepwise result normally invokes it automatically because one-definition-per-file construction history and satisfied headers need regrouping. A naturally coherent result in either mode does not take an organization round trip solely for process compliance.
-2. **Project the input schema.** Call `mthds_inputs_template` with the final whole-bundle `files` submission plus `explicit: false`. Show the returned compact template, but **do not save it as `inputs.json`** — input preparation belongs exclusively to `/pipelex-inputs`.
-3. **Present the flow.** Point to the interactive method graph where the host rendered the valid verdict's view; in terminal hosts, present a concise text flow of the final structure.
-4. **Warn again for a `PipeFunc`.** When the delivered bundle holds one, repeat it in the report, naming the pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The contract line said it before the method existed; this is the last point before the user runs it.
-5. **Hand off inputs — and the code.** Suggest preparing real inputs with `/pipelex-inputs`, and say that once they are ready `/pipelex-run` runs the method. This skill never runs one itself: a run needs inputs and spends inference credit. Say too that `/pipelex-catalog` saves the method to the Pipelex catalog, where it gets an `mt_…` id anything can call. Then, when the workspace holds a codebase (a `package.json` or a `pyproject.toml`), say that `/pipelex-integrate` wires the method into it with generated types and a typed call site; when it holds none and the user wants an application around the method, `/pipelex-scaffold` creates one — for a TypeScript web app, one already running this method, and otherwise one it hands to `/pipelex-integrate`.
-
-> **NEVER write `inputs.json` manually.** If the user provides files, paths, or wants to run with real data, invoke `/pipelex-inputs` — it handles the template, path resolution, placeholder formatting, and file copying.
-
----
-
-## Editing an existing method (adaptive re-entry)
-
-Structural changes to an existing method — adding, removing, or rewiring steps; changing a pipe contract; reshaping a concept — are design work (contract-preserving tweaks belong to `/pipelex-edit`, which routes structural requests here).
-
-### The target of a re-entry — a bundle directory, or a catalog id
-
-New construction resolves a bundle home above and has nothing to look up. A re-entry has a method already, and it may be named by a catalog id rather than by a directory.
-
-This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
-
-1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to **step 1** below.
-2. **Several hits are the user's choice, never yours.** More than one directory can legitimately hold the same link: `/pipelex-catalog`'s conflict path tells the user to pull a comparison copy into a sibling directory, and that copy carries the same link and is meant for reading, not for editing. Name the directories and ask which one is the work.
-3. **No hit — hand the pull to `/pipelex-catalog`**; there is no cross-skill invocation on Mistral Vibe, so open that skill's `SKILL.md` beside this one and follow it. It brings the method's sources to disk and the workshop writes the link beside them; then carry on with that directory. The search only sees the working directory and below, so a bundle linked somewhere else reads as no hit — if the user knows where it is, ask for the path rather than pulling a second copy.
-
-**What the search proves, and what it does not.** It answers where this method lives locally and nothing else. A linked directory can be behind the catalog, ahead of it, or both at once, and the link records no hashes to tell them apart — so do not present the local files as the saved method's current content. `/pipelex-catalog` is what compares the two, and it is also the only way the work done here reaches the saved copy.
-
-**A published address is not a target for this skill.** `github.com/<owner>/<repo>[/<selector>][@<tag>]` names somebody else's published package: nothing of it is on disk, and there is nowhere to write a change back. Say so and point at `/pipelex-explain`, which reads such an address at the level of its contract.
-
-### The re-entry procedure
-
-1. **Baseline before every edit.** Read every `.mthds` file outside `runs/` and validate the whole bundle. Record whether it is runnable or a scaffold and its exact pending set. If it is invalid, repair the baseline first; never redesign on a broken baseline. Retain the original contents until the final verdict is restored.
-2. **Map the full affected region.**
-   - A pipe contract change includes every parent controller whose wiring must adapt.
-   - A main-pipe contract change includes root boundary concepts and invalidates any saved `inputs.json`.
-   - A concept reshape includes its introducing declaration and every consumer that field-reads it.
-3. **Choose the re-entry mode from the affected graph, not the whole method's size.**
-   - **Direct coherent edit:** when the affected region is shallow and its complete graph, propagated contracts, mappings, ownership, and concept shapes can be understood together, edit the smallest coherent region directly. Validate the whole bundle after the coherent edit and restore the baseline runnable/scaffold state.
-   - **Signature-driven re-entry:** when the affected region is nested, uncertain, cross-module, cross-branch, or intentionally staged, reopen the smallest sufficient region to signatures. Internals-only changes may replace one concrete with a same-contract signature; contract changes reopen the child and sufficient parent wiring; concept reshapes reopen the declaration and every field-reading consumer.
-4. **Build a reachable re-entry scaffold atomically.**
-   - Keep or coherently edit the smallest unaffected concrete ancestor whose wiring reaches the affected region; it is the scaffold anchor.
-   - Replace only the directly affected concrete children reachable from that anchor with signatures, and remove their old concrete definitions before validating. A signature left beside its old concrete is already satisfied and is not a backlog item.
-   - Reshape or declare each changed concept exactly once in the scaffold at its common logical owner, so the new signatures' contracts resolve. Later refinements reference that declaration; they do not redeclare it.
-   - Do not predeclare deeper descendants while their parent is only a signature. Introduce those child signatures when that parent receives its concrete controller definition, keeping every pending signature reachable.
-   - Validate the atomic scaffold, then drain its structured backlog with Step S2.
-5. **Recover rather than leave an unproven edit.** If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure.
-6. **Converge and deliver.** Restore at least the baseline verdict. Run `/pipelex-organize` only if signature-driven re-entry produced a construction-shaped layout that needs regrouping. Re-project the input template; if `inputs.json` exists and the client surface changed, flag the drift and hand the refresh to `/pipelex-inputs`. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
+1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`; a converged stepwise construction or signature-driven re-entry normally invokes it; a naturally coherent result in either mode never takes the round trip for process compliance alone.
+2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
+3. **Present the flow**: the interactive method graph where the host rendered it, else a concise text flow.
+4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
+5. **Hand off**: `/pipelex-inputs` prepares real inputs, then `/pipelex-run` runs the method; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`) with generated types and a typed call site, and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
+6. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
 **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 
----
+## Re-entry
 
-## Invariants & rules
+**For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-### Both modes
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** Then read [re-entry.md](references/re-entry.md) before editing any file, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise restore at least the baseline verdict and deliver as step 6 says.
 
-- **Contract stability.** A definition preserves the contract its parent relies on, matched by concept identity. An intentional contract change propagates through every affected parent mapping before delivery.
-- **Client contract first.** The root inputs, output, semantics, and boundary concept shapes are fixed before implementation artifacts are written.
-- **One concept declaration, complete shape.** A concept is declared exactly once. Its structure is fixed from every field-reading consumer; it is never "completed" by a duplicate later declaration.
-- **Whole-bundle proof.** Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files. Completed always means valid, runnable, and no pending signatures.
+## Stops
 
-### Stepwise mode only
+| Condition | Do this |
+|---|---|
+| `status: "error"`, class `input_domain` | the submission is malformed: fix the call |
+| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| validation fails twice on the same construct, or the client contract itself looks wrong | pause and show the user |
 
-- **Additive refinement.** After the root scaffold (or a deliberate re-entry reopening), every refinement adds one concrete definition file; existing construction files and satisfied headers persist until organization.
-- **One concrete definition per refinement file.** This keeps failures bounded and checkpoints resumable.
-- **Backlog = `{signatures} − {concretes}`.** Recompute it from the structured verdict after every expansion; never hand-track it.
-- **The root file is written once during new stepwise construction.** Direct construction and coherent direct re-entry are not subject to this construction-history rule.
+## References
 
----
-
-## Autonomy
-
-This skill is **automatic by default**.
-
-- Infer and announce the client contract; discuss only genuine input/output/semantic ambiguity or a user request to collaborate on it.
-- Choose direct or stepwise construction automatically from the observable tests above. Never ask the user to choose the workflow.
-- Direct mode writes and validates the coherent candidate. Stepwise mode refines automatically without per-layer approval; valid checkpoints are the review surface.
-- Pause only when the client contract itself appears wrong, validation fails twice on the same construct, or the required MCP tools cannot produce a verdict.
-
----
-
-## Reference
-
-- [Writing `.mthds` Directly](references/writing-mthds.md) — **read before writing**. The supported MTHDS subset, concrete operators/controllers, `PipeSignature`, and runnable gate.
-- [Native Content Types](../shared/native-content-types.md) — attributes of native concepts (`Image.url`, `Page.text_and_images`, ...) for `$var.field` references and construct `from` paths.
+- [writing-mthds.md](references/writing-mthds.md): before writing any `.mthds` file.
+- [stepwise.md](references/stepwise.md): stepwise at step 3 or 4, or a signature-driven re-entry.
+- [re-entry.md](references/re-entry.md): a structural change to an existing method.
+- [Native content types](../shared/native-content-types.md): a native's fields, for `$var.field` and `from`.

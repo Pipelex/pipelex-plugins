@@ -107,6 +107,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "credentials.md.j2").write_text("# Credentials\n")
+    (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -134,6 +135,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "mthds-reference.md.j2").write_text("Ref.\n")
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "credentials.md.j2").write_text("Credentials.\n")
+    (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -1406,14 +1408,28 @@ class TestAdaptiveDesignSkill:
     The skill is executable guidance rather than Python control flow, so these
     tests guard the observable decisions and transition invariants that agents
     must follow, plus their propagation to every rendered platform.
+
+    Since the size diet's phase 4 the choice of mode and direct construction are
+    `SKILL.md`'s, and stepwise construction and re-entry are references read on
+    their condition (`skills/pipelex-design/references/stepwise.md` and
+    `re-entry.md`), so each pin reads the file its sentence moved to.
     """
 
     REPO_ROOT = Path(__file__).parents[2]
     SKILLS = REPO_ROOT / "templates" / "skills"
+    REFERENCES = REPO_ROOT / "skills" / "pipelex-design" / "references"
 
     @property
     def design(self) -> str:
         return (self.SKILLS / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+
+    @property
+    def stepwise(self) -> str:
+        return (self.REFERENCES / "stepwise.md").read_text(encoding="utf-8")
+
+    @property
+    def reentry(self) -> str:
+        return (self.REFERENCES / "re-entry.md").read_text(encoding="utf-8")
 
     def test_direct_mode_covers_shallow_concrete_graphs(self) -> None:
         body = self.design
@@ -1429,7 +1445,11 @@ class TestAdaptiveDesignSkill:
         assert "Pipe count is secondary" in body
 
     def test_stepwise_mode_keeps_resumable_guarantees(self) -> None:
-        body = self.design
+        """The skill chooses stepwise as the complement of the direct criteria, plus the two
+        signals that are not complements; the reference names every signal as its entry condition."""
+        assert "explicit request for a scaffold, partial design, staged work, or a resumable intermediate result" in self.design
+        assert "a large graph that benefits from independently valid review checkpoints" in self.design
+        body = self.stepwise
         assert "nested controllers or multiple structural layers whose child contracts are not all fixed" in body
         assert "explicit request for a scaffold, partial design, staged work, or a resumable intermediate result" in body
         assert "Drain the signature backlog breadth-first" in body
@@ -1437,14 +1457,18 @@ class TestAdaptiveDesignSkill:
         assert "Early stopping exists only in stepwise mode" in body
 
     def test_direct_to_stepwise_transition_removes_the_abandoned_draft(self) -> None:
-        body = self.design
+        body = self.stepwise
         assert "removes abandoned direct-only intermediate concepts and concrete child definitions" in body
         assert "Do **not** append signatures beside the abandoned concrete definitions" in body
         assert "every pipe/concept code is declared only where the stepwise model permits it" in body
         assert "Validate the root scaffold before adding definitions" in body
+        assert (
+            "**If the design would need a placeholder or a guessed contract, or writing or validation exposes an unresolved structural boundary**"
+            in self.design
+        )
 
     def test_existing_method_reentry_is_adaptive(self) -> None:
-        body = self.design
+        body = self.reentry
         assert "Choose the re-entry mode from the affected graph, not the whole method's size" in body
         assert "**Direct coherent edit:** when the affected region is shallow" in body
         assert (
@@ -1457,7 +1481,15 @@ class TestAdaptiveDesignSkill:
         assert "remove their old concrete definitions before validating" in body
         assert "each changed concept exactly once in the scaffold" in body
         assert "Do not predeclare deeper descendants while their parent is only a signature" in body
-        assert "Never duplicate a concept already retained by a direct→stepwise transition or signature-driven re-entry" in body
+        assert "Never duplicate a concept already retained by a direct→stepwise transition or signature-driven re-entry" in self.stepwise
+
+    def test_the_reentry_baseline_and_recovery_stay_in_the_skill(self) -> None:
+        """What protects the user's bundle on a re-entry is a guard, so it is read before the
+        reference is: the baseline, the retained original, and the restore on failure."""
+        body = self.design
+        assert "**Never redesign on a broken baseline**" in body
+        assert "**Retain the original contents until the final verdict is restored.**" in body
+        assert "restore the retained baseline contents and report the failure" in body
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_adaptive_workflow(self, target_name: str) -> None:
@@ -1471,12 +1503,16 @@ class TestAdaptiveDesignSkill:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-design/SKILL.md"))
         assert "Design a MTHDS bundle top-down at the right depth" in body
-        assert "## Direct construction — complete shallow graph" in body
-        assert "## Signature-driven construction — validated stepwise refinement" in body
-        assert "## Editing an existing method (adaptive re-entry)" in body
+        assert "### 3. Infer the construction mode" in body
+        assert "### 4. Direct construction" in body
+        assert "## Re-entry" in body
+        assert "read [stepwise.md](references/stepwise.md) before writing any file" in body
+        assert "read [re-entry.md](references/re-entry.md) before editing any file" in body
         assert "Never ask the user to choose the workflow" in body
         assert "{%" not in body
         assert "{{" not in body
+        assert self.stepwise.startswith("# Signature-driven stepwise construction")
+        assert self.reentry.startswith("# Re-entering an existing method")
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_design_is_model_invocable_on_every_platform(self, target_name: str) -> None:
@@ -1899,7 +1935,7 @@ class TestBundleHome:
 
     def test_design_resolves_the_home_before_it_writes(self) -> None:
         body = self._template("pipelex-design")
-        assert "### Resolve the bundle home before writing" in body
+        assert "### 2. Resolve the bundle home before writing" in body
         assert "A path the user named" in body
         assert "`<package>/methods/<name>/`" in body
         assert "`<project root>/methods/<name>/`" in body
@@ -2308,15 +2344,36 @@ class TestCatalogIdInEverySkill:
     TEMPLATES = REPO_ROOT / "templates" / "skills"
 
     BRIDGED: ClassVar[tuple[str, ...]] = ("pipelex-design", "pipelex-edit", "pipelex-organize")
+    # The skills that carry the bridge block inline. `pipelex-design` reads it from the shared
+    # reference `skills/shared/catalog-id.md` since the size diet's phase 4; edit and organize
+    # switch in phase 6 (`wip/skill-size-diet/plan.md`, Deferred).
+    BRIDGED_INLINE: ClassVar[tuple[str, ...]] = ("pipelex-edit", "pipelex-organize")
+    BRIDGED_BY_REFERENCE: ClassVar[tuple[str, ...]] = ("pipelex-design",)
+    SHARED_BRIDGE = "skills/shared/catalog-id.md.j2"
 
     def skill(self, name: str) -> str:
         return (self.TEMPLATES / name / "SKILL.md.j2").read_text(encoding="utf-8")
 
-    @pytest.mark.parametrize("skill", BRIDGED)
+    @pytest.mark.parametrize("skill", BRIDGED_INLINE)
     def test_the_file_based_skills_bridge_an_id_to_a_directory(self, skill: str) -> None:
         body = self.skill(skill)
         assert 'include "skills/shared/catalog-id-bridge.md.j2"' in body
         assert "catalog_id_bridge_resume" in body, "the include's resume step is set by the including skill"
+
+    @pytest.mark.parametrize("skill", BRIDGED_BY_REFERENCE)
+    def test_a_skill_can_bridge_through_the_shared_reference(self, skill: str) -> None:
+        """The bridge block keeps one source: the shared reference includes it and sets its resume
+        step, and a skill that points there says when, before reading any file, and keeps the
+        bridge's two guards itself — a guard never lives only in a file read on demand."""
+        shared = (self.TEMPLATES.parent / self.SHARED_BRIDGE).read_text(encoding="utf-8")
+        assert 'include "skills/shared/catalog-id-bridge.md.j2"' in shared
+        assert "catalog_id_bridge_resume" in shared, "the shared reference sets the resume step"
+        body = self.skill(skill)
+        assert 'include "skills/shared/catalog-id-bridge.md.j2"' not in body, "the block has one carrier per skill"
+        assert "read [the catalog-id reference](../shared/catalog-id.md) before reading any file" in body
+        assert "**For a catalog id (`mt_…`) or a published address**" in body, "an address is the bridge's to refuse"
+        assert "never choose" in body
+        assert "**Never present a linked directory as the saved method's current content.**" in body
 
     @pytest.mark.parametrize("skill", BRIDGED)
     def test_the_file_based_skills_say_when_the_saved_copy_fell_behind(self, skill: str) -> None:
@@ -2330,7 +2387,8 @@ class TestCatalogIdInEverySkill:
         it would suppress that failure rather than add to it. This asserts the
         other half: that the step reaches the rendered text on every target and
         carries no build-error marker, rather than trusting the build to have
-        run."""
+        run — in each skill that carries the block, and in the shared reference
+        a skill reads it from."""
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
         rendered = render_templates(
             self.REPO_ROOT / "templates",
@@ -2339,10 +2397,16 @@ class TestCatalogIdInEverySkill:
             include_skills=list(self.BRIDGED),
             target_name=config.name,
         )
-        for skill in self.BRIDGED:
-            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert "PIPELEX_BUILD_ERROR" not in body, f"{target_name}/{skill}: the bridge's resume step did not resolve"
-            assert "say which one, and go to **" in body, f"{target_name}/{skill}: the bridge names no step to resume at"
+        carriers = [f"skills/{skill}/SKILL.md" for skill in self.BRIDGED_INLINE] + ["skills/shared/catalog-id.md"]
+        for carrier in carriers:
+            body = next(content for path, content in rendered.items() if path.match(carrier))
+            assert "PIPELEX_BUILD_ERROR" not in body, f"{target_name}/{carrier}: the bridge's resume step did not resolve"
+            assert "say which one, and go to **" in body, f"{target_name}/{carrier}: the bridge names no step to resume at"
+        shared = next(content for path, content in rendered.items() if path.match("skills/shared/catalog-id.md"))
+        assert shared.startswith("# A catalog id or a published address as the target\n\nRead this when "), (
+            f"{target_name}: the shared reference opens with its entry condition"
+        )
+        assert "pipelex-design" not in shared, f"{target_name}: the shared reference names no skill, so edit and organize can point at it unchanged"
 
     def test_the_bridge_never_picks_between_two_linked_directories(self) -> None:
         """`/pipelex-catalog`'s conflict path deliberately creates a second

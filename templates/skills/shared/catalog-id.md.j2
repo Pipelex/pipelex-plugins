@@ -1,0 +1,22 @@
+{#- The catalog-id bridge as a shared reference, rendered per target.
+
+   Box F of `wip/skill-size-diet/design.md` set the pattern with
+   `credentials.md`: text a skill needs only on a condition it can see before
+   acting, and which differs per harness, is a shared reference rendered per
+   target rather than an include every skill carries in full. A catalog id or a
+   published address as the target of a file-based skill is such a condition,
+   and the bridge's text names a cross-skill hand-off, which is per harness.
+
+   The bridge block itself keeps one source, `catalog-id-bridge.md.j2`: this
+   file only includes it. It is worded for any file-based skill — design, edit
+   and organize — so the resume step is generic; the skill that points here
+   keeps, at its pointer, the guards the bridge states (read-before-act: a
+   guard never lives only in a file read on demand). `pipelex-design` points
+   here since phase 4 of the size diet; `pipelex-edit` and `pipelex-organize`
+   still include the block inline until phase 6 switches them. -#}
+# A catalog id or a published address as the target
+
+Read this when a skill that works on files is given a registered method's catalog id (`mt_…`) or a published method's address as its target, before reading or writing any file, and then go back to the step that sent you here. Below, "this skill" is the skill that sent you here and "this one" its `SKILL.md`, and that skill's guards hold throughout.
+
+{% set catalog_id_bridge_resume %}**the step that sent you here**{% endset -%}
+{% include "skills/shared/catalog-id-bridge.md.j2" %}

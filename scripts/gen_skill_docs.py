@@ -70,8 +70,8 @@ STATIC_ASSET_DIRS = ("references", "scripts")
 
 # Shared reference files, rendered standalone per target: the MTHDS language
 # references that ground the skills, and the files a skill reads when one of its
-# stops fires, such as `credentials.md`. Paths are relative to the templates/
-# directory.
+# stops fires or one of its branches is taken, such as `credentials.md` and
+# `catalog-id.md`. Paths are relative to the templates/ directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
 # shared blocks — are deliberately NOT listed here: they are {% include %}-d by
@@ -81,6 +81,7 @@ SHARED_TEMPLATES = [
     "skills/shared/mthds-reference.md.j2",
     "skills/shared/native-content-types.md.j2",
     "skills/shared/credentials.md.j2",
+    "skills/shared/catalog-id.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
