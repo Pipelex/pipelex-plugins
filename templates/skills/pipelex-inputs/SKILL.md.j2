@@ -1,7 +1,7 @@
 ---
 name: pipelex-inputs
 description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo[/selector][@tag]) — also use when the user names one of those, e.g. "prepare inputs for mt_abc123" or "prepare inputs for github.com/Pipelex/methods/documents". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
-{% include "skills/shared/frontmatter.md.j2" %}
+{%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
   - mcp__plugin_pipelex_pipelex__mthds_prepare_inputs
@@ -15,10 +15,7 @@ Prepare input data for running MTHDS method bundles. This skill is the single en
 
 The target method comes in three forms, and every MCP call in this skill takes whichever one applies: a **local bundle** (a directory of `.mthds` files, submitted as `files`), a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id`), or a **published method** at its address (`method_ref`, e.g. `github.com/Pipelex/methods/documents@v0.1.0`). Only the first needs local files — the other two are resolved server-side, so no method source enters the conversation. Exactly one selector goes on any call; a second is refused at the extra field.
 
-**Submitting a local bundle.** Each `files` item is either a path or inline contents, and for workspace files the path form is preferred:
-
-- `{path: <absolute path to the .mthds file>}` — **prefer this.** It keeps the real path as provenance in diagnostics, and it spares you copying entire bundles into the request. The workshop resolves a path against **its own** working directory — wherever the harness launched it, which is not necessarily your bundle — so pass an absolute path rather than trusting a relative one to line up. (Same rule as the file *inputs* further down; anything you hand the server as a path follows it.)
-- `{content: <file content>, uri: <path relative to the bundle dir>}` — the inline fallback. Use it when the server can't read the path, and note it is the **only** form the hosted console accepts, since that deployment has no filesystem.
+**Submitting a local bundle.** {% include "skills/shared/validate-call.md.j2" %} Anything else you hand the server as a path follows the same rule, the file *inputs* further down included.
 
 ## Requirements — the Pipelex MCP tools
 
@@ -81,7 +78,7 @@ The `/inputs` subdirectory is only created when there are actual data files to s
 
 ### Step 2: Get the Input Template
 
-Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>`, submitted as `files`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content); for a published method, `method_ref: "github.com/…"` alone (projected from the package the address resolves to). Never supply two selectors — exactly one per call, and a second is refused at the extra field rather than one of them quietly winning. Pass **`explicit: false`** — the tool's own default is the ceremonial `{concept, content}` envelope, and this skill works in the **light** shape (bare example values) end to end. The remaining defaults resolve the method's declared `main_pipe`. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
+Call the **`mthds_inputs_template`** tool with the target from Step 1 — for a local bundle, the whole bundle: every `.mthds` file in `<output_dir>` outside `runs/`, submitted as `files`; for a registered method, `method_id: "mt_…"` alone (the template is projected from the method's current stored content); for a published method, `method_ref: "github.com/…"` alone (projected from the package the address resolves to). Never supply two selectors — exactly one per call, and a second is refused at the extra field rather than one of them quietly winning. Pass **`explicit: false`** — the tool's own default is the ceremonial `{concept, content}` envelope, and this skill works in the **light** shape (bare example values) end to end. The remaining defaults resolve the method's declared `main_pipe`. (To target a different pipe, pass `pipe_ref` as a qualified `domain.pipe_code`.)
 
 Branch on the structured verdict, never on transport:
 

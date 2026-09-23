@@ -8,7 +8,6 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
-
 ---
 
 # Generate synthetic input files

@@ -42,11 +42,13 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   └── shared/                       # Two kinds: rendered per target, or include-only partials
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
 │       ├── native-content-types.md.j2 # Native content-type documentation (rendered per target)
+│       ├── credentials.md.j2          # Connecting the workshop and where its key comes from, per harness (rendered per target; read when an MCP stop fires)
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (include-only)
-│       ├── mcp-requirements.md.j2     # The MCP-backed skills' three opening bullets, credential sentence included (include-only)
-│       ├── validate-call.md.j2        # How a bundle is submitted: the path form of `files` (include-only)
+│       ├── mcp-requirements.md.j2     # The MCP-backed skills' two stops, each pointing at credentials.md (include-only)
+│       ├── validate-call.md.j2        # How a bundle is submitted: the file set (runs/ excluded) and the path form of `files` (include-only)
+│       ├── project-root.md.j2         # Where a project starts: the project markers design, integrate and catalog share (include-only)
 │       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only)
-│       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in its three wordings (include-only)
+│       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in one wording (include-only)
 │       ├── saved-copy-notice.md.j2    # The linked saved method does not have this change; `/pipelex-catalog` compares the two and updates it (include-only)
 │       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only)
 │       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
@@ -60,7 +62,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
 └── mcp/
     └── vibe-mcp.toml.j2             # Vibe [[mcp_servers]] fragment: the workshop launcher (Vibe has no plugin manifest)
-skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets, copied verbatim into every target
+skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets — references/ and scripts/ — copied verbatim into every target, executable bits kept
 ├── pipelex-design/references/writing-mthds.md          # MTHDS authoring reference
 ├── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes
 ├── pipelex-integrate/references/                       # typescript.md, python.md, codegen-check.mjs, codegen_check.py — detection tables, call-site templates, the offline gates copied into TS and python-pydantic projects
@@ -103,7 +105,9 @@ make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 2. Run `make build` to regenerate all targets.
 3. Run `make check` (or `make agent-check`) to validate.
 
-**A block several skills say word for word lives in one include.** The MCP requirements bullets, the `files` path-form sentence, the formatting-hook sentence, the stale-types notice, the saved-copy notice, the catalog-id bridge and the PipeFunc warning are include-only partials under `templates/skills/shared/`; a skill sets what it words differently with `{% set %}` and includes the rest. Never paste one of those blocks into a new skill — `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a block has more than one source. The partials, their parameters and the two whitespace mechanics are in `docs/build-targets.md`.
+**A block several skills say word for word lives in one include.** The MCP requirements' two stops, the submission convention (the file set and the `files` path form), the project-root markers, the formatting-hook sentence, the stale-types notice, the saved-copy notice, the catalog-id bridge and the PipeFunc warning are include-only partials under `templates/skills/shared/`; a skill sets what it words differently with `{% set %}` and includes the rest. Never paste one of those blocks into a new skill — `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a block has more than one source. The partials, their parameters and the two whitespace mechanics are in `docs/build-targets.md`.
+
+**Every skill is written to the read-before-act rule, and fits under the compaction ceiling.** Of each sentence ask what happens if the model never reads it: a **guard** (skipping it loses something unrecoverable, sends something off the machine, spends credit, or is silently wrong) stays in `SKILL.md` once, at its step, and is registered in `tests/unit/test_skill_guards.py`; a **branch** moves to `skills/<skill>/references/` behind a pointer placed at its condition, read before acting; a **stop** is one row of the stop table; **rationale** goes to `docs/decisions.md` and ships nowhere. A procedure whose text is its correctness ships as a script under `skills/<skill>/scripts/`. `make check` reports every rendered `SKILL.md` over 13,000 characters — what Claude Code keeps of a skill after a compaction — and fails a link that resolves to nothing or a shipped reference, script or shared file nothing names. The shape and the checks that hold it are in `docs/build-targets.md`, "The size of a skill"; the campaign that set them is `wip/skill-size-diet/`.
 
 CI repeats the read-only half of that loop on every pull request — `make check` and `make agent-test` — with the branch-flow guard and the release-only version and changelog gates beside them. `docs/ci.md` says which workflow runs when, what each check means, and which of them is not reporting yet.
 

@@ -1,7 +1,6 @@
 ---
 name: pipelex-edit
 description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
-
 ---
 
 # Edit a MTHDS bundle
@@ -15,10 +14,9 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 
 This skill proves every edit with the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — never declare an edit done on the hook's silence alone: the hook's semantic-validation stage is fail-open (it is skipped without an API key), so the MCP verdict is the authoritative check.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."*
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim.
+- **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 - **`mthds_inputs_template`** is needed only for the inputs-refresh check (Step 6) — when the edit cannot have touched the input template, it goes unused.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Just write the files — don't hand-format, and re-read a file before editing it again after the hook reformatted it.
 
@@ -52,7 +50,7 @@ In interactive mode, present the planned edits and ask "Does this plan look righ
 
 ### Step 1: Read the bundle
 
-Locate the bundle directory and read **every** `.mthds` file in it (the root — usually `main.mthds` — carries the `domain` header, `description`, and `main_pipe`; module files carry the pipes and concepts). Understand where the change lands before touching anything.
+Locate the bundle directory and read **every** `.mthds` file in it outside `runs/` (the root — usually `main.mthds` — carries the `domain` header, `description`, and `main_pipe`; module files carry the pipes and concepts). Understand where the change lands before touching anything.
 
 ### Step 2: Classify the change
 
@@ -62,7 +60,7 @@ Classification reads the bundle you already have and calls no tool, so it comes 
 
 ### Step 3: Baseline verdict
 
-Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change. Surface the `validation_errors[]` and the Markdown summary, and offer to repair first — never edit on a broken baseline, or your regressions and the pre-existing errors become indistinguishable.
@@ -90,7 +88,7 @@ When the edit could have changed the input template — a renamed main-pipe inpu
 
 State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs, `/pipelex-run` when they want to run the method, and `/pipelex-catalog` when the edit should reach the saved method this directory is linked to.
 
-**Generated types may now be stale.** Search the **whole project** for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — and keep the ones whose `sources` name a file this edit changed or removed, **or whose `bundle_dir` holds a `.mthds` file this edit created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory, so matching on `sources` alone misses exactly the edit that adds a file. The sidecar sits beside the **generated tree**, never beside the bundle: `src/generated/<method>/` or `<package>/generated/<method>/`. Looking only next to the `.mthds` file finds nothing and reports a clean bill that is wrong. For each, say that the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it. This notice is the guard that speaks at edit time, before the drift gate `/pipelex-integrate` wires into the project fails in CI, so do not skip it.
+**Generated types may now be stale.** Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
 **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 

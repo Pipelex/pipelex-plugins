@@ -6,7 +6,6 @@ allowed-tools:
   - Read
   - Grep
   - Glob
-
   - mcp__plugin_pipelex_pipelex__mthds_list_methods
   - mcp__plugin_pipelex_pipelex__mthds_save_method
   - mcp__plugin_pipelex_pipelex__mthds_get_method
@@ -29,10 +28,9 @@ What it does not do: author or repair a method (`/pipelex-design`, `/pipelex-edi
 
 This skill is **`mthds_list_methods`**, **`mthds_save_method`** and **`mthds_get_method`**, served by the plugin's `pipelex` MCP server. There is no fallback: the catalog lives behind the API key, so without the server there is nothing to list, save or pull.
 
-- **If the catalog tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* Never report a method id, a name, or a method as saved when the answer did not come from these tools.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim.
+- **If the catalog tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. Never report a method id, a name, or a method as saved when the answer did not come from these tools.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 - **`mthds_validate`** is optional and has one narrow use: answering *"would this save?"* without saving. Never call it on the way to a save — `mthds_save_method` reads the files, validates them and saves those same bytes in one call, so a verdict taken here would be a second read of files that may have changed between the two.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
 
 ## Mode
 
@@ -54,7 +52,7 @@ The target is a **bundle directory**. The arm is decided by one file.
 
 ### Step 1 — Read the directory and decide the arm
 
-Gather every `.mthds` file beneath the directory **except anything under a `runs/` directory** — that is where `/pipelex-run` saves a completed run's artifacts, and a method that emits or echoes a `.mthds` file would otherwise have its own output saved as part of its source. Submit them as `files` with the **root file first**: the one carrying the bundle's `domain` header, usually `main.mthds`. The platform derives the method's listed description from the first file, and the tool neither reorders them nor guesses which is the root. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+Gather the bundle's files as the convention below says, and submit them as `files` with the **root file first**: the one carrying the bundle's `domain` header, usually `main.mthds`. The platform derives the method's listed description from the first file, and the tool neither reorders them nor guesses which is the root. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 Then read `pipelex-method.json` beside that root file:
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A run's artifacts stay out of the bundle**: `pipelex-design`, `pipelex-edit`, `pipelex-organize`, `pipelex-explain` and `pipelex-inputs` gather, read and submit every `.mthds` file of a bundle directory except those under `runs/`, where `/pipelex-run` saves a completed run's artifacts, so a method that produces a `.mthds` file no longer has its own output validated or explained as its source, and `pipelex-organize` never deletes one.
+- **What to tell the user about the workshop and its key lives in one shared file**: an MCP-backed skill keeps its stops on an absent Pipelex tool and on a `config`-class error, and reads the new `shared/credentials.md` for the harness-specific connection and key instructions, which each skill used to carry in full.
+
 ### Fixed
 
 - **Mistral Vibe loads `pipelex-design` and `pipelex-scaffold`**: both descriptions carried a `: ` that strict YAML reads as a second key, so Vibe, which parses a skill's frontmatter strictly, dropped the two skills with nothing but a warning in its log. The descriptions are reworded, and `make check` now parses every rendered skill's frontmatter as strict YAML and fails one that does not parse, or whose `name` is not its directory.

@@ -10,10 +10,18 @@
    the user rather than what makes it impossible.
 
    MCP tools are never listed here: their names are per-platform, so each skill
-   appends its own after the include. -#}
-{% if platform == "claude" -%}
+   appends its own after the include.
+
+   Whitespace: the fields open with their own line break and end without one,
+   and every skill includes this partial with `{%- include %}`, which strips the
+   break before it. So a target with no fields to add (Codex, Vibe) renders the
+   `description:` line straight into the closing `---`, with no blank line
+   between them, and Claude's list runs straight into the MCP tools a skill
+   appends. -#}
+{% if platform == "claude" %}
 allowed-tools:
 {%- for tool in skill_tools | default(["Bash", "Read", "Write", "Edit", "Grep", "Glob"]) %}
   - {{ tool }}
 {%- endfor %}
-{% endif -%}
+{%- endif %}
+{#- -#}

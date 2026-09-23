@@ -39,7 +39,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
 
 **`templates/`** holds all `.j2` source files. Never edit files in `pipelex/`, `pipelex-codex/`, or `pipelex-vibe/` directly — they are generated output.
 
-**`skills/`** at the repo root (if present) holds only static per-skill assets (`references/` subdirectories) that are copied into every target. Several skills use it — `pipelex-design`, `pipelex-synthetic-inputs`, `pipelex-integrate`, `pipelex-scaffold` — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs` and `codegen_check.py`, the scripts the skill copies verbatim into TypeScript and Python projects, so a reference edit is followed by `make build` and, for a script, by running it — `tests/unit/test_pipelex_integrate_skill.py` executes both, and pyright type-checks the Python one against the real `pipelex-sdk`. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
+**`skills/`** at the repo root (if present) holds only static per-skill assets — `references/`, read on a branch, and `scripts/`, run by path — that are copied into every target, a script's executable bit included. Several skills use it — `pipelex-design`, `pipelex-synthetic-inputs`, `pipelex-integrate`, `pipelex-scaffold` — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs` and `codegen_check.py`, the scripts the skill copies verbatim into TypeScript and Python projects, so a reference edit is followed by `make build` and, for a script, by running it — `tests/unit/test_pipelex_integrate_skill.py` executes both, and pyright type-checks the Python one against the real `pipelex-sdk`. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
 
 ## Target configuration
 
@@ -132,6 +132,24 @@ Every rendered `SKILL.md` opens with YAML frontmatter that `make check` parses *
 
 The Mistral Vibe target is manifestless: it emits skills, the Vibe hook files (`hooks/vibe-hooks.toml` + `hooks/check-mthds-vibe.sh`) and the MCP fragment (`mcp/vibe-mcp.toml`), and is wired into Vibe with `skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]`, a `hooks.toml` entry, and the fragment's `[[mcp_servers]]` entry appended to the end of `~/.vibe/config.toml`, once the `mcp_servers = []` line a new Vibe config carries is deleted, with the API key written into its `env` table (Vibe forwards no shell environment into a stdio spawn — see [decisions.md](decisions.md) "Vibe target bakes the launcher as a config fragment").
 
+## The size of a skill
+
+Every skill is written to one rule, the **read-before-act rule** of the size diet (`wip/skill-size-diet/design.md`, box A): of each sentence, ask what happens if the model never reads it, and what would tell it.
+
+- A **guard** — skipping it loses something that cannot be recovered, sends something off the machine, spends credit, or leaves a result silently wrong — stays in `SKILL.md`, once, in one sentence, at the step it governs.
+- A **branch** — the wrong thing done on a path the model could have recognised before taking it — goes to a reference under `skills/<skill>/references/`, and `SKILL.md` keeps the condition and a pointer to follow **before acting**, at the decision point and never only in a closing list. References are one level deep: a reference never sends the model to another.
+- A **stop** — a verdict, an exit code or a refusal says so — is one row of the stop table; a recovery longer than a line goes to the branch's reference.
+- **Rationale** goes to `docs/decisions.md` and ships nowhere.
+
+A `SKILL.md` takes one shape, in this order: the frontmatter; what the skill does and what it is not, in a few lines; the requirements; the guards that span several steps; the main path as numbered steps in the imperative, each with its own guards and pointers; the stop table; and an index of references, each with the condition that sends the model there. A procedure whose text is its correctness — a shell chain, a hash, a comparison of resolved paths — ships as a script under `skills/<skill>/scripts/`, takes its values as arguments, prints one line opening with a stable verdict word, never prints a secret, and is executed by the unit suite.
+
+These checks hold the shape:
+
+- **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It reports without failing until `SKILL_CEILING_ENFORCED` is flipped at the end of the diet.
+- **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target — a link that climbs out of it names a file the installed plugin does not carry — and every anchor a heading of the file it points into, slugged as GitHub does, inline code keeping its text; code, fenced or inline, is an example and never a link; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
+- **The guard registry.** `tests/unit/test_skill_guards.py` lists each skill's guards by their canonical sentence and asserts, on every target, that each appears exactly once in the rendered `SKILL.md` and in no reference or shared file. A skill phase registers its guards in the change that places them.
+- **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`.
+
 ## Codex marketplace discovery
 
 Codex resolves `codex plugin marketplace add Pipelex/pipelex-plugins` by scanning `.agents/plugins/marketplace.json` (preferred) or `.claude-plugin/marketplace.json`. The canonical Codex packaging spec is `packaging/codex-marketplace.json`; the build syncs a byte-identical copy to `.agents/plugins/marketplace.json` on every run. The freshness check fails if the copy drifts from the canonical source.
@@ -221,20 +239,21 @@ So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make chec
 
 `templates/skills/shared/` holds two kinds of file, told apart by the `SHARED_TEMPLATES` list in `gen_skill_docs.py`.
 
-**Rendered standalone.** The files listed there — the MTHDS language references — are rendered per target and written to `skills/shared/`, where a skill body links to them.
+**Rendered standalone.** The files listed there — the MTHDS language references, and `credentials.md`, which says how to connect the workshop and where its key comes from on each harness — are rendered per target and written to `skills/shared/`, where a skill body links to them. They are references in the size diet's sense: a skill reads one when a condition sends it there, so each is named by a pointer at that condition.
 
 **Include-only partials.** Every other file there is `{% include %}`-d by the skill templates and never rendered on its own, so it ships as part of whichever skills include it and nowhere else. They exist so that a block several skills say word for word has one source: the credential sentence used to sit in five templates, and correcting it meant five edits and a test that asserted two of them were identical.
 
 | Partial | What it carries | Parameters the including template sets |
 | --- | --- | --- |
 | `frontmatter.md.j2` | the YAML frontmatter fields shared by every skill (Claude's `allowed-tools`) | `skill_tools` (the harness-native tools the skill pre-approves; defaults to the writing set) |
-| `mcp-requirements.md.j2` | the three bullets an MCP-backed skill opens with: the STOP on an absent tool, the STOP on a `config`-class error, and where the server gets its API key | `mcp_absent_lead` (`the tool is`, `the tools are`, `a tool is`), `mcp_absent_suffix`, `mcp_config_parenthetical`, `mcp_config_suffix`, `mcp_requirements_extra` (a bullet inserted before the credential one) |
-| `validate-call.md.j2` | how a local bundle is handed to the workshop: the path form of `files`, and the inline fallback the hosted console needs | none |
+| `mcp-requirements.md.j2` | the two stops an MCP-backed skill opens with — an absent tool, a `config`-class error surfaced verbatim — each pointing at `shared/credentials.md` for what to tell the user | `mcp_absent_lead` (`the tool is`, `the tools are`, `a tool is`), `mcp_absent_suffix`, `mcp_config_parenthetical`, `mcp_config_suffix`, `mcp_requirements_extra` (a bullet appended after the two stops) |
+| `validate-call.md.j2` | how a local bundle is handed to the workshop: which files (every `.mthds` file beneath the bundle directory except `runs/`), the path form of `files`, and the inline fallback the hosted console needs | `validate_call_file_set` (`false` in `pipelex-integrate` alone, which states the file set its call site loads) |
 | `formatting-hook.md.j2` | that the validation hook formats every `.mthds` write, so no skill hand-formats | `formatting_hook_write_clause` |
-| `stale-types-notice.md.j2` | the notice that a bundle change may have outdated a generated tree, in the three wordings its call sites use | `stale_types_variant` (`edit`, `design`, `organize`) |
+| `stale-types-notice.md.j2` | the notice that a bundle change may have outdated a generated tree, in one wording for its three call sites | none |
 | `saved-copy-notice.md.j2` | the notice that the linked saved method does not have this change, offering `/pipelex-catalog` and never saving | none |
 | `catalog-id-bridge.md.j2` | how a file-based skill reaches a catalog id: the search over the link files, the several-hits question, the pull, and the refusal of a published address | `catalog_id_bridge_resume` (the step the skill resumes at, interpolated mid-sentence) |
 | `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
+| `project-root.md.j2` | where a project starts — the nearest directory holding one of the project markers — for design, integrate and catalog | none |
 
 Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
 
@@ -243,8 +262,10 @@ Two mechanics matter when writing one. A partial that may be included **mid-sent
 {% include "skills/shared/mcp-requirements.md.j2" %}
 ```
 
+**The frontmatter partial is the one exception to the line-break rule.** Its fields open with their own line break and end without one, and every skill includes it with `{%- include %}` (and sets `skill_tools`, when it does, with `{%- set %}`), which strips the break before it. So a target with no fields to add renders the `description:` line straight into the closing `---`, and Claude's tool list runs straight into the MCP tools a skill appends; a blank line inside the block fails `TestRenderedFrontmatterShape`.
+
 A parameter left unset falls back to the partial's own default, so a skill sets only what it says differently. `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a skill pastes one of these blocks instead of including it.
 
-**A parameter with no default is left bare, because strict mode is the guard.** Under `StrictUndefined` an unset or misspelled name raises at render time and `_render_or_die` names the template and the variable, so neither of the two parameters in this table needs a marker for the absent case — and an `{% if x is defined %}` guard around one would suppress that failure rather than add to it, trading a precise build error for a marker caught later. What strict mode cannot see is a name that is **present and wrong**. That is `stale_types_variant`'s case: it selects one of three blocks, so a misspelled variant falls off the end of the chain and drops the notice entirely, which is why its `{% else %}` emits `PIPELEX_BUILD_ERROR` for `scripts/check.py` to refuse in any generated file. `catalog_id_bridge_resume` is interpolated rather than branched on, so it has no wrong-value case to catch and takes no marker. Guard a parameter only where it may legitimately be absent, with `{% if x is defined %}` or `{{ x | default(…) }}` — `mcp_requirements_extra` is the one that is.
+**A parameter with no default is left bare, because strict mode is the guard.** Under `StrictUndefined` an unset or misspelled name raises at render time and `_render_or_die` names the template and the variable, so a parameter with no default needs no marker for the absent case — and an `{% if x is defined %}` guard around one would suppress that failure rather than add to it, trading a precise build error for a marker caught later. What strict mode cannot see is a name that is **present and wrong**: a partial that selects one of several blocks by a parameter's value falls off the end of its chain on a misspelled value and drops the block entirely, so such a chain ends in an `{% else %}` that emits `PIPELEX_BUILD_ERROR`, which `scripts/check.py` refuses in any generated file. No partial branches on a value today — `stale_types_variant` did until the size diet unified its three wordings — and the check stays for the next one. `catalog_id_bridge_resume` is interpolated rather than branched on, so it has no wrong-value case to catch.
 
 Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.

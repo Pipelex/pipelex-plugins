@@ -1,8 +1,8 @@
 ---
 name: pipelex-catalog
 description: Carry an MTHDS method between a bundle directory and the Pipelex method catalog — list what the organization has saved, save a directory as a new method or update the one it is linked to, and pull a saved method back to disk. Use when the user says "save this method", "save it to Pipelex", "push my changes to the saved method", "update mt_abc123", "what methods do I have", "list my saved methods", "pull mt_abc123 so I can edit it", "get that saved method onto disk", or "rename the saved method". A save is a deployment — every caller of the method's id runs the new content from its next call — so this skill never saves on its own initiative, and it never deletes a saved method.
-{% set skill_tools = ["Bash(git status:*)", "Read", "Grep", "Glob"] -%}
-{% include "skills/shared/frontmatter.md.j2" %}
+{%- set skill_tools = ["Bash(git status:*)", "Read", "Grep", "Glob"] %}
+{%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_list_methods
   - mcp__plugin_pipelex_pipelex__mthds_save_method
@@ -52,7 +52,7 @@ The target is a **bundle directory**. The arm is decided by one file.
 
 ### Step 1 — Read the directory and decide the arm
 
-Gather every `.mthds` file beneath the directory **except anything under a `runs/` directory** — that is where `/pipelex-run` saves a completed run's artifacts, and a method that emits or echoes a `.mthds` file would otherwise have its own output saved as part of its source. Submit them as `files` with the **root file first**: the one carrying the bundle's `domain` header, usually `main.mthds`. The platform derives the method's listed description from the first file, and the tool neither reorders them nor guesses which is the root. {% include "skills/shared/validate-call.md.j2" %}
+Gather the bundle's files as the convention below says, and submit them as `files` with the **root file first**: the one carrying the bundle's `domain` header, usually `main.mthds`. The platform derives the method's listed description from the first file, and the tool neither reorders them nor guesses which is the root. {% include "skills/shared/validate-call.md.j2" %}
 
 Then read `pipelex-method.json` beside that root file:
 
@@ -104,7 +104,7 @@ A **valid bundle with pending signatures is saved**, because the catalog holds d
 
 An `mt_…` id, or a name resolved through [List and find](#list-and-find) first. Always use the **written arm** — `mthds_get_method` with `output_dir` — so no source passes through the conversation. The inline arm is for reading a method that is not on disk, which is `/pipelex-explain`'s job, not this skill's.
 
-**Where it lands**, taking the first that applies: a path the user named; otherwise `methods/<name>/` under the project root — the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory, and `<package>/methods/<name>/` in a packaged Python project — otherwise `./methods/<name>/`.
+**Where it lands**, taking the first that applies: a path the user named; otherwise `methods/<name>/` under the project root — {% include "skills/shared/project-root.md.j2" %}, and `<package>/methods/<name>/` in a packaged Python project — otherwise `./methods/<name>/`.
 
 `output_dir` is **relative to the workshop's own working directory**, which is the directory the harness was launched in and not necessarily where the user is standing; an absolute path is accepted only while it resolves inside that directory. So resolve the landing path by the rule above, then express it relative to the workshop's root — and when the project root the rule found is outside that root, say so and stop, because a path inside the workshop is legal wherever it points and nothing downstream will notice that the files went somewhere the rule did not choose.
 

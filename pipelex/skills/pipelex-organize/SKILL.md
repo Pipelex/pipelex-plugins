@@ -8,7 +8,6 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
-
   - mcp__plugin_pipelex_pipelex__mthds_validate
 ---
 
@@ -24,9 +23,8 @@ It is a **content-preserving transformation** — the method's semantics never c
 
 Equivalence is checked through the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — this skill never reorganizes without proving the verdict is preserved.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* Do not touch the bundle files without validation available.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never reorganize unvalidated.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
+- **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. Do not touch the bundle files without validation available.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never reorganize unvalidated.
 
 **Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Don't hand-format, and re-read a file before editing it again after the hook reformatted it.
 
@@ -84,8 +82,8 @@ Within every file: satisfied signature headers are dropped; a still-pending sign
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
-2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+1. Gather **all** `.mthds` files in the bundle directory, none under a `runs/` directory (e.g. `methods/summarize_pdf/`).
+2. Call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
 
 Branch on the structured verdict:
@@ -112,13 +110,13 @@ Call `mthds_validate` with **the composed candidate set** (all planned files, no
 Only after the candidate verdict matches:
 
 1. **Write every file of the new layout** (Write tool — the hook lints and reformats each in place; a new file may legitimately reuse an old file's name, e.g. `main.mthds`).
-2. **Delete every `.mthds` file that is not part of the new layout.** Delete only `.mthds` files; leave `inputs.json`, input files, and anything else in the directory alone.
-3. **Confirm on disk**: re-gather the directory's `.mthds` files and validate once more — this catches anything the formatting hook changed.
+2. **Delete every `.mthds` file that is not part of the new layout.** Delete only `.mthds` files, and never one under a `runs/` directory, which holds a run's artifacts rather than the bundle; leave `inputs.json`, input files, and anything else in the directory alone.
+3. **Confirm on disk**: re-gather the directory's `.mthds` files outside `runs/` and validate once more — this catches anything the formatting hook changed.
 4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` (no verdict — e.g. the MCP dropped mid-swap) or a verdict that does not match the baseline, roll back: you still hold every original file's content from Step 1 — rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree, never beside the bundle — and for each one whose `sources` name a file in this directory, or whose `bundle_dir` is this directory or holds it, say the generated types there are now stale and offer `/pipelex-integrate` to refresh them: an equivalent verdict leaves the concept set as it was, but the new layout removes, rewrites and adds the very files the sidecar hashed, so that project's drift gate reports each of them as `stale-source` until a refresh records the new layout. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), check for generated types this layout made stale. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
 
 **When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries this notice too), say it here as well. **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to. A reorganization is exactly the change this notice exists for: the verdict is identical, so nothing about the method's behaviour moved, and yet every file in this directory was renamed, rewritten or removed.
 
