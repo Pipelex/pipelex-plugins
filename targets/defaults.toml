@@ -51,8 +51,9 @@ skill_dir = "${CLAUDE_SKILL_DIR}"
 #                    in a validate verdict — the one floor stated as "and earlier",
 #                    so a bump here means the signature arrived in a later release
 #                    than this one and the sentence naming it has to be re-read
-#   node             the Node the JS templates' `engines.node` names
-#   python_min/max   the range the Python starter's `requires-python` names
+#   node             the Node the method app's `engines.node` names
+#   python_min/max   the range `pipelex-sdk`'s `requires-python` names, which the
+#                    initializer branch's Python project must be created on
 #   method_app_port  the port pipelex-method-apps' webapp-js template serves on
 [vars.floors]
 pipelex_sdk_js = "0.18.0"

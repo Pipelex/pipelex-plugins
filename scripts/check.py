@@ -105,21 +105,6 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
         r"pipelex-sdk (\d+\.\d+\.\d+) or later is not importable",
         "pipelex_sdk_py",
     ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "Node \u2265 the `engines\\.node` field of `package\\.json` \\((\\d+\\.\\d+) at writing\\)",
-        "node",
-    ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "a Python inside `requires-python` of `pyproject\\.toml` \\((\\d+\\.\\d+)\u2013\\d+\\.\\d+ at writing\\)",
-        "python_min",
-    ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "a Python inside `requires-python` of `pyproject\\.toml` \\(\\d+\\.\\d+\u2013(\\d+\\.\\d+) at writing\\)",
-        "python_max",
-    ),
 ]
 
 # A number in a template that equals a floor and means something else entirely.
@@ -720,9 +705,8 @@ def check_version_floors(base_dir: Path) -> list[str]:
                 f"{rel_path}: the sentence stating the `{key}` floor was reworded — re-anchor VERSION_FLOOR_STATIC_REFS in this same change"
             )
             continue
-        # Every occurrence, not the first: `starters.md` states the Node floor once per
-        # template column, so a second one left behind by a bump is exactly the drift
-        # this rule exists to catch.
+        # Every occurrence, not the first: a reference that states a floor twice, and a
+        # second one left behind by a bump, is exactly the drift this rule exists to catch.
         for match in matches:
             if match.group(1) != expected:
                 line = text[: match.start()].count("\n") + 1
