@@ -111,7 +111,22 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never fabricate a value or abandon `inputs.json`",
     ),
     "pipelex-run": ("Never improvise a run id, a status or an output.",),
-    "pipelex-scaffold": ("never report a URL",),
+    "pipelex-scaffold": (
+        "never report a URL",
+        "exactly two branches and carries no templates of its own",
+        "never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room",
+        "**A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else**",
+        "**Never print a key, and never ask for one in the conversation.**",
+        "**the value moves only through a shell that expands the variable itself, and never through you**",
+        "**no reading an env file back**",
+        "One thing always confirms, in every mode: **`gh repo create`**",
+        "**Never install a toolchain, and never let a version manager download one.**",
+        "This is the **one commit this skill makes**",
+        "Nothing beyond what the initializer writes is authored by this skill",
+        "**On Python, finish with `uv sync` from inside `<dir>`.**",
+        "Run the script, never its steps by hand",
+        "Add **no** SDK dependency and create **no** empty `methods/` directory",
+    ),
 }
 
 CASES = [(target, skill, guard) for target in TARGET_OUTPUTS for skill, guards in GUARDS.items() for guard in guards]

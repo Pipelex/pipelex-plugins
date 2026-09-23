@@ -123,15 +123,33 @@ Waiting on this phase: none but `L-260911-3a85ca`, which is ranked urgent and la
 
 The three most invoked large skills are in the new shape. Record their sizes, what each smoke session showed, and the ceiling check's report.
 
+Written 2026-09-23, after phase 4 landed as PR #57 (`cda0ea3` on `dev`), and carried by phase 5a's branch.
+
+- **Their sizes at `cda0ea3`**, all under the 13,000-character ceiling on every target:
+
+  | Skill | Before, on Claude | Claude | Codex | Vibe |
+  |---|---|---|---|---|
+  | `pipelex-integrate` | 60,753 | 12,983 | 12,841 | 12,887 |
+  | `pipelex-inputs` | 41,480 | 12,816 | 12,719 | 12,740 |
+  | `pipelex-design` | 32,645 | 12,893 | 12,714 | 12,721 |
+
+  `pipelex-integrate` grew by 35 characters on Claude after its phase, through `L-260923-e3b8e1` and `L-260923-ed42a7`, both landed in the new shape as one edit each, which is what box G promised of an open bug that waits for its skill's phase. None of the three is near the phase target of about 12,000. The reason is the same each time: the shared blocks a skill must carry, and the qualifiers the read against the quotes restored. So the margin under the ceiling is thin, and a later edit to one of these skills pays for itself or moves a branch to a reference.
+- **What the smoke sessions showed** ([`smoke-integrate.md`](smoke-integrate.md), [`smoke-inputs.md`](smoke-inputs.md), [`smoke-design.md`](smoke-design.md)). On Claude Code and on Codex, every branch reference was read on its branch before the action it governs, and none on a main path. No moved caveat was missed and no guard broke, so no template changed for the diet's sake. Two patterns recur, and neither broke anything. A model reads a reference in the same turn as the action it governs, as the catalog-id search showed. And it reads a reference beside the check that decides whether it is needed, as with `re-entry.md` and the baseline validation. What the sessions found older than the diet was filed: Codex never offers the run (`L-260923-530eb0`), the workshop refuses a path outside its launch directory (`L-260923-019e50`), the stepwise mode outgrows the API's cap on files per validation (`L-260923-579324`), and validation follows one branch of a `PipeCondition` (`L-260923-998db9`, `pipelex`'s). The scenarios are written in the shape the eval suite `L-260921-479a8e` will take.
+- **The ceiling check's report**, from `make check` on phase 5a's branch after its rewrite. `pipelex-scaffold` is over on every target, at 40,486 characters on Claude after this phase, down from 63,683, and phase 5b takes the method-app path out. `pipelex-catalog`, `pipelex-run`, `pipelex-explain`, `pipelex-organize`, `pipelex-synthetic-inputs` and `pipelex-edit` are over on every target, and phase 6 trims them. Every other skill is under on every target.
+- **Nothing is pending a person.** The one decision the checkpoint could raise, whether the thin margins call for a lower target on the remaining skills, is answered by the rule already in force: a skill ends under the ceiling, and the target of about 12,000 is an aim, not a gate.
+
 ## Phase 5a — `pipelex-scaffold`: the starters leave, branch B runs through scripts · `L-260923-7febe6`
 
-- [ ] `classification-scaffold.md`.
-- [ ] The starter path is deleted, with `references/starters.md` and its tests: the Python starter, the gallery, the starter's bootstrap and env-file step, the GitHub-template form and the starter half of the fresh-clone shortcut (box E's amendment). Every project that is not a TypeScript web app goes to the ecosystem's initializer and then to `/pipelex-integrate`.
-- [ ] Branch B's programs become scripts: the repository test with the pristine commit, and the env-file write, which never prints a key and reports `filled`, `kept` or `empty` and the plane as `production` or `other`. The unit suite executes them directly.
-- [ ] References, each entered on its condition: the version-manager activation, the GitHub form, the per-framework detail in the existing `references/initializers.md`.
-- [ ] The method-app path is left as it stands; it moves in phase 5b.
+- [x] `classification-scaffold.md`.
+- [x] The starter path is deleted, with `references/starters.md` and its tests: the Python starter, the gallery, the starter's bootstrap and env-file step, the GitHub-template form and the starter half of the fresh-clone shortcut (box E's amendment). Every project that is not a TypeScript web app goes to the ecosystem's initializer and then to `/pipelex-integrate`. The `python_min` and `python_max` floors, which only the Python starter's prerequisite stated, left `[vars.floors]` with it.
+- [x] Branch B's programs become scripts: the repository test with the pristine commit, and the env-file write, which never prints a key and reports `filled`, `kept` or `empty` and the plane as `production` or `other`. The unit suite executes them directly. They are `skills/pipelex-scaffold/scripts/commit-pristine.sh` and `write-env-file.sh`, executed by `tests/unit/test_pipelex_scaffold_scripts.py`.
+- [x] References, each entered on its condition: the version-manager activation, the GitHub form, the per-framework detail in the existing `references/initializers.md`. They are `references/version-managers.md` and `references/github.md`, and `initializers.md` now opens with its entry condition.
+- [x] The method-app path is left as it stands; it moves in phase 5b.
 - [ ] Guards registered, smoke sessions run: a Python CLI, a FastAPI service, a TypeScript library, a directory holding only `.git`, and the Codex main path.
 - [ ] `/rev`.
+
+- **Rendered sizes after the rewrite**: 40,486 characters on Claude, 40,497 on Codex and 40,511 on Vibe, down from 63,683 on Claude. The skill stays over the ceiling until phase 5b moves the method-app path, as box I's order expects.
+- **The behaviour changes** are listed at the top of [`classification-scaffold.md`](classification-scaffold.md): the starters are no longer scaffolded from, the template-checkout stop names the method-app family alone, an existing `.gitignore` that does not ignore a `node_modules/` directory present gains that line, and an `.env.example` the initializer wrote keeps its own lines.
 
 Waiting on this phase: `L-260915-4b00fe` and `L-260912-059765`, both about branch B's env file, which its script now owns. And `L-260923-7001f2`, which routes a Python CLI to the family's `cli-python` template (epic `L-260923-71f4a9`) on top of this phase, through the family's initializer rather than a recipe of the skill's own.
 
