@@ -1,5 +1,7 @@
 # Word and Excel recipes — python-docx, openpyxl
 
+Read this at step 4 of the skill when the format is `docx` or `xlsx`, before writing any code; each recipe ends with step 5's verify command.
+
 Recipes for the `docx` and `xlsx` formats of `/pipelex-synthetic-inputs`, carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner line, and a verify step. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
 
 ## Word documents (DOCX)

@@ -43,16 +43,15 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
 │       ├── native-content-types.md.j2 # Native content-type documentation (rendered per target)
 │       ├── credentials.md.j2          # Connecting the workshop and where its key comes from, per harness (rendered per target; read when an MCP stop fires)
-│       ├── catalog-id.md.j2           # A catalog id or a published address given to a file-based skill: the bridge include, whole (rendered per target; read by pipelex-design, and by edit and organize from size-diet phase 6)
+│       ├── catalog-id.md.j2           # A catalog id or a published address given to a file-based skill: the bridge include, whole (rendered per target; read by pipelex-design, pipelex-edit and pipelex-organize)
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (include-only)
 │       ├── mcp-requirements.md.j2     # The MCP-backed skills' two stops, each pointing at credentials.md (include-only)
 │       ├── validate-call.md.j2        # How a bundle is submitted: the file set (runs/ excluded) and the path form of `files` (include-only)
 │       ├── project-root.md.j2         # Where a project starts: the project markers design, integrate and catalog share (include-only)
 │       ├── skill-dir.md.j2            # Codex and Vibe: defines the `<skill-dir>` placeholder a skill names its own files by; nothing on Claude (include-only)
-│       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only; edit and organize)
 │       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in one wording (include-only)
 │       ├── saved-copy-notice.md.j2    # The linked saved method does not have this change; `/pipelex-catalog` compares the two and updates it (include-only)
-│       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only; edit, organize, and shared/catalog-id.md)
+│       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only; included by shared/catalog-id.md alone)
 │       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
 ├── hooks/
 │   ├── hooks.json.j2                # Claude PostToolUse hook config
@@ -65,9 +64,12 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 └── mcp/
     └── vibe-mcp.toml.j2             # Vibe [[mcp_servers]] fragment: the workshop launcher (Vibe has no plugin manifest)
 skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets — references/ and scripts/ — copied verbatim into every target, executable bits kept
+├── pipelex-explain/references/                         # not-on-disk.md — a catalog id or a published address, read before the first call on one
 ├── pipelex-design/references/                          # writing-mthds.md — the MTHDS authoring reference, read before every write; stepwise.md — signature-driven construction; re-entry.md — a structural change to an existing method; each of the last two read on its condition
-├── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes
+├── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes; venv.md — the venv rung, read when `uv` is not on PATH, its block executed by tests/recipes too
 ├── pipelex-inputs/references/                          # synthetic.md, user-data.md — the strategies and their worked examples; published-address.md — a method_ref target; prepare-errors.md — prepare's input_domain errors, the size limit's terminal branch included; each read on its condition
+├── pipelex-run/references/                             # published-address.md — a method_ref target, read at step 1; failed-run.md — the failure routing, read before a failed run is routed; linked-run.md — a linked run refused at method_id
+├── pipelex-catalog/references/                         # python.md — which .py files a PipeFunc bundle sends, read at Save step 3; conflict.md — a save refused at expected_updated_at; unknown-id.md — a save's error at method_id; each read on its condition
 ├── pipelex-integrate/references/                       # typescript.md, python.md — detection, call-site templates, list narrowing, what the results carry; refresh.md, harness.md, signature-fallback.md, orphans.md, gate-failures.md — the branches, each read on its condition; codegen-check.mjs, codegen_check.py — the offline gates copied into TS and python-pydantic projects
 └── pipelex-scaffold/                                   # references/: initializers.md, the ecosystem initializers; version-managers.md and github.md, each read on its condition; scripts/: commit-pristine.sh and write-env-file.sh, the initializer branch's pristine commit and env file, run by path
 pipelex/                       # Claude prod plugin (generated, checked in)
@@ -108,7 +110,7 @@ make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
 2. Run `make build` to regenerate all targets.
 3. Run `make check` (or `make agent-check`) to validate.
 
-**A block several skills say word for word lives in one include.** The MCP requirements' two stops, the submission convention (the file set and the `files` path form), the project-root markers, the formatting-hook sentence, the stale-types notice, the saved-copy notice, the catalog-id bridge and the PipeFunc warning are include-only partials under `templates/skills/shared/`; a skill sets what it words differently with `{% set %}` and includes the rest. Never paste one of those blocks into a new skill — `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a block has more than one source. The partials, their parameters and the two whitespace mechanics are in `docs/build-targets.md`.
+**A block several skills say word for word lives in one include.** The MCP requirements' two stops, the submission convention (the file set and the `files` path form), the project-root markers, the stale-types notice, the saved-copy notice, the catalog-id bridge and the PipeFunc warning are include-only partials under `templates/skills/shared/`; a skill sets what it words differently with `{% set %}` and includes the rest. Never paste one of those blocks into a new skill — `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a block has more than one source. The partials, their parameters and the two whitespace mechanics are in `docs/build-targets.md`.
 
 **Every skill is written to the read-before-act rule, and fits under the compaction ceiling.** Of each sentence ask what happens if the model never reads it: a **guard** (skipping it loses something unrecoverable, sends something off the machine, spends credit, or is silently wrong) stays in `SKILL.md` once, at its step, and is registered in `tests/unit/test_skill_guards.py`; a **branch** moves to `skills/<skill>/references/` behind a pointer placed at its condition, read before acting; a **stop** is one row of the stop table; **rationale** goes to `docs/decisions.md` and ships nowhere. A procedure whose text is its correctness ships as a script under `skills/<skill>/scripts/`. `make check` reports every rendered `SKILL.md` over 13,000 characters — what Claude Code keeps of a skill after a compaction — and fails a link that resolves to nothing or a shipped reference, script or shared file nothing names. The shape and the checks that hold it are in `docs/build-targets.md`, "The size of a skill"; the campaign that set them is `wip/skill-size-diet/`.
 
