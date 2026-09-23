@@ -47,17 +47,23 @@ The questions of design section 8, answered with evidence recorded here before a
 
 ## Phase 1 — the shared blocks and the machinery · `L-260923-8c296f`
 
-- [ ] The `mcp-requirements` include shrinks to its two stops — an absent tool, a `config`-class error surfaced verbatim — and a pointer to `shared/credentials.md`, a new shared reference rendered per target and read when the error is about the key (box F). The credential sentence corrected by `L-260912-65d6fc` moves there unchanged.
-- [ ] The deferrals the plugin-skills-gaps campaign assigned here (its `plan.md`, "Deferred"): one statement of the path form of `files`, replacing the sources in `pipelex-inputs` and `pipelex-integrate`; one include for the project markers design and integrate share; one wording of the stale-types notice; the `runs/` exclusion in the shared submission convention; the frontmatter's stray blank line.
-- [ ] The build copies `skills/<skill>/scripts/` beside `references/`, executable bits kept, and the freshness check covers both.
-- [ ] `scripts/check.py` gains the ceiling check in report mode (box C) and the link check both ways (box H), with unit tests.
-- [ ] The guard registry's machinery in the unit suite: a guard's canonical sentence asserted exactly once in each target's rendered `SKILL.md` and in no reference.
-- [ ] `CLAUDE.md` and `docs/build-targets.md` state the read-before-act rule and the shape, for whoever writes the next skill; `docs/decisions.md` records the campaign's decisions.
+- [x] The `mcp-requirements` include shrinks to its two stops — an absent tool, a `config`-class error surfaced verbatim — and a pointer to `shared/credentials.md`, a new shared reference rendered per target and read when the error is about the key (box F). The credential sentence corrected by `L-260912-65d6fc` moves there unchanged.
+- [x] The deferrals the plugin-skills-gaps campaign assigned here (its `plan.md`, "Deferred"): one statement of the path form of `files`, replacing the sources in `pipelex-inputs` and `pipelex-integrate`; one include for the project markers design and integrate share; one wording of the stale-types notice; the `runs/` exclusion in the shared submission convention; the frontmatter's stray blank line.
+- [x] The build copies `skills/<skill>/scripts/` beside `references/`, executable bits kept, and the freshness check covers both.
+- [x] `scripts/check.py` gains the ceiling check in report mode (box C) and the link check both ways (box H), with unit tests.
+- [x] The guard registry's machinery in the unit suite: a guard's canonical sentence asserted exactly once in each target's rendered `SKILL.md` and in no reference.
+- [x] `CLAUDE.md` and `docs/build-targets.md` state the read-before-act rule and the shape, for whoever writes the next skill; `docs/decisions.md` records the campaign's decisions.
 - [ ] `/rev`.
 
 ### Checkpoint 1
 
 The machinery a skill phase relies on is on `dev`. Record the ceiling value, the skill-directory variable, the report the ceiling check prints, and any fact of phase 0 that changed a box.
+
+- **The ceiling is 13,000 characters** (`SKILL_CEILING_CHARS` in `scripts/check.py`), in report mode (`SKILL_CEILING_ENFORCED = False`). At the end of phase 1 it reports every skill over it on every target — thirty files, from `pipelex-scaffold` (about 63,700 characters on Claude) down to `pipelex-edit` (about 14,000). `pipelex-edit` is new to the list at this value, so phase 6 trims it with `pipelex-organize`.
+- **The skill-directory variable is `skill_dir`, decided and not yet in `targets/`**: `${CLAUDE_SKILL_DIR}` on Claude, a `<skill-dir>` placeholder defined in one sentence on Codex and Vibe. It lands with the first skill that names a script or a verbatim copy — phase 2, for integrate's copy of its gate script, which Vibe performed as a read-and-rewrite until told to `cp` — because a variable nothing reads is a dead switch.
+- **What phase 0 changed.** Box C's value (13,000, not 16,000). Box E holds on every target, with one addition to what a script owes the skill: it is run by its absolute path from the user's project, through its interpreter, because on Codex and Vibe the model otherwise runs it from inside the skill's directory. And one bug found on the way and fixed on its own, `L-260923-dfb8ee`: Vibe dropped two skills over their frontmatter.
+- **What phase 1 changed beyond the move**, each named in its pull request: `design`, `edit`, `organize` and `explain` now exclude `runs/` from what they submit, through the shared convention (box F's deferral); the stale-types notice has one wording; the requirements block's recovery text moved to `shared/credentials.md`. Two items were filed from the work: `L-260923-58d533` (integrate's call site and gates load a run's `runs/` artifacts) and `L-260923-0964b0` (skills tell Codex users to type a Claude spelling of a skill).
+- [ ] `/rev` (the checkpoint's own review is phase 1's pass).
 
 ## Phase 2 — `pipelex-integrate` · `L-260923-5a94e7`
 

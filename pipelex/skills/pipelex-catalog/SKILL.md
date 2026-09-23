@@ -1,7 +1,6 @@
 ---
 name: pipelex-catalog
 description: Carry an MTHDS method between a bundle directory and the Pipelex method catalog — list what the organization has saved, save a directory as a new method or update the one it is linked to, and pull a saved method back to disk. Use when the user says "save this method", "save it to Pipelex", "push my changes to the saved method", "update mt_abc123", "what methods do I have", "list my saved methods", "pull mt_abc123 so I can edit it", "get that saved method onto disk", or "rename the saved method". A save is a deployment — every caller of the method's id runs the new content from its next call — so this skill never saves on its own initiative, and it never deletes a saved method.
-
 allowed-tools:
   - Bash(git status:*)
   - Read

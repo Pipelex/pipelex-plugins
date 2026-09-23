@@ -612,7 +612,9 @@ def check_skill_links(base_dir: Path) -> list[str]:
     errors: list[str] = []
     for output_dir in _collect_output_dirs(base_dir):
         skills_dir = output_dir / "skills"
-        markdown_files = sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
+        markdown_files = (
+            sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
+        )
         named: set[Path] = set()
         for md_file in markdown_files:
             text = md_file.read_text(encoding="utf-8")

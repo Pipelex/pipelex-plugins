@@ -1097,13 +1097,13 @@ class TestPipelexIntegrateSkill:
         assert "a file edited, removed or added" in self.refresh_cells(body)["re-checked"]
         assert "never add the file's hash to `sources` by hand" in body
 
-        # The three editing skills word the notice differently but state the same
-        # `bundle_dir` fact; since box J the three wordings share one include.
+        # The three editing skills state the same `bundle_dir` fact through one
+        # include, in one wording since the size diet unified the three.
         templates = self.REPO_ROOT / "templates" / "skills"
         notice = (templates / "shared" / "stale-types-notice.md.j2").read_text(encoding="utf-8")
-        assert "**or whose `bundle_dir` holds a `.mthds` file this edit created**" in notice
-        assert "**or whose `bundle_dir` holds a `.mthds` file this re-entry created**" in notice
-        assert "or whose `bundle_dir` is this directory or holds it" in notice
+        assert "**or whose `bundle_dir` holds a `.mthds` file this change created**" in notice
+        for skill in ("pipelex-edit", "pipelex-design", "pipelex-organize"):
+            assert 'include "skills/shared/stale-types-notice.md.j2"' in (templates / skill / "SKILL.md.j2").read_text(encoding="utf-8")
         organize = (templates / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "**When invoked on its own rather than by `/pipelex-design`**" in organize
 

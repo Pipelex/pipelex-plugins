@@ -10,6 +10,7 @@ from typing import ClassVar
 import pytest
 
 from scripts.check import (
+    SKILL_CEILING_CHARS,
     VERSION_FLOOR_STATIC_REFS,
     check_build_error_markers,
     check_codex_marketplace_plugins,
@@ -18,7 +19,6 @@ from scripts.check import (
     check_matched_target_versions,
     check_no_templates_in_output,
     check_shared_files_exist,
-    SKILL_CEILING_CHARS,
     check_skill_argument_placeholders,
     check_skill_ceiling,
     check_skill_frontmatter,
@@ -818,7 +818,11 @@ class TestSkillLinks:
     def test_an_anchor_must_name_a_heading(self, skill_tree: Path) -> None:
         self._shared_named(skill_tree)
         skill_md = self._skill(skill_tree) / "SKILL.md"
-        skill_md.write_text(skill_md.read_text() + "## Step 8 — a method that is not on disk\n\nSee [step 8](#step-8--a-method-that-is-not-on-disk) and [gone](#gone) and [LLM](../shared/mthds-reference.md#pipellm).\n")
+        skill_md.write_text(
+            skill_md.read_text()
+            + "## Step 8 — a method that is not on disk\n\n"
+            + "See [step 8](#step-8--a-method-that-is-not-on-disk) and [gone](#gone) and [LLM](../shared/mthds-reference.md#pipellm).\n"
+        )
         errors = check_skill_links(skill_tree)
         assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#gone` names no heading of SKILL.md"], errors
 
@@ -855,7 +859,10 @@ class TestSkillLinks:
         references.mkdir()
         (references / "branch.md").write_text("# Branch\n\nRun `${CLAUDE_SKILL_DIR}/scripts/env-file.sh`.\n")
         skill_md = self._skill(skill_tree) / "SKILL.md"
-        skill_md.write_text(skill_md.read_text() + "Run `${CLAUDE_SKILL_DIR}/scripts/acquire.sh <dir>`. On branch B, read [references/branch.md](references/branch.md).\n")
+        skill_md.write_text(
+            skill_md.read_text()
+            + "Run `${CLAUDE_SKILL_DIR}/scripts/acquire.sh <dir>`. On branch B, read [references/branch.md](references/branch.md).\n"
+        )
         errors = check_skill_links(skill_tree)
         assert errors == ["pipelex/skills/pipelex-test/scripts/unused.sh: shipped but named by nothing the model reads"], errors
 

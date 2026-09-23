@@ -1,7 +1,6 @@
 ---
 name: pipelex-explain
 description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose stored source it reads — or a published method's address, explained at the level of its contract. Strictly read-only — it explains in the conversation and writes nothing.
-
 allowed-tools:
   - Read
   - Grep

@@ -698,8 +698,12 @@ class TestSkillFailureDiscipline:
         table."""
         bodies, body = self._render_mcp_skills(target_name)
         for skill, skill_body in bodies.items():
-            assert "(../shared/credentials.md#where-the-key-comes-from)" in skill_body, f"{target_name}/{skill}: the config stop must point at the key reference"
-            assert "The server authenticates to the API with" not in skill_body, f"{target_name}/{skill}: the credential sentence lives in shared/credentials.md"
+            assert "(../shared/credentials.md#where-the-key-comes-from)" in skill_body, (
+                f"{target_name}/{skill}: the config stop must point at the key reference"
+            )
+            assert "The server authenticates to the API with" not in skill_body, (
+                f"{target_name}/{skill}: the credential sentence lives in shared/credentials.md"
+            )
         session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
         if target_name == "prod":
             assert "from the **plugin configuration**" in body, f"{target_name}: Claude's canonical channel is the plugin configuration"
@@ -737,6 +741,7 @@ class TestSharedSkillIncludes:
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
         "**The saved method does not have this change.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
+        "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -859,7 +864,10 @@ class TestPipelexRunSkill:
         the submission gathers every `.mthds` file beneath the bundle — so without an
         exclusion a method that emits or echoes one submits its own output as source."""
         body = self.run_skill
-        assert "except anything under a `runs/` directory" in body
+        assert 'include "skills/shared/validate-call.md.j2"' in body
+        assert "validate_call_file_set" not in body, "run submits the shared file set, runs/ exclusion included"
+        partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
+        assert "except anything under a `runs/` directory" in partial
 
     def test_the_artifact_directory_is_relative_and_a_refusal_is_retried(self) -> None:
         """`dir` is relative to the workshop's own working directory and an absolute
@@ -1015,7 +1023,10 @@ class TestPipelexCatalogSkill:
         extension, so a method that emits or echoes a `.mthds` file would otherwise
         have its own output saved to the catalog as part of its source."""
         body = self.catalog_skill
-        assert "except anything under a `runs/` directory" in body
+        assert 'include "skills/shared/validate-call.md.j2"' in body
+        assert "validate_call_file_set" not in body, "catalog submits the shared file set, runs/ exclusion included"
+        partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
+        assert "except anything under a `runs/` directory" in partial
         assert "root file first" in body
 
     def test_python_is_chosen_and_never_swept(self) -> None:
@@ -2476,3 +2487,16 @@ class TestSkillScriptsCopy:
         setup_static_assets(base, out, base / "templates", None)
         assert not (out / "skills" / "demo" / "scripts").exists(), "a retired scripts/ directory kept shipping"
         assert static_asset_mismatches(base, out, base / "templates", None) == []
+
+
+class TestRenderedFrontmatterShape:
+    """The size diet's box F: the frontmatter partial leaves no blank line inside the block."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+
+    @pytest.mark.parametrize("target", ["pipelex", "pipelex-codex", "pipelex-vibe"])
+    def test_no_blank_line_inside_the_frontmatter(self, target: str) -> None:
+        for skill_md in sorted((self.REPO_ROOT / target / "skills").glob("*/SKILL.md")):
+            text = skill_md.read_text(encoding="utf-8")
+            block = text[4 : text.index("\n---\n", 4)]
+            assert "\n\n" not in block, f"{skill_md.relative_to(self.REPO_ROOT)}: a blank line inside the frontmatter"
