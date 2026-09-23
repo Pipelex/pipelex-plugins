@@ -49,7 +49,7 @@ Phase 0 landed in #51 at `1e58d7e`.
 - [x] `scripts/check.py` gains the ceiling check in report mode (box C) and the link check both ways (box H), with unit tests.
 - [x] The guard registry's machinery in the unit suite: a guard's canonical sentence asserted exactly once in each target's rendered `SKILL.md` and in no reference.
 - [x] `CLAUDE.md` and `docs/build-targets.md` state the read-before-act rule and the shape, for whoever writes the next skill; `docs/decisions.md` records the campaign's decisions.
-- [ ] `/rev`.
+- [x] `/rev`: two rounds at profile 3 (cubic, Codex, code-review), each fixing what it confirmed — the link check's containment, anchors, fences and nested references, and the `runs/` exclusion carried into every gathering step. One duplication deferred below.
 
 ### Checkpoint 1
 
@@ -59,7 +59,7 @@ The machinery a skill phase relies on is on `dev`. Record the ceiling value, the
 - **The skill-directory variable is `skill_dir`, decided and not yet in `targets/`**: `${CLAUDE_SKILL_DIR}` on Claude, a `<skill-dir>` placeholder defined in one sentence on Codex and Vibe. It lands with the first skill that names a script or a verbatim copy — phase 2, for integrate's copy of its gate script, which Vibe performed as a read-and-rewrite until told to `cp` — because a variable nothing reads is a dead switch.
 - **What phase 0 changed.** Box C's value (13,000, not 16,000). Box E holds on every target, with one addition to what a script owes the skill: it is run by its absolute path from the user's project, through its interpreter, because on Codex and Vibe the model otherwise runs it from inside the skill's directory. And one bug found on the way and fixed on its own, `L-260923-dfb8ee`: Vibe dropped two skills over their frontmatter.
 - **What phase 1 changed beyond the move**, each named in its pull request: `design`, `edit`, `organize`, `explain` and `inputs` now exclude `runs/` from what they submit, through the shared convention (box F's deferral); the stale-types notice has one wording; the requirements block's recovery text moved to `shared/credentials.md`. Two items were filed from the work: `L-260923-58d533` (integrate's call site and gates load a run's `runs/` artifacts) and `L-260923-0964b0` (skills tell Codex users to type a Claude spelling of a skill).
-- [ ] `/rev` (the checkpoint's own review is phase 1's pass).
+- [x] `/rev` (the checkpoint's own review is phase 1's pass).
 
 ## Phase 2 — `pipelex-integrate` · `L-260923-5a94e7`
 
