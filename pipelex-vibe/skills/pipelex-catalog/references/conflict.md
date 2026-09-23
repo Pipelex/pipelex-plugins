@@ -1,0 +1,8 @@
+# When the saved method moved since this directory synced
+
+Read this when `mthds_save_method` answers an `input_domain` error at `expected_updated_at`, before replying to the user. The error carries both timestamps, and nothing was written — not the method, not the link: somebody saved over this method after this directory last synced with it. Give the user both timestamps and the two ways forward below; the skill's guard holds, and choosing between them is the user's alone.
+
+1. **Compare first.** Pull the saved version into a **new** sibling directory — one that does not exist yet, since the pull refuses a directory that already holds a bundle. That copy gets its own `pipelex-method.json` and is therefore linked to the same method, so it is for reading: do not save from it, and it is the user's to remove once the comparison is done.
+2. **Save over it**, on an explicit yes and nothing less: the same call with `expected_updated_at` omitted. Say what that costs — whatever the other writer saved is replaced, and the catalog keeps no earlier version to give back. **The name goes with it**: an update rewrites the catalog row's `name` from this call, and the refusal carries timestamps only, so if the other writer also renamed the method, sending the link's copy reverts their rename. Read the current name with `mthds_list_methods` before this call and carry that one, unless the user is deliberately renaming.
+
+When the user is choosing the second way, say in one line that the check is best-effort: the tool reads the stored method and then writes, and the platform accepts no compare-and-swap, so a save landing inside that window is still overwritten.

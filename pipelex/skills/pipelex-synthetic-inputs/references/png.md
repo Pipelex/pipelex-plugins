@@ -1,5 +1,7 @@
 # PNG recipes — Pillow and matplotlib
 
+Read this at step 4 of the skill when the format is `png`, before writing any code; its **Verify** section is step 5's check.
+
 Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
 
 `Pillow` is MIT-CMU, `matplotlib` PSF-style and `numpy` BSD; every recipe below was executed and looked at under Pillow 12.3.0, matplotlib 3.11.1 and numpy 2.5.2 before it was committed.
@@ -12,10 +14,6 @@ Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a compl
 | a flowchart, process, architecture or org chart | `diagram` | [Diagram (Pillow)](#diagram-pillow) |
 | a scanned or photographed page — an invoice, receipt, form, letter — for OCR or document understanding | `document_scan` | [Scanned document (Pillow)](#scanned-document-pillow) |
 | an app or web screen — a dashboard, a list, a settings page — for UI understanding | `screenshot` | [App screenshot (Pillow)](#app-screenshot-pillow) |
-
-**Not covered:** `photograph` and `handwritten`. Code cannot render either to a standard a vision model would mistake for the real thing, and an imitation is worse than nothing — it lets a method run on the wrong kind of input and report success. Say so and ask the user for a real file for that input; there is no public-image last resort here, and since the dead `w3.org` PDF was removed there is none for `pdf` either.
-
-A brief that sounds like a photograph is sometimes a `document_scan` in disguise: "a photo of a receipt" is a scanned document, and that recipe covers it. Read what the method actually does with the image before refusing.
 
 ## Conventions shared by every recipe
 
@@ -657,11 +655,9 @@ Column widths are fixed shares, not measured, so a long cell will overlap its ne
 ## Verify
 
 ```bash
-uv run --quiet --no-project --with pillow python -c "from PIL import Image; im = Image.open('<output_dir>/inputs/<name>.png'); print(im.format, im.size, im.mode)"
+uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<output_dir>/inputs/<name>.png"
 ```
 
 Expect `PNG`, the size the recipe declares, and `RGB` — or `RGBA` from the chart recipe, which is matplotlib's doing and not a fault. Then look at the file: on Claude Code, open it with the `Read` tool and check it reads as its category — a chart with the series drafted, a diagram whose arrows go where the process goes, a page that looks scanned and whose totals add up, a screen that looks like an app. Fix the content block and rerun if it does not; the recipes are seeded, so nothing else moves.
 
-A failed render must leave nothing behind, but only what it created: remove `<target>` when this run is what put it there, and never on a path that already held a file (Step 4 makes you confirm before overwriting one).
-
-There is no last-resort public image, by design (see "Not covered" above), and no last-resort public PDF either. When the environment cannot be resolved, the answer is the skill's Step 2 table: say what is missing and ask the user for a file.
+A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.

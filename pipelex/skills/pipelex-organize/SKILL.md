@@ -8,122 +8,74 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
-
   - mcp__plugin_pipelex_pipelex__mthds_validate
 ---
 
 # Organize a designed MTHDS bundle
 
-The signature-driven mode of `/pipelex-design` is deliberately additive: every refinement **adds** a new `<code>.mthds` file, and satisfied `PipeSignature` headers linger in the files that declared them. A converged library can therefore be correct but shaped by construction history — one file per pipe, contracts duplicated as stale headers, no relationship between file layout and how the method reads. Direct designs are normally coherent already and skip this skill; they may still use it later on explicit request or when their layout genuinely needs regrouping.
+Regroup a designed library's `.mthds` files for **comprehension**, the way source code is spread across files: the root shows the contract and the top-level flow, and a reader descends into just the module they care about. Signature-driven construction leaves one file per refinement and satisfied `PipeSignature` headers behind. Direct designs are normally coherent already and skip this skill, unless the user asks or their layout genuinely needs regrouping; `/pipelex-design` auto-invokes it after converged signature-driven construction or re-entry when the layout still reflects construction history, and an already coherent direct result does not invoke it solely for process compliance.
 
-This skill regroups that library into a layout organized for **comprehension** — the way source code is spread across files in any language: related pipes gathered into one file per coherent unit, so a reader (human or agent) can discover the method progressively — open the root to see the contract and the top-level flow, then descend into just the module they care about. **The layout scales with the method:** a simple method fits entirely in `main.mthds`; a complex method with many pipes gets one file per subtree or functional area. Consolidation into fewer files is the usual *effect*, but the goal is grouping, not a single file.
+It is a **content-preserving transformation**: the method's semantics never change, and the validation verdict before and after must be identical.
 
-It is a **content-preserving transformation** — the method's semantics never change, and the validation verdict before and after must be identical. That equivalence is proven with the `mthds_validate` tool, never assumed.
+## Requirements
 
-## Requirements — the Pipelex MCP tool
+- **`mthds_validate`** is required: this skill never reorganizes without proving the verdict is preserved.
+- **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. Do not touch the bundle files without validation available.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never reorganize unvalidated.
 
-Equivalence is checked through the **`mthds_validate`** tool, served by the plugin's `pipelex` MCP server. It is required — this skill never reorganizes without proving the verdict is preserved.
+## Guards
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* Do not touch the bundle files without validation available.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never reorganize unvalidated.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
+- **Change the layout, never the method.** A declaration may move to another file and be reordered, a non-root file may be renamed, a `PipeSignature` header whose code has a concrete definition anywhere in the library is dropped, and per-file `domain = "..."` lines are absorbed into the files that survive. Nothing else changes: pipe and concept codes, the `domain`, `main_pipe`, `description`, `system_prompt`; any pipe's `inputs`/`output`, `type`, prompts, steps, branches, outcomes or other body field; any concept's `description`, `refines` or structure fields.
+- **An unsatisfied signature** — a `PipeSignature` with no concrete definition, a scaffold's backlog — **is kept**, deduplicated to one header per code, never dropped.
+- **Keep every original file's content until the new layout is confirmed on disk.**
 
-**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. Don't hand-format, and re-read a file before editing it again after the hook reformatted it.
-
----
-
-## The target — a bundle directory, or a catalog id
-
-This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
-
-1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to **Step 1** of the procedure below.
-2. **Several hits are the user's choice, never yours.** More than one directory can legitimately hold the same link: `/pipelex-catalog`'s conflict path tells the user to pull a comparison copy into a sibling directory, and that copy carries the same link and is meant for reading, not for editing. Name the directories and ask which one is the work.
-3. **No hit — hand the pull to `/pipelex-catalog`**. It brings the method's sources to disk and the workshop writes the link beside them; then carry on with that directory. The search only sees the working directory and below, so a bundle linked somewhere else reads as no hit — if the user knows where it is, ask for the path rather than pulling a second copy.
-
-**What the search proves, and what it does not.** It answers where this method lives locally and nothing else. A linked directory can be behind the catalog, ahead of it, or both at once, and the link records no hashes to tell them apart — so do not present the local files as the saved method's current content. `/pipelex-catalog` is what compares the two, and it is also the only way the work done here reaches the saved copy.
-
-**A published address is not a target for this skill.** `github.com/<owner>/<repo>[/<selector>][@<tag>]` names somebody else's published package: nothing of it is on disk, and there is nowhere to write a change back. Say so and point at `/pipelex-explain`, which reads such an address at the level of its contract.
-
----
-
-## What this skill may and may not change
-
-**May change (layout only):**
-
-- Which file a concept or pipe declaration lives in, and the file names of non-root files.
-- The order of declarations.
-- Dropping a `PipeSignature` header whose code has a concrete definition anywhere in the library (the definition supersedes it — the header is construction scaffolding).
-- Absorbing per-file `domain = "..."` membership lines into whichever files survive.
-
-**Must NOT change (semantics):**
-
-- Pipe codes, concept codes, the `domain`, `main_pipe`, `description`, `system_prompt`.
-- Any pipe's `inputs`/`output` contract, `type`, prompts, steps, branches, outcomes, or any other body field.
-- Any concept's `description`, `refines`, or structure fields.
-- **Unsatisfied signatures.** A `PipeSignature` with no concrete definition (an early-stopped scaffold's backlog) is kept — deduplicated to one header per code, never dropped. The bundle stays its own todo list.
-
-If reorganizing seems to require a semantic edit (a rename, a contract fix, a missing declaration), STOP and report it — that is `/pipelex-design` territory, not organization.
-
----
-
-## The target layout — group for comprehension
-
-Think of it exactly like organizing source code across files. The unit of grouping is a **coherent piece of the method**: a controller together with the sub-pipes only it wires (its private subtree), or a functional area several small pipes serve.
-
-- **Root `main.mthds` is the entry point and table of contents.** It carries the bundle header (`domain`, `description`, `main_pipe`, `system_prompt`), the boundary concepts (the client-facing contract), and the main pipe. Reading it alone tells you what the method does, what goes in and out, and what the top-level steps are. **The root file is always named `main.mthds`** unless the user says otherwise — a root inherited under another name (e.g. a legacy `bundle.mthds`) is renamed as part of organizing.
-- **One file per module.** Each top-level subtree (or clearly-named functional area) gets its own `<snake_case_name>.mthds` file — named after the controller that heads it or the area it implements — containing that subtree's pipes in flow order (controller first, then the pipes it wires) plus the intermediate concepts introduced for that subtree. Each non-root file starts with `domain = "<same_domain>"` only.
-- **Shared declarations go up.** A pipe or concept used by several modules lives in the root file (or, if the shared surface is large, a dedicated `shared.mthds`), never duplicated.
-- **Scale the file count to the method, in both directions.** A simple method — a handful of pipes — belongs entirely in `main.mthds`; don't scatter it. A complex method with tens of pipes needs several module files; don't cram it into one. And never keep a file per pipe: that is the construction sprawl this skill exists to clean up. Each file should read like a chapter, not a line.
-- **Progressive discovery is the test.** An agent that needs to understand or modify one step should be able to read the root plus one module file and have everything relevant — nothing important hidden in an unrelated file, no file that can't be understood without opening all the others.
-
-Within every file: satisfied signature headers are dropped; a still-pending signature (scaffold case) sits in the module of the controller that wires it.
-
----
-
-## Procedure
+## Process
 
 ### Step 1 — Baseline verdict
 
-1. Gather **all** `.mthds` files in the bundle directory (e.g. `methods/summarize_pdf/`).
-2. Call `mthds_validate` with `files` for every file. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
-3. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set.
+**For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-Branch on the structured verdict:
-
-- `is_valid: true` → proceed (runnable or scaffold — both are organizable).
-- `is_valid: false` → STOP. Do not reorganize a broken library — report the verdict and point to `/pipelex-design` to fix it first. Organization must start from, and preserve, a passing verdict.
-- `status: "error"` → class `input_domain`: fix the call; class `config`: stop per the rule above; class `runtime`: report and retry once before stopping.
+Gather the bundle's files as the convention below says, read each, and call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set. `is_valid: true` proceeds, runnable or scaffold.
 
 ### Step 2 — Plan the layout, compose the files
 
-1. **Map the structure**: from the main pipe down, identify the subtrees and which pipes/concepts belong to each; identify shared declarations.
-2. **Decide the file set** using the target-layout rules above — possibly just `main.mthds`, possibly root + several module files. State the plan in one line (e.g. `main.mthds + extract.mthds + analyze.mthds + report.mthds`).
-3. **Compose every file in memory** (do not write yet): copy each declaration verbatim into its assigned file, one declaration per concept, one entry per pipe, ordered for top-down reading within each file.
+Map the structure from the main pipe down: the subtrees, the pipes and concepts each owns, and the shared declarations. Then decide the file set by these rules, honoring any layout the user asked for (a single file, a grouping):
+
+- **The root is `main.mthds`** unless the user says otherwise, and a root inherited under another name is renamed. It holds the bundle header (`domain`, `description`, `main_pipe`, `system_prompt`), the boundary concepts and the main pipe, so reading it alone tells what the method does, what goes in and out, and the top-level steps.
+- **One file per module**: each top-level subtree — a controller with the sub-pipes only it wires — or functional area gets its own `<snake_case_name>.mthds`, named after the controller heading it or the area it implements, holding its pipes in flow order (controller first) and the intermediate concepts introduced for it. A non-root file starts with `domain = "<same_domain>"` only.
+- **Shared declarations go up** to the root, or to a dedicated `shared.mthds` when that surface is large, never duplicated.
+- **Scale the file count to the method**: a handful of pipes belongs entirely in `main.mthds`, tens of pipes need several modules, and never one file per pipe.
+- **Progressive discovery is the test**: the root plus one module file holds everything relevant to one step.
+- A still-pending signature sits in the module of the controller that wires it.
+
+State the plan in one line (`main.mthds + extract.mthds + report.mthds`) and proceed; never ask. Compose every file in memory, **copying each declaration verbatim** into its file, one declaration per concept and one entry per pipe, top-down within each file.
 
 ### Step 3 — Prove equivalence before touching disk
 
-Call `mthds_validate` with **the composed candidate set** (all planned files, nothing else). The verdict must match the baseline exactly: `is_valid: true`, the same `is_runnable`, and an identical `pending_signatures` set.
-
-- **Match** → proceed to Step 4.
-- **Mismatch or failure** → the composition dropped or duplicated something; fix the *composition* (never the semantics) and re-validate. If it still fails after two fix attempts, STOP, leave the original layout untouched, and report the discrepancy.
+Call `mthds_validate` with **the composed candidate set** alone, inline, since nothing is written yet. The verdict must match the baseline exactly: `is_valid: true`, the same `is_runnable`, and an identical `pending_signatures` set. A mismatch means the composition dropped or duplicated something: fix the composition, never the semantics, and re-validate.
 
 ### Step 4 — Swap the layout
 
-Only after the candidate verdict matches:
-
-1. **Write every file of the new layout** (Write tool — the hook lints and reformats each in place; a new file may legitimately reuse an old file's name, e.g. `main.mthds`).
-2. **Delete every `.mthds` file that is not part of the new layout.** Delete only `.mthds` files; leave `inputs.json`, input files, and anything else in the directory alone.
-3. **Confirm on disk**: re-gather the directory's `.mthds` files and validate once more — this catches anything the formatting hook changed.
-4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` (no verdict — e.g. the MCP dropped mid-swap) or a verdict that does not match the baseline, roll back: you still hold every original file's content from Step 1 — rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
+1. Write every file of the new layout; a new file may reuse an old file's name.
+2. Delete every `.mthds` file that is not part of the new layout. **Delete only `.mthds` files, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
+3. **Confirm on disk**: validate the bundle once more, gathered as in Step 1, since the hook may have reformatted what was written.
+4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` or a verdict that differs from the baseline, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
 
-One short summary: the layout (which files, what each contains, one line per file), the preserved verdict (runnable, or valid scaffold with its pending list). **When invoked on its own rather than by `/pipelex-design`** (whose delivery step speaks for it), search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — they sit beside each generated tree, never beside the bundle — and for each one whose `sources` name a file in this directory, or whose `bundle_dir` is this directory or holds it, say the generated types there are now stale and offer `/pipelex-integrate` to refresh them: an equivalent verdict leaves the concept set as it was, but the new layout removes, rewrites and adds the very files the sidecar hashed, so that project's drift gate reports each of them as `stale-source` until a refresh records the new layout. No approval prompts — by the time you report, the bundle is organized and proven equivalent.
+One short summary: the layout, one line per file saying what it holds, and the preserved verdict (runnable, or a valid scaffold with its pending list). No approval prompts.
 
-**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries this notice too), say it here as well. **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to. A reorganization is exactly the change this notice exists for: the verdict is identical, so nothing about the method's behaviour moved, and yet every file in this directory was renamed, rewritten or removed.
+**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries both notices), end with them, since an identical verdict still rewrote every file:
 
----
+1. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
+2. **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
 
-## Autonomy
+## Stops
 
-This skill is **fully automatic once invoked** — no per-step approval, including the layout decision (announce it, don't ask). `/pipelex-design` auto-invokes it after converged signature-driven construction or re-entry when the layout still reflects construction history; an already coherent direct result does not invoke it solely for process compliance. It can also be invoked explicitly on any designed bundle directory. The only stops are the ones above: missing/misconfigured MCP tool, a failing baseline verdict, or a candidate that cannot be proven equivalent. If the user has expressed a layout preference (single file, specific grouping), honor it — the equivalence proof works the same for any layout.
+| Condition | Do this |
+|---|---|
+| `is_valid: false` at the baseline | never reorganize a broken library: report the verdict and point to `/pipelex-design` to fix it first |
+| `status: "error"`, class `input_domain` | fix the call |
+| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| the candidate still differs from the baseline after two fixes of the composition | stop, leave the original layout untouched, and report the discrepancy |
+| the regrouping seems to need a semantic edit (a rename, a contract fix, a missing declaration) | stop and report it: that is `/pipelex-design`'s work |

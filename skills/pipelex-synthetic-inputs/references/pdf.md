@@ -1,5 +1,7 @@
 # PDF recipes — reportlab
 
+Read this at step 4 of the skill when the format is `pdf`, before writing any code; its **Verify** section is step 5's check.
+
 Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with reportlab python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
 
 `reportlab` is BSD-licensed and pure Python; every recipe below was executed under reportlab 5.0.1 before it was committed.
@@ -288,10 +290,4 @@ uv run --quiet --no-project python -c "import re, sys; print('pages:', len(re.fi
 
 The page count needs no packages, so it runs under whichever interpreter Step 2 resolved — the `uv run` above on rung 1, the absolute venv interpreter path on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
 
-Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed render must leave nothing behind, but only what it created: remove `<target>` when this run is what put it there, and never on a path that already held a file (Step 4 makes you confirm before overwriting one).
-
-## No last resort — ask for a file
-
-When the environment cannot be resolved (the skill's Step 2 table, last row), there is no fallback here: say what is missing, say the one command that fixes it, and ask the user for their own PDF for that input. `pdf` behaves exactly like `png` in this respect.
-
-An earlier version of this reference offered a public test PDF on `w3.org` as a substitution. It is gone for two reasons. It had already stopped resolving — the URL now answers `300 Multiple Choices` with an HTML error page, which `mthds_prepare_inputs` would pass through unchanged for the hosted API to fetch, handing the method an error page as its document. And it was the wrong shape regardless: it is offered precisely when the machine has just failed to reach a package registry, and a document that is not what the brief asked for lets a method run on the wrong input and report success — the same reasoning that keeps `photograph` out of `references/png.md`.
+Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.
