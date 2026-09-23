@@ -146,7 +146,7 @@ A `SKILL.md` takes one shape, in this order: the frontmatter; what the skill doe
 
 These checks hold the shape:
 
-- **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It reports without failing until `SKILL_CEILING_ENFORCED` is flipped at the end of the diet.
+- **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It fails on any skill over the ceiling on any target: it reported without failing while the size diet brought each skill under, and has failed since the diet's last phase.
 - **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target — a link that climbs out of it names a file the installed plugin does not carry — and every anchor a heading of the file it points into, slugged as GitHub does, inline code keeping its text; code, fenced or inline, is an example and never a link; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
 - **The guard registry.** `tests/unit/test_skill_guards.py` lists each skill's guards by their canonical sentence and asserts, on every target, that each appears exactly once in the rendered `SKILL.md` and in no reference or shared file. A skill phase registers its guards in the change that places them.
 - **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`.
@@ -223,7 +223,7 @@ Two rules come with it. **A verbatim copy is a `cp` from `{{ skill_dir }}/refere
 
 ### Version floors
 
-`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, the Python range `pipelex-sdk` installs into and the method app's port. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
+`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, and the Python range `pipelex-sdk` installs into. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
 
 These are **value substitutions**, which is why they do not contradict the trimmed-variable rule this repo inherited from `mthds-plugins`: nothing branches on a floor, it is only printed. The rule that bans dead switches bans variables a skill *reads to decide what to do*.
 
