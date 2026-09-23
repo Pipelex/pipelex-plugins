@@ -588,11 +588,15 @@ def _heading_slugs(text: str) -> set[str]:
     keeps the tool's name in its anchor.
     """
     slugs: set[str] = set()
+    seen: dict[str, int] = {}
     for line in _without_fenced_blocks(text).splitlines():
         match = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
         if match:
-            heading = re.sub(r"[^\w\- ]", "", match.group(1).lower())
-            slugs.add(heading.replace(" ", "-"))
+            slug = re.sub(r"[^\w\- ]", "", match.group(1).lower()).replace(" ", "-")
+            # A repeated heading's later occurrences are `slug-1`, `slug-2`, … on GitHub.
+            count = seen.get(slug, 0)
+            seen[slug] = count + 1
+            slugs.add(slug if count == 0 else f"{slug}-{count}")
     return slugs
 
 

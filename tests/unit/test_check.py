@@ -900,6 +900,17 @@ class TestSkillLinks:
         errors = check_skill_links(skill_tree)
         assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#step-5---and-print-the-run-id-first` names no heading of SKILL.md"], errors
 
+    def test_a_repeated_heading_takes_a_numbered_anchor(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "## Prerequisites\n\n## Prerequisites\n\n"
+            + "See [A](#prerequisites), [B](#prerequisites-1) and [none](#prerequisites-2).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#prerequisites-2` names no heading of SKILL.md"], errors
+
     def test_a_link_leaving_the_target_fails(self, skill_tree: Path) -> None:
         """A file outside the target exists here but not in the installed plugin, so the link fails there."""
         self._shared_named(skill_tree)
