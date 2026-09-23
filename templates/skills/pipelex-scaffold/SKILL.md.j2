@@ -188,13 +188,15 @@ Nothing beyond what the initializer writes is authored by this skill: no example
 
 ### Step 3: The pristine commit
 
+**When `<dir>` held a `.git` before step 2, ask before running the script**: the commit lands on the user's branch, so show `git -C <dir> status --short` and confirm it, in every mode, as the Mode section says.
+
 {% include "skills/shared/skill-dir.md.j2" %}Run the script, never its steps by hand:
 
 ```bash
 bash "{{ skill_dir }}/scripts/commit-pristine.sh" '<dir>' 'Scaffold <framework or language> project'
 ```
 
-It makes `<dir>` a repository of its own when it is not one, whichever initializer ran, keeps the dependency tree out with a `.gitignore`, and commits `<dir>` alone. Its first line is the verdict. `committed:` names the commit and lists the staged paths after it; `kept:` names a commit the initializer made itself, which is the pristine one. Read the paths, and name the commit in the report. A `refused:` line is in the stop table. **When `<dir>` held a `.git` before step 2**, the commit lands on the user's branch, so it confirms first, as the Mode section says: show `git -C <dir> status --short`, and ask.
+It makes `<dir>` a repository of its own when it is not one, whichever initializer ran, keeps the dependency tree and `.env` out with a `.gitignore`, and commits `<dir>` alone. Its first line is the verdict. `committed:` names the commit and lists the staged paths after it; `kept:` names a commit the initializer made itself, which is the pristine one. Read the paths, and name the commit in the report. A `refused:` line is in the stop table.
 
 ### Step 4: The env file
 
@@ -261,6 +263,8 @@ Two lines are easy to forget and matter:
 | The server listened beyond loopback | the start command has already stopped it; report no URL and say this copy's `make dev` does not bind the server to this machine |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `commit-pristine.sh` or `write-env-file.sh` says `refused: usage` or `refused: no-directory` | the command was typed wrong: check `<dir>` and its quoting, and run it again |
+| `commit-pristine.sh` says `refused: no-git` | git is missing: the toolchain row above applies |
+| `write-env-file.sh` says `refused: not-a-repository` | step 3 made no repository: run it first, and write no env file before it prints `committed:` or `kept:` |
 | `commit-pristine.sh` says `refused: nothing-to-commit` | the initializer wrote nothing: read its output and run it again; never commit an empty directory |
 | `commit-pristine.sh` says `refused: init-failed`, `stage-failed` or `commit-failed` | relay git's message from its standard error verbatim; a missing `user.name` or `user.email` is the user's to set, never yours |
 | `write-env-file.sh` says `refused: not-ignored` | no key was written: `.env` is still not ignored after the script added it to `.gitignore`, most often because git already tracks it. Say so, and leave the file for the user |

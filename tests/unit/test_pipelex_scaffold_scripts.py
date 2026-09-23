@@ -169,6 +169,29 @@ class TestCommitPristine:
         assert {"__pycache__/", ".venv/", ".env"} <= set(lines)
         assert "node_modules/" not in lines
 
+    def test_a_mixed_project_keeps_its_dependency_tree_out(self, tmp_path: Path) -> None:
+        """A Python project that also installed Node packages gets Python's lines and `node_modules/`."""
+        project = tmp_path / "mixed"
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert "node_modules" not in _git(project, "ls-files")
+
+    def test_an_env_file_the_initializer_wrote_never_reaches_the_commit(self, tmp_path: Path) -> None:
+        """The env-file script ignores `.env` one step too late for a `.env` the initializer wrote: once
+        committed, no ignore rule reaches it and it stays in the history."""
+        project = tmp_path / "svc"
+        project.mkdir()
+        (project / ".gitignore").write_text("build/\n", encoding="utf-8")
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "main.py"]
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\n.env\n"
+
     def test_a_directory_inside_the_user_s_repository_gets_its_own(self, tmp_path: Path) -> None:
         """`git -C <dir>` scopes nothing: with no `.git` of its own, `<dir>` is governed by the user's
         repository, and a staging there would sweep their worktree into this commit. `uv init` makes a
@@ -320,8 +343,10 @@ class TestWriteEnvFile:
         [
             f"PIPELEX_BASE_URL={PRODUCTION_URL}\nPIPELEX_API_KEY=plx_the_users_own_fake_key\n",
             "PIPELEX_BASE_URL=http://127.0.0.1:8081\nPIPELEX_API_KEY=plx_the_users_own_fake_key",
+            "export PIPELEX_API_KEY=plx_the_users_own_fake_key\n",
+            'PIPELEX_API_KEY = "plx_the_users_own_fake_key"\r\n',
         ],
-        ids=["their-key-beside-the-example-url", "their-key-beside-their-own-url-without-final-newline"],
+        ids=["their-key-beside-the-example-url", "their-key-beside-their-own-url-without-final-newline", "exported", "spaced-quoted-crlf"],
     )
     def test_a_file_that_already_carries_a_key_is_left_byte_for_byte(self, tmp_path: Path, carried: str) -> None:
         """A later assignment of either line would silently replace a working credential while the report
@@ -333,10 +358,53 @@ class TestWriteEnvFile:
         assert result.stdout.startswith("kept base-url=file plane=")
         assert (project / ".env").read_bytes() == carried.encode("utf-8")
 
-    def test_the_plane_is_read_from_the_file_the_user_kept(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        "carried",
+        [
+            "PIPELEX_BASE_URL=http://127.0.0.1:8081\nPIPELEX_API_KEY=plx_the_users_own_fake_key\n",
+            "export PIPELEX_BASE_URL = 'http://127.0.0.1:8081/'\nexport PIPELEX_API_KEY=plx_the_users_own_fake_key\n",
+        ],
+        ids=["plain", "exported-spaced-quoted"],
+    )
+    def test_the_plane_is_read_from_the_file_the_user_kept(self, tmp_path: Path, carried: str) -> None:
         project = self.project(tmp_path)
-        (project / ".env").write_text("PIPELEX_BASE_URL=http://127.0.0.1:8081\nPIPELEX_API_KEY=plx_the_users_own_fake_key\n", encoding="utf-8")
+        (project / ".env").write_text(carried, encoding="utf-8")
         assert _run(WRITE_ENV_FILE, str(project), cwd=tmp_path).stdout == "kept base-url=file plane=other\n"
+
+    def test_a_key_the_file_empties_again_is_filled(self, tmp_path: Path) -> None:
+        """A dotenv reader resolves the last assignment, so a key followed by an empty one is no key."""
+        project = self.project(tmp_path)
+        (project / ".env").write_text("PIPELEX_API_KEY=plx_an_old_fake_key\nPIPELEX_API_KEY=\n", encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert _dotenv_reading((project / ".env").read_text(encoding="utf-8"))["PIPELEX_API_KEY"] == FAKE_KEY
+
+    def test_an_example_a_dotenv_star_rule_hid_is_made_visible(self, tmp_path: Path) -> None:
+        """`create-next-app` ignores `.env*`, which hides the example from review, commit and clone."""
+        project = self.project(tmp_path, example=None)
+        (project / ".gitignore").write_text("node_modules\n.env*\n", encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env.example"], check=False).returncode == 1
+        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules\n.env*\n\n!.env.example\n"
+
+    @pytest.mark.parametrize("inherited", ["shellopts", "bash-env"])
+    def test_an_inherited_trace_prints_no_value(self, tmp_path: Path, inherited: str) -> None:
+        """Bash starts traced when the environment carries `SHELLOPTS=xtrace` or a `BASH_ENV` that sets
+        it, and a trace prints each command with its variables expanded."""
+        project = self.project(tmp_path)
+        environment = _environment({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL})
+        if inherited == "shellopts":
+            environment["SHELLOPTS"] = "xtrace"
+        else:
+            startup = tmp_path / "startup.sh"
+            startup.write_text("set -x\n", encoding="utf-8")
+            environment["BASH_ENV"] = str(startup)
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
+        assert result.stdout == "filled base-url=copied plane=other\n"
+        for value in (FAKE_KEY, FAKE_URL):
+            assert value not in result.stdout and value not in result.stderr
 
     @pytest.mark.parametrize(
         "credentials",
@@ -396,6 +464,23 @@ class TestWriteEnvFile:
     @pytest.mark.parametrize(("arguments", "verdict"), [((), "usage"), (("no-such-dir",), "no-directory")], ids=["no-arguments", "no-directory"])
     def test_a_mistyped_command_is_refused(self, tmp_path: Path, arguments: tuple[str, ...], verdict: str) -> None:
         assert _run(WRITE_ENV_FILE, *arguments, cwd=tmp_path).stdout == f"refused: {verdict}\n"
+
+
+@pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)
+def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Path) -> None:
+    """`cd` searches `CDPATH` before the working directory, so a same-named directory elsewhere would
+    be the one resolved, and printed onto the resolved path."""
+    decoy = tmp_path / "elsewhere" / "app"
+    decoy.mkdir(parents=True)
+    project = _repository(tmp_path / "work" / "app")
+    (project / "main.py").write_text("\n", encoding="utf-8")
+    environment = _environment()
+    environment["CDPATH"] = str(tmp_path / "elsewhere")
+    arguments = ("app", "Scaffold Python project") if script == COMMIT_PRISTINE else ("app",)
+    result = _run(script, *arguments, cwd=tmp_path / "work", env=environment)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert list(decoy.iterdir()) == []
+    assert (project / ".gitignore").is_file()
 
 
 @pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)

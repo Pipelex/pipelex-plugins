@@ -125,6 +125,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Nothing beyond what the initializer writes is authored by this skill",
         "**On Python, finish with `uv sync` from inside `<dir>`.**",
         "Run the script, never its steps by hand",
+        "**When `<dir>` held a `.git` before step 2, ask before running the script**",
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
     ),
 }

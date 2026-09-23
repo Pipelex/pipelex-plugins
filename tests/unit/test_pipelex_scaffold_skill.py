@@ -306,7 +306,9 @@ class TestPipelexScaffoldSkill:
             # And each branch's Step 3 says what to put in front of the user rather than only what to report.
             assert "That is the commit the Mode section sends back for confirmation" in body
             assert "`git -C <dir> status --short` before staging says what will ride along" in body
-            assert "**When `<dir>` held a `.git` before step 2**, the commit lands on the user's branch, so it confirms first" in body
+            # Before the command it gates: the script stages and commits in one run.
+            ask = body.index("**When `<dir>` held a `.git` before step 2, ask before running the script**")
+            assert ask < body.index("scripts/commit-pristine.sh\" '<dir>'")
 
     def test_branch_b_locks_the_python_project_before_the_hand_off(self) -> None:
         """Round 2: `uv init` writes a `pyproject.toml` and neither a lock file nor an environment.

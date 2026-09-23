@@ -24,7 +24,7 @@ refuse() {
 
 [ $# -eq 2 ] && [ -n "$2" ] || refuse usage "usage: commit-pristine.sh <dir> <message>"
 command -v git > /dev/null 2>&1 || refuse no-git
-dir=$(cd "$1" 2> /dev/null && pwd) || refuse no-directory "no directory at $1"
+dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory "no directory at $1"
 message=$2
 
 # An initializer that wrote nothing leaves nothing to commit, and a commit of the .gitignore
@@ -55,17 +55,20 @@ ignored_by_the_project() {
 # `npm init -y` and `tsc --init` write no .gitignore, so the staging would commit the whole
 # dependency tree into the commit that is meant to be a readable baseline, and `uv init` writes
 # none inside an enclosing repository. A Python project gets Python's lines and any other gets
-# Node's. An initializer's own .gitignore is kept, and only a node_modules/ it does not ignore is
-# added to it.
+# Node's. An initializer's own .gitignore is kept, and gains only what it does not ignore of what
+# is there: a node_modules/, whatever the language, and a `.env` the initializer wrote, so that it
+# never reaches the commit.
 if [ ! -e "$dir/.gitignore" ]; then
   if [ -e "$dir/pyproject.toml" ]; then
     printf '__pycache__/\n*.egg-info/\nbuild/\ndist/\n.venv/\n.env\n' > "$dir/.gitignore"
   else
     printf 'node_modules/\ndist/\n.env\n' > "$dir/.gitignore"
   fi
-elif [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
+fi
+if [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
   printf '\nnode_modules/\n' >> "$dir/.gitignore"
 fi
+[ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore"
 
 # The pathspec is on both commands. `add -A -- .` bounds what is staged, and a commit without
 # one would commit the whole index, anything the user had staged included.
