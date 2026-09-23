@@ -1,0 +1,60 @@
+# Facts — the skill size diet, phase 0
+
+The answers to the questions of [`design.md`](design.md) section 8, gathered on 2026-09-23 against `pipelex-plugins` at `34001cf`, before any template moved. [`plan.md`](plan.md) phase 0 ticks each question and points here; this file holds the evidence. Versions matter here, because every answer is a fact about one release of a harness: Claude Code 2.1.280, Codex CLI 0.153.4, Mistral Vibe 2.21.0.
+
+## 1. The token count, and the ceiling it sets
+
+**Measured** with the Messages API's token-counting endpoint (`POST /v1/messages/count_tokens`), each rendered `SKILL.md` sent as the sole user message and the count of a one-character message subtracted. Four models were counted; `claude-opus-5-5`, `claude-sonnet-5` and `claude-fable-5-1` gave identical counts for every file, so the Claude 5 family shares one tokenizer, and `claude-haiku-4-5-20251001` uses the older, sparser one.
+
+| Skill | Claude chars | Codex chars | Vibe chars | Tokens, Claude 5 family (Claude target) | Tokens, Haiku 4.5 | Lowest characters per token, any target |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pipelex-scaffold` | 63683 | 63600 | 63607 | 21681 | 16548 | 2.94 |
+| `pipelex-integrate` | 60767 | 60063 | 60458 | 20291 | 15566 | 2.99 |
+| `pipelex-inputs` | 42117 | 41547 | 41901 | 14947 | 10986 | 2.82 |
+| `pipelex-design` | 32849 | 32305 | 32652 | 10917 | 7720 | 3.01 |
+| `pipelex-catalog` | 21502 | 20757 | 21097 | 6980 | 5359 | 3.08 |
+| `pipelex-run` | 20643 | 19845 | 20192 | 6990 | 5389 | 2.95 |
+| `pipelex-explain` | 18536 | 17862 | 18202 | 5996 | 4565 | 3.09 |
+| `pipelex-synthetic-inputs` | 16011 | 15832 | 15832 | 5780 | 4373 | 2.77 |
+| `pipelex-organize` | 15997 | 15508 | 15855 | 5275 | 3924 | 3.02 |
+| `pipelex-edit` | 14167 | 13623 | 13970 | 4798 | 3555 | 2.95 |
+
+**The Claude 5 tokenizer is denser than the design assumed.** Across every rendered `SKILL.md` on every target, the ratio runs from 2.77 characters per token (`pipelex-synthetic-inputs`, the most code-heavy) to 3.12 (`pipelex-explain` on Codex). Haiku 4.5 runs from 3.66 to 4.27. So the design's proposed 16,000 characters is about 5,780 Claude 5 tokens at the lowest ratio, and unsafe under box C's own test. The references are denser still — the synthetic-inputs recipes reach 2.28 — but carry no ceiling.
+
+**Claude Code does not count real tokens here.** The binary of Claude Code 2.1.280 builds the post-compaction `invoked_skills` attachment in a function that keeps each skill whole while its estimated size is at most `rcr=5000`, and within a combined `ocr=25000`, newest invocation first. The estimate is the rough one, `function Yu(e,r=4){…return Math.round(e.length/r)}` — characters divided by four — and a skill over it is cut at `n*4` characters less the length of a marker that reads *"[... skill content truncated for compaction; use Read on the skill path if you need the full text]"*. The content recorded is the invocation's text, which is `Base directory for this skill: <dir>` and a blank line, then the body with `${CLAUDE_SKILL_DIR}` substituted. So today Claude Code keeps about 19,900 characters of a skill, whatever the tokenizer, and says so when it cuts.
+
+**The ceiling is 13,000 characters.** Box C derives it from the documented contract, 5,000 tokens, at the lowest ratio measured: 5,000 × 2.77 is 13,850, and 13,000 leaves a margin of about 6 %, enough for a rewritten skill whose tables and code run denser than today's, down to 2.6 characters per token. It sits well under the 19,900 characters the current implementation keeps, so it holds whether Claude Code keeps its character estimate or moves to real tokens. At this value `pipelex-edit` joins the skills over the ceiling, with `pipelex-organize`, which phase 6 already named.
+
+## 2. Claude Code
+
+- **The skill's directory** is stated in the invocation itself: `Base directory for this skill: <dir>` heads the injected text (the `getPromptForCommand` wrapper in the same binary), and `${CLAUDE_SKILL_DIR}` is substituted in the body before the model sees it. A relative link such as `references/x.md` is therefore resolvable against a directory the model was just told.
+- **Executable bits survive the plugin cache.** Installed plugins run from `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`; the scripts other plugins ship there keep their mode, for example `temporal/0.4.2/skills/temporal-cloud-setup/scripts/provision.sh` and `plugin-dev/…/skills/hook-development/scripts/hook-linter.sh`, both `-rwxr-xr-x`, and this plugin's own `hooks/check-mthds.sh` in `pipelex/0.6.0/`.
+- **Compaction** re-attaches each invoked skill as described in section 1, within 5,000 estimated tokens each and 25,000 together.
+
+## 3. Codex CLI 0.153.4
+
+Answered in an isolated `CODEX_HOME` (the user's own `~/.codex` untouched), with a copy of the plugin carrying a throwaway `scripts/probe.sh` and `references/probe-ref.md` under `pipelex-run`, installed with `codex plugin marketplace add` and `codex plugin add`, and driven by `codex exec -m gpt-6-astra`. Source read at the `rust-v0.153.4` tag.
+
+- **The skill's directory.** The skill list is a developer message, `<skills_instructions>`, with a table of roots (`r2` = `…/plugins/cache/pipelex-plugins/pipelex/0.7.0/skills`) and a short path per skill (`pipelex:pipelex-run: … (file: r2/pipelex-run/SKILL.md)`). An invoked skill arrives as a separate user message carrying its absolute path and the whole file: `<skill><name>pipelex:pipelex-run</name><path>/…/skills/pipelex-run/SKILL.md</path>…</skill>`. The rule that relative paths resolve against the directory holding `SKILL.md` comes from the model's own base instructions for current models ("Resolve relative paths against the directory containing a filesystem-backed `SKILL.md`"), or from Codex's catalog prompt for models whose metadata asks for it (`ext/skills/src/catalog_prompt.rs:29`); a model Codex has no metadata for gets neither.
+- **A relative link to `references/` resolves.** Invoked as `$pipelex:pipelex-run`, the model ran `cat references/probe-ref.md` with the skill's directory as its working directory and reported the marker.
+- **A script under `scripts/` runs from the cache copy, with its executable bit.** The cache copy of `probe.sh` is `-rwxr-xr-x`; the model ran `./scripts/probe.sh` under the ordinary `workspace-write` sandbox, **with the skill's directory as its working directory**, not the user's project.
+- **Integrate's copy works.** In an empty project the model ran `cp <cache>/skills/pipelex-integrate/references/codegen-check.mjs scripts/codegen-check.mjs`, and `cmp` found the copy identical to the source.
+- **Compaction keeps no skill body at all.** The `<skill>` message is a contextual fragment (`ext/skills/src/fragments.rs:76-91`, listed at `core/src/context/contextual_user_message.rs:23`), which `core/src/event_mapping.rs:98-101` never counts as a user message, so neither local compaction (`core/src/compact.rs`, which keeps real user messages within `COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000`) nor remote compaction v2, the default for an OpenAI provider (`core/src/compact_remote_v2.rs:498-508`), carries it. What survives is the model's summary and the re-injected skill list with the path, from which the model can read the file again.
+- **Two further facts.** Only the namespaced mention `$pipelex:pipelex-run` injects a skill (`ext/skills/src/selection.rs:72` compares the full name), so a skill's `/pipelex-inputs`-style cross-reference never triggers an injection on Codex. And `ext/skills/src/render.rs:19` caps an injected skill at `MAX_SKILL_PROMPT_BYTES = 8_000`, but only for plugins declaring the agent-plugins manifest schema, which this one does not: the 20,151-byte `pipelex-run` was injected whole.
+
+## 4. Mistral Vibe 2.21.0
+
+Answered from the installed source (`~/.local/share/uv/tools/mistral-vibe/lib/python3.14/site-packages/vibe/`) and two live sessions under an isolated `VIBE_HOME` whose `skill_paths` pointed at a copy of `pipelex-vibe/skills` carrying the same probe files, run as `vibe --trust --auto-approve -p … < /dev/null` (the `< /dev/null` is needed: `-p` mode reads stdin to its end when it is not a terminal).
+
+- **The skill's directory.** The system prompt's `<available_skills>` block gives each skill's absolute `SKILL.md` path (`core/system_prompt.py:252-253`). Loading a skill through the `skill` tool, or by `/skill-name`, returns its body followed by `Base directory for this skill: <dir>` and "Relative paths in this skill are relative to this base directory." (`core/tools/builtins/skill.py:57-61`), with a sampled list of at most ten of its files. **Nothing is substituted in a skill body** (`core/skills/manager.py:140-158`), so a `${…}` token reaches the model literally.
+- **A relative link resolves** once the skill is loaded: the model read `references/probe-ref.md` by its absolute path and reported the marker.
+- **Scripts run in place, with the bit they have on disk.** Vibe reads skills where `skill_paths` points and copies nothing (`core/skills/manager.py:65-127`). The model ran `cd <skill dir> && ./scripts/probe.sh`, so, as on Codex, **the working directory became the skill's**.
+- **Integrate's copy was not a copy.** Without loading the skill, the model guessed the path from the `SKILL.md` it was listed with, missed `references/`, found the file with `find`, then read it and wrote it back through its own output. The result happened to be identical, but a verbatim copy has to be named as a `cp` from the skill's directory to be one, and Vibe's read and write tools cap at 64,000 bytes.
+- **Compaction keeps no skill body.** Automatic compaction runs at `auto_compact_threshold`, 200,000 tokens by default (`config/_defaults.py:10`), and on `/compact`; it keeps the system prompt and one envelope of recent user messages within `COMPACT_USER_MESSAGE_MAX_TOKENS = 20_000` and a summary (`core/compaction/manager.py:88-110`, `core/compaction/context.py:153-169`). The skill arrived as a tool message and is dropped; calling `skill` again returns it whole.
+- **Two further facts.** Reading a reference or running a script outside the project needs the user's approval in an interactive session (`core/tools/utils.py:105-118`), once per directory. And Vibe parses frontmatter with `yaml.safe_load` and drops a skill that fails: `pipelex-design` and `pipelex-scaffold` did not load, because their descriptions carried a `: ` (filed and fixed on its own, not in this phase).
+
+## 5. What the facts settle
+
+- **Box E holds on every target.** Each harness gives the model the directory a `SKILL.md` lives in, a relative `references/` link resolves against it, and a script shipped under `scripts/` runs with its executable bit — from Claude's and Codex's cache copies and from Vibe's in-place checkout.
+- **The skill-directory variable is `skill_dir`.** It renders as `${CLAUDE_SKILL_DIR}` on Claude, which Claude Code substitutes before the model reads the body, and as `<skill-dir>` on Codex and Vibe, where nothing is substituted, beside one sentence saying that `<skill-dir>` is the directory holding the `SKILL.md` the harness named. A skill runs a script **by its absolute path, from the user's project, through its interpreter** — `sh "<skill-dir>/scripts/x.sh" …` — because two of the three harnesses let the model `cd` into the skill's directory otherwise, and a script acting on the project must run where the project is. A verbatim copy is named as a `cp` from `<skill-dir>/references/…`, never left to a read and a write.
+- **The ceiling is a Claude fact, and it is worth having everywhere.** Codex and Vibe carry no skill body across a compaction whatever its size, and both leave the path behind so the model can read the file again; Claude Code is the only harness that re-attaches skills, and it is the one the ceiling is calibrated for. On all three, a smaller `SKILL.md` is what a model re-reads after a compaction, and what Codex reads whole in the one case where a model reads the file itself with a bounded output.
