@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **`pipelex-integrate` keeps its whole procedure across a compaction**: its `SKILL.md` now holds the main path, its guards and a stop table, and its branches — refresh mode, a project that owns a codegen harness, the signature fallback, orphans, and a gate that gives no verdict — live in references it reads when the branch is taken, so Claude Code re-attaches the skill whole after compacting a session instead of cutting it off. Step 10 copies the drift gate with a `cp` from the skill's own directory rather than reading and rewriting it, which Mistral Vibe used to do, and a refresh re-copies a stale gate the same way.
 - **A run's artifacts stay out of the bundle**: `pipelex-design`, `pipelex-edit`, `pipelex-organize`, `pipelex-explain` and `pipelex-inputs` gather, read and submit every `.mthds` file of a bundle directory except those under `runs/`, where `/pipelex-run` saves a completed run's artifacts, so a method that produces a `.mthds` file no longer has its own output validated or explained as its source, and `pipelex-organize` never deletes one.
 - **What to tell the user about the workshop and its key lives in one shared file**: an MCP-backed skill keeps its stops on an absent Pipelex tool and on a `config`-class error, and reads the new `shared/credentials.md` for the harness-specific connection and key instructions, which each skill used to carry in full.
 
