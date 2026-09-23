@@ -674,7 +674,7 @@ class TestPipelexScaffoldSkill:
 
     def test_integrate_hands_a_missing_project_to_scaffold(self) -> None:
         integrate = (self.SKILLS / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
-        assert "**No project at all** → this is not an integration yet: offer" in integrate
+        assert "none means offering" in integrate
         assert "pipelex-scaffold" in integrate
 
     def test_references_describe_both_starters_and_the_initializers(self) -> None:
@@ -1339,9 +1339,10 @@ class TestMethodAppBranch:
         The gallery's `make add-method` refuses a bundle path, so `/pipelex-integrate` sent every
         local bundle down the hand-written route. The method app's takes one, and its usage says so.
         """
-        integrate = (REPO_ROOT / "templates" / "skills" / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
-        assert "**a local bundle is one command when the project's `make add-method` takes a bundle path**" in integrate
-        assert "**otherwise, place the method where the project keeps them**" in integrate
+        # The harness branch left the skill body for a reference read at step 1 (the size diet, phase 2).
+        harness = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "harness.md").read_text(encoding="utf-8")
+        assert "**A local bundle is one command when the project's `make add-method` takes a bundle path**" in harness
+        assert "**Otherwise, place the method where the project keeps them**" in harness
         typescript = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "typescript.md").read_text(encoding="utf-8")
         assert "a local bundle is one command when `make add-method` takes a bundle path" in typescript
         assert "where `make add-method` takes only a catalog id or an address, as the gallery's does" in typescript

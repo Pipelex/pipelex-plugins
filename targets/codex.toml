@@ -7,3 +7,4 @@ source = "pipelex-codex/"
 [vars]
 platform = "codex"
 harness_name = "Codex"
+skill_dir = "<skill-dir>"

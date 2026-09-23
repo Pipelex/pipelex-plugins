@@ -63,12 +63,17 @@ The machinery a skill phase relies on is on `dev`. Record the ceiling value, the
 
 ## Phase 2 — `pipelex-integrate` · `L-260923-5a94e7`
 
-- [ ] `classification-integrate.md`.
-- [ ] The main path: the three selectors, the rules each stated once, steps 1 to 12 as short imperatives, the target table, the sidecar's shape, the stop table. The narrowing of a list output through its `items` envelope stays as a guard.
-- [ ] References, each entered on its condition: the signature fallback when `main_pipe` is absent, refresh mode, the harness section, the report on orphans, the long gate-failure rows. What the returned results carry, and the narrowing code, go to `references/typescript.md` and `references/python.md`, which already hold the call-site templates.
-- [ ] The script candidates judged against box E's test: the containment check and the sidecar's hashes. Record the ruling and why.
-- [ ] Guards registered, smoke sessions run: a TypeScript project from a local bundle, a refresh, a project owning a harness, a run that meets orphans, and the Codex main path.
+- [x] `classification-integrate.md`.
+- [x] The main path: the three selectors, the rules each stated once, steps 1 to 12 as short imperatives, the target table, the sidecar's shape, the stop table. The narrowing of a list output through its `items` envelope stays as a guard.
+- [x] References, each entered on its condition: the signature fallback when `main_pipe` is absent, refresh mode, the harness section, the report on orphans, the long gate-failure rows. What the returned results carry, and the narrowing code, go to `references/typescript.md` and `references/python.md`, which already hold the call-site templates.
+- [x] The script candidates judged against box E's test: the containment check and the sidecar's hashes. Record the ruling and why.
+- [ ] Guards registered, smoke sessions run: a TypeScript project from a local bundle, a refresh, a project owning a harness, a run that meets orphans, and the Codex main path. **The guards are registered** (the `pipelex-integrate` entry of `GUARDS` in `tests/unit/test_skill_guards.py`); **the smoke sessions are pending**, and this box is ticked when they have run.
 - [ ] `/rev`.
+
+- **Rendered sizes after the rewrite**: 12,941 characters on Claude, 12,799 on Codex and 12,845 on Vibe, all under the 13,000 ceiling. The Claude render was 60,753 characters before.
+- **The references, each with its entry condition**, all indexed at the foot of `SKILL.md`: `refresh.md` (step 1 finds this method's `sources.json`, the user asks to refresh, or an editing skill hands off), `harness.md` (step 1 finds a `codegen` script or Makefile target, or a `sources.json` with a `derived` map), `signature-fallback.md` (step 3 finds no `main_pipe`), `orphans.md` (step 6 returns orphans and no drift), `gate-failures.md` (a gate exits `2`). `typescript.md` and `python.md` are read at step 1 by language, and now carry the list-output narrowing code and the account of what the results carry.
+- **The script ruling: neither candidate became a script.** The containment check is two path resolutions and a comparison, and one of its inputs — the directory the session was launched in — is known to the model, not to a script run from the project; the tool refuses a climbing `output_dir` itself, and comparing the resolved paths answers the symlink case. The sidecar's hashes are verified by the gate step 10 installs and step 11 runs, which reports a wrong or missing hash, or a file left out, as `stale-source` before the report is written. Either becomes a candidate again if a smoke session shows a model getting it wrong. The full reasoning is in `docs/decisions.md`, under "`pipelex-integrate`'s rationale, moved out of the skill".
+- **The behaviour changes** are listed at the top of [`classification-integrate.md`](classification-integrate.md): the gate copy as a literal `cp` from the skill's directory, refresh mode deferring to step 4's rule on a lock without a sidecar, and the rule for reading a `codegen` script applied at step 1, where the harness branch is taken.
 
 Waiting on this phase, to land afterwards in the new shape: `L-260913-3784bb`, `L-260913-48195f`, `L-260913-10e237`, `L-260913-7436ee`, `L-260913-0f8a89` (the orphan logic); `L-260912-dc69dc`, `L-260912-a4471f`, `L-260912-248381`, `L-260912-ac493c`, `L-260913-6cac17`, `L-260913-50b58c`, `L-260920-140727`, `L-260920-32b840`, `L-260922-65260d`, `L-260916-89e5b8`.
 

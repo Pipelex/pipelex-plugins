@@ -12,6 +12,14 @@ marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
 
+# Where a skill's own files are, for a sentence that names one: a reference the
+# skill copies verbatim, a script it runs. Claude Code substitutes
+# ${CLAUDE_SKILL_DIR} in a skill body before the model reads it; Codex and
+# Mistral Vibe substitute nothing, so they override this with a <skill-dir>
+# placeholder that `templates/skills/shared/skill-dir.md.j2` defines in one
+# sentence (wip/skill-size-diet/facts.md, sections 3 to 5).
+skill_dir = "${CLAUDE_SKILL_DIR}"
+
 # Version floors the skills state to the user. One table, so a bump is one edit
 # rather than a hunt through prose. These are VALUE substitutions — the kind the
 # trimmed-variable rule allows — not switches a skill branches on: nothing reads
