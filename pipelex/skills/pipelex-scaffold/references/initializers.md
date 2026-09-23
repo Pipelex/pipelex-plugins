@@ -50,3 +50,13 @@ Every `uv init` above also takes `--python <X.Y>`, the interpreter the skill's p
 - One commit, the pristine scaffold, so the user's first real change is a clean diff.
 - `.env.example` and `.env` written, `.env` ignored, `PIPELEX_API_KEY` filled only from the shell environment, and `PIPELEX_BASE_URL` filled from it whenever the shell sets one, with a key or without — an exported base URL is the plane the user has declared, a keyless self-hosted runner included, and a key is refused by every plane but the one that issued it, so the example's production URL never stays beside another plane's key. Both files land *after* the pristine commit, which holds the initializer's output as it came, so they stay untracked for the user to review and commit — the same posture the method app leaves `make create`'s edits in.
 - Nothing else Pipelex-shaped: the SDK dependency, the `methods/` directory and the generated tree arrive with the first `/pipelex-integrate`.
+
+## The env verdict, in the report's words
+
+`write-env-file.sh` prints `<key> base-url=<origin> plane=<plane>` and never a value, and the report turns each part into words without printing the URL:
+
+- **`filled`**: the key was taken from the environment **and not validated**. A placeholder someone exported once passes a presence test and fails the first run, and this skill never calls the API.
+- **`kept`**: `.env` already carried a key, and both of its lines were left as they were.
+- **`empty`**: say where a key comes from and that `.env`'s `PIPELEX_API_KEY=` line is where it goes: `app.pipelex.com` issues production's keys. Never ask for the key in the conversation.
+- **`base-url=copied`**: the base URL came from the environment; name the plane from `plane`. **When it came without a key and the plane is `other`, say the file points at another plane, and warn that a key from `app.pipelex.com` is production's and will be refused there**: a key for that plane goes on the file's `PIPELEX_API_KEY=` line.
+- **`base-url=file`**: the file points where the example or the user left it, and `plane` names which.

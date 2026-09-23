@@ -43,6 +43,16 @@ if ! prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || [ -n "$pref
   error=$(git -C "$dir" init -q -b main 2>&1) || refuse init-failed "$error"
 fi
 
+# An ignore rule reaches only untracked paths, so a `.env` or a node_modules/ an initializer had
+# already staged would ride into the commit past the lines written below. Unstage what the index
+# holds of either and HEAD does not, before those lines are read: a path the user committed is
+# theirs, and stays tracked.
+for staged_early in .env node_modules; do
+  [ -n "$(git -C "$dir" ls-files --cached -- "$staged_early")" ] || continue
+  git -C "$dir" rev-parse -q --verify "HEAD:$staged_early" > /dev/null 2>&1 && continue
+  error=$(git -C "$dir" rm -r -q --cached -- "$staged_early" 2>&1) || refuse stage-failed "$error"
+done
+
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
 # repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
 # only this machine ignores.

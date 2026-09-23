@@ -192,6 +192,33 @@ class TestCommitPristine:
         assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "main.py"]
         assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\n.env\n"
 
+    def test_what_an_initializer_staged_before_it_was_ignored_never_reaches_the_commit(self, tmp_path: Path) -> None:
+        """An ignore rule reaches only untracked paths: a `.env` and a `node_modules/` already in the index
+        would ride into the commit past the lines the script writes, so the script unstages them first."""
+        project = _repository(tmp_path / "svc")
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / "package.json").write_text("{}\n", encoding="utf-8")
+        _git(project, "add", "-A")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "package.json"]
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\ndist/\n.env\n"
+        assert (project / ".env").is_file() and (project / "node_modules" / "x" / "i.js").is_file(), "unstaging removed a file"
+
+    def test_an_env_file_the_user_committed_stays_tracked(self, tmp_path: Path) -> None:
+        """Only what the index holds and HEAD does not is unstaged: a path the user committed is theirs,
+        and `write-env-file.sh` then refuses to put a key into it."""
+        project = _repository(tmp_path / "mine")
+        (project / ".env").write_text("MINE=1\n", encoding="utf-8")
+        _git(project, "add", ".env")
+        _git(project, "commit", "-q", "-m", "my env")
+        (project / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert ".env" in _git(project, "ls-files").splitlines()
+
     @pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root writes a read-only file")
     def test_a_gitignore_that_cannot_be_completed_stops_the_commit(self, tmp_path: Path) -> None:
         """Staging after a failed append would commit the `.env` the line was meant to keep out."""
