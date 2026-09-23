@@ -38,12 +38,12 @@ The implementation tracker for [`design.md`](design.md), whose boxes were all ra
 
 The questions of design section 8, answered with evidence recorded here before any template moves.
 
-- [ ] On Codex: how the model learns a skill's directory; whether a relative link to `references/` resolves; whether a script under `scripts/` runs from the plugin's cache copy with its executable bit intact. Answered in a live session with a throwaway script in a local build.
-- [ ] The same three on Mistral Vibe.
-- [ ] Whether Codex or Vibe carries an invoked skill across its own compaction, and within what budget.
-- [ ] Whether `pipelex-integrate`'s instruction to copy `references/codegen-check.mjs` works on all three targets today.
-- [ ] The token count of every rendered `SKILL.md` on every target, taken with the token-counting endpoint, which sets box C's character ceiling: 5,000 times the lowest characters-per-token ratio measured, less a stated margin. The proposed 16,000 holds only if no skill falls below 3.2 characters per token; density varies with code blocks and tables, so the smallest and the largest skill are not a sufficient sample.
-- [ ] The template variable that names a skill's directory on each target, settled from the answers above.
+- [x] On Codex: how the model learns a skill's directory; whether a relative link to `references/` resolves; whether a script under `scripts/` runs from the plugin's cache copy with its executable bit intact. Answered in a live session with a throwaway script in a local build. **Yes to all three** ([`facts.md`](facts.md) §3): the invoked skill carries its absolute path, a relative link resolves, and the script runs with its bit — with the skill's directory as its working directory.
+- [x] The same three on Mistral Vibe. **Yes to all three once the skill is loaded** ([`facts.md`](facts.md) §4): Vibe states the base directory and runs skills in place; nothing is substituted in a body. Found on the way: Vibe drops `pipelex-design` and `pipelex-scaffold`, whose descriptions are not strict YAML — `L-260923-dfb8ee`, fixed on its own.
+- [x] Whether Codex or Vibe carries an invoked skill across its own compaction, and within what budget. **Neither does, at any size**; both keep the path so the model can read the file again ([`facts.md`](facts.md) §3–4).
+- [x] Whether `pipelex-integrate`'s instruction to copy `references/codegen-check.mjs` works on all three targets today. **On Claude and Codex, as a `cp`; on Vibe the model read and rewrote the file rather than copying it**, so the instruction must name a `cp` from the skill's directory (integrate's phase).
+- [x] The token count of every rendered `SKILL.md` on every target, taken with the token-counting endpoint, which sets box C's character ceiling: 5,000 times the lowest characters-per-token ratio measured, less a stated margin. The proposed 16,000 holds only if no skill falls below 3.2 characters per token; density varies with code blocks and tables, so the smallest and the largest skill are not a sufficient sample. **Measured: 2.77 to 3.12 characters per token under the Claude 5 tokenizer, so the ceiling is 13,000 characters** ([`facts.md`](facts.md) §1). Claude Code itself measures the kept 5,000 tokens as characters divided by four, about 19,900 characters, so the ceiling holds under either reading.
+- [x] The template variable that names a skill's directory on each target, settled from the answers above. **`skill_dir`**: `${CLAUDE_SKILL_DIR}` on Claude, a `<skill-dir>` placeholder defined in one sentence on Codex and Vibe; a script is run by its absolute path from the user's project, through its interpreter ([`facts.md`](facts.md) §5).
 
 ## Phase 1 — the shared blocks and the machinery · `L-260923-8c296f`
 
