@@ -12,56 +12,36 @@ allowed-tools:
 
 # Generate synthetic input files
 
-Make the files a method needs to run when the user has none: a PDF for a `native.Document` input, a PNG for a `native.Image` input, a Word or Excel file when the method asks for one. Everything is rendered by Python code this skill writes and runs — no image-generation model, no hosted method, no image API — from packages whose licences are compatible with MIT.
+Make the files a method needs to run when the user has none — a PDF for a `native.Document` input, a PNG for a `native.Image` input, a Word or Excel file when the method asks for one — rendered by Python code this skill writes and runs, from packages whose licences are compatible with MIT. This skill is the plugin's file factory: `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never starts a run — the first two belong to `/pipelex-inputs`, the run to `/pipelex-run`.
 
-This skill is the plugin's file factory. `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it directly for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never starts a run — the first two belong to `/pipelex-inputs`, the run to `/pipelex-run`.
+It makes `pdf` (letters, multi-page reports, tables, invoices); `png` as a `chart` (bar, line, pie, scatter), a `diagram` (flowcharts, architecture and org charts), a `document_scan` (scanned-looking invoices, receipts, forms and letters for OCR) or a `screenshot` (dashboards, settings pages, lists); and `docx` and `xlsx`. **Not covered, by design:** photographs and handwriting. A stand-in lets a method run on the wrong kind of input and report success, so say so plainly and ask the user for a real file for that input. Do not draw an approximation, and do not substitute a public image. A photo of a receipt or a form is a `document_scan`, which this skill makes; read what the method does with the image before refusing.
 
-## What this skill makes, and what it refuses
+## Requirements
 
-| Format | Good for | Recipes |
-|---|---|---|
-| `pdf` | letters and memos, multi-page reports, tables, invoices and statements — anything a `native.Document` input reads | [references/pdf.md](references/pdf.md) |
-| `png` — `chart` | data visualizations: bar, line, pie, scatter | [references/png.md](references/png.md) |
-| `png` — `diagram` | flowcharts, architecture and org charts, process diagrams | [references/png.md](references/png.md) |
-| `png` — `document_scan` | scanned-looking pages for OCR and document-understanding methods: invoices, receipts, forms, letters | [references/png.md](references/png.md) |
-| `png` — `screenshot` | app and web screens for UI-understanding methods: dashboards, settings pages, lists | [references/png.md](references/png.md) |
-| `docx`, `xlsx` | Word and Excel inputs | [references/office.md](references/office.md) |
+A Python this skill can reach: `uv` on `PATH`, or `python3` with `venv` and `pip`. No MCP tool, no API key, no Pipelex service.
 
-**Not covered, by design:** photographs and handwriting. Code cannot render either to a standard a vision model would mistake for the real thing, and a stand-in is worse than none — it lets a method run on the wrong kind of input and report success. When a request asks for one, say so plainly and ask the user for a real file for that input. Do not draw an approximation, and do not substitute a public image.
+## Guards
 
-## Rules
-
-- **No AI in the loop.** Files come from reportlab, Pillow and matplotlib code. If a request cannot be met that way, the answer is the refusal above, not a model.
+- **No AI in the loop.** Files come from reportlab, Pillow and matplotlib code — no image-generation model, no hosted method, no image API. A request code cannot meet gets the refusal above, not a model.
 - **Permissive packages only.** `reportlab` (BSD), `Pillow` (MIT-CMU), `matplotlib` (PSF-style), `numpy` (BSD), `python-docx` (MIT), `openpyxl` (MIT). Nothing else: no PyMuPDF (AGPL), nothing that needs a system binary (poppler, cairo, wkhtmltopdf, Ghostscript), nothing that reaches the network at runtime.
-- **Content first, then render.** The realism is in what the file says, not how it is drawn. Draft the content from the brief before opening a recipe (Step 3). Entities are obviously fictional — "Acme Hardware Supply", "Jane Example", `INV-2026-0042` — never real people, companies or brands.
-- **Deterministic within one environment.** Seed every source of randomness (`SEED` in each content block) and pass `invariant=1` to reportlab, so that a rerun on the same machine with the same packages produces the same file and an edit to the content block changes only the content. That is the whole promise: the packages are not pinned, and a different Pillow or numpy build can shift the pixels of a PNG even with the same seed, so two renders from different environments are compared by what they show, never by their bytes. Word and Excel files embed a creation timestamp that neither library lets you fix, so two `docx`/`xlsx` renders of the same content differ byte for byte even on one machine — the content is reproducible, the bytes are not.
-- **Modest sizes, with one exception to know about.** PNGs default to 1200×800; document-shaped PNGs to A4 at 150 dpi (1240×1754); PDFs to a few pages. PDFs come out in the low kilobytes and most PNGs in the tens of kilobytes, but `document_scan` is different in kind: `scannerize()` adds per-pixel grain, which does not compress, so an A4 page lands in the low megabytes. That is the one output that can meet the storage-size limit `/pipelex-inputs` reports at upload time, and that limit is a terminal branch there — so check the size in Step 5, and if it is the problem, render the page at 100 dpi (827×1169) or turn the grain down before reaching for anything else.
-- **Nothing installed into the project, nothing installed onto the machine without asking.** Packages are fetched into `uv`'s cache or into a venv this skill owns under the user's cache directory (Step 2). Installing a *tool* — `uv` itself, a system package — always asks first, in every mode.
-- **A failure leaves nothing behind.** A render that fails removes its partial output, so no `inputs.json` can ever point at a broken file.
-- **Report what was done.** Every file gets one line: path, format, dimensions or page count, and what it contains. A fallback of any kind is named as one.
-
-## The request
-
-A request carries four things. When `/pipelex-inputs` calls this skill they arrive explicitly; when the user invokes it directly, infer them from the conversation and confirm only what is genuinely ambiguous.
-
-| Field | Meaning | Default when absent |
-|---|---|---|
-| `format` | `pdf`, `png`, `docx`, `xlsx` — for `png`, also the category from the table above | from the target concept: `native.Document` → `pdf`, `native.Image` → `png`; the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`) |
-| `brief` | one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it | ask for it, or derive it from the method's purpose and the input's description |
-| `target` | the path to write | `<output_dir>/inputs/<input_variable>.<ext>`; standalone, `./inputs/<name>.<ext>` |
-| `constraints` | page count, pixel size, language, anything the method's input description pins | the per-format defaults in the recipes |
-
-Mode follows the caller: a request from `/pipelex-inputs` runs in whatever mode that skill is in; a direct invocation defaults to **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
+- **Nothing installed into the project, nothing installed onto the machine without asking.** Packages are fetched into `uv`'s cache or into a venv this skill owns under the user's cache directory. Installing a *tool* — `uv` itself, a system package — always asks first, in every mode.
 
 ## Process
 
 ### Step 1: Settle the request
 
-Fill the four fields. If the format is one this skill refuses (a photograph, handwriting), stop here with the refusal and the ask for a real file. If the brief is missing and cannot be derived, ask for it — one question, then proceed.
+A request carries four fields: explicit when `/pipelex-inputs` calls, otherwise inferred from the conversation, confirming only what is genuinely ambiguous.
+
+- `format`: `pdf`, `png` with its category, `docx` or `xlsx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`).
+- `brief`: one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it. Derive it from the method's purpose and the input's description, or ask for it — one question, then proceed.
+- `target`: the path to write; by default `<output_dir>/inputs/<input_variable>.<ext>`, standalone `./inputs/<name>.<ext>`.
+- `constraints`: page count, pixel size, language, anything the input's description pins; otherwise the recipe's defaults.
+
+A photograph or handwriting stops here, with the refusal above. Mode follows the caller: a request from `/pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
 
 ### Step 2: Resolve the environment
 
-Do this once per invocation, before any recipe. The outcome is the **runner line** — the first line of every recipe — and every recipe below it is identical whichever rung produced it.
+Once per invocation, before any recipe. The outcome is the **runner line**, the first line of every recipe; everything below it is identical whichever rung produced it.
 
 **Package sets by format:** `pdf` → `reportlab`; `png` → `pillow matplotlib numpy`; `docx` → `python-docx`; `xlsx` → `openpyxl`.
 
@@ -75,82 +55,50 @@ command -v uv >/dev/null && uv run --quiet --no-project --with reportlab python 
 command -v uv >/dev/null && uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -c "import PIL, matplotlib, numpy; print('png ready', PIL.__version__, matplotlib.__version__)"
 ```
 
-On success the runner line is `uv run --quiet --no-project --with <set> python << 'PYEOF'` — exactly as the recipes are written. Packages land in `uv`'s cache; the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
+On success the runner line is `uv run --quiet --no-project --with <set> python << 'PYEOF'`, exactly as the recipes are written, and the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
 
-**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** Create a venv this skill owns, once, fill it with the whole allowlist, and reuse it on every later invocation:
-
-```bash
-VENV="${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv"
-# --clear empties the directory before building, so refuse anything that is not already
-# a venv: on a symlink it would empty the link's target, and this rung runs unattended.
-if [ -e "$VENV" ] && { [ -L "$VENV" ] || [ ! -f "$VENV/pyvenv.cfg" ]; }; then
-  echo "refusing to build a venv over $VENV — it exists and is not one; move it aside" >&2; exit 1
-fi
-# `-m venv` leaves bin/python behind even when ensurepip fails, so test for a working pip,
-# not for the file — and rebuild with --clear rather than trusting a half-made venv.
-"$VENV/bin/python" -m pip --version >/dev/null 2>&1 || python3 -m venv --clear "$VENV"
-"$VENV/bin/python" -c "import reportlab, PIL, matplotlib, numpy, docx, openpyxl" 2>/dev/null || "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check reportlab pillow matplotlib numpy python-docx openpyxl
-"$VENV/bin/python" -c "import sys, reportlab, PIL, matplotlib, numpy, docx, openpyxl; print('venv ready:', sys.argv[1])" "$VENV"
-```
-
-On success the runner line becomes `"$VENV/bin/python" << 'PYEOF'` — and **substitute the absolute path this command printed**, not the `$VENV` reference: each later command runs in a fresh shell where `VENV` is unset, and `"$VENV/bin/python"` would then expand to `/bin/python`, which exists on some Linux distributions and silently runs the wrong interpreter. That substitution is the only difference between the rungs. This rung installs something durable, isolated from the project and from the system Python, so proceed in automatic mode and state it: the venv path and the packages installed into it.
-
-**When a rung fails, say exactly what failed and what fixes it.** Quote the error, then:
-
-| Situation | The message, and the way forward |
-|---|---|
-| `python3 -m venv` fails (typically `ensurepip` missing — Debian/Ubuntu without `python3-venv`) | give the platform cure (`sudo apt install python3-venv`) **and** the recommended one, the `uv` installer: `curl -LsSf https://astral.sh/uv/install.sh \| sh` (it also brings a managed Python where there is none). Both install a tool onto the machine: **ask before running either**, whatever the mode. Offer to continue once one has run |
-| no `python3` at all | the same offer: install `uv`, asked first |
-| a download fails on either rung (offline, proxy, registry down) | a warm `uv` cache still works — run the preflight anyway before concluding; if it fails too, say the machine needs network once, and stop |
-| everything above failed, or the user declined | **stop gracefully**: state what is missing and the one command that fixes it; offer the user's own file for this input — for every format, including `pdf`: there is no public last resort. Never fabricate a file, and never substitute a document the brief did not ask for. When called from `/pipelex-inputs`, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues |
+**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** When `uv` is not on `PATH` (the preflight prints nothing, and `command -v uv` finds nothing for a format that has no preflight), read [venv.md](references/venv.md) before creating anything: it builds the venv this skill owns under `${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv` and gives the runner line.
 
 ### Step 3: Draft the content
 
-Write down what the file will say before rendering it — in the reply, briefly, so the user sees it and can redirect. Use the method's own vocabulary: if it extracts invoice fields, the file is an invoice with a seller, a buyer, an invoice number, a date, line items with quantities and unit prices, a subtotal, a tax line and a total that add up. Keep values internally consistent (totals sum, dates are in order, ids look like ids), because the method will read them and a checker may compare them. By format:
-
-- **Document (`pdf`, `document_scan`)**: title, parties, identifiers and dates, the body paragraphs or the line items, the closing block.
-- **`chart`**: the series and their values, axis labels with units, the title, the chart kind.
-- **`diagram`**: the nodes and their labels, the edges, the reading direction.
-- **`screenshot`**: the app and the screen, the sidebar entries, the visible records or cards.
-
-Fictional throughout. Match the length the method expects: a two-line memo and a ten-page report are different briefs.
+Before opening a recipe, write down what the file will say — in the reply, briefly, so the user sees it and can redirect: the realism is in the content. Use the method's own vocabulary: if it extracts invoice fields, the file is an invoice with a seller, a buyer, an invoice number, a date, line items with quantities and unit prices, a subtotal, a tax line and a total that add up. Keep values internally consistent (totals sum, dates are in order, ids look like ids): the method will read them and a checker may compare them. A document (`pdf`, `document_scan`) has its title, parties, identifiers and dates, body or line items, and closing block; a `chart` its series and values, axis labels with units, title and kind; a `diagram` its labelled nodes, edges and reading direction; a `screenshot` its app and screen, sidebar entries and visible records or cards. Entities are obviously fictional — "Acme Hardware Supply", "Jane Example", `INV-2026-0042` — never real people, companies or brands. Match the length the method expects: a two-line memo and a ten-page report are different briefs.
 
 ### Step 4: Render
 
-Open the reference for the format and take the recipe that matches the content — the reference's opening table says which. Copy the recipe, replace its content block with what Step 3 drafted, set the output path to `target`, keep the runner line from Step 2, and run it. The file lands in `<output_dir>/inputs/` when the caller is `/pipelex-inputs`.
+Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep step 2's runner line and the recipe's `SEED` and `invariant=1`, and run it.
 
-Two checks on `target` before the render, both cheap and both guarding against a silent success:
-
-- **The path must be fully substituted.** `<` and `>` are legal filename characters, so a recipe still carrying `<output_dir>` writes into a real directory of that name, prints success and exits 0. If `target` still contains `<` or `>`, stop and resolve it first.
-- **An existing file is the user's, not yours.** If something is already at `target`, say so and confirm before overwriting — every recipe truncates the path it opens.
-
-If the run fails, clean up what *this run* created, and nothing else:
+**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `inputs/.invoice.part.pdf` for `inputs/invoice.pdf`), and `target` when this run created it:
 
 ```bash
+rm -f "<target_dir>/.<target_stem>.part<target_ext>"
 # Only when target did not exist before this render — never on a path you did not create.
 rm -f "<target>"
 ```
 
-then read the error. A recipe error is yours to fix and rerun; an environment error goes back to Step 2's table.
-
 ### Step 5: Verify
 
-Reopen the file and confirm it is what the brief asked for:
-
-- **PNG**: `uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<target>"` (or the venv's python) — expect `PNG`, the size the recipe declared, and `RGB` (`RGBA` from the matplotlib chart recipe, which is normal). Read the kilobytes too: a `document_scan` in the low megabytes is expected, any other category past a megabyte is not. Then view it with the `Read` tool and check it reads as its category: a chart with the series drafted, a diagram with the nodes, a page that looks scanned, a screen that looks like an app. Fix and rerun if it does not.
-- **PDF**: `head -c 5 "<target>"` prints `%PDF-`, and `wc -c "<target>"` is not tiny. For the page count run the **Verify** block at the end of `references/pdf.md`, which uses the runner line Step 2 resolved — a bare `python3` is not available on a machine that reached rung 1 through the `uv` installer.
-- **DOCX / XLSX**: reopen with the same library that wrote it and print the headings or the sheet dimensions.
+Reopen the file with its reference's verify command, through step 2's interpreter and never a bare `python3`, and confirm what the brief asked for: `%PDF-`, a size in the kilobytes and the page count for a PDF; for a PNG the declared size, `RGB` (`RGBA` from the chart recipe) and its kilobytes, a `document_scan` in the low megabytes and any other category under one (a scan is the one output that can meet the upload's size limit: if that limit is the problem, re-render it at 100 dpi or with less grain, as `png.md` says, before anything else); the headings or the sheet dimensions for Word and Excel. Then view a PNG with the `Read` tool and check it reads as its category — a chart with the drafted series, a diagram with its nodes, a page that looks scanned, a screen that looks like an app — and fix and rerun if it does not.
 
 ### Step 6: Report
 
 One line per file: path, format, dimensions or page count, and a sentence on its content. Name any fallback as one. Then:
 
-- **Called from `/pipelex-inputs`**: hand the path back and stop — that skill writes `inputs.json`, uploads the file with `mthds_prepare_inputs`, and offers the run. On a graceful failure, hand back no path and the reason.
+- **Called from `/pipelex-inputs`**: hand the path back and stop — that skill writes `inputs.json`, uploads the file with `mthds_prepare_inputs`, and offers the run. After a refusal or a graceful stop, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues.
 - **Direct invocation**: mention that `/pipelex-inputs` is where the file becomes a runnable input.
 
-## Reference
+## Stops
 
-- [references/pdf.md](references/pdf.md) — reportlab: canvas letters, multi-page Platypus reports, tables, a composed line-item document, verification, and why there is no last resort.
-- [references/png.md](references/png.md) — Pillow and matplotlib: the shared preamble and font helper, one recipe per category, the scanner post-process, verification.
-- [references/office.md](references/office.md) — Word and Excel through a host `docx`/`xlsx` skill when one is available, otherwise `python-docx` / `openpyxl`.
-- `/pipelex-inputs` — the flow that turns these files into a runnable `inputs.json`.
+When a rung fails, quote the error and say exactly what failed and what fixes it.
+
+| Condition | Do this |
+|---|---|
+| `python3 -m venv` fails (typically `ensurepip` missing — Debian/Ubuntu without `python3-venv`), or there is no `python3` at all | offer the recommended cure, the `uv` installer, `curl -LsSf https://astral.sh/uv/install.sh \| sh`, which also brings a Python where there is none, and for a failed `venv` the platform cure, `sudo apt install python3-venv`; both install a tool, so ask before running either, and continue once one has run |
+| a download fails on either rung (offline, proxy, registry down) | run the preflight anyway before concluding, since a warm `uv` cache still works; if it fails too, say the machine needs network once, and stop |
+| no rung is reachable, or the user declined | **stop gracefully**: state what is missing and the one command that fixes it, and offer the user's own file for this input, whatever the format, `pdf` included: there is no public last resort. Never fabricate a file, and never substitute a document the brief did not ask for. Then report as step 6 says |
+| a recipe stops on `OUT still holds a placeholder` | set `OUT` to the real `target` and rerun |
+| any other recipe error | remove what this run created, fix the recipe and rerun |
+
+## References
+
+- [pdf.md](references/pdf.md), [png.md](references/png.md), [office.md](references/office.md): the recipes and their verify commands, at steps 4 and 5, for their format.
+- [venv.md](references/venv.md): at step 2, when `uv` is not on `PATH`.

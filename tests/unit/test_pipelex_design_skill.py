@@ -164,11 +164,8 @@ class TestPipelexDesignSkill:
     def test_the_formatting_note_is_not_a_design_step(self, target_name: str) -> None:
         """The formatting-hook note is a stop by the read-before-act test — the hook's block names the syntax
         error, and the harness refuses an edit to a file changed since it was read — so design carries none of
-        it. The note keeps its one wording in the skills that still include it, until phase 6 decides for them."""
+        it. Phase 6 decided the same for `pipelex-edit` and `pipelex-organize`, pinned in their own modules."""
         assert "**Formatting is automatic.**" not in self.render(target_name)
-        for skill in ("pipelex-edit", "pipelex-organize"):
-            template = (self.REPO_ROOT / "templates" / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
-            assert 'include "skills/shared/formatting-hook.md.j2"' in template, f"{skill} lost the formatting note"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_platform_renders_the_skill(self, target_name: str) -> None:
