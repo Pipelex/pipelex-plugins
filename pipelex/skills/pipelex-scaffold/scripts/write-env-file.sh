@@ -15,7 +15,8 @@
 #     <plane>   production when the base URL `.env` resolves to is https://api.pipelex.com, or
 #               when it names none; other for any other URL
 #   refused: <reason>   no key was written, and <reason> is one of usage, no-directory,
-#                       not-a-repository, not-ignored
+#                       not-a-repository (<dir> is not the root of a repository of its own),
+#                       not-ignored, write-failed (a file in <dir> could not be written)
 # The exit code is presentation: 0 unless refused.
 #
 # Why every value moves through this shell and never through the model: a value typed into a
@@ -36,22 +37,24 @@ refuse() {
 
 [ $# -eq 1 ] || refuse usage
 dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory
-git -C "$dir" rev-parse --git-dir > /dev/null 2>&1 || refuse not-a-repository
+# The pristine commit made <dir> the root of a repository of its own. Inside the user's repository
+# instead, `.gitignore` and `.env` would be judged and written by their rules, in their worktree.
+prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) && [ -z "$prefix" ] || refuse not-a-repository
 example="$dir/.env.example"
 env="$dir/.env"
 
 # The example carries the two lines every Pipelex project shares; an example the initializer
 # wrote for its own variables keeps them, and gains the two lines only when it has neither.
 if [ ! -e "$example" ]; then
-  printf 'PIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" > "$example"
+  printf 'PIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" > "$example" || refuse write-failed
 elif ! grep -q '^PIPELEX_' "$example"; then
-  printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$example"
+  printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$example" || refuse write-failed
 fi
 
 # An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
 # hidden example is never reviewed, committed or carried by a clone.
 if git -C "$dir" check-ignore -q -- .env.example; then
-  printf '\n!.env.example\n' >> "$dir/.gitignore"
+  printf '\n!.env.example\n' >> "$dir/.gitignore" || refuse write-failed
 fi
 
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
@@ -66,12 +69,18 @@ ignored_by_the_project() {
 
 # `.env` is ignored before a key can reach it, and nothing is written when it cannot be.
 if ! ignored_by_the_project .env; then
-  printf '\n.env\n' >> "$dir/.gitignore"
+  printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
   ignored_by_the_project .env || refuse not-ignored
 fi
 
-# An existing `.env` is never overwritten: it may hold a key the user filled.
-[ -e "$env" ] || cp "$example" "$env"
+# An existing `.env` is never overwritten: it may hold a key the user filled. One the initializer
+# wrote for its own variables gains the two lines, so the report's `PIPELEX_API_KEY=` line is there.
+# A new one is readable by its owner alone, since it is about to hold a key.
+if [ ! -e "$env" ]; then
+  (umask 077 && cp "$example" "$env") || refuse write-failed
+elif ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?PIPELEX_' "$env"; then
+  printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$env" || refuse write-failed
+fi
 
 # The value a dotenv reader resolves for a name: its last assignment, with an `export ` prefix, the
 # spaces around `=` and one pair of quotes taken off. It is read into the shell and never printed.
@@ -96,7 +105,7 @@ else
     printf '\n# Copied from the shell environment; a later line overrides an earlier one.\n'
     [ -z "${PIPELEX_API_KEY:-}" ] || printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY"
     [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL"
-  } >> "$env"
+  } >> "$env" || refuse write-failed
   if [ -n "${PIPELEX_API_KEY:-}" ]; then key=filled; else key=empty; fi
   [ -z "${PIPELEX_BASE_URL:-}" ] || origin=copied
 fi

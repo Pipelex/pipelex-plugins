@@ -10,8 +10,9 @@
 #   kept: <sha> <subject>        nothing was left to stage, because the initializer committed the
 #                                tree itself (create-next-app does); that commit is the pristine one
 #   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
-#                                no-directory, init-failed, stage-failed, nothing-to-commit,
-#                                commit-failed; git's own message, if any, goes to stderr
+#                                no-directory, init-failed, write-failed, stage-failed,
+#                                nothing-to-commit, commit-failed; git's own message, if any,
+#                                goes to stderr
 # The exit code is presentation: 0 for committed and kept, 1 for refused.
 
 set -u
@@ -60,15 +61,15 @@ ignored_by_the_project() {
 # never reaches the commit.
 if [ ! -e "$dir/.gitignore" ]; then
   if [ -e "$dir/pyproject.toml" ]; then
-    printf '__pycache__/\n*.egg-info/\nbuild/\ndist/\n.venv/\n.env\n' > "$dir/.gitignore"
+    printf '__pycache__/\n*.egg-info/\nbuild/\ndist/\n.venv/\n.env\n' > "$dir/.gitignore" || refuse write-failed
   else
-    printf 'node_modules/\ndist/\n.env\n' > "$dir/.gitignore"
+    printf 'node_modules/\ndist/\n.env\n' > "$dir/.gitignore" || refuse write-failed
   fi
 fi
 if [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
-  printf '\nnode_modules/\n' >> "$dir/.gitignore"
+  printf '\nnode_modules/\n' >> "$dir/.gitignore" || refuse write-failed
 fi
-[ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore"
+[ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
 
 # The pathspec is on both commands. `add -A -- .` bounds what is staged, and a commit without
 # one would commit the whole index, anything the user had staged included.

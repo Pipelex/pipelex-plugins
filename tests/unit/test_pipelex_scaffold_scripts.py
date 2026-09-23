@@ -192,6 +192,18 @@ class TestCommitPristine:
         assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "main.py"]
         assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\n.env\n"
 
+    @pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root writes a read-only file")
+    def test_a_gitignore_that_cannot_be_completed_stops_the_commit(self, tmp_path: Path) -> None:
+        """Staging after a failed append would commit the `.env` the line was meant to keep out."""
+        project = tmp_path / "svc"
+        project.mkdir()
+        (project / ".gitignore").write_text("build/\n", encoding="utf-8")
+        (project / ".gitignore").chmod(0o444)
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.stdout == "refused: write-failed\n"
+        assert subprocess.run(["git", "-C", str(project), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+
     def test_a_directory_inside_the_user_s_repository_gets_its_own(self, tmp_path: Path) -> None:
         """`git -C <dir>` scopes nothing: with no `.git` of its own, `<dir>` is governed by the user's
         repository, and a staging there would sweep their worktree into this commit. `uv init` makes a
@@ -454,6 +466,39 @@ class TestWriteEnvFile:
         assert result.stdout == "filled base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
 
+    def test_an_env_file_the_initializer_wrote_gains_the_two_lines(self, tmp_path: Path) -> None:
+        """The report tells the user to fill `.env`'s `PIPELEX_API_KEY=` line, so the line has to be there."""
+        project = self.project(tmp_path)
+        (project / ".env").write_text("DATABASE_URL=\n", encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
+        assert result.stdout == "empty base-url=file plane=production\n"
+        assert (project / ".env").read_text(encoding="utf-8") == f"DATABASE_URL=\n\n{EXAMPLE}"
+
+    def test_a_new_env_file_is_readable_by_its_owner_alone(self, tmp_path: Path) -> None:
+        project = self.project(tmp_path)
+        (project / ".env.example").chmod(0o644)
+        _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert (project / ".env").stat().st_mode & 0o077 == 0
+
+    @pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root writes a read-only file")
+    def test_a_key_that_cannot_be_written_is_never_reported_filled(self, tmp_path: Path) -> None:
+        project = self.project(tmp_path)
+        (project / ".gitignore").write_text(".env\n", encoding="utf-8")
+        (project / ".env").write_text(EXAMPLE, encoding="utf-8")
+        (project / ".env").chmod(0o444)
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "refused: write-failed\n"
+        assert result.returncode == 1
+
+    def test_a_directory_inside_the_user_s_repository_is_refused(self, tmp_path: Path) -> None:
+        """Step 3 refused before its `git init`, so `<dir>` is still governed by the user's repository."""
+        outer = _repository(tmp_path / "their-repo")
+        project = outer / "app"
+        project.mkdir()
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "refused: not-a-repository\n"
+        assert list(project.iterdir()) == [] and not (outer / ".gitignore").exists()
+
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"
         project.mkdir()
@@ -481,6 +526,17 @@ def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Pa
     assert result.returncode == 0, result.stdout + result.stderr
     assert list(decoy.iterdir()) == []
     assert (project / ".gitignore").is_file()
+
+
+def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
+    """The helper is copied into each script, which runs alone, so the copies are held together here."""
+
+    def helper(script: Path) -> str:
+        text = script.read_text(encoding="utf-8")
+        start = text.index("ignored_by_the_project() {")
+        return text[start : text.index("\n}\n", start)]
+
+    assert helper(COMMIT_PRISTINE) == helper(WRITE_ENV_FILE)
 
 
 @pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)

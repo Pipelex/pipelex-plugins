@@ -64,9 +64,8 @@ TARGETS_DIR_NAME = "targets"
 # statement left off this list drifts silently on the next bump.
 #
 # Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
-# bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
-# `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python
-# floor. A reworded reference fails this check instead of passing silently, which
+# bare numeric sweep would read a JSON example's value or another library's version
+# as a floor whenever the two happen to coincide. A reworded reference fails this check instead of passing silently, which
 # is the right way round — re-anchor the pattern in the same change that rewords
 # the sentence.
 VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
@@ -726,8 +725,8 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
 
     This one IS a numeric sweep, which the static-reference rule above deliberately
     is not, and the difference is what each reads. `skills/` is prose about the whole
-    ecosystem, where `3.14` is a JSON example and `3.11` is matplotlib's version, so
-    a sweep there would be mostly false. `templates/` is ours, every floor in it
+    ecosystem, where a number is as often an example's value or another library's
+    version, so a sweep there would be mostly false. `templates/` is ours, every floor in it
     belongs in the table, and demanding an anchor per sentence would rebuild the same
     hand-kept list whose omissions this rule exists to catch. The escape is
     `TEMPLATE_FLOOR_LOOKALIKES` instead: a number that genuinely means something else

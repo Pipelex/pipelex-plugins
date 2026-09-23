@@ -1,6 +1,6 @@
 ---
 name: pipelex-scaffold
-description: Start a new project that will call MTHDS methods through Pipelex, in TypeScript or Python — from a Pipelex template or from the ecosystem's own initializer. A TypeScript web app for a method comes from the method-app template, created for that method in one command and left running with its URL reported; every other project is handed to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "build me a web app for this method", "set up a Pipelex project from scratch", "new Python CLI for this method", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user stands in a fresh copy of a Pipelex template not yet made theirs — this skill finishes it with the template's own gesture. Not for adding Pipelex to code that already exists — that is /pipelex-integrate.
+description: Start a new project that will call MTHDS methods through Pipelex, in TypeScript or Python — from a Pipelex template or from the ecosystem's own initializer. A TypeScript web app for a method comes from the method-app template, created for that method in one command and left running with its URL reported; every other project is handed to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "build me a web app for this method", "set up a Pipelex project from scratch", "new Python CLI for this method", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user stands in a fresh copy of the method-app template not yet made theirs — this skill finishes it with the template's own gesture. Not for adding Pipelex to code that already exists — that is /pipelex-integrate.
 {%- include "skills/shared/frontmatter.md.j2" %}
 ---
 
@@ -176,7 +176,7 @@ The retries wait out the first compilation of the page, for two minutes at most.
 
 ### Step 1: Prerequisites
 
-As in branch A, for the language chosen: `uv` for Python, which runs the initializer and writes the lock; Node and `npm` for TypeScript; `git` for both. Never install a toolchain, and read [references/version-managers.md](references/version-managers.md) before stopping on a missing `node` or `uv`, as branch A does.
+As in branch A, for the language chosen: `uv` for Python, which runs the initializer and writes the lock; Node and `npm` for TypeScript; `git` for both. Never install a toolchain, and read [references/version-managers.md](references/version-managers.md) before stopping on a missing `node` or `uv`, as branch A does. **On Python, `uv python find` must print an interpreter before anything is created**: uv downloads a Python it lacks on first use, which is the toolchain install this step forbids, so a `uv` with no Python is a missing piece.
 
 ### Step 2: Run the initializer — never assemble by hand
 
@@ -244,7 +244,7 @@ Two lines are easy to forget and matter:
 
 | Condition | Do this |
 |---|---|
-| A toolchain piece is missing (Node below the floor, no `uv`, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first read [references/version-managers.md](references/version-managers.md), since a runtime a version manager already holds is not missing |
+| A toolchain piece is missing (Node below the floor, no `uv`, no Python `uv python find` finds, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first read [references/version-managers.md](references/version-managers.md), since a runtime a version manager already holds is not missing |
 | The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse. On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it, which git refuses outright |
 | The method app's `git clone` fails (network, permissions) | report git's error verbatim; the chain removes its own temporary path and copies nothing |
 | A `.pipelex-method-apps-…` directory already sits beside the destination | an earlier run was killed before its trap could run. Leave it: this run's `mktemp` makes a path of its own and touches no other. Name it in the report so the user can remove it |
@@ -263,6 +263,7 @@ Two lines are easy to forget and matter:
 | The server listened beyond loopback | the start command has already stopped it; report no URL and say this copy's `make dev` does not bind the server to this machine |
 | An initializer is interactive with no non-interactive form | hand the command to the user to run in the session; resume after |
 | `commit-pristine.sh` or `write-env-file.sh` says `refused: usage` or `refused: no-directory` | the command was typed wrong: check `<dir>` and its quoting, and run it again |
+| either script says `refused: write-failed` | a file in `<dir>` could not be written, most often for a permission: say which and leave it to the user; the script staged, committed and filled nothing after it |
 | `commit-pristine.sh` says `refused: no-git` | git is missing: the toolchain row above applies |
 | `write-env-file.sh` says `refused: not-a-repository` | step 3 made no repository: run it first, and write no env file before it prints `committed:` or `kept:` |
 | `commit-pristine.sh` says `refused: nothing-to-commit` | the initializer wrote nothing: read its output and run it again; never commit an empty directory |

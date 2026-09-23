@@ -639,13 +639,11 @@ class TestVersionFloors:
         assert len(errors) == 1
         assert "[vars.floors] is missing or empty" in errors[0]
 
-    # Two numbers under `skills/` equal a floor and mean something else entirely. They
-    # are the reason the anchors are written against prose instead of swept numerically,
-    # and naming them here is what lets the sweep below refuse every other stray match.
-    UNRELATED_FLOOR_LOOKALIKES: ClassVar[set[tuple[str, str]]] = {
-        ("skills/pipelex-design/references/writing-mthds.md", "3.14"),
-        ("skills/pipelex-synthetic-inputs/references/png.md", "3.11"),
-    }
+    # A number under `skills/` that equals a floor and means something else entirely is
+    # named here, once, with its file. Such numbers are the reason the anchors are written
+    # against prose instead of swept numerically, and naming them is what lets the sweep
+    # below refuse every other stray match. None does today.
+    UNRELATED_FLOOR_LOOKALIKES: ClassVar[set[tuple[str, str]]] = set()
 
     def test_every_static_statement_of_a_floor_is_anchored(self) -> None:
         """The anchors are a hand-kept list, so the way this rule fails is by omission:
