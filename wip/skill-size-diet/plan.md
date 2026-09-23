@@ -36,7 +36,7 @@ The questions of design section 8, answered with evidence recorded here before a
 - [ ] The same three on Mistral Vibe.
 - [ ] Whether Codex or Vibe carries an invoked skill across its own compaction, and within what budget.
 - [ ] Whether `pipelex-integrate`'s instruction to copy `references/codegen-check.mjs` works on all three targets today.
-- [ ] The token count of rendered skills, taken with the token-counting endpoint on at least the smallest and the largest rendered `SKILL.md`, which sets box C's character ceiling (16,000 proposed) with its margin stated.
+- [ ] The token count of every rendered `SKILL.md` on every target, taken with the token-counting endpoint, which sets box C's character ceiling: 5,000 times the lowest characters-per-token ratio measured, less a stated margin. The proposed 16,000 holds only if no skill falls below 3.2 characters per token; density varies with code blocks and tables, so the smallest and the largest skill are not a sufficient sample.
 - [ ] The template variable that names a skill's directory on each target, settled from the answers above.
 
 ## Phase 1 — the shared blocks and the machinery · `L-260923-8c296f`
@@ -114,7 +114,7 @@ Blocked by `L-260922-12f302` (the initializer and the serve target in `pipelex-m
 
 ## Phase 6 — the rest, and the ceiling bites · `L-260923-6b46c8`
 
-- [ ] `pipelex-catalog`, `pipelex-run`, `pipelex-explain` and `pipelex-synthetic-inputs` trimmed under the ceiling by the same rule, each rare branch behind a pointer.
+- [ ] `pipelex-catalog`, `pipelex-run`, `pipelex-explain` and `pipelex-synthetic-inputs` trimmed under the ceiling by the same rule, each rare branch behind a pointer, and with them any other skill the ceiling calibrated in phase 0 puts over it — `pipelex-organize` first, which sits just under 16,000.
 - [ ] The ceiling check flips from reporting to failing, if phase 5b has already landed; otherwise 5b flips it.
 - [ ] `/rev`.
 
