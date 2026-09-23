@@ -176,7 +176,7 @@ The retries wait out the first compilation of the page, for two minutes at most.
 
 ### Step 1: Prerequisites
 
-As in branch A, for the language chosen: `uv` for Python, which runs the initializer and writes the lock; Node and `npm` for TypeScript; `git` for both. Never install a toolchain, and read [references/version-managers.md](references/version-managers.md) before stopping on a missing `node` or `uv`, as branch A does. **On Python, `uv python find` must print an interpreter before anything is created**: uv downloads a Python it lacks on first use, which is the toolchain install this step forbids, so a `uv` with no Python is a missing piece.
+As in branch A, for the language chosen: `uv` for Python, which runs the initializer and writes the lock, or the tool the user named in its place (poetry, pdm, hatch); Node and `npm` for TypeScript; `git` for both. Never install a toolchain, and read [references/version-managers.md](references/version-managers.md) before stopping on a missing `node` or `uv`, as branch A does. {% set python_ceiling = floors.python_max.split(".")[0] ~ "." ~ (floors.python_max.split(".")[1] | int + 1) %}**On Python, find an interpreter from {{ floors.python_min }} to {{ floors.python_max }} before anything is created, and create the project on it**: `pipelex-sdk`, which `/pipelex-integrate` adds next, installs into no other. With uv, `uv python find '>={{ floors.python_min }},<{{ python_ceiling }}'` must print one, since uv downloads a Python it lacks on first use, which is the toolchain install this step forbids; pass its version to `uv init` as `--python <X.Y>`.
 
 ### Step 2: Run the initializer — never assemble by hand
 
@@ -184,7 +184,7 @@ As in branch A, for the language chosen: `uv` for Python, which runs the initial
 
 Nothing beyond what the initializer writes is authored by this skill: no example code, no folder layout of its own, no opinion the framework did not ship.
 
-**On Python, finish with `uv sync` from inside `<dir>`.** `uv init` writes a `pyproject.toml` and stops: no lock file, no environment. `/pipelex-integrate` picks the package manager off the lock file and reads no lock file as `pip install` into the active environment, so a project handed over without one is a uv project installed into with pip.
+**On a project `uv init` created, finish with `uv sync` from inside `<dir>`.** `uv init` writes a `pyproject.toml` and stops: no lock file, no environment. `/pipelex-integrate` picks the package manager off the lock file and reads no lock file as `pip install` into the active environment, so a project handed over without one is a uv project installed into with pip.
 
 ### Step 3: The pristine commit
 
@@ -244,7 +244,7 @@ Two lines are easy to forget and matter:
 
 | Condition | Do this |
 |---|---|
-| A toolchain piece is missing (Node below the floor, no `uv`, no Python `uv python find` finds, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first read [references/version-managers.md](references/version-managers.md), since a runtime a version manager already holds is not missing |
+| A toolchain piece is missing (Node below the floor, no `uv` where `uv init` runs, no Python from {{ floors.python_min }} to {{ floors.python_max }}, no git) | STOP, name the exact missing piece and the template README's line about it; never install a toolchain — first read [references/version-managers.md](references/version-managers.md), since a runtime a version manager already holds is not missing |
 | The target directory exists and is not empty — anything at all beyond a lone `.git` | STOP, ask for another; never delete, move or write into it, and never offer to. **A directory holding nothing but `.git` is empty here and is written into**; that exception is the one directory entry by name and not a class, so `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and anything else still refuse. On branch A that directory is served by the acquisition beside it (Step 2) and never by a `git clone` into it, which git refuses outright |
 | The method app's `git clone` fails (network, permissions) | report git's error verbatim; the chain removes its own temporary path and copies nothing |
 | A `.pipelex-method-apps-…` directory already sits beside the destination | an earlier run was killed before its trap could run. Leave it: this run's `mktemp` makes a path of its own and touches no other. Name it in the report so the user can remove it |

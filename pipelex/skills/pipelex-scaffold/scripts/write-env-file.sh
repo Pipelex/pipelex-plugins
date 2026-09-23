@@ -8,7 +8,7 @@
 # table and the report key on it:
 #   <key> base-url=<origin> plane=<plane>
 #     <key>     filled   the key was copied from the shell's PIPELEX_API_KEY
-#               kept     `.env` already carried a key, so neither of its lines was touched
+#               kept     `.env` already carried a key, so it was not touched
 #               empty    no key: the user fills `.env`'s PIPELEX_API_KEY= line
 #     <origin>  copied   the shell's PIPELEX_BASE_URL was copied into `.env`
 #               file     `.env`'s own line stands: the example's production URL, or the user's
@@ -16,7 +16,8 @@
 #               when it names none; other for any other URL
 #   refused: <reason>   no key was written, and <reason> is one of usage, no-directory,
 #                       not-a-repository (<dir> is not the root of a repository of its own),
-#                       not-ignored, write-failed (a file in <dir> could not be written)
+#                       not-ignored, write-failed (a file in <dir> could not be written, or
+#                       `.env` could not be closed to other users before the key reached it)
 # The exit code is presentation: 0 unless refused.
 #
 # Why every value moves through this shell and never through the model: a value typed into a
@@ -43,12 +44,26 @@ prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) && [ -z "$prefix" ]
 example="$dir/.env.example"
 env="$dir/.env"
 
+# Whether <file> assigns <name>, in any form a dotenv reader accepts.
+assigns() {
+  grep -Eq "^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=" "$1"
+}
+
+# Appends to <file> whichever of the two Pipelex lines it lacks. A line it carries is never
+# repeated, since a dotenv reader resolves a repeated name to its later line.
+add_missing_lines() {
+  lines=
+  assigns "$1" PIPELEX_BASE_URL || lines="PIPELEX_BASE_URL=$production"$'\n'
+  assigns "$1" PIPELEX_API_KEY || lines="${lines}PIPELEX_API_KEY="$'\n'
+  [ -z "$lines" ] || printf '\n%s' "$lines" >> "$1" || refuse write-failed
+}
+
 # The example carries the two lines every Pipelex project shares; an example the initializer
-# wrote for its own variables keeps them, and gains the two lines only when it has neither.
+# wrote for its own variables keeps them, and gains whichever of the two it lacks.
 if [ ! -e "$example" ]; then
   printf 'PIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" > "$example" || refuse write-failed
-elif ! grep -q '^PIPELEX_' "$example"; then
-  printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$example" || refuse write-failed
+else
+  add_missing_lines "$example"
 fi
 
 # An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
@@ -73,13 +88,10 @@ if ! ignored_by_the_project .env; then
   ignored_by_the_project .env || refuse not-ignored
 fi
 
-# An existing `.env` is never overwritten: it may hold a key the user filled. One the initializer
-# wrote for its own variables gains the two lines, so the report's `PIPELEX_API_KEY=` line is there.
-# A new one is readable by its owner alone, since it is about to hold a key.
+# An existing `.env` is never overwritten: it may hold a key the user filled. A new one is
+# readable by its owner alone, since it is about to hold a key.
 if [ ! -e "$env" ]; then
   (umask 077 && cp "$example" "$env") || refuse write-failed
-elif ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?PIPELEX_' "$env"; then
-  printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$env" || refuse write-failed
 fi
 
 # The value a dotenv reader resolves for a name: its last assignment, with an `export ` prefix, the
@@ -89,25 +101,31 @@ resolved() {
     sed -E -e 's/[[:space:]]+$//' -e 's/^"(.*)"$/\1/' -e "s/^'(.*)'\$/\1/"
 }
 
-# One test on the file's key decides whether anything is written. A file that carries a key keeps
-# both of its lines, because every dotenv reader resolves a repeated name to its later line, so an
-# append after the user's key would silently replace it. The base URL cannot carry a test of its
-# own: the example ships its line non-empty. A base URL the shell sets is copied with a key or
+# One test on the file's key decides whether anything is written. A file that carries a key is
+# left as it is, because every dotenv reader resolves a repeated name to its later line, so an
+# append after the user's lines would silently replace them. The base URL cannot carry a test of
+# its own: the example ships its line non-empty. A file without a key gains the lines it lacks, so
+# the report's `PIPELEX_API_KEY=` line is there. A base URL the shell sets is copied with a key or
 # without one, since it is the plane the user declared, and a key is refused by every plane but
 # the one that issued it. The comment goes out once, and only when a line follows it.
 origin=file
+key=empty
 if [ -n "$(resolved PIPELEX_API_KEY)" ]; then
   key=kept
-elif [ -z "${PIPELEX_API_KEY:-}${PIPELEX_BASE_URL:-}" ]; then
-  key=empty
 else
-  {
-    printf '\n# Copied from the shell environment; a later line overrides an earlier one.\n'
-    [ -z "${PIPELEX_API_KEY:-}" ] || printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY"
-    [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL"
-  } >> "$env" || refuse write-failed
-  if [ -n "${PIPELEX_API_KEY:-}" ]; then key=filled; else key=empty; fi
-  [ -z "${PIPELEX_BASE_URL:-}" ] || origin=copied
+  add_missing_lines "$env"
+  if [ -n "${PIPELEX_API_KEY:-}${PIPELEX_BASE_URL:-}" ]; then
+    # A `.env` the initializer wrote was made under the user's umask, readable by others as often
+    # as not. Only the group's and others' bits go, so a file its owner made read-only stays so.
+    [ -z "${PIPELEX_API_KEY:-}" ] || chmod go-rwx "$env" || refuse write-failed
+    {
+      printf '\n# Copied from the shell environment; a later line overrides an earlier one.\n'
+      [ -z "${PIPELEX_API_KEY:-}" ] || printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY"
+      [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL"
+    } >> "$env" || refuse write-failed
+    [ -z "${PIPELEX_API_KEY:-}" ] || key=filled
+    [ -z "${PIPELEX_BASE_URL:-}" ] || origin=copied
+  fi
 fi
 
 # The plane the file resolves to, read as a dotenv reader reads it.

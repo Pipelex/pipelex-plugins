@@ -474,6 +474,27 @@ class TestWriteEnvFile:
         assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".env").read_text(encoding="utf-8") == f"DATABASE_URL=\n\n{EXAMPLE}"
 
+    @pytest.mark.parametrize("name", [".env", ".env.example"])
+    def test_a_file_carrying_one_pipelex_line_gains_the_other_alone(self, tmp_path: Path, name: str) -> None:
+        """Round 3: a file that set its base URL and no key line kept no `PIPELEX_API_KEY=` line for
+        the user to fill, and a second base URL line would have replaced theirs."""
+        carried = "PIPELEX_BASE_URL=http://127.0.0.1:8081\n"
+        project = self.project(tmp_path, carried if name == ".env.example" else EXAMPLE)
+        (project / name).write_text(carried, encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
+        assert result.stdout == "empty base-url=file plane=other\n"
+        assert (project / name).read_text(encoding="utf-8") == f"{carried}\nPIPELEX_API_KEY=\n"
+
+    def test_a_key_written_into_an_existing_env_file_closes_it_to_other_users(self, tmp_path: Path) -> None:
+        """Round 3: an initializer writes `.env` under the user's umask, and the key was appended to it
+        with the mode it came with."""
+        project = self.project(tmp_path)
+        (project / ".env").write_text("DATABASE_URL=\n", encoding="utf-8")
+        (project / ".env").chmod(0o644)
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert (project / ".env").stat().st_mode & 0o777 == 0o600
+
     def test_a_new_env_file_is_readable_by_its_owner_alone(self, tmp_path: Path) -> None:
         project = self.project(tmp_path)
         (project / ".env.example").chmod(0o644)

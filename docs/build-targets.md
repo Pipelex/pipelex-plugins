@@ -223,7 +223,7 @@ Two rules come with it. **A verbatim copy is a `cp` from `{{ skill_dir }}/refere
 
 ### Version floors
 
-`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node and the method app's port. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
+`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, the Python range `pipelex-sdk` installs into and the method app's port. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
 
 These are **value substitutions**, which is why they do not contradict the trimmed-variable rule this repo inherited from `mthds-plugins`: nothing branches on a floor, it is only printed. The rule that bans dead switches bans variables a skill *reads to decide what to do*.
 

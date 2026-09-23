@@ -320,10 +320,13 @@ class TestPipelexScaffoldSkill:
         on the reference, because either alone is the half-application.
         """
         for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
-            assert "**On Python, finish with `uv sync` from inside `<dir>`.**" in body
+            assert "**On a project `uv init` created, finish with `uv sync` from inside `<dir>`.**" in body
             assert "reads no lock file as `pip install` into the active environment" in body
         reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
-        assert "**On Python, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**" in reference
+        assert (
+            "**On a project `uv init` created, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**"
+            in reference
+        )
         assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
 
     def test_the_initializer_branch_runs_its_scripts_and_reports_their_verdicts(self) -> None:
