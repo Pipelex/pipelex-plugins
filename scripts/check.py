@@ -37,7 +37,9 @@ SKILL_CEILING_ENFORCED = False
 
 # A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
 MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
-FENCED_BLOCK_PATTERN = re.compile(r"^(```|~~~).*?^\1", re.MULTILINE | re.DOTALL)
+# A fenced block, indented or not (a list item indents its fences), closed by a fence of the same
+# character at least as long as the one that opened it, so a four-backtick fence can wrap a three.
+FENCED_BLOCK_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,}).*?^[ \t]*(?P=fence)[`~]*[ \t]*$", re.MULTILINE | re.DOTALL)
 INLINE_CODE_PATTERN = re.compile(r"`[^`\n]*`")
 # Where a skill names one of its own scripts: after the skill-directory expression, whatever a
 # target spells it as, so the check keys on the `/scripts/<name>` tail that every spelling shares.
@@ -567,10 +569,14 @@ def check_skill_ceiling(base_dir: Path) -> list[str]:
     return [line for _, line in sorted(over, key=lambda item: -item[0])]
 
 
+def _without_fenced_blocks(text: str) -> str:
+    """The text with fenced blocks blanked, line count kept, so a `#` comment in code is never a heading."""
+    return FENCED_BLOCK_PATTERN.sub(lambda match: "\n" * match.group(0).count("\n"), text)
+
+
 def _markdown_prose(text: str) -> str:
     """The text with fenced blocks and inline code blanked, so an example is never read as a link."""
-    text = FENCED_BLOCK_PATTERN.sub(lambda match: "\n" * match.group(0).count("\n"), text)
-    return INLINE_CODE_PATTERN.sub("``", text)
+    return INLINE_CODE_PATTERN.sub("``", _without_fenced_blocks(text))
 
 
 def _heading_slugs(text: str) -> set[str]:
@@ -578,9 +584,11 @@ def _heading_slugs(text: str) -> set[str]:
 
     Lowercased, every character that is not a letter, a digit, a space, a hyphen or an underscore
     dropped, and each space turned into a hyphen — so `Step 8 — a method` becomes `step-8--a-method`.
+    Inline code keeps its text and loses only its backticks, as on GitHub, so a heading naming a tool
+    keeps the tool's name in its anchor.
     """
     slugs: set[str] = set()
-    for line in _markdown_prose(text).splitlines():
+    for line in _without_fenced_blocks(text).splitlines():
         match = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
         if match:
             heading = re.sub(r"[^\w\- ]", "", match.group(1).lower())
@@ -612,6 +620,7 @@ def check_skill_links(base_dir: Path) -> list[str]:
     errors: list[str] = []
     for output_dir in _collect_output_dirs(base_dir):
         skills_dir = output_dir / "skills"
+        target_root = output_dir.resolve()
         markdown_files = (
             sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
         )
@@ -623,6 +632,9 @@ def check_skill_links(base_dir: Path) -> list[str]:
                 path_part, _, anchor = target.partition("#")
                 resolved = (md_file.parent / path_part).resolve() if path_part else md_file.resolve()
                 if path_part:
+                    if not resolved.is_relative_to(target_root):
+                        errors.append(f"{rel}: link to `{target}` leaves the target, whose installed copy does not carry it")
+                        continue
                     if not resolved.is_file():
                         errors.append(f"{rel}: link to `{target}` names no file in this target")
                         continue
@@ -632,7 +644,7 @@ def check_skill_links(base_dir: Path) -> list[str]:
                         named.add(resolved)
                 if anchor and resolved.suffix == ".md" and anchor not in _heading_slugs(resolved.read_text(encoding="utf-8")):
                     errors.append(f"{rel}: anchor `#{anchor}` names no heading of {resolved.name}")
-            skill_root = md_file.parent if md_file.name == "SKILL.md" else md_file.parent.parent
+            skill_root = skills_dir / md_file.relative_to(skills_dir).parts[0]
             for match in SKILL_SCRIPT_MENTION_PATTERN.finditer(text):
                 script = (skill_root / "scripts" / match.group(1).rstrip(".")).resolve()
                 if script.is_file():

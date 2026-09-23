@@ -63,19 +63,20 @@ TEMPLATES_DIR_NAME = "templates"
 CODEX_DISCOVERY_MARKETPLACE_SRC = Path("packaging/codex-marketplace.json")
 CODEX_DISCOVERY_MARKETPLACE_DST = Path(".agents/plugins/marketplace.json")
 
-# Shared reference files, rendered standalone per target. These are the MTHDS
-# language references that ground the skills. Paths are relative to the
-# templates/ directory.
-#
-# `skills/shared/frontmatter.md.j2` is deliberately NOT listed here: it is an
-# include-only partial ({% include %}-d by skill templates for their YAML
-# frontmatter), so it must exist as a file but should not be rendered standalone
-# (that would only ship a near-empty artifact).
 # The per-skill static asset directories under the repo-root `skills/<skill>/`, copied
 # verbatim into every target beside the rendered SKILL.md: `references/` holds what a
 # branch reads on demand, `scripts/` the programs a skill runs by path.
 STATIC_ASSET_DIRS = ("references", "scripts")
 
+# Shared reference files, rendered standalone per target: the MTHDS language
+# references that ground the skills, and the files a skill reads when one of its
+# stops fires, such as `credentials.md`. Paths are relative to the templates/
+# directory.
+#
+# The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
+# shared blocks — are deliberately NOT listed here: they are {% include %}-d by
+# skill templates, so they must exist as files but should not be rendered
+# standalone (that would only ship a fragment).
 SHARED_TEMPLATES = [
     "skills/shared/mthds-reference.md.j2",
     "skills/shared/native-content-types.md.j2",

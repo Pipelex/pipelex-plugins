@@ -143,10 +143,10 @@ Every skill is written to one rule, the **read-before-act rule** of the size die
 
 A `SKILL.md` takes one shape, in this order: the frontmatter; what the skill does and what it is not, in a few lines; the requirements; the guards that span several steps; the main path as numbered steps in the imperative, each with its own guards and pointers; the stop table; and an index of references, each with the condition that sends the model there. A procedure whose text is its correctness — a shell chain, a hash, a comparison of resolved paths — ships as a script under `skills/<skill>/scripts/`, takes its values as arguments, prints one line opening with a stable verdict word, never prints a secret, and is executed by the unit suite.
 
-Four checks hold the shape:
+These checks hold the shape:
 
 - **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It reports without failing until `SKILL_CEILING_ENFORCED` is flipped at the end of the diet.
-- **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target, and every anchor a heading of the file it points into; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
+- **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target — a link that climbs out of it names a file the installed plugin does not carry — and every anchor a heading of the file it points into, slugged as GitHub does, inline code keeping its text; code, fenced or inline, is an example and never a link; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
 - **The guard registry.** `tests/unit/test_skill_guards.py` lists each skill's guards by their canonical sentence and asserts, on every target, that each appears exactly once in the rendered `SKILL.md` and in no reference or shared file. A skill phase registers its guards in the change that places them.
 - **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`.
 
@@ -253,7 +253,7 @@ So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make chec
 | `saved-copy-notice.md.j2` | the notice that the linked saved method does not have this change, offering `/pipelex-catalog` and never saving | none |
 | `catalog-id-bridge.md.j2` | how a file-based skill reaches a catalog id: the search over the link files, the several-hits question, the pull, and the refusal of a published address | `catalog_id_bridge_resume` (the step the skill resumes at, interpolated mid-sentence) |
 | `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
-| `project-root.md.j2` | where a project starts — the nearest directory holding one of the four markers — for design, integrate and catalog | none |
+| `project-root.md.j2` | where a project starts — the nearest directory holding one of the project markers — for design, integrate and catalog | none |
 
 Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
 

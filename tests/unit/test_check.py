@@ -877,3 +877,48 @@ class TestSkillLinks:
         skill_md = self._skill(skill_tree) / "SKILL.md"
         skill_md.write_text(skill_md.read_text() + "```md\n[x](references/nope.md)\n```\n\nInline `[y](references/nope.md)` too.\n")
         assert check_skill_links(skill_tree) == []
+
+    def test_an_indented_or_longer_fence_is_code_too(self, skill_tree: Path) -> None:
+        """A list item indents its fences, and a four-backtick fence wraps a three-backtick example."""
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "1. Write it:\n\n   ```ts\n   handlers[kind](payload)\n   ```\n\n"
+            + "````md\n```ts\n[x](references/nope.md)\n```\n[y](references/gone.md)\n````\n\nAfter the fence.\n"
+        )
+        assert check_skill_links(skill_tree) == []
+
+    def test_an_anchor_keeps_the_text_of_inline_code(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "### Step 5 — `mthds_run`, and print the run id first\n\n"
+            + "See [step 5](#step-5--mthds_run-and-print-the-run-id-first) and [wrong](#step-5---and-print-the-run-id-first).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#step-5---and-print-the-run-id-first` names no heading of SKILL.md"], errors
+
+    def test_a_link_leaving_the_target_fails(self, skill_tree: Path) -> None:
+        """A file outside the target exists here but not in the installed plugin, so the link fails there."""
+        self._shared_named(skill_tree)
+        (skill_tree / "README.md").write_text("# Readme\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "See [the readme](../../../README.md).\n")
+        errors = check_skill_links(skill_tree)
+        assert errors == [
+            "pipelex/skills/pipelex-test/SKILL.md: link to `../../../README.md` leaves the target, whose installed copy does not carry it"
+        ], errors
+
+    def test_a_script_named_by_a_nested_reference_is_named(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        scripts = self._skill(skill_tree) / "scripts"
+        scripts.mkdir()
+        (scripts / "probe.sh").write_text("#!/bin/sh\n")
+        nested = self._skill(skill_tree) / "references" / "sub"
+        nested.mkdir(parents=True)
+        (nested / "x.md").write_text("# X\n\nRun `${CLAUDE_SKILL_DIR}/scripts/probe.sh`.\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "On a branch, read [references/sub/x.md](references/sub/x.md).\n")
+        assert check_skill_links(skill_tree) == []
