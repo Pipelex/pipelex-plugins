@@ -51,7 +51,7 @@ Evaluated in order:
 | User says "template" / "schema" / "placeholder" / "what inputs does it need?" | **Template** |
 | No clear signal (e.g. right after `/pipelex-design`, with no further context) | **Template**, then offer to populate |
 
-- **Template**: replace each file-ish mock URL (`https://mock-xxxxxxxx.invalid/...`) with `"<VARNAME-url-or-path-relative-to-this-inputs-file>"`, never `"<path-to-VARNAME>"`; save, show it with its path, and offer synthetic data or the user's files.
+- **Template**: replace each file-ish mock URL (an `https://` URL on a `.invalid` host) with `"<VARNAME-url-or-path-relative-to-this-inputs-file>"`, never `"<path-to-VARNAME>"`; save, show it with its path, and offer synthetic data or the user's files.
 - **Synthetic**: read [references/synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input. Codex has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.
 - **User data**: read [references/user-data.md](references/user-data.md) before matching any file to an input.
 - **Mixed**: the user's files first, then synthetic values for what they leave unfilled; read both references.
