@@ -7,6 +7,13 @@ item: L-260923-a9bdfe
 
 The implementation tracker for [`design.md`](design.md), whose boxes were all ratified on 2026-09-23. The epic is `L-260923-a9bdfe`, which superseded the parked item `L-260921-7918a6`. Each phase below names its ledger item beside its heading once filed; the order between them is recorded as `blocked_by` on the later item. Every phase is a move in the sense of box G: it changes no behaviour beyond what box G lists, and its pull request names each exception.
 
+## Handoff from the ratifying session — 2026-09-23
+
+- **Done.** The design was written from a measurement at `fd26a2c` and every box ratified in an interview (box E amended, box I's order with it). The epic `L-260923-a9bdfe` superseded `L-260921-7918a6`, and the phase items below are filed under it with their order in `blocked_by`. Filed on the way: `L-260922-e01c73` (the inputs contradiction), `L-260922-2e3997` (the Python template gap, since carried by the `cli-python` epic `L-260923-71f4a9`), `L-260922-12f302` (the method-app family's initializer and serve target). `L-260923-7001f2`, which routes a Python CLI to `cli-python`, was noted with the ratified rulings and now waits on phase 5a.
+- **The documents travel in PR #48** (`docs/Skill-size-diet-design`, worktree `_pipelex-plugins--skill-size-diet` at the workspace root). The design commits are `daa095a` (draft) and `832136b` (ratified, with this plan). Landing it takes a recorded `/rev` pass, then `/ledger-land`; the PR body says `Advances L-260923-a9bdfe`.
+- **Next.** Louis starts phase 0 himself, in a new session: `wt add --for L-260923-75fb17`, then `ledger claim L-260923-75fb17 --renew` from inside it. If PR #48 has not landed, branch from `docs/Skill-size-diet-design` so the documents are there. `L-260922-e01c73` can land at any moment before phase 0.
+- **Open questions.** None of Louis's are pending. What remains open is the facts list of phase 0 (design section 8), above all whether Codex and Vibe can locate and run a skill's `scripts/`, which box E rests on outside Claude.
+
 ## Standing rules for every phase
 
 - **Classify before moving.** Each skill phase starts with a classification of the skill's text under box A — guard, branch, stop or rationale — written beside this plan as `classification-<skill>.md`, one row per paragraph with its destination. The pull request is reviewed against it, which is what makes a move readable as a move.
