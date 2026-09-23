@@ -22,7 +22,7 @@ The smoke sessions that close phase 3 of [`plan.md`](plan.md), under box H of [`
 approval_mode = "approve"
 ```
 
-`mthds_run` was deliberately left out of it, so under `codex exec`'s approval policy `never` a run call would have been refused. The user's own `~/.codex` was left untouched: its `config.toml` hash and timestamps, and its `pipelex-plugins` plugin cache, are the same after the runs as before them.
+`mthds_run` was deliberately left out of it, on the belief that under `codex exec`'s approval policy `never` a run call would then have been refused. It would not: phase 6's smoke sessions found that Codex asks approval only for a tool the workshop marks destructive, which `mthds_run` is not, and no session here called it ([`smoke-phase6.md`](smoke-phase6.md), "Found on the way"). The user's own `~/.codex` was left untouched: its `config.toml` hash and timestamps, and its `pipelex-plugins` plugin cache, are the same after the runs as before them.
 
 **What counts as a read**, as in phase 2: a `Read` naming `references/<name>.md`, or a shell command printing it. A read of another skill's reference, such as `pipelex-synthetic-inputs`' own `references/pdf.md` in scenario 3, belongs to that skill and is not a branch of this one. The projects are scratch git repositories outside every repository, each with a committed baseline, so no workspace `CLAUDE.md` or `AGENTS.md` loads and the diff after a session is exactly what the session did. The transcripts and projects were kept in the orchestrating session's scratch directory (`/private/tmp/claude-501/…/scratchpad/smoke-inputs/`), which is temporary; the session ids below are the durable handles.
 

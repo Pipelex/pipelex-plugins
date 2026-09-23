@@ -68,6 +68,13 @@ class TestPipelexCatalogSkillShape:
         for name in self.REFERENCES:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
 
+    def test_the_unknown_id_reference_answers_a_pull_too(self) -> None:
+        """The stop-table row names the error, not the tool, so a pull of an unknown id reaches the reference
+        as well as a save does. Phase 6's smoke sessions found it written for a save alone."""
+        reference = self.reference("unknown-id.md")
+        assert "`mthds_save_method` or a pull's `mthds_get_method`" in reference.splitlines()[2]
+        assert "**A pull has no link to judge.**" in reference
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_each_branch_keeps_its_guard_at_the_pointer(self, target_name: str) -> None:
         """A guard never lives only in a file read on demand, so the line that sends the model to a branch
