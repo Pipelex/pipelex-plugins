@@ -41,7 +41,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 `git`; `node` at 22.12 or later with `npm`, for the method app and for TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
 
-**On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**, since `pipelex-sdk` installs into no other. `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
+**On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**, since `pipelex-sdk` installs into no other. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
 ## Branch A — the method app
 
@@ -83,7 +83,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
 
 ## The report
 
-**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that `make serve` inside the project restarts it. Then say what was created and where, with its name and title; the template's version and the git outcome, which is no commit when `<dir>` sits in another repository's work tree; that `make create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of `.env.local`, `[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production || echo other` or production when the shell exports none; and `make add-method METHOD=…` for a second method, `npm run codegen` after a bundle edit.
+**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that `make serve` inside the project restarts it. Then say what was created and where, with its name and title; the template's version and the git outcome, which is no commit when `<dir>` sits in another repository's work tree; that `make create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `make create` wrote, `u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other`; and `make add-method METHOD=…` for a second method, `npm run codegen` after a bundle edit.
 
 **On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL. A key reported `filled` was taken from the environment **and not validated**.
 

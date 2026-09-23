@@ -37,6 +37,8 @@ INITIALIZER_COPY_MARKER = "rev-parse --show-cdup"
 PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-method-apps/webapp-js "
 PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version>" -- .'
 TARGETS = ("prod", "codex", "mistral-vibe")
+# The method app's report reads the plane of the `.env.local` `make create` wrote with this test.
+PLANE_TEST = 'u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other'
 
 # What the family's initializer and `make serve` print, as `pipelex-method-apps` documents them
 # (`initializers/js/README.md`, `webapp-js/scripts/lib/serve.mts`). The skill keys its stop table on
@@ -279,8 +281,9 @@ class TestPipelexScaffoldSkill:
             assert "`committed:` names it and lists the staged paths" in body
             assert "`kept:` names the commit the initializer made itself" in body
             assert "the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL" in body
-            # The method app's report still reads the plane by a test, never an echo.
-            assert '`[ "${PIPELEX_BASE_URL%/}" = https://api.pipelex.com ] && echo production || echo other`' in body
+            # The method app's report still reads the plane by a test, never an echo, and only of the file
+            # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
+            assert f"the plane of the `.env.local` `make create` wrote, `{PLANE_TEST}`" in body
             # The env file's own command left the skill: the script is the only thing that writes it.
             assert ">> <dir>/.env" not in body
             assert "cp -n" not in body
@@ -288,6 +291,25 @@ class TestPipelexScaffoldSkill:
         for word in ("**`filled`**", "**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
             assert word in initializers, f"the reference does not say what {word} means"
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize(
+        ("base_url", "plane"),
+        [(None, "production"), ("https://api.pipelex.com/", "production"), ("https://api-dev.pipelex.com", "other")],
+        ids=["unset", "production-with-a-slash", "another-plane"],
+    )
+    def test_the_plane_test_reads_an_unset_base_url_as_production(self, shell: list[str], base_url: str | None, plane: str) -> None:
+        """`make create` writes production's URL when the shell exports none, so the test must say so too."""
+        environment = {key: value for key, value in os.environ.items() if key != "PIPELEX_BASE_URL"}
+        if base_url is not None:
+            environment["PIPELEX_BASE_URL"] = base_url
+        result = subprocess.run([*shell, "-c", PLANE_TEST], capture_output=True, text=True, check=True, env=environment)
+        assert result.stdout == f"{plane}\n"
+
+    def test_the_interpreter_check_needs_uv_only_where_uv_runs(self) -> None:
+        """A poetry, pdm or hatch project on a machine with no uv is not stopped for lacking one."""
+        for body in _bodies():
+            assert "With uv, `uv python find '>=" in body
 
     def test_declares_no_mcp_tool(self) -> None:
         """The scaffold skill is MCP-free: no allowed-tools entry, no MCP-absent STOP message."""
