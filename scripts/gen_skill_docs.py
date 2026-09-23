@@ -809,7 +809,7 @@ def check_freshness(base_dir: Path, target_name: str = "prod") -> int:
                     rel = skill_md.relative_to(base_dir)
                     all_stale.append(f"  ORPHAN: {rel} (no corresponding .j2 template)")
 
-        # Copied static assets (per-skill references/) are not rendered, so they
+        # Copied static assets (per-skill references/ and scripts/) are not rendered, so they
         # need their own comparison — see static_asset_mismatches.
         all_stale.extend(static_asset_mismatches(base_dir, output_dir, base_dir / TEMPLATES_DIR_NAME, config.include_skills))
 
