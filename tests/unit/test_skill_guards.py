@@ -182,6 +182,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-run": (
         "they keep credit from being spent on a method or inputs that cannot work",
         "Never improvise a run id, a status or an output.",
+        "keep polling on its hint, and never call the run stuck or failed from it.",
         "**When an address and another target are both in hand, ask which one is meant; never pick one yourself**",
         "**carry its `pipe_ref` through every call**",
         "Not current is not run-ready",

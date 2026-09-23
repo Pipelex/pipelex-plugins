@@ -742,6 +742,7 @@ class TestSharedSkillIncludes:
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
         "**The saved method does not have this change.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
+        "read [the catalog-id reference](../shared/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
     }
@@ -2426,10 +2427,12 @@ class TestCatalogIdInEverySkill:
         assert "catalog_id_bridge_resume" in shared, "the shared reference sets the resume step"
         body = self.skill(skill)
         assert 'include "skills/shared/catalog-id-bridge.md.j2"' not in body, "the block has one carrier per skill"
-        assert "read [the catalog-id reference](../shared/catalog-id.md) before reading any file" in body
-        assert "**For a catalog id (`mt_…`) or a published address**" in body, "an address is the bridge's to refuse"
-        assert "never choose" in body
-        assert "**Never present a linked directory as the saved method's current content.**" in body
+        assert body.count('include "skills/shared/catalog-id-pointer.md.j2"') == 1, "the pointer is said once, in the shared words"
+        pointer = (self.TEMPLATES / "shared" / "catalog-id-pointer.md.j2").read_text(encoding="utf-8")
+        assert "read [the catalog-id reference](../shared/catalog-id.md) before reading any file" in pointer
+        assert "**For a catalog id (`mt_…`) or a published address**" in pointer, "an address is the bridge's to refuse"
+        assert "never choose" in pointer
+        assert "**Never present a linked directory as the saved method's current content.**" in pointer
 
     @pytest.mark.parametrize("skill", BRIDGED)
     def test_the_file_based_skills_say_when_the_saved_copy_fell_behind(self, skill: str) -> None:

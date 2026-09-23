@@ -84,6 +84,7 @@ class TestPipelexRunSkill:
         run reaches only once it is terminal, is never met. The size diet moved it to the step that polls."""
         body = self.render(target_name)
         assert "It is not a slow run." in self.the_step(body, 6)
+        assert "A status marked `degraded` is the last-known one" in self.the_step(body, 6), "a stale read proves nothing"
         assert "RUNNING" not in self.the_step(body, 8)
         assert "RUNNING" not in self.reference("failed-run.md")
 

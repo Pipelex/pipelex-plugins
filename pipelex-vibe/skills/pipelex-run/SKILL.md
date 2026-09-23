@@ -59,7 +59,7 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run that stays `RUNNING` with no error and no progress: say what it is, a workflow task that failed out of sight. It is not a slow run.
+`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run that stays `RUNNING` with no error and no progress: say what it is, a workflow task that failed out of sight. It is not a slow run. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the files
 

@@ -66,7 +66,7 @@ class TestPipelexOrganizeSkill:
         assert body.count("except anything under a `runs/` directory") == 1
         assert "none under a `runs/` directory" not in body
         assert "outside `runs/`" not in body
-        assert "validate the bundle once more, gathered as in step 1" in body
+        assert "validate the bundle once more, gathered as in Step 1" in body
         assert "never one under a `runs/` directory" in body
 
     @pytest.mark.parametrize("target_name", TARGETS)

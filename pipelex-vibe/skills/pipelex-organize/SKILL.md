@@ -50,7 +50,7 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 
 1. Write every file of the new layout; a new file may reuse an old file's name.
 2. Delete every `.mthds` file that is not part of the new layout. **Delete only `.mthds` files, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
-3. **Confirm on disk**: validate the bundle once more, gathered as in step 1, since the hook may have reformatted what was written.
+3. **Confirm on disk**: validate the bundle once more, gathered as in Step 1, since the hook may have reformatted what was written.
 4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` or a verdict that differs from the baseline, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
