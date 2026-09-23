@@ -47,7 +47,7 @@ One line before the call: the target, the pipe, where the inputs came from, and 
 
 > Running `summarize_pdf` (main pipe `summarize`) from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
-**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**: a `files` submission carries `.mthds` only, linked or not, so a function the hosted plane has not already registered cannot resolve, and a saved method run by its id alone, through `/pipelex-catalog`, is what carries it.
+**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**: a `files` submission carries `.mthds` only, linked or not, so a function the hosted plane has not already registered cannot resolve, and what carries it is a method saved through `/pipelex-catalog` and run here by its id alone.
 
 The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.**
 
