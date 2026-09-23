@@ -966,7 +966,7 @@ class TestPipelexRunSkill:
         failed out of sight, not a slow run — the distinction cost a project hours."""
         body = self.run_skill
         assert "a workflow task that failed out of sight" in body
-        assert "It is not a slow run" in body
+        assert "not a slow run" in body
 
     def test_it_prepares_nothing_and_routes_instead(self) -> None:
         body = self.run_skill

@@ -61,6 +61,8 @@ One line before the call: the target, the pipe, where the inputs came from, and 
 
 > Running `summarize_pdf` (main pipe `summarize`) from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
+**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**: a `files` submission carries `.mthds` only, linked or not, so a function the hosted plane has not already registered cannot resolve, and a saved method run by its id alone, through `/pipelex-catalog`, is what carries it.
+
 The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.**
 
 ### 5. `mthds_run`, and the run id first
@@ -73,7 +75,7 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run that stays `RUNNING` with no error and no progress: say what it is, a workflow task that failed out of sight. It is not a slow run. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
+`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error, long past what its pipes could take, measured from `created_at`, is most likely a workflow task that failed out of sight and not a slow run: say so with the run id and the elapsed time, and leave the user the id to follow it by. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the files
 

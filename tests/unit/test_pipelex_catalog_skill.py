@@ -74,6 +74,7 @@ class TestPipelexCatalogSkillShape:
         reference = self.reference("unknown-id.md")
         assert "`mthds_save_method` or a pull's `mthds_get_method`" in reference.splitlines()[2]
         assert "**A pull has no link to judge.**" in reference
+        assert "An empty stored source answers at the same location and is not a miss" in reference
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_each_branch_keeps_its_guard_at_the_pointer(self, target_name: str) -> None:
