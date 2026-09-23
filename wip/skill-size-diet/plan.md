@@ -84,6 +84,11 @@ Waiting on this phase, to land afterwards in the new shape: `L-260913-3784bb`, `
 
 The first skill in the new shape. Before inputs and design repeat it, read the result against the design: whether the classification held, whether any moved caveat was missed in a smoke session, and whether box B's shape needs a correction. Record what changed.
 
+- **Landed** in `pipelex-plugins#53` as `ee7abfe`, on `dev`; no release carries it yet.
+- **The classification held in its placements, and leaked in its qualifiers.** Every sentence went where its row said, and no smoke session met a caveat that had moved out of its reach. But the rewrite shortened sentences as it placed them, and a shortened guard lost conditions its row never recorded dropping: the interrupted run's "the tree's artifacts are the target's", the signature's "when the verdict carries it", the destination's "by default", the launch directory itself passing containment, the unrunnable method's own remedy, the bundle's destination on TypeScript, and a blanket "never regenerate" where the old text scoped it to its rows. None was a placement error, so no smoke session could see it; the two review rounds found them all by comparing the new sentence with the old. **The correction for inputs and design**: a classification row quotes every condition, qualifier and remedy of the sentence it classifies, and the rewrite is read against those quotes before the first review, not after.
+- **No moved caveat was missed in a smoke session** ([`smoke-integrate.md`](smoke-integrate.md)): each branch reference was read on its branch and none on the main path.
+- **Box B's shape needs no correction, but its budget does.** The shape fitted: a main path of short imperatives, a stop table, references pointed at their conditions. The margin did not: after the review's fixes the Claude render sits 52 characters under the ceiling, so every bug waiting on this phase lands in a reference or pays for itself in `SKILL.md`. For inputs and design the target is to finish the rewrite well under the ceiling — about 12,000 characters — so the review's restorations have room.
+
 ## Phase 3 — `pipelex-inputs` · `L-260923-e7a655`
 
 - [ ] `classification-inputs.md`.
