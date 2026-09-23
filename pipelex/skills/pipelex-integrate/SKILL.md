@@ -36,7 +36,7 @@ Automatic unless the user asks to be walked through it, which confirms dependenc
 - **Never generate from one source and run from another**: the call site runs the selector the sidecar records.
 - **A project that owns a codegen harness keeps it**: never a second generated layout beside its own.
 - **A `method_ref` is recorded exactly as it was passed, an absent tag included**, in a sidecar or a harness's manifest.
-- **No `dropWireNulls` / `wireOutput` helper**: it is lossy, and the schemas parse `null`s already.
+- **No `dropWireNulls` / `wireOutput` helper**.
 
 ## Process
 
@@ -60,7 +60,7 @@ Before step 2, read your branch: a `codegen` script or Makefile target, or a `so
 
 ### 3. The signature
 
-Type and run the call site against the verdict's **`main_pipe`**, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain, since a namespaced one fails only on a real run.
+Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain, since a namespaced one fails only on a real run.
 
 No `main_pipe` (a workshop at `@pipelex/mcp` 0.13.0 or earlier, for one) → read [references/signature-fallback.md](references/signature-fallback.md) before step 4.
 
@@ -74,7 +74,7 @@ State the target, the destination and the generator in one line. The target foll
 | `pyproject.toml`, no `pipelex` dependency | `python-pydantic` |
 | a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |
 
-The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/`, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
+The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/` by default, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
 
 ### 5. Tooling exclusions
 

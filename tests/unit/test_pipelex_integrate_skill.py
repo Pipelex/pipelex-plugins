@@ -298,7 +298,7 @@ class TestPipelexIntegrateSkill:
     def test_signature_comes_from_the_verdict_and_the_heuristic_is_absent(self) -> None:
         body = self.integrate
         fallback = self.reference("signature-fallback.md")
-        assert "Type and run the call site against the verdict's **`main_pipe`**, never a signature derived from the source." in body
+        assert "Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source." in body
         # Why `main_pipe` — for a published package, its `METHODS.toml` entry — is a maintainer's reason.
         assert "which is why the call site is typed and run against `main_pipe.pipe_ref`" in self.decisions
         # The skill keeps the condition, the pointer at it, and the stop a model must not talk its way past.

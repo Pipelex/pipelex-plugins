@@ -14,6 +14,7 @@ Companion to `/pipelex-integrate` for a project that has a `package.json`. Every
 | **Type checker still covers the tree** | `tsconfig.json` `include` / `exclude` — the generated directory must stay inside `include` and outside `exclude` | an exclusion that would drop it is **not** added; the report says the typecheck is the check that covers generated code |
 | **Aggregate gate** | `package.json` `scripts.check` / `ci` / `validate` / `verify`; a Makefile `check` target; a `.github/workflows/*.yml` job with a lint or test step; `.pre-commit-config.yaml` | none: the `codegen:check` script alone, and a sentence in the report saying where to call it |
 | **Call-site location** | the project's existing service / action / client layer (`src/actions/`, `src/services/`, `src/lib/`, `src/server/`) → beside it | `src/pipelex/` |
+| **Bundle location** | a bundle already in the project stays where it is; one from outside is copied to `methods/<name>/` at the project root, the directory the call-site template's `BUNDLE_DIR` reads, and the user told | ask |
 | **Not gitignored** | the generated root and `sources.json` must be committable | a `.gitignore` pattern that swallows them is reported and un-ignored on confirmation |
 | **Owns a codegen harness** | `scripts.codegen` in `package.json`; `sources.json` with a `derived` map; `docs/codegen.md`; `make add-method` | the skill's harness branch, entered at step 1, which decides whether the script is a Pipelex harness at all; then the harness section below |
 
