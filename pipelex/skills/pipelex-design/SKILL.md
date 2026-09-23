@@ -47,7 +47,7 @@ Fix the **input concept(s)**, the **output concept** and the **description**, pr
 **Never ask the user to choose the workflow.**
 
 - **Direct** when the complete graph can be authored without placeholders or speculative contracts: the graph is one concrete operator; or one top-level controller whose children are concrete leaf operators; no child is a controller unless the whole nested graph and every contract is fixed and a direct layout is still clearly safer; every branch, iteration, mapping and intermediate owner is decided; every concept shape can be fixed from its consumers; every pipe can be concrete in the first coherent artifact. One controller is a strong fast-path signal, not a rule. Pipe count is secondary: cross-branch concept dependencies, uncertain ownership, or unresolved child contracts make even a lone controller stepwise.
-- **Stepwise** otherwise, for a large graph that benefits from independently valid review checkpoints, or on an explicit request for a scaffold, partial design, staged work, or a resumable intermediate result: read [stepwise.md](references/stepwise.md) before writing any file.
+- **Stepwise** otherwise, and even where direct holds, for a large graph that benefits from independently valid review checkpoints or on an explicit request for a scaffold, partial design, staged work, or a resumable intermediate result: read [stepwise.md](references/stepwise.md) before writing any file.
 
 When borderline, take the simplest path that can be written **completely** and validated confidently.
 
@@ -63,9 +63,9 @@ Branch on the **structured verdict** from its Markdown summary, never on transpo
 
 ### 6. The runnable gate and delivery
 
-Re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. Then:
+For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
 
-1. **Organize only when the layout needs it.** A direct result that is already coherent skips `/pipelex-organize`; a converged stepwise construction or signature-driven re-entry normally invokes it; a naturally coherent result in either mode never takes the round trip for process compliance alone.
+1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
 3. **Present the flow**: the interactive method graph where the host rendered it, else a concise text flow.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
@@ -78,7 +78,7 @@ Re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, 
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** Then read [re-entry.md](references/re-entry.md) before editing any file, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise restore at least the baseline verdict and deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 

@@ -66,7 +66,7 @@ class TestPipelexDesignSkill:
             "- **Stepwise** otherwise": ("references/stepwise.md",),
             "**If the design would need a placeholder": ("references/stepwise.md",),
             "**For a catalog id (`mt_…`) or a published address**": ("../shared/catalog-id.md",),
-            "Then read [re-entry.md]": ("references/re-entry.md", "references/stepwise.md"),
+            "Then read [re-entry.md]": ("references/re-entry.md", "references/writing-mthds.md", "references/stepwise.md"),
         }
         for decision, targets in at_the_decision.items():
             line = self.the_line(body, decision)
@@ -76,6 +76,36 @@ class TestPipelexDesignSkill:
         index = body.split("## References", 1)[1]
         for name in self.SHIPPED:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_runnable_gate_holds_for_a_completed_method_only(self, target_name: str) -> None:
+        """A re-entry on a deliberately partial scaffold is delivered at its baseline verdict: a gate that asked
+        every ending for a runnable verdict would drive it to expand signatures nobody asked for, or loop."""
+        body = self.render(target_name)
+        gate = self.the_line(body, "this verdict is the runnable gate")
+        assert gate.startswith("For a completed method, "), f"{target_name}: the runnable gate has lost its condition: {gate!r}"
+        assert "A re-entry restores at least its baseline verdict instead." in gate
+        assert self.the_line(body, "**The baseline, before every edit**").endswith("otherwise deliver as step 6 says.")
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_re_entry_references_are_read_before_any_repair(self, target_name: str) -> None:
+        """Repairing a broken baseline edits the bundle, so the references a re-entry reads before editing, the
+        authoring reference among them, are pointed at before the repair is asked for."""
+        line = self.the_line(self.render(target_name), "**The baseline, before every edit**")
+        assert line.index("Then read [re-entry.md]") < line.index("repair it first"), f"{target_name}: {line!r}"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_two_stepwise_signals_win_over_direct(self, target_name: str) -> None:
+        """A large graph wanting checkpoints and an explicit request for a scaffold are not complements of the
+        direct criteria, so they must choose stepwise even when every direct criterion holds."""
+        line = self.the_line(self.render(target_name), "- **Stepwise** otherwise")
+        assert line.startswith("- **Stepwise** otherwise, and even where direct holds, "), f"{target_name}: {line!r}"
+
+    def test_an_early_stop_still_gives_the_delivery_notices(self) -> None:
+        """A stepwise scaffold stopped early never reaches step 6, where the stale-types check and the saved-copy
+        notice live, yet it changed files; the reference sends it back to both."""
+        early = self.reference("stepwise.md").split("## Stopping early", 1)[1].split("\n## ", 1)[0]
+        assert "stale-types check" in early and "saved-copy notice" in early
 
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one

@@ -52,7 +52,7 @@ The new file bounds the ordinary fix:
 
 ## Stopping early
 
-Early stopping exists only in stepwise mode. When the user requested a partial scaffold or interrupts before convergence, confirm `is_valid: true`, report the exact pending-signature backlog, and explain that resuming means expanding those signatures. Do not claim it is runnable and do not auto-organize it; offer `/pipelex-organize` only if the user wants the valid scaffold regrouped.
+Early stopping exists only in stepwise mode. When the user requested a partial scaffold or interrupts before convergence, confirm `is_valid: true`, report the exact pending-signature backlog, and explain that resuming means expanding those signatures. Do not claim it is runnable and do not auto-organize it; offer `/pipelex-organize` only if the user wants the valid scaffold regrouped. Then run the skill's stale-types check, the last item of step 6, and give the saved-copy notice after it: a scaffold changed files as much as a runnable result does.
 
 ## The rules of this mode
 

@@ -152,6 +152,17 @@ The rewrite was compressed until it fitted, and then read against every quote ab
 - "It must be structured if any consumer field-reads it" (line 74), where "must" and "consumer" had dropped out.
 - "A naturally coherent result in either mode does not take an organization round trip solely for process compliance" (line 208), which had shrunk to a qualifier of the stepwise case alone.
 
+## What the first review round restored
+
+The review read the draft against the old skill and found four conditions the read above had missed. Each is back at the destination its row names, and `tests/unit/test_pipelex_design_skill.py` pins it.
+
+- "For a completed method" (line 204), the runnable gate's condition. Without it a re-entry on a deliberately partial scaffold was told to fix until the method was runnable. Step 6 now says a re-entry restores at least its baseline verdict instead.
+- The two stepwise signals that are not complements of the direct criteria (lines 113–119) choose stepwise even where the direct criteria hold. "Stepwise otherwise" had made them read as the complement.
+- The authoring reference, "the syntax source of truth" (line 33), is pointed at from the re-entry line as well as from step 1. The old skill named it for both paths at its head.
+- The re-entry references are pointed at before the baseline repair, which edits the bundle, and not after it.
+
+A fifth change is new: a stepwise scaffold stopped early never reaches step 6, so `references/stepwise.md` sends it back to the stale-types check and the saved-copy notice that step 6 now carries for every run.
+
 ## What the rewrite adds
 
 Nothing a reviewer should read as new behaviour beyond the changes above: the pointers at each decision point, the "Guards" and "Stops" headings of box B's shape, the bridge's two guards stated at the pointer, the stop table's rows (each an arm the old text handled inline), and, in each new reference, an opening sentence naming the condition that sends the model there and a sentence naming the skill's guards rather than restating them.

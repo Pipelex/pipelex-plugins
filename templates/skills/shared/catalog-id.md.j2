@@ -16,7 +16,7 @@
    still include the block inline until phase 6 switches them. -#}
 # A catalog id or a published address as the target
 
-Read this when a skill that works on files is given a registered method's catalog id (`mt_…`) or a published method's address as its target, before reading or writing any file, and then go back to the step that sent you here. Below, "this skill" is the skill that sent you here and "this one" its `SKILL.md`, and that skill's guards hold throughout.
+Read this when a skill that works on files is given a registered method's catalog id (`mt_…`) or a published method's address as its target, before reading or writing any file, and then return to the skill that sent you here and continue just after its pointer to this file. Below, "this skill" is the skill that sent you here and "this one" its `SKILL.md`, and that skill's guards hold throughout.
 
-{% set catalog_id_bridge_resume %}**the step that sent you here**{% endset -%}
+{% set catalog_id_bridge_resume %}**the skill that sent you here, just after its pointer to this file**{% endset -%}
 {% include "skills/shared/catalog-id-bridge.md.j2" %}

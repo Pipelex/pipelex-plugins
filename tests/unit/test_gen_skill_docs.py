@@ -1436,7 +1436,7 @@ class TestAdaptiveDesignSkill:
         assert "the graph is one concrete operator; or one top-level controller whose children are concrete leaf operators" in body
         assert "every pipe can be concrete in the first coherent artifact" in body
         assert "Include **no temporary `PipeSignature` declarations**" in body
-        assert "A direct result that is already coherent skips `/pipelex-organize`" in body
+        assert "a result already coherent in either mode skips it" in body
 
     def test_controller_count_is_not_a_hard_threshold(self) -> None:
         body = self.design
@@ -2407,6 +2407,11 @@ class TestCatalogIdInEverySkill:
             f"{target_name}: the shared reference opens with its entry condition"
         )
         assert "pipelex-design" not in shared, f"{target_name}: the shared reference names no skill, so edit and organize can point at it unchanged"
+        # The skill that points here sends the model with a pointer, not a numbered step, so "the step that sent
+        # you here" could resolve to the pointer itself and send the model back to this file.
+        assert "go to **the skill that sent you here, just after its pointer to this file**" in shared, (
+            f"{target_name}: the shared reference does not say where to continue"
+        )
 
     def test_the_bridge_never_picks_between_two_linked_directories(self) -> None:
         """`/pipelex-catalog`'s conflict path deliberately creates a second
