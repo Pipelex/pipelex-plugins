@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Mistral Vibe loads `pipelex-design` and `pipelex-scaffold`**: both descriptions carried a `: ` that strict YAML reads as a second key, so Vibe, which parses a skill's frontmatter strictly, dropped the two skills with nothing but a warning in its log. The descriptions are reworded, and `make check` now parses every rendered skill's frontmatter as strict YAML and fails one that does not parse, or whose `name` is not its directory.
+
 ## [0.7.0] - 2026-09-23
 
 ### Added
