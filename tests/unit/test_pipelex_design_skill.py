@@ -107,6 +107,12 @@ class TestPipelexDesignSkill:
         early = self.reference("stepwise.md").split("## Stopping early", 1)[1].split("\n## ", 1)[0]
         assert "stale-types check" in early and "saved-copy notice" in early
 
+    def test_a_signature_driven_re_entry_reads_the_stepwise_reference_first(self) -> None:
+        """The skill points at the stepwise reference before `re-entry.md` chooses the mode, so the scaffold's
+        section says in words to have read it: its rules govern the scaffold and every refinement."""
+        scaffold = self.reference("re-entry.md").split("## 3. ", 1)[1].split("\n## ", 1)[0]
+        assert "only after reading the stepwise reference the skill points at for this branch" in scaffold
+
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one
         ships as literal braces; and each opens by naming the condition that sends the model to it."""
@@ -118,9 +124,10 @@ class TestPipelexDesignSkill:
 
     def test_a_reference_never_sends_the_model_to_another(self) -> None:
         """References are one level deep: one read is enough to take a branch. A reference may name the skill's
-        steps and guards and the authoring reference the skill reads before writing, in words, but never
-        another reference by its file, and it links nothing but the shared files. A signature-driven re-entry
-        needs both branch references, so the skill points at both from the same line."""
+        steps and guards, the authoring reference the skill reads before writing, and the stepwise reference a
+        signature-driven re-entry reads, in words, but never another reference by its file, and it links nothing
+        but the shared files. A signature-driven re-entry needs both branch references, so the skill points at
+        both from the same line, and `re-entry.md` names the stepwise one in words where that mode is taken."""
         for name in self.BRANCH_REFERENCES:
             text = self.reference(name)
             for other in self.SHIPPED:

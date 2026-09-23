@@ -1,6 +1,6 @@
 # A catalog id or a published address as the target
 
-Read this when a skill that works on files is given a registered method's catalog id (`mt_…`) or a published method's address as its target, before reading or writing any file, and then return to the skill that sent you here and continue just after its pointer to this file. Below, "this skill" is the skill that sent you here and "this one" its `SKILL.md`, and that skill's guards hold throughout.
+Read this when a skill that works on files is given a registered method's catalog id (`mt_…`) or a published method's address as its target, before reading or writing any file. Once a catalog id resolves to a directory, return to the skill that sent you here and continue just after its pointer to this file; a published address is the end of that skill's work, as the last paragraph says. Below, "this skill" is the skill that sent you here and "this one" its `SKILL.md`, and that skill's guards hold throughout.
 
 This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
 

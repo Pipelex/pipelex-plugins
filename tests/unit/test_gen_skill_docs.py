@@ -2412,6 +2412,11 @@ class TestCatalogIdInEverySkill:
         assert "go to **the skill that sent you here, just after its pointer to this file**" in shared, (
             f"{target_name}: the shared reference does not say where to continue"
         )
+        # A published address is refused here, so the return to the sending skill is conditional on an id that
+        # resolved; an unconditional one would carry the skill into its file-based flow with no directory.
+        opening = shared.split("\n\n")[1]
+        assert "Once a catalog id resolves to a directory, return to the skill that sent you here" in opening
+        assert "a published address is the end of that skill's work" in opening
 
     def test_the_bridge_never_picks_between_two_linked_directories(self) -> None:
         """`/pipelex-catalog`'s conflict path deliberately creates a second

@@ -15,7 +15,7 @@ Read this when the request is a structural or contract change to an existing met
 
 ## 3. Build a reachable re-entry scaffold atomically
 
-For a signature-driven re-entry:
+For a signature-driven re-entry, and only after reading the stepwise reference the skill points at for this branch, whose naming rules, one-definition-per-file rule and failure procedure govern the scaffold and every refinement:
 
 - Keep or coherently edit the smallest unaffected concrete ancestor whose wiring reaches the affected region; it is the scaffold anchor.
 - Replace only the directly affected concrete children reachable from that anchor with signatures, and remove their old concrete definitions before validating. A signature left beside its old concrete is already satisfied and is not a backlog item.
