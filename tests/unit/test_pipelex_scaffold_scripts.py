@@ -207,6 +207,20 @@ class TestCommitPristine:
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\ndist/\n.env\n"
         assert (project / ".env").is_file() and (project / "node_modules" / "x" / "i.js").is_file(), "unstaging removed a file"
 
+    def test_a_staged_file_rewritten_since_is_unstaged_too(self, tmp_path: Path) -> None:
+        """`npm install` rewrites `node_modules/.package-lock.json` after an initializer staged it, and
+        `git rm --cached` refuses a path whose staged content matches neither HEAD nor the file."""
+        project = _repository(tmp_path / "svc")
+        (project / "node_modules").mkdir()
+        (project / "node_modules" / ".package-lock.json").write_text('{"lockfileVersion": 3}\n', encoding="utf-8")
+        (project / "package.json").write_text("{}\n", encoding="utf-8")
+        _git(project, "add", "-A")
+        (project / "node_modules" / ".package-lock.json").write_text('{"lockfileVersion": 3, "packages": {}}\n', encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "package.json"]
+        assert (project / "node_modules" / ".package-lock.json").read_text(encoding="utf-8") == '{"lockfileVersion": 3, "packages": {}}\n'
+
     def test_an_env_file_the_user_committed_stays_tracked(self, tmp_path: Path) -> None:
         """Only what the index holds and HEAD does not is unstaged: a path the user committed is theirs,
         and `write-env-file.sh` then refuses to put a key into it."""

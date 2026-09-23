@@ -46,11 +46,12 @@ fi
 # An ignore rule reaches only untracked paths, so a `.env` or a node_modules/ an initializer had
 # already staged would ride into the commit past the lines written below. Unstage what the index
 # holds of either and HEAD does not, before those lines are read: a path the user committed is
-# theirs, and stays tracked.
+# theirs, and stays tracked. `-f` because a file rewritten since it was staged, as `npm install`
+# rewrites node_modules/.package-lock.json, is otherwise refused; `--cached` leaves the file itself.
 for staged_early in .env node_modules; do
   [ -n "$(git -C "$dir" ls-files --cached -- "$staged_early")" ] || continue
   git -C "$dir" rev-parse -q --verify "HEAD:$staged_early" > /dev/null 2>&1 && continue
-  error=$(git -C "$dir" rm -r -q --cached -- "$staged_early" 2>&1) || refuse stage-failed "$error"
+  error=$(git -C "$dir" rm -r -q -f --cached -- "$staged_early" 2>&1) || refuse stage-failed "$error"
 done
 
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the

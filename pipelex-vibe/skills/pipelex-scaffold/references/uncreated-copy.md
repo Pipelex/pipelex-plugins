@@ -4,17 +4,17 @@ Read this when a copy of the method-app template stands and has not been made th
 
 ## After the initializer
 
-The copy and its pristine commit stand, so go straight to [Run `make create`](#run-make-create), with the values the verdict's `next:` line spells.
+The copy stands, with its pristine commit unless the `git:` line said it sits in another repository's work tree, where the initializer made neither a repository nor a commit. Either way, go straight to [Run `make create`](#run-make-create), with the values the verdict's `next:` line spells.
 
 - **`copied` after `--dry-run`**, in interactive mode: first show the user the identity and the plan `make create` printed, with its warnings. They are in the log whose path the initializer printed, under `--quiet`. A license holder the user gives now goes into the real run as `LICENSE_HOLDER='…'`. The dry run was not free: it installed the dependencies, which write `node_modules/` and let the template's husky point the repository's `core.hooksPath` at the project's hooks.
-- **`copied` after `--no-create`**, because the shell had no key: the user writes `<dir>/.env.local` themselves, in their own editor — `cp .env.example .env.local`, then the key and the base URL of the plane that issued it. `make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back, and the report says it was kept.
+- **`copied` after `--no-create`**, because the shell had no key: the user writes `<dir>/.env.local` themselves, in their own editor — `cp .env.example .env.local`, then the key and the base URL of the plane that issued it. `make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back, and the report says it was kept and names its plane only from a `PIPELEX_BASE_URL` the shell exports, never production by default: the file may name another plane, and reading it is not allowed.
 - **`failed: create`**: the end of the log the initializer named says which of two cases it is.
   - **A refusal before `make create` wrote anything** changed no tracked file, so it can run again; the dependencies it installed stay, and the next run skips that install. Relay the message, supply a value it asks for from the conversation or by asking the user once, and run it again. A refusal naming a capability the API does not serve means the plane it ran against does not serve what codegen needs yet: say so, point at the template README's line on which plane does, and stop there.
   - **A failure after the scaffold** cannot be undone by running `make create` again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off, but for the one cause below.
 
 **A cause the harness's own sandbox imposes is the user's to lift, never yours to work around**, in either case: a denied `ps`, which the template's tests and `make serve` both need, or an npm cache the sandbox will not let npm write. Nothing in the copy fixes it. Name it, say that the user lifts the sandbox or runs the steps the failure named, then `make serve`, in a terminal of their own, and stop.
 
-**A copy the user stands in is one of these when its own repository already holds the pristine commit**, whose subject opens `Start from Pipelex/pipelex-method-apps/webapp-js`, as the one this file makes by hand does too. Read it before anything else, since the user seldom says who made the copy. This prints the commit, and prints nothing for a copy that is not its own repository's root or holds no such commit, which is [a copy the initializer did not make](#a-copy-the-initializer-did-not-make):
+**A copy the user stands in is one of these when its own repository already holds the pristine commit**, whose subject opens `Start from Pipelex/pipelex-method-apps/webapp-js`, as the one this file makes by hand does too. Read it before anything else, since the user seldom says who made the copy. This prints the commit, and prints nothing for a copy that is not its own repository's root or holds no such commit, which is [a copy with no pristine commit](#a-copy-with-no-pristine-commit), whether a hand made it or the initializer left it inside another repository's work tree:
 
 ```bash
 [ -z "$(git -C <dir> rev-parse --show-cdup 2>/dev/null || echo outside)" ] &&
@@ -23,9 +23,9 @@ The copy and its pristine commit stand, so go straight to [Run `make create`](#r
 
 A commit it prints is the pristine one, and the report names it as found; go straight to [Run `make create`](#run-make-create), with the method the user gave.
 
-## A copy the initializer did not make
+## A copy with no pristine commit
 
-A copy made by hand is often made without git, and it may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-method-apps`, so git places its checkout inside the family repository, where it passes every other test. Read git before initializing anything. One command tells the cases apart, and initializes only a copy that no repository tracks:
+A copy made by hand is often made without git, and any copy may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-method-apps`, so git places its checkout inside the family repository, where it passes every other test. Read git before initializing anything. One command tells the cases apart, and initializes only a copy that no repository tracks:
 
 ```bash
 case "$(git -C <dir> remote get-url origin 2>/dev/null)" in
@@ -37,13 +37,13 @@ case "$prefix" in
   "") ;;
   outside) git -C <dir> init -b main ;;
   *) if git -C <dir> ls-files -- . | grep -q .; then echo "an enclosing repository already tracks this directory" >&2; exit 1; fi
-     git -C <dir> init -b main ;;
+     echo "inside another repository's work tree: no repository and no commit of its own" ;;
 esac
 ```
 
-The `origin` it reads belongs to whichever repository holds the directory, and it is read before anything is initialized, so a template's own checkout stops here, the skill's template-checkout stop, whether the directory is its repository's root or a directory inside it. `--show-prefix` prints nothing when the directory is its repository's root, which needs no path comparison and so survives symlinks and letter case. **A directory another repository already tracks is not a fresh copy**, whoever owns that repository, a fork of the family under another name included: stop and ask the user what they meant, rather than planting a second repository inside theirs. A copy that nothing tracks gets a repository of its own, whether it stands alone or sits untracked inside the user's repository.
+The `origin` it reads belongs to whichever repository holds the directory, and it is read before anything is initialized, so a template's own checkout stops here, the skill's template-checkout stop, whether the directory is its repository's root or a directory inside it. `--show-prefix` prints nothing when the directory is its repository's root, which needs no path comparison and so survives symlinks and letter case. **A directory another repository already tracks is not a fresh copy**, whoever owns that repository, a fork of the family under another name included: stop and ask the user what they meant: a copy they committed there themselves goes on to [Run `make create`](#run-make-create) with no commit of yours, and anything else stops. A copy outside every repository gets one of its own. **A copy that sits untracked inside another repository's work tree gets no repository and no commit**, just as the initializer gives it none, because a second repository planted inside the user's is what the family refuses: go straight to [Run `make create`](#run-make-create), whose changes the user reviews there as new files.
 
-When that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make the pristine commit before `make create`, because the gesture's changes are reviewable only against it. The directory is the user's, so this commit confirms in every mode: show `git -C <dir> status --short` and say what it will land on. `<version>` is the copy's `package.json` version, the family's:
+When the copy is its own repository's root and that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make the pristine commit before `make create`, because the gesture's changes are reviewable only against it. The directory is the user's, so this commit confirms in every mode: show `git -C <dir> status --short` and say what it will land on. `<version>` is the copy's `package.json` version, the family's:
 
 ```bash
 git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version>" -- .
@@ -66,4 +66,4 @@ echo "its warnings:"; grep -E '^(warning: |! )' "$log" | LC_ALL=C sort -u | grep
 
 **The gesture's warnings are read from the whole log, not from its tail.** `make create` prints its own warnings as `! …` and the bootstrap's as `warning: …`, all before `make all`, whose output fills the tail, and it runs the bootstrap twice, so the block's last line lists each distinct warning once. Every one goes into the report with what answers it. An MIT project whose user named no copyright holder always gets `warning: LICENSE copyright line left untouched — pass --license-holder to claim it.`: the project's `LICENSE` still names the template's copyright holder, and since the gesture refuses a project it has already made, the answer is now an edit of that line, by the user, or by you with the holder they name.
 
-A non-zero exit is one of the two cases under [After the initializer](#after-the-initializer), and `make serve` waits until it is fixed. On `0`, go on to `make serve`. The report is the method app's, and its git outcome is the pristine commit you made or found.
+A non-zero exit is one of the two cases under [After the initializer](#after-the-initializer), and `make serve` waits until it is fixed. On `0`, go on to `make serve`. The report is the method app's, and its git outcome is the pristine commit you made or found, or no commit for a copy inside another repository's work tree.

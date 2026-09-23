@@ -274,6 +274,8 @@ class TestPipelexScaffoldSkill:
             assert "| A script says `refused:` |" in body
             for verdict in ("`usage`", "`no-directory`", "`not-a-repository`"):
                 assert verdict in body, f"the stop table has no reading of {verdict}"
+            # The script prints no git message for it: the initializer is re-run, not the user sent to fix git.
+            assert "`nothing-to-commit`: the initializer wrote nothing in `<dir>`; read its output and rerun it" in body
             assert "`committed:` names it and lists the staged paths" in body
             assert "`kept:` names the commit the initializer made itself" in body
             assert "the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL" in body
@@ -336,6 +338,9 @@ class TestPipelexScaffoldSkill:
         assert "**state the exact command and confirm before running it**" in github
         assert "gh repo create <owner>/<name> --private --source <dir> --remote origin" in github
         assert "--template" in github and "--template Pipelex/" not in github
+        # `gh` refuses a directory inside another work tree and hints at the nested `git init` the family refuses.
+        assert "**A method app inside another repository's work tree has neither a repository nor a pristine commit of its own**" in github
+        assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
         # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
@@ -468,6 +473,9 @@ class TestMethodAppBranch:
                 assert verdict in table, f"the stop table has no row for {verdict}"
             assert "| any other `refused:`, `failed: write` or `failed: commit` |" in table
             assert "| any other `make serve` verdict |" in table
+            # A server the user started from the copy is left running by `make serve`, and its verdict says so.
+            assert "when it says the server was stopped, read `<dir>/.serve/server.log`'s tail" in table
+            assert "one still running is the user's to stop" in table
             # `copied` is what --dry-run and --no-create print, and it leads to the uncreated copy.
             assert "`copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md)" in body
             for verdict in SERVE_VERDICTS:
@@ -584,6 +592,8 @@ class TestUncreatedCopyReference:
         assert "cannot be undone by running `make create` again" in reference
         # The key reaches the gesture from the shell or a file the user wrote, and is never read back.
         assert "`make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back" in reference
+        # The report's plane rule falls back to production, which a file the user wrote may contradict.
+        assert "names its plane only from a `PIPELEX_BASE_URL` the shell exports, never production by default" in reference
 
     def test_the_fresh_copy_is_recognized_before_git_is_initialized_in_it(self) -> None:
         """The method app's own checkout sits inside the family repository.
@@ -597,8 +607,11 @@ class TestUncreatedCopyReference:
         block = _recipe(reference, OWN_REPOSITORY_MARKER)
         # The origin is read, and a tracked directory refused, before any repository is made.
         assert block.index("remote get-url origin") < block.index("init -b main")
-        assert block.index("ls-files -- . | grep -q .") < block.rindex("init -b main")
         assert "*/Pipelex/pipelex-method-apps*|*:Pipelex/pipelex-method-apps*" in block
+        # Only a copy outside every repository gets one: the family plants no repository inside another.
+        assert block.count("init -b main") == 1
+        assert "outside) git -C <dir> init -b main ;;" in block
+        assert "**A copy that sits untracked inside another repository's work tree gets no repository and no commit**" in reference
         # The first commit is looked for only once the copy is its own repository.
         assert reference.index(OWN_REPOSITORY_MARKER) < reference.index("git -C <dir> rev-parse -q --verify HEAD")
 
@@ -683,23 +696,26 @@ class TestUncreatedCopyRecipes:
         assert self._git(target, "symbolic-ref", "--short", "HEAD").strip() == "main"
 
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    def test_a_copy_inside_another_repository_gets_its_own(self, tmp_path: Path, shell: list[str]) -> None:
+    def test_a_copy_inside_another_repository_gets_none_of_its_own(self, tmp_path: Path, shell: list[str]) -> None:
+        """The initializer plants no repository inside another's work tree, so a later session that meets
+        its copy there, after `--no-create` or `failed: create`, plants none either."""
         parent = tmp_path / "monorepo"
         parent.mkdir()
         subprocess.run(["git", "-C", str(parent), "init", "-q", "-b", "trunk"], check=True)
         (parent / "README.md").write_text("theirs\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(parent), "add", "README.md"], check=True)
         _git_commit(parent, "the user's own history")
-        before = (self._git(parent, "log", "--format=%H"), self._git(parent, "status", "--porcelain"))
+        history = self._git(parent, "log", "--format=%H")
         target = parent / "apps" / "receipt-review"
         target.mkdir(parents=True)
         (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
         result = self._own_repository(dir_literal=str(target), shell=shell, cwd=tmp_path)
         assert result.returncode == 0, result.stderr
-        # The copy is a repository of its own, with no commit yet, so the pristine commit is made there.
-        assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(target.resolve())
-        assert subprocess.run(["git", "-C", str(target), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
-        assert self._git(parent, "log", "--format=%H") == before[0]
+        assert result.stdout == "inside another repository's work tree: no repository and no commit of its own\n"
+        assert not (target / ".git").exists()
+        assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(parent.resolve())
+        assert self._git(parent, "log", "--format=%H") == history
+        assert self._git(parent, "diff", "--cached", "--name-only") == ""
 
     @staticmethod
     def _repository_tracking_a_copy(root: Path, origin: str) -> Path:

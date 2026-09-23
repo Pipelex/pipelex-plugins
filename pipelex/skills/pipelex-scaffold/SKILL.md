@@ -42,7 +42,7 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 
 ## Mode
 
-Automatic by default; an explicit signal wins ("just do it", "walk me through"), and an ambiguous branch is one question, asked once. One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's command takes `--dry-run` first, so the user sees the plan before anything is created from it.
+Automatic by default; an explicit signal wins ("just do it", "walk me through"). One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's command takes `--dry-run` first, so the user sees the plan before anything is created from it.
 
 ## Prerequisites
 
@@ -106,9 +106,9 @@ Two lines close it. **The project's own instructions and skills load in a sessio
 | `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-method-apps` | STOP: that is the template, not a copy |
 | any other `refused:`, `failed: write` or `failed: commit` | the line says what stands and names the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
 | `failed: create` | read the end of the log it named, then [references/uncreated-copy.md](references/uncreated-copy.md); never substitute a base URL the user did not declare |
-| `make serve` says `refused: not-loopback` | report no URL, and say this copy's dev script does not bind the server to this machine |
-| any other `make serve` verdict | relay it; after `failed:` the server was stopped, so read `<dir>/.serve/server.log`'s tail, fix the cause and run `make serve` again |
-| A script says `refused:` | nothing more was written: `usage`, `no-directory` and `not-a-repository` mean a wrong `<dir>` or step 3 before step 2; relay the others with git's message, since a permission, a git identity or a tracked `.env` is the user's to fix |
+| `make serve` says `refused: not-loopback` | report no URL, and relay the cause it names |
+| any other `make serve` verdict | relay it; when it says the server was stopped, read `<dir>/.serve/server.log`'s tail, fix the cause and run `make serve` again; one still running is the user's to stop |
+| A script says `refused:` | `usage`, `no-directory` and `not-a-repository` mean a wrong `<dir>` or step 3 before step 2; `nothing-to-commit`: the initializer wrote nothing in `<dir>`; read its output and rerun it; relay the others with git's message, since a permission, a git identity or a tracked `.env` is the user's to fix |
 
 ## Reference
 
