@@ -1,6 +1,6 @@
 # The venv rung — no `uv` on this machine
 
-Read this at step 2 of the skill when the `uv` preflight fails and prints nothing, which means `uv` is not on `PATH`, before creating or installing anything. It needs `python3` with its `venv` and `pip` modules; when either is missing, or the program below fails, the skill's stop table says what to offer.
+Read this at step 2 of the skill when `uv` is not on `PATH` (its preflight prints nothing, or `command -v uv` finds nothing for a format with no preflight), before creating or installing anything. It needs `python3` with its `venv` and `pip` modules; when either is missing, or the program below fails, the skill's stop table says what to offer.
 
 Create a venv this skill owns, once, fill it with the whole allowlist, and reuse it on every later invocation:
 

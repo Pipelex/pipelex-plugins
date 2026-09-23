@@ -83,8 +83,9 @@ class TestPipelexRunSkill:
         """A run stuck in `RUNNING` never becomes terminal, so a reading placed with the failure routing, which a
         run reaches only once it is terminal, is never met. The size diet moved it to the step that polls."""
         body = self.render(target_name)
-        assert "not a slow run" in self.the_step(body, 6)
-        assert "measured from `created_at`" in self.the_step(body, 6), "stuck is judged from elapsed time, the one signal the status carries"
+        assert "a workflow task that failed out of sight" in self.the_step(body, 6)
+        assert "long after `created_at`" in self.the_step(body, 6), "elapsed time is the one signal the status carries"
+        assert "do not call it failed" in self.the_step(body, 6), "elapsed time alone cannot tell a slow run from a dead one"
         assert "`PipeFunc`, the line says its Python does not travel" in self.the_step(body, 4), "said before credit is spent"
         assert "A status marked `degraded` is the last-known one" in self.the_step(body, 6), "a stale read proves nothing"
         assert "RUNNING" not in self.the_step(body, 8)

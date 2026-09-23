@@ -75,7 +75,7 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error, long past what its pipes could take, measured from `created_at`, is most likely a workflow task that failed out of sight and not a slow run: say so with the run id and the elapsed time, and leave the user the id to follow it by. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
+`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error, long after `created_at`, may be slow or may be a workflow task that failed out of sight, and nothing the status carries tells the two apart: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the files
 
@@ -89,7 +89,7 @@ Give `failure_message` **verbatim** first, then read [failed-run.md](references/
 
 A run id alone, with no method and no inputs: nothing is validated or prepared.
 
-- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take.
+- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's two readings hold here as well: a status marked `degraded` is only last-known, and one still `RUNNING` long after `created_at` may be slow or stuck, which the status cannot tell apart.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
 - **"download the files from run X"** → `mthds_download_artifacts`, as step 7 says; it works days after the run.
 

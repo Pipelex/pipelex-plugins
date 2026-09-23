@@ -324,7 +324,7 @@ class TestRecipes:
 
     def test_preflight_falls_through_quietly_when_uv_is_absent(self, tmp_path: Path) -> None:
         """Rung 1's guard is `command -v uv >/dev/null && …`, and the skill's pointer
-        to the venv rung ("When the preflight prints nothing") depends on that failing
+        to the venv rung ("the preflight prints nothing") depends on that failing
         *silently* so the agent drops to rung 2 instead of reading a shell error as a
         package problem. Needs neither uv nor the network, so it runs everywhere."""
         bash = shutil.which("bash")

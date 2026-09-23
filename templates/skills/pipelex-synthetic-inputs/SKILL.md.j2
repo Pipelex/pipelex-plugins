@@ -51,7 +51,7 @@ command -v uv >/dev/null && uv run --quiet --no-project --with pillow --with mat
 
 On success the runner line is `uv run --quiet --no-project --with <set> python << 'PYEOF'`, exactly as the recipes are written, and the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
 
-**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** When the preflight prints nothing, read [venv.md](references/venv.md) before creating anything: it builds the venv this skill owns under `${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv` and gives the runner line.
+**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** When `uv` is not on `PATH` (the preflight prints nothing, and `command -v uv` finds nothing for a format that has no preflight), read [venv.md](references/venv.md) before creating anything: it builds the venv this skill owns under `${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv` and gives the runner line.
 
 ### Step 3: Draft the content
 

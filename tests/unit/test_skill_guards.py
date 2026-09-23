@@ -193,7 +193,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Say which method it was filed under, and do not let the filing read as the saved method having run.**",
         "**Report that id the moment it returns, before anything else.**",
         "**For an address, give `method_provenance` beside it**",
-        "is most likely a workflow task that failed out of sight and not a slow run",
+        "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**",
         "**report the paths the tool returns**",
         "Give `failure_message` **verbatim** first",

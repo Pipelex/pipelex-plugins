@@ -962,11 +962,12 @@ class TestPipelexRunSkill:
         assert "`failure_message` **verbatim**" in body
 
     def test_a_stuck_run_is_named_rather_than_waited_on(self) -> None:
-        """A durable run sitting in RUNNING with no error is a workflow task that
-        failed out of sight, not a slow run — the distinction cost a project hours."""
+        """A durable run sitting in RUNNING with no error may be a workflow task that
+        failed out of sight — waiting on one cost a project hours — but the status cannot
+        tell it from a slow run, so the skill stops waiting and reports rather than diagnoses."""
         body = self.run_skill
         assert "a workflow task that failed out of sight" in body
-        assert "not a slow run" in body
+        assert "stop waiting" in body
 
     def test_it_prepares_nothing_and_routes_instead(self) -> None:
         body = self.run_skill
@@ -1598,7 +1599,8 @@ class TestSyntheticInputsSkill:
         assert "**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.**" in body
         assert "pipelex-plugins/synth-venv" in body
         # The venv rung is read from its reference when `uv` is absent (the size diet, phase 6).
-        assert "When the preflight prints nothing, read [venv.md](references/venv.md) before creating anything" in body
+        assert "When `uv` is not on `PATH` (the preflight prints nothing, and `command -v uv` finds nothing" in body
+        assert "for a format that has no preflight), read [venv.md](references/venv.md) before creating anything" in body
         venv = (self.REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "references" / "venv.md").read_text(encoding="utf-8")
         assert "the runner line becomes `\"$VENV/bin/python\" << 'PYEOF'`" in venv
         assert "That substitution is the only difference between the rungs" in venv

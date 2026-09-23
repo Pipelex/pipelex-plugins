@@ -89,7 +89,7 @@ Output: final_output
 | a **local bundle** does not validate | explain it anyway from the source, say what the verdict was, and route a fix to `/pipelex-edit` or `/pipelex-design` |
 | a **catalog id** does not validate | explain it from the source read above with `validation_errors[]` beside it, and say the fix is not on this disk |
 | a published **address** does not validate | report `validation_errors[]` and stop: there is no source to explain, and the fix is upstream |
-| the verdict carries no `main_pipe` | say so, and which cause the tool's message points to. Do not reconstruct a signature from the input template. |
+| the verdict carries no `main_pipe` | say so, and which cause the tool's message points to: the method settles no entry pipe, the contract did not come back whole, or the workshop predates the field. Do not reconstruct a signature from the input template. |
 | the user wants the method changed, or a saved method's files on disk | route: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one, `/pipelex-catalog` to bring a saved method to disk |
 
 ## References
