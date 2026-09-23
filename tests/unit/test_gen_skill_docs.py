@@ -931,19 +931,20 @@ class TestPipelexRunSkill:
 
     def test_a_list_input_keeps_its_files_in_a_directory_of_its_own(self) -> None:
         """An indexed list item `photo_1.png` is also the copy of a scalar input called
-        `photo_1`, and a list file kept under its own name `invoice.pdf` is also the
-        copy of an input called `invoice`: either way one file silently replaces the
-        other and two inputs upload the same bytes. A directory per list input leaves
-        no name two inputs can share."""
+        `photo_1`, a list file kept under its own name `invoice.pdf` is also the copy of
+        an input called `invoice`, and a renamed duplicate `shoe_1.jpg` is also a real
+        file of that name: each time one file silently replaces another and two values
+        upload the same bytes. A directory per list input, its files named by position,
+        leaves no name two values can share — and a worked example is what a model
+        copies, so none of them may show a list flat under `inputs/`."""
         references = Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references"
         user_data = (references / "user-data.md").read_text(encoding="utf-8")
         synthetic = (references / "synthetic.md").read_text(encoding="utf-8")
-        assert "A list input's files go in a directory named after the input" in user_data
-        assert "`inputs/images/shoe_1.jpg`" in user_data
+        assert "A list input's files go in a directory named after the input, each named by its position" in user_data
         assert "`<output_dir>/inputs/<input_variable>/1.<ext>`" in synthetic
         for text in (user_data, synthetic):
             assert "`<input_variable>_1.<ext>`" not in text
-            assert "`images_1.jpg`" not in text
+            assert not re.search(r"\[\s*\"inputs/[^/\"]+\"", text), "a list example puts its files flat under inputs/"
 
     def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
         """No prepared file is written when nothing needed uploading, so an offer that

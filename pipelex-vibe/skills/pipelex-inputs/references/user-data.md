@@ -37,7 +37,7 @@ For each input variable of the template, apply these rules in order:
 
 ## Copy
 
-Copy — or symlink — each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input and keep their own names (`inputs/images/shoe.jpg`), two that share a name getting an index (`inputs/images/shoe_1.jpg`): a single input's copy never lands in a list's directory, so no copy overwrites another's. Create `inputs/` only when there is a file to copy.
+Copy — or symlink — each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input, each named by its position in the list with its original extension (`inputs/images/1.jpg`, `inputs/images/2.png`): no two positions share a name, and a single input's copy never lands in a list's directory, so no copy overwrites another's. Create `inputs/` only when there is a file to copy.
 
 ## Fill
 
@@ -47,7 +47,7 @@ Set each matched input's light value:
 - a web page Document: the URL string, `"page": "https://example.com/article"`;
 - an Image: the path string, `"photo": "inputs/photo.jpg"`;
 - a Text from a `.txt` or `.md` file: the file's actual content as the string value;
-- a list, from a folder for instance: a list of those values, `"images": ["inputs/img_001.jpg", "inputs/img_002.jpg", "inputs/img_003.png"]`.
+- a list, from a folder for instance: a list of those values, `"images": ["inputs/images/1.jpg", "inputs/images/2.jpg", "inputs/images/3.png"]`.
 
 Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and one prepare call then covers both sources' files.
 
@@ -84,11 +84,11 @@ After the skill's step 5, and before its step 6 offers the run, show the user wh
 
    `inputs.json` still reads `"invoice": "inputs/invoice.pdf"`, `uploads` lists that one new uri, and `inputs/invoice.pdf` stays on disk untouched. The method is now runnable, so the run is offered.
 
-**A folder of images.** A batch image captioner expects `images: Image[]`, and the user says "use the photos in `./product-photos/`", which holds `shoe.jpg`, `hat.png` and `bag.jpg`. All three are copied into `<output_dir>/inputs/images/`, and `inputs.json` is:
+**A folder of images.** A batch image captioner expects `images: Image[]`, and the user says "use the photos in `./product-photos/`", which holds `shoe.jpg`, `hat.png` and `bag.jpg`. All three are copied into `<output_dir>/inputs/images/`, named by their position, and `inputs.json` is:
 
 ```json
 {
-  "images": ["inputs/images/shoe.jpg", "inputs/images/hat.png", "inputs/images/bag.jpg"]
+  "images": ["inputs/images/1.jpg", "inputs/images/2.png", "inputs/images/3.jpg"]
 }
 ```
 
