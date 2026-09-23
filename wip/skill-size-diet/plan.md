@@ -61,6 +61,8 @@ The machinery a skill phase relies on is on `dev`. Record the ceiling value, the
 - **What phase 1 changed beyond the move**, each named in its pull request: `design`, `edit`, `organize`, `explain` and `inputs` now exclude `runs/` from what they submit, through the shared convention (box F's deferral); the stale-types notice has one wording; the requirements block's recovery text moved to `shared/credentials.md`. Two items were filed from the work: `L-260923-58d533` (integrate's call site and gates load a run's `runs/` artifacts) and `L-260923-0964b0` (skills tell Codex users to type a Claude spelling of a skill).
 - [x] `/rev` (the checkpoint's own review is phase 1's pass).
 
+Phase 1 landed in #52 at `2fd7120`.
+
 ## Phase 2 — `pipelex-integrate` · `L-260923-5a94e7`
 
 - [x] `classification-integrate.md`.
