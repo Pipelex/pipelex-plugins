@@ -84,7 +84,7 @@ class TestPipelexDesignSkill:
         body = self.render(target_name)
         gate = self.the_line(body, "this verdict is the runnable gate")
         assert gate.startswith("For a completed method, "), f"{target_name}: the runnable gate has lost its condition: {gate!r}"
-        assert "A re-entry restores at least its baseline verdict instead, unless it finishes a scaffold." in gate
+        assert "A re-entry restores at least its baseline verdict instead." in gate
         assert self.the_line(body, "**The baseline, before every edit**").endswith("otherwise deliver as step 6 says.")
 
     @pytest.mark.parametrize("target_name", TARGETS)
@@ -100,17 +100,6 @@ class TestPipelexDesignSkill:
         direct criteria, so they must choose stepwise even when every direct criterion holds."""
         line = self.the_line(self.render(target_name), "- **Stepwise** otherwise")
         assert line.startswith("- **Stepwise** otherwise, and even where direct holds, "), f"{target_name}: {line!r}"
-
-    @pytest.mark.parametrize("target_name", TARGETS)
-    def test_finishing_a_scaffold_is_routed_to_the_stepwise_loop(self, target_name: str) -> None:
-        """`/pipelex-run`, `/pipelex-inputs` and `/pipelex-integrate` send a valid scaffold here to be finished,
-        so the skill routes that request through the re-entry baseline to the stepwise loop, and the loop's
-        reference names it among its entry conditions."""
-        body = self.render(target_name)
-        assert "A structural change to an existing method, or finishing its scaffold, is a [re-entry](#re-entry)" in body
-        assert "too for a signature-driven re-entry or to finish a scaffold." in self.the_line(body, "Then read [re-entry.md]")
-        entry = self.reference("stepwise.md").split("\n\n")[1]
-        assert "when the user asks to finish an existing scaffold, before writing any file" in entry
 
     def test_an_early_stop_still_gives_the_delivery_notices(self) -> None:
         """A stepwise scaffold stopped early never reaches step 6, where the stale-types check and the saved-copy

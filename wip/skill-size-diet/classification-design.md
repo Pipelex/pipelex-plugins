@@ -161,7 +161,7 @@ The review read the draft against the old skill and found four conditions the re
 - The authoring reference, "the syntax source of truth" (line 33), is pointed at from the re-entry line as well as from step 1. The old skill named it for both paths at its head.
 - The re-entry references are pointed at before the baseline repair, which edits the bundle, and not after it.
 
-Two changes are new. Finishing an existing scaffold, which `/pipelex-run`, `/pipelex-inputs` and `/pipelex-integrate` send here, is routed as a re-entry to the stepwise loop, and its backlog is delivered through the runnable gate; the old skill carried the loop inline and never named that request. And a stepwise scaffold stopped early never reaches step 6, so `references/stepwise.md` sends it back to the stale-types check and the saved-copy notice that step 6 now carries for every run.
+A fifth change is new: a stepwise scaffold stopped early never reaches step 6, so `references/stepwise.md` sends it back to the stale-types check and the saved-copy notice that step 6 now carries for every run.
 
 ## What the rewrite adds
 

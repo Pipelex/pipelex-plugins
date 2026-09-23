@@ -14,7 +14,7 @@ allowed-tools:
 
 # Design a MTHDS bundle top-down at the right depth
 
-Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method, or finishing its scaffold, is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
+Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
 
 ## Requirements
 
@@ -63,7 +63,7 @@ Branch on the **structured verdict** from its Markdown summary, never on transpo
 
 ### 6. The runnable gate and delivery
 
-For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead, unless it finishes a scaffold. Then:
+For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
@@ -78,7 +78,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry or to finish a scaffold. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
