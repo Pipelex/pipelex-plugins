@@ -182,6 +182,8 @@ Every rendered `SKILL.md` is under the ceiling on every target and `make check` 
 
 ## Deferred
 
+- **From phase 6's review, round 4 (filed):** `pipelex-catalog`'s pull tells the user to commit the link file even after a refusal that wrote nothing — `L-260923-bf3f76`.
+- **From phase 6's review, round 4 (filed):** `pipelex-run` polls a `degraded` status with no bound, so a long outage of the platform's live view never hands control back — `L-260923-722f1d`.
 - **From phase 6's review, round 1:** the per-skill test modules each carry their own copy of the reference-shape helpers — rendering, the reference reader, the static-reference, one-level-deep, byte-for-byte and size-ceiling tests — and the copies have already drifted apart: one entry-condition check wants `"Read this when "` and another `"Read this "`, and one link rule allows `#` anchors. Move the helpers and the shared reference-shape rules into one module that every skill's tests use, and settle each drift on the stricter form.
 - **From phase 3's review, round 4 (pre-existing, filed):** `pipelex-inputs`' `references/published-address.md` reads a published package's sandbox refusal as a `config` error, which the workshop now classifies as `input_domain` at `method_ref` — `L-260923-4ce273`.
 - **From phase 3's review, round 3 (pre-existing, filed):** `pipelex-inputs` has no strategy for an `inputs.json` that is already filled and only wants preparing, so a hand-back from `/pipelex-run` lands on the no-signal row, whose Template strategy saves placeholders over the filled file without asking — `L-260923-c8f18e`.
