@@ -11,6 +11,8 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
@@ -479,6 +481,41 @@ def check_skill_argument_placeholders(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_skill_frontmatter(base_dir: Path) -> list[str]:
+    """Check that every rendered SKILL.md opens with frontmatter strict YAML accepts.
+
+    Mistral Vibe parses a skill's frontmatter with `yaml.safe_load` and drops a skill that fails,
+    with nothing but a warning in its log; Codex repairs such a line and Claude Code tolerates it,
+    so the loss shows on one harness only. The usual cause is a `: ` inside an unquoted
+    `description:`, which strict YAML reads as a second mapping. The frontmatter must also carry a
+    string `name` equal to the skill's directory and a string `description`.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            rel = skill_md.relative_to(base_dir)
+            text = skill_md.read_text(encoding="utf-8")
+            end = text.find("\n---\n", 4)
+            if not text.startswith("---\n") or end == -1:
+                errors.append(f"{rel}: no `---` frontmatter block at the top")
+                continue
+            try:
+                data = yaml.safe_load(text[4:end])
+            except yaml.YAMLError as exc:
+                reason = str(exc).splitlines()[0]
+                errors.append(f"{rel}: frontmatter is not valid YAML ({reason}); Mistral Vibe drops this skill")
+                continue
+            if not isinstance(data, dict):
+                errors.append(f"{rel}: frontmatter is not a mapping")
+                continue
+            fields = cast(dict[str, Any], data)
+            if fields.get("name") != skill_md.parent.name:
+                errors.append(f"{rel}: frontmatter `name` is {fields.get('name')!r}, not the skill's directory {skill_md.parent.name!r}")
+            if not isinstance(fields.get("description"), str) or not fields["description"].strip():
+                errors.append(f"{rel}: frontmatter carries no string `description`")
+    return errors
+
+
 def check_build_error_markers(base_dir: Path) -> list[str]:
     """Check that no generated file carries a shared include's build-error marker.
 
@@ -808,6 +845,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_skill_argument_placeholders(base_dir),
         "FAIL: Found $ARGUMENTS or $<digit> in a SKILL.md. Rewrite without the token (an escape reaches Codex and Vibe verbatim).",
         "  No argument placeholders found.",
+    )
+    failed |= _run_check(
+        "Checking every SKILL.md frontmatter parses as strict YAML...",
+        check_skill_frontmatter(base_dir),
+        "FAIL: A SKILL.md frontmatter is not valid YAML, or lacks its name or description. Quote the value or reword it.",
+        "  Every SKILL.md frontmatter is valid YAML with its name and description.",
     )
     failed |= _run_check(
         "Checking for unresolved shared-include variants...",

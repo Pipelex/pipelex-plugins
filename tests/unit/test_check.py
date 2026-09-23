@@ -19,6 +19,7 @@ from scripts.check import (
     check_no_templates_in_output,
     check_shared_files_exist,
     check_skill_argument_placeholders,
+    check_skill_frontmatter,
     check_stale_references,
     check_target_plugin_versions,
     check_version_floors,
@@ -731,3 +732,32 @@ class TestNoTemplatesInOutput:
     def test_missing_targets_dir_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="Targets directory not found"):
             check_no_templates_in_output(tmp_path)
+
+
+class TestSkillFrontmatter:
+    """Mistral Vibe drops a skill whose frontmatter strict YAML rejects, so `make check` parses it the same way."""
+
+    def test_a_valid_frontmatter_passes(self, skill_tree: Path) -> None:
+        assert check_skill_frontmatter(skill_tree) == []
+
+    def test_a_colon_in_an_unquoted_description_fails(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-test\ndescription: Design a method. Construction is adaptive: a graph is written.\n---\n\n# Test\n")
+        errors = check_skill_frontmatter(skill_tree)
+        assert len(errors) == 1
+        assert "not valid YAML" in errors[0]
+        assert "Mistral Vibe drops this skill" in errors[0]
+
+    def test_the_name_must_be_the_skill_directory(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-other\ndescription: A test.\n---\n")
+        assert check_skill_frontmatter(skill_tree) == [
+            "pipelex/skills/pipelex-test/SKILL.md: frontmatter `name` is 'pipelex-other', not the skill's directory 'pipelex-test'"
+        ]
+
+    def test_a_missing_description_or_block_fails(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-test\n---\n")
+        assert check_skill_frontmatter(skill_tree) == ["pipelex/skills/pipelex-test/SKILL.md: frontmatter carries no string `description`"]
+        skill_md.write_text("# No frontmatter\n")
+        assert check_skill_frontmatter(skill_tree) == ["pipelex/skills/pipelex-test/SKILL.md: no `---` frontmatter block at the top"]
