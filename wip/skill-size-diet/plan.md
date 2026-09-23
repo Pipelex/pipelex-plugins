@@ -160,10 +160,12 @@ Waiting on this phase: `L-260915-4b00fe` and `L-260912-059765`, both about branc
 
 Blocked by `L-260922-12f302` (the initializer and the serve target in `pipelex-method-apps`).
 
-- [ ] The method-app path becomes the initializer, then the serve target, and the stop table keys on the verdicts they print; the acquisition and dev-server chains leave the skill, and their tests leave with them for the family's own.
-- [ ] The ceiling check flips from reporting to failing, if phase 6 has already landed.
-- [ ] Smoke sessions: the method app from a local bundle, from a catalog id, and the Codex main path.
+- [x] The method-app path becomes the initializer, then the serve target, and the stop table keys on the verdicts they print; the acquisition and dev-server chains leave the skill, and their tests leave with them for the family's own. Commit `a6eae4e` on `feature/Scaffold-method-app-via`; the classification is [`classification-scaffold-method-app.md`](classification-scaffold-method-app.md), and a copy `make create` has not run in is the new `references/uncreated-copy.md`.
+- [x] The ceiling check flips from reporting to failing, if phase 6 has already landed. Phase 6 had landed, so `SKILL_CEILING_ENFORCED` is gone and `make check` fails any rendered `SKILL.md` over 13,000 characters. The scaffold renders 12,751 characters on Claude, 12,764 on Codex and 12,778 on Vibe.
+- [ ] Smoke sessions: the method app from a local bundle, from a catalog id, and the Codex main path. Run against a snapshot of `a6eae4e`, with a no-key scenario and a `--no-create` copy added, and recorded in `smoke-scaffold-method-app.md` once they finish.
 - [ ] `/rev`.
+
+**Handoff, 2026-09-23.** The session that wrote `a6eae4e` stopped at its context's wrap-up threshold before `/rev`, whose headroom check refused the round. `make check` and `make agent-test` passed at `a6eae4e`, which is not pushed. What is left, from the worktree `_pipelex-plugins--scaffold-method-app-via`: read `smoke-scaffold-method-app.md` if the smoke sessions committed it, and fix in the template any wording they exposed; run `/rev 4` (round 1, bar `open`), triage, fix and record the pass with `ledger review-pass`; tick the two boxes above and phase 6's flip box; write Checkpoint 4; push; open the pull request to `dev` with `Closes L-260923-0d9cb6` and `Advances L-260923-a9bdfe`; land it with `/ledger-land`. The behaviour changes the pull request must name are at the top of the classification. No question is pending a person.
 
 ## Phase 6 — the rest, and the ceiling bites · `L-260923-6b46c8`
 
