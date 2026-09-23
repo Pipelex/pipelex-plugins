@@ -28,9 +28,22 @@ TARGET_OUTPUTS = ("pipelex", "pipelex-codex", "pipelex-vibe")
 
 GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-design": (
+        "this skill never guesses at validity",
+        "Do not write `.mthds` files without validation available.",
         "Never silently skip validation.",
+        "**Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**",
+        "**Never write `inputs.json`.**",
+        "**This skill never runs a method**: a run needs inputs and spends inference credit.",
+        "write the closest in-scope equivalent and call out the deviation",
+        "**On a method app, ask first**",
+        "A bundle that already lives elsewhere stays there.",
         "Offer that; never do it.",
         "Never write or edit `pipelex-method.json`",
+        "**When several directories are linked to the method, ask which is the work; never choose.**",
+        "**Never present a linked directory as the saved method's current content.**",
+        "**Never redesign on a broken baseline**",
+        "**Retain the original contents until the final verdict is restored.**",
+        "restore the retained baseline contents and report the failure",
     ),
     "pipelex-edit": (
         "Offer that; never do it.",

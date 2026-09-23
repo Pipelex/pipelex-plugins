@@ -43,15 +43,16 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │       ├── mthds-reference.md.j2      # MTHDS language reference (rendered per target)
 │       ├── native-content-types.md.j2 # Native content-type documentation (rendered per target)
 │       ├── credentials.md.j2          # Connecting the workshop and where its key comes from, per harness (rendered per target; read when an MCP stop fires)
+│       ├── catalog-id.md.j2           # A catalog id or a published address given to a file-based skill: the bridge include, whole (rendered per target; read by pipelex-design, and by edit and organize from size-diet phase 6)
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (include-only)
 │       ├── mcp-requirements.md.j2     # The MCP-backed skills' two stops, each pointing at credentials.md (include-only)
 │       ├── validate-call.md.j2        # How a bundle is submitted: the file set (runs/ excluded) and the path form of `files` (include-only)
 │       ├── project-root.md.j2         # Where a project starts: the project markers design, integrate and catalog share (include-only)
 │       ├── skill-dir.md.j2            # Codex and Vibe: defines the `<skill-dir>` placeholder a skill names its own files by; nothing on Claude (include-only)
-│       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only)
+│       ├── formatting-hook.md.j2      # The validation hook formats every `.mthds` write (include-only; edit and organize)
 │       ├── stale-types-notice.md.j2   # A bundle change may have outdated a generated tree, in one wording (include-only)
 │       ├── saved-copy-notice.md.j2    # The linked saved method does not have this change; `/pipelex-catalog` compares the two and updates it (include-only)
-│       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only)
+│       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only; edit, organize, and shared/catalog-id.md)
 │       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
 ├── hooks/
 │   ├── hooks.json.j2                # Claude PostToolUse hook config
@@ -64,7 +65,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 └── mcp/
     └── vibe-mcp.toml.j2             # Vibe [[mcp_servers]] fragment: the workshop launcher (Vibe has no plugin manifest)
 skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets — references/ and scripts/ — copied verbatim into every target, executable bits kept
-├── pipelex-design/references/writing-mthds.md          # MTHDS authoring reference
+├── pipelex-design/references/                          # writing-mthds.md — the MTHDS authoring reference, read before every write; stepwise.md — signature-driven construction; re-entry.md — a structural change to an existing method; each of the last two read on its condition
 ├── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes
 ├── pipelex-inputs/references/                          # synthetic.md, user-data.md — the strategies and their worked examples; published-address.md — a method_ref target; prepare-errors.md — prepare's input_domain errors, the size limit's terminal branch included; each read on its condition
 ├── pipelex-integrate/references/                       # typescript.md, python.md — detection, call-site templates, list narrowing, what the results carry; refresh.md, harness.md, signature-fallback.md, orphans.md, gate-failures.md — the branches, each read on its condition; codegen-check.mjs, codegen_check.py — the offline gates copied into TS and python-pydantic projects
