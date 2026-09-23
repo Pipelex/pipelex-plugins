@@ -80,6 +80,21 @@ def _repository(path: Path) -> Path:
     return path
 
 
+def _ignored_only_on_this_machine(tmp_path: Path, project: Path, where: str, pattern: str, environment: dict[str, str]) -> None:
+    """Ignore `pattern` where a clone never carries it: this machine's global excludes file, as a
+    developer's often does, or the repository's own `info/exclude`."""
+    if where == "global-excludes":
+        excludes = tmp_path / "global-ignore"
+        excludes.write_text(f"{pattern}\n", encoding="utf-8")
+        config = tmp_path / "global-config"
+        config.write_text(f"[core]\n\texcludesFile = {excludes}\n", encoding="utf-8")
+        environment["GIT_CONFIG_GLOBAL"] = str(config)
+    else:
+        exclude = project / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(f"{pattern}\n", encoding="utf-8")
+
+
 def _dotenv_reading(text: str) -> dict[str, str]:
     """An env file resolved the way dotenv readers resolve it: the later of two assignments wins."""
     resolved: dict[str, str] = {}
@@ -127,6 +142,32 @@ class TestCommitPristine:
         assert result.returncode == 0, result.stderr
         assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\nnode_modules/\n"
         assert "node_modules" not in _git(project, "ls-files")
+
+    @pytest.mark.parametrize("where", ["global-excludes", "info-exclude"])
+    def test_a_node_modules_only_this_machine_ignores_goes_into_the_project_s_gitignore(self, tmp_path: Path, where: str) -> None:
+        """A teammate's clone carries the project's `.gitignore` alone, so their next `git add` would
+        take the dependency tree this machine's own rule kept out of the pristine commit."""
+        project = _repository(tmp_path / "svc")
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / ".gitignore").write_text("build/\n", encoding="utf-8")
+        environment = _environment()
+        _ignored_only_on_this_machine(tmp_path, project, where, "node_modules/", environment)
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Express project", cwd=tmp_path, env=environment)
+        assert result.returncode == 0, result.stderr
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\nnode_modules/\n"
+
+    def test_a_python_project_gets_python_s_lines(self, tmp_path: Path) -> None:
+        """`uv init` writes no `.gitignore` inside an enclosing repository, and Node's lines would leave
+        `__pycache__/` to be committed on the first run."""
+        project = tmp_path / "cli"
+        project.mkdir()
+        (project / "pyproject.toml").write_text('[project]\nname = "cli"\n', encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        lines = (project / ".gitignore").read_text(encoding="utf-8").splitlines()
+        assert {"__pycache__/", ".venv/", ".env"} <= set(lines)
+        assert "node_modules/" not in lines
 
     def test_a_directory_inside_the_user_s_repository_gets_its_own(self, tmp_path: Path) -> None:
         """`git -C <dir>` scopes nothing: with no `.git` of its own, `<dir>` is governed by the user's
@@ -333,6 +374,17 @@ class TestWriteEnvFile:
         assert result.stdout == "refused: not-ignored\n"
         assert result.returncode == 1
         assert FAKE_KEY not in (project / ".env").read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("where", ["global-excludes", "info-exclude"])
+    def test_an_ignore_rule_only_this_machine_carries_is_not_the_project_s(self, tmp_path: Path, where: str) -> None:
+        """Phase 5a's smoke sessions: a developer's global excludes file ignored `.env`, so the project got
+        no line of its own, and a teammate's clone would have taken the key with its next `git add`."""
+        project = self.project(tmp_path)
+        environment = _environment({"PIPELEX_API_KEY": FAKE_KEY})
+        _ignored_only_on_this_machine(tmp_path, project, where, ".env", environment)
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
 
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"

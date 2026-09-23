@@ -46,10 +46,20 @@ elif ! grep -q '^PIPELEX_' "$example"; then
   printf '\nPIPELEX_BASE_URL=%s\nPIPELEX_API_KEY=\n' "$production" >> "$example"
 fi
 
+# Ignored by a .gitignore the project carries. This machine's global excludes file and the
+# repository's info/exclude never travel with a clone, so a teammate's `git add` would take a
+# `.env` that only this machine ignores.
+ignored_by_the_project() {
+  git -C "$dir" -c core.excludesFile=/dev/null check-ignore -q -- "$1" || return 1
+  source=$(git -C "$dir" -c core.excludesFile=/dev/null check-ignore -v -- "$1")
+  case ${source%%:*} in .gitignore | */.gitignore) return 0 ;; esac
+  return 1
+}
+
 # `.env` is ignored before a key can reach it, and nothing is written when it cannot be.
-if ! git -C "$dir" check-ignore -q .env; then
+if ! ignored_by_the_project .env; then
   printf '\n.env\n' >> "$dir/.gitignore"
-  git -C "$dir" check-ignore -q .env || refuse not-ignored
+  ignored_by_the_project .env || refuse not-ignored
 fi
 
 # An existing `.env` is never overwritten: it may hold a key the user filled.

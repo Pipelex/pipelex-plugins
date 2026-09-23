@@ -19,6 +19,9 @@ Each is named in the pull request, as box G requires.
 - **The template-checkout stop names the method-app family alone.** The fresh-clone block's `origin` test matched the starters' repositories as well; with the starters gone, a starter's checkout is an ordinary directory to the skill.
 - **Branch B's `.gitignore` check completes.** The skill told the model to confirm that a `.gitignore` covers the dependency tree and to write one where the initializer left none; an existing one that did not ignore `node_modules/` was left to the model's judgement. The script writes the three lines when there is none, as before, and adds `node_modules/` to an existing one that does not ignore a `node_modules/` directory present.
 - **Branch B's `.env.example` keeps an initializer's own.** The skill said to write it; the script writes it when it is absent and adds the two Pipelex lines to one the initializer wrote only when it has neither.
+- **Branch B's ignore rules are the project's own.** A `.env` or a `node_modules/` that only this machine ignored, through the user's global excludes file or the repository's `info/exclude`, used to count as ignored, so the project got no line and a teammate's clone would take it. Both scripts now count only a `.gitignore` the project carries. The smoke sessions found it on a machine whose global excludes ignore `.env`.
+- **A Python project gets Python's `.gitignore` lines.** Where `uv init` writes none, inside an enclosing repository, the skill wrote Node's three lines and left `__pycache__/` to be committed. The script now writes Python's lines when `pyproject.toml` is at the root.
+- **Branch B confirms a commit on the user's own repository.** The Mode section's exception named branch A's acquisition alone, so a directory holding only the user's `.git` took the initializer's commit on their branch with no question. The exception now names either branch, and branch B's step 3 carries it.
 
 ## Rows
 

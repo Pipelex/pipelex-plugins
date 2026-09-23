@@ -42,12 +42,28 @@ if ! prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || [ -n "$pref
   error=$(git -C "$dir" init -q -b main 2>&1) || refuse init-failed "$error"
 fi
 
+# Ignored by a .gitignore the project carries. This machine's global excludes file and the
+# repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
+# only this machine ignores.
+ignored_by_the_project() {
+  git -C "$dir" -c core.excludesFile=/dev/null check-ignore -q -- "$1" || return 1
+  source=$(git -C "$dir" -c core.excludesFile=/dev/null check-ignore -v -- "$1")
+  case ${source%%:*} in .gitignore | */.gitignore) return 0 ;; esac
+  return 1
+}
+
 # `npm init -y` and `tsc --init` write no .gitignore, so the staging would commit the whole
-# dependency tree into the commit that is meant to be a readable baseline. An initializer's own
-# .gitignore is kept, and only a node_modules/ it does not ignore is added to it.
+# dependency tree into the commit that is meant to be a readable baseline, and `uv init` writes
+# none inside an enclosing repository. A Python project gets Python's lines and any other gets
+# Node's. An initializer's own .gitignore is kept, and only a node_modules/ it does not ignore is
+# added to it.
 if [ ! -e "$dir/.gitignore" ]; then
-  printf 'node_modules/\ndist/\n.env\n' > "$dir/.gitignore"
-elif [ -d "$dir/node_modules" ] && ! git -C "$dir" check-ignore -q node_modules; then
+  if [ -e "$dir/pyproject.toml" ]; then
+    printf '__pycache__/\n*.egg-info/\nbuild/\ndist/\n.venv/\n.env\n' > "$dir/.gitignore"
+  else
+    printf 'node_modules/\ndist/\n.env\n' > "$dir/.gitignore"
+  fi
+elif [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
   printf '\nnode_modules/\n' >> "$dir/.gitignore"
 fi
 

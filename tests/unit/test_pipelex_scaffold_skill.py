@@ -293,14 +293,20 @@ class TestPipelexScaffoldSkill:
         lands on their branch, and `add -A -- .` sweeps in whatever their worktree was already
         showing. Step 3 was qualified when the ruling landed and the Mode section was not, which is
         the half-application this suite exists to catch.
+
+        Phase 5a's smoke sessions found the same half-application on branch B: a directory holding
+        only the user's `.git` took the initializer's commit on their branch with no question, because
+        the exception named the method app's acquisition alone. It now names either branch, and branch
+        B's Step 3 carries the confirmation at the step it governs.
         """
         for body in [self.scaffold] + [self.render(target) for target in ("prod", "codex", "mistral-vibe")]:
             assert "The pristine commit does not need confirmation **on a directory this skill created**" in body
-            assert "**The acquisition into a directory that already held a repository is the exception**" in body
+            assert "**A pristine commit into a directory that already held a repository is the exception**, on either branch" in body
             assert "None of the three grounds above holds" in body
-            # And Step 3 says what to put in front of the user rather than only what to report.
+            # And each branch's Step 3 says what to put in front of the user rather than only what to report.
             assert "That is the commit the Mode section sends back for confirmation" in body
             assert "`git -C <dir> status --short` before staging says what will ride along" in body
+            assert "**When `<dir>` held a `.git` before step 2**, the commit lands on the user's branch, so it confirms first" in body
 
     def test_branch_b_locks_the_python_project_before_the_hand_off(self) -> None:
         """Round 2: `uv init` writes a `pyproject.toml` and neither a lock file nor an environment.
@@ -348,6 +354,17 @@ class TestPipelexScaffoldSkill:
         integrate = (self.SKILLS / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "none means offering" in integrate
         assert "pipelex-scaffold" in integrate
+
+    def test_every_pointer_to_the_version_managers_names_a_runtime_that_is_missing(self) -> None:
+        """Phase 5a's smoke sessions: a pointer reading "reached `node` through a version manager" sent a
+        model whose `node` answered on the `PATH`, from under `~/.nvm`, to read the reference off its
+        branch. Every pointer names the condition, a runtime the `PATH` lacks or one below the floor."""
+        pointers = [line for line in self.scaffold.splitlines() if "references/version-managers.md" in line]
+        assert pointers
+        for line in pointers:
+            assert "missing" in line, line
+        # References are one level deep, so the initializers reference sends the reader to no other one.
+        assert "references/" not in (self.REFERENCES_DIR / "initializers.md").read_text(encoding="utf-8")
 
     def test_the_references_carry_the_initializers_the_version_managers_and_github(self) -> None:
         # The initializers reference sends the reader to the repository test the script runs rather

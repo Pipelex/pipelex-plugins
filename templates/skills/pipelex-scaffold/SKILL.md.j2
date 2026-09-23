@@ -58,7 +58,7 @@ The `origin` it reads belongs to whichever repository holds the directory, and i
 
 ## Mode
 
-Automatic by default, with the plugin's usual rules: an explicit user signal wins ("just do it" → automatic; "walk me through" → interactive); a genuinely ambiguous branch is one question, asked once; a request that gave every input up front proceeds without re-asking. One thing always confirms, in every mode: **`gh repo create`**, because it creates a repository on GitHub. The pristine commit does not need confirmation **on a directory this skill created** — it holds the template as it came, and no user content is at stake. **The acquisition into a directory that already held a repository is the exception**, and it is a second thing that always confirms: there the commit lands on the user's branch, on top of their history, and `add -A -- .` records whatever their worktree was already showing along with the template (Step 3). None of the three grounds above holds, so state what will be staged and what it will land on, and ask — in every mode.
+Automatic by default, with the plugin's usual rules: an explicit user signal wins ("just do it" → automatic; "walk me through" → interactive); a genuinely ambiguous branch is one question, asked once; a request that gave every input up front proceeds without re-asking. One thing always confirms, in every mode: **`gh repo create`**, because it creates a repository on GitHub. The pristine commit does not need confirmation **on a directory this skill created** — it holds the template as it came, and no user content is at stake. **A pristine commit into a directory that already held a repository is the exception**, on either branch, and it is a second thing that always confirms: there the commit lands on the user's branch, on top of their history, and `add -A -- .` records whatever their worktree was already showing along with what this skill put there (each branch's Step 3). None of the three grounds above holds, so state what will be staged and what it will land on, and ask — in every mode.
 
 On the method app, interactive mode runs `make create` with `DRY_RUN=1` first and shows the user the identity and the plan it prints; automatic mode runs it directly, because its read-only half refuses before it changes a tracked file. Either way, the first run on a fresh copy installs the dependencies before anything else, which takes minutes, writes `node_modules/`, and lets the template's husky point the repository's `core.hooksPath` at the project's hooks. A dry run is not free, and a repository the user made gets that setting too.
 
@@ -194,7 +194,7 @@ Nothing beyond what the initializer writes is authored by this skill: no example
 bash "{{ skill_dir }}/scripts/commit-pristine.sh" '<dir>' 'Scaffold <framework or language> project'
 ```
 
-It makes `<dir>` a repository of its own when it is not one, whichever initializer ran, keeps the dependency tree out with a `.gitignore`, and commits `<dir>` alone. Its first line is the verdict. `committed:` names the commit and lists the staged paths after it; `kept:` names a commit the initializer made itself, which is the pristine one. Read the paths, and name the commit in the report. A `refused:` line is in the stop table.
+It makes `<dir>` a repository of its own when it is not one, whichever initializer ran, keeps the dependency tree out with a `.gitignore`, and commits `<dir>` alone. Its first line is the verdict. `committed:` names the commit and lists the staged paths after it; `kept:` names a commit the initializer made itself, which is the pristine one. Read the paths, and name the commit in the report. A `refused:` line is in the stop table. **When `<dir>` held a `.git` before step 2**, the commit lands on the user's branch, so it confirms first, as the Mode section says: show `git -C <dir> status --short`, and ask.
 
 ### Step 4: The env file
 
@@ -236,7 +236,7 @@ The env file's verdict becomes words this way, and the URL is never printed:
 Two lines are easy to forget and matter:
 
 - **The project's own instructions and skills load in a session started inside it.** Its `CLAUDE.md` / `AGENTS.md` and its own skills (`bump-sdk` and the like) are not in the current session; {% if platform == "claude" %}`cd <dir> && claude`{% else %}`cd <dir>`, then starting {{ harness_name }} there,{% endif %} is how they arrive.
-- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. The one exception is a machine where step 1 reached `node` through a version manager, whose hand-off [references/version-managers.md](references/version-managers.md) describes. Hand the method to it{% if platform == "claude" %} with `/pipelex-integrate`{% else %} by opening `../pipelex-integrate/SKILL.md` and following it{% endif %}; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first. On the method app the method is already in the page, and `/pipelex-integrate` runs the project's `make add-method` for the next one.
+- **`/pipelex-integrate` still works from here meanwhile**, because the Pipelex workshop writes anywhere under the directory the harness was launched in, and the new project sits there. The one exception is a machine where `node` was missing from the `PATH` and step 1 reached it through a version manager, whose hand-off [references/version-managers.md](references/version-managers.md) describes. Hand the method to it{% if platform == "claude" %} with `/pipelex-integrate`{% else %} by opening `../pipelex-integrate/SKILL.md` and following it{% endif %}; a bundle that lives elsewhere on disk is copied into the project by that skill. No method yet → `/pipelex-design` first. On the method app the method is already in the page, and `/pipelex-integrate` runs the project's `make add-method` for the next one.
 
 ## When something goes wrong
 
@@ -270,6 +270,6 @@ Two lines are easy to forget and matter:
 ## Reference
 
 - [references/initializers.md](references/initializers.md) — per language, the minimal default and the common frameworks' non-interactive initializers, whether each runs `git init`, and where the import package or `src/` root lands.
-- [references/version-managers.md](references/version-managers.md) — `node` or `uv` reached through a version manager the machine already has, before stopping on it.
+- [references/version-managers.md](references/version-managers.md) — `node` or `uv` missing from the `PATH`, or `node` below the floor, before stopping on it: a version manager the machine already has may hold one.
 - [references/github.md](references/github.md) — the repository on GitHub, before any `gh` command.
 - `/pipelex-integrate` — the skill this one hands every project to, except a method app, which already runs its method.
