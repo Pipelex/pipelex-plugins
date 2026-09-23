@@ -51,7 +51,7 @@ This skill validates through the **`mthds_validate`** tool and projects input sc
 
 ### How to validate
 
-1. Gather **all** `.mthds` files in the bundle directory (the whole library — a broken sibling fails the verdict too, and the report names it).
+1. Gather **all** `.mthds` files in the bundle directory, none under a `runs/` directory (the whole library — a broken sibling fails the verdict too, and the report names it).
 2. Call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 3. Branch on the **structured verdict**, never on transport:
    - `status: "ok"`, `is_valid: true`, `pending_signatures` non-empty → valid stepwise design scaffold, not yet runnable. The Markdown summary's `## Pending signatures` section is the backlog.
@@ -237,7 +237,7 @@ This skill works on files, so a **catalog id** (`mt_…`) is not a target it can
 
 ### The re-entry procedure
 
-1. **Baseline before every edit.** Read every `.mthds` file and validate the whole bundle. Record whether it is runnable or a scaffold and its exact pending set. If it is invalid, repair the baseline first; never redesign on a broken baseline. Retain the original contents until the final verdict is restored.
+1. **Baseline before every edit.** Read every `.mthds` file outside `runs/` and validate the whole bundle. Record whether it is runnable or a scaffold and its exact pending set. If it is invalid, repair the baseline first; never redesign on a broken baseline. Retain the original contents until the final verdict is restored.
 2. **Map the full affected region.**
    - A pipe contract change includes every parent controller whose wiring must adapt.
    - A main-pipe contract change includes root boundary concepts and invalidates any saved `inputs.json`.

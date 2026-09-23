@@ -59,7 +59,7 @@ In interactive mode, present the planned edits and ask "Does this plan look righ
 
 ### Step 1: Read the bundle
 
-Locate the bundle directory and read **every** `.mthds` file in it (the root — usually `main.mthds` — carries the `domain` header, `description`, and `main_pipe`; module files carry the pipes and concepts). Understand where the change lands before touching anything.
+Locate the bundle directory and read **every** `.mthds` file in it outside `runs/` (the root — usually `main.mthds` — carries the `domain` header, `description`, and `main_pipe`; module files carry the pipes and concepts). Understand where the change lands before touching anything.
 
 ### Step 2: Classify the change
 

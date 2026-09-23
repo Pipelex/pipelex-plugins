@@ -18,7 +18,7 @@ Read a method and say what it does, in plain language.
 
 ## What it takes
 
-- **A bundle directory** — every `.mthds` file beneath it, read as one library. A single file is the same job with one file in it, and is the normal shape of a simple method.
+- **A bundle directory** — every `.mthds` file beneath it outside a `runs/` directory, read as one library. A single file is the same job with one file in it, and is the normal shape of a simple method.
 - **A registered method's catalog id** (`mt_…`) — the source belongs to the user's own organization, so explaining it means reading it: the workshop hands back the stored files and they are explained exactly as a bundle on disk is, without a byte of them being written anywhere. See [step 8](#step-8--a-method-that-is-not-on-disk).
 - **A published address** (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) — explained at the level of its contract, through the workshop; the source stays in the repository it names. **An address with no `@<tag>` floats**: it resolves to the default branch at its head, so the contract you explain is the one that happens to be there now and the same question can get a different answer tomorrow. Accept it, and say so in one line.
 
@@ -43,7 +43,7 @@ Automatic. Reading and explaining costs nothing and changes nothing, so there is
 
 ## Step 1 — Read the whole library, then judge it
 
-Every `.mthds` file beneath the directory, not the root alone. They are **one method**: a concept declared in one file is referenced from another, and a pipe's implementation routinely sits in a different file from the `PipeSignature` that declared it. Read them all before saying anything about any of them — an explanation written from the root file alone reports gaps that the file next to it fills.
+Every `.mthds` file beneath the directory, not the root alone, and none under a `runs/` directory, which holds a run's artifacts rather than the method. They are **one method**: a concept declared in one file is referenced from another, and a pipe's implementation routinely sits in a different file from the `PipeSignature` that declared it. Read them all before saying anything about any of them — an explanation written from the root file alone reports gaps that the file next to it fills.
 
 ## Step 2 — Resolve every signature before calling it pending
 

@@ -1,6 +1,6 @@
 # Connecting the Pipelex workshop, and its key
 
-Read this when an MCP-backed skill has stopped: because a Pipelex MCP tool is absent from the session, or because a call returned a `config`-class error about the API key. It says what to tell the user on Claude Code; the skill's own stop still holds, so answer from here and do not carry on.
+Read this when an MCP-backed skill sends you here: because a Pipelex MCP tool is absent from the session, or because a call returned a `config`-class error about the API key. It says what to tell the user on Claude Code, and nothing more: whether the skill stops there or carries on without the tool is the skill's own rule, which this file changes in neither direction.
 
 ## The tool is absent
 
