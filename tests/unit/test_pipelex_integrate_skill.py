@@ -359,7 +359,11 @@ class TestPipelexIntegrateSkill:
         assert '`binder.ts` imports its sibling as `from "./types"`' in typescript
         assert "Nor is the tree dropped from the type checker to quiet the error." in typescript
         assert "so the report says the integration cannot execute until the emitter is fixed" in typescript
-        assert "Whether to move the project to a bundler resolution meanwhile is the user's decision, not yours." in typescript
+        assert "Whether to move the project to a bundler resolution, or its build to a bundler, meanwhile is the user's decision" in typescript
+        assert "never add a bundler step or change the build to make the module load" in typescript
+        # A bundler resolution type-checks clean yet fails at runtime when plain Node loads tsc's output: no TS2835 warns of it.
+        assert "runs `tsc`'s ES module output under plain Node meets the same `ERR_MODULE_NOT_FOUND` at runtime with no `TS2835`" in typescript
+        assert "read how the project runs its compiled code" in typescript
 
     def orphans_branch(self, body: str) -> str:
         """Step 6's orphans branch: the one place the skill states the condition the run continues on."""
@@ -506,7 +510,10 @@ class TestPipelexIntegrateSkill:
         assert 'name.endsWith(".mthds")' in typescript
         assert "mthds_contents: [bundle]" not in typescript
         # Its own relative imports need extensions on the resolution that meets the emitter defect.
-        assert "**The three relative imports above are extensionless, which is correct only on a bundler resolution.**" in typescript
+        assert (
+            "**The three relative imports above are extensionless, which is correct only on a bundler resolution whose code a bundler, "
+            "an extension-resolving runtime or CommonJS loads.**"
+        ) in typescript
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         assert "mthds_contents=_read_bundle()," in python
