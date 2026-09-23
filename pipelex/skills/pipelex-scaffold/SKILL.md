@@ -58,7 +58,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through"),
 npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --quiet
 ```
 
-It never prompts, reads a bundle path from where it runs, and takes several minutes. Pass `--name`, `--title`, `--description`, `--author-name`, `--author-email`, `--repo-url` or a `--license…` option only with a value the user gave, never an invented one, and `--pipe`, `--method-name` or `--label` to answer a refusal that names it.
+It never prompts and reads a bundle path from where it runs. **Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step. Pass `--name`, `--title`, `--description`, `--author-name`, `--author-email`, `--repo-url` or a `--license…` option only with a value the user gave, never an invented one, and `--pipe`, `--method-name` or `--label` to answer a refusal that names it.
 
 **Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome (`git: …`) and `make create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
 
@@ -102,7 +102,7 @@ Two lines close it. **The project's own instructions and skills load in a sessio
 |---|---|
 | A toolchain piece is missing, or `refused: missing-tool` or `node-too-old` | STOP and name it, first reading [references/version-managers.md](references/version-managers.md) for `node` or `uv` |
 | The directory is not empty, or `refused: not-empty` | STOP and ask for another; never delete, move or write into it, and never offer to |
-| `refused: no-key` | offer a harness restarted from a shell that exports the key, or `--no-create` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
+| `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `--no-create` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
 | `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-method-apps` | STOP: that is the template, not a copy |
 | any other `refused:`, `failed: write` or `failed: commit` | the line says what stands and names the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
 | `failed: create` | read the end of the log it named, then [references/uncreated-copy.md](references/uncreated-copy.md); never substitute a base URL the user did not declare |

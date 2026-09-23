@@ -33,6 +33,8 @@ CREATE_COMMAND = "npm create --yes @pipelex/method-app@latest '<dir>' -- --metho
 SERVE_COMMAND = "make -C '<dir>' serve"
 CREATE_MARKER = "create METHOD='<method>'"
 OWN_REPOSITORY_MARKER = "rev-parse --show-prefix"
+INITIALIZER_COPY_MARKER = "rev-parse --show-cdup"
+PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-method-apps/webapp-js "
 PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version>" -- .'
 TARGETS = ("prod", "codex", "mistral-vibe")
 
@@ -451,6 +453,14 @@ class TestMethodAppBranch:
             assert "Branch on the verdict's first word, never on the exit code." in body
             assert "Its verdict is its last line not opening with `make`" in body
 
+    def test_a_command_whose_verdict_decides_the_next_step_runs_in_the_foreground(self) -> None:
+        """A headless session ends with its turn and kills what it backgrounded, which left a half-made copy
+        holding an `.env.local` in the phase 5b smoke sessions; "several minutes" alone invited the background."""
+        for body in _bodies():
+            assert "**Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step." in body
+        reference = UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8")
+        assert "**Run the block in the foreground with a long timeout**, never in the background" in reference
+
     def test_the_stop_table_keys_on_the_family_s_verdicts(self) -> None:
         for body in _bodies():
             table = body[body.index("## When something goes wrong") :]
@@ -468,6 +478,8 @@ class TestMethodAppBranch:
             assert "`write-env-file.sh` moves it on one branch and `make create` on the other" in body
             row = next(line for line in body.splitlines() if line.startswith("| `refused: no-key` |"))
             assert "a harness restarted from a shell that exports the key" in row
+            # An unattended model took the second way itself in the phase 5b smoke sessions.
+            assert row.startswith("| `refused: no-key` | STOP and offer two ways, running neither until the user picks: ")
             assert "`--no-create` and a `<dir>/.env.local` the user writes in their own editor" in row
             # A key is refused by every plane but the one that issued it.
             assert "never substitute a base URL the user did not declare" in body
@@ -533,6 +545,26 @@ class TestUncreatedCopyReference:
         for condition in ("`copied` (after `--dry-run` or `--no-create`)", "`failed: create`", "the user stands in one"):
             assert condition in entry, condition
         assert "`/pipelex-scaffold` then goes on at branch A's step 2, `make serve`" in self.reference
+        # A Codex session served a copy whose `make all` was red in the phase 5b smoke sessions.
+        assert "**Never run `make serve` on a copy whose `make create` failed**" in entry
+        assert "and `make serve` waits until it is fixed. On `0`, go on to `make serve`." in self.reference
+
+    def test_a_copy_the_initializer_committed_goes_straight_to_create(self) -> None:
+        """A user standing in a copy seldom says who made it, so its history is read before the git reading a
+        hand-made copy gets, and a copy already committed is not read as one that needs a repository."""
+        reference = self.reference
+        block = _recipe(reference, INITIALIZER_COPY_MARKER)
+        assert PRISTINE_SUBJECT_PREFIX in block
+        assert reference.index(INITIALIZER_COPY_MARKER) < reference.index(OWN_REPOSITORY_MARKER)
+        # The commit this file makes by hand carries the subject the block recognizes.
+        assert PRISTINE_COPY_COMMIT.split('"')[1].startswith(PRISTINE_SUBJECT_PREFIX)
+
+    def test_a_cause_the_sandbox_imposes_is_handed_to_the_user(self) -> None:
+        """Codex's `workspace-write` sandbox denies `ps`, which the template's tests and `make serve` need,
+        and no edit in the copy lifts it (`L-260923-e82e4a`)."""
+        reference = self.reference
+        assert "**A cause the harness's own sandbox imposes is the user's to lift, never yours to work around**" in reference
+        assert "A red `make all` is fixed, never handed off, but for the one cause below." in reference
 
     def test_the_create_gesture_is_driven_and_never_reimplemented(self) -> None:
         reference = self.reference
@@ -593,6 +625,52 @@ class TestUncreatedCopyRecipes:
         block = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), OWN_REPOSITORY_MARKER).replace("<dir>", dir_literal)
         assert "<dir>" not in block
         return subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, cwd=str(cwd))
+
+    @staticmethod
+    def _initializer_copy(*, dir_literal: str, shell: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        block = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), INITIALIZER_COPY_MARKER).replace("<dir>", dir_literal)
+        assert "<dir>" not in block
+        return subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, cwd=str(cwd))
+
+    @classmethod
+    def _committed_copy(cls, target: Path, *subjects: str) -> None:
+        target.mkdir(parents=True)
+        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "main"], check=True)
+        for number, subject in enumerate(subjects):
+            (target / f"file-{number}.txt").write_text(f"{number}\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(target), "add", "-A", "--", "."], check=True)
+            _git_commit(target, subject)
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize(
+        "subject",
+        [f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)", f"{PRISTINE_SUBJECT_PREFIX}0.4.0"],
+        ids=["the-initializer-s", "made-by-hand"],
+    )
+    def test_a_copy_already_committed_prints_its_pristine_commit(self, tmp_path: Path, shell: list[str], subject: str) -> None:
+        target = tmp_path / "receipt review"
+        self._committed_copy(target, subject, "the user's own change")
+        pristine = self._git(target, "log", "--format=%h", "-1", "HEAD~1").strip()
+        result = self._initializer_copy(dir_literal="'receipt review'", shell=shell, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines() == [f"{pristine} {subject}"]
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize("case", ["no-repository", "another-history", "inside-a-repository-that-holds-one"])
+    def test_any_other_copy_prints_nothing(self, tmp_path: Path, shell: list[str], case: str) -> None:
+        """A copy the block prints nothing for goes on to the git reading for a copy made by hand."""
+        target = tmp_path / "receipt-review"
+        if case == "no-repository":
+            target.mkdir()
+        elif case == "another-history":
+            self._committed_copy(target, "the user's copy")
+        else:
+            self._committed_copy(tmp_path / "monorepo", f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)")
+            target = tmp_path / "monorepo" / "apps" / "receipt-review"
+            target.mkdir(parents=True)
+        result = self._initializer_copy(dir_literal=str(target), shell=shell, cwd=tmp_path)
+        assert result.stdout == ""
+        assert not (case == "no-repository" and (target / ".git").exists())
 
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
     def test_a_copy_without_a_repository_gets_one(self, tmp_path: Path, shell: list[str]) -> None:

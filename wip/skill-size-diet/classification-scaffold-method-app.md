@@ -13,7 +13,7 @@ Phase 5b of [`plan.md`](plan.md) under box A of [`design.md`](design.md): every 
 
 ## The behaviour changes
 
-Each is named in the pull request, as box G requires. The first four are the family's commands' own rules, which box E's amendment adopts; the last two are phase 5a's round-4 deferrals, noted on this phase's item.
+Each is named in the pull request, as box G requires. The first four are the family's commands' own rules, which box E's amendment adopts; the next two are phase 5a's round-4 deferrals, noted on this phase's item; the last two came from this phase's smoke sessions (`smoke-scaffold-method-app.md`).
 
 - **The method app is created by the family's initializer and served by `make serve`.** What the user gets is the same project and the same running page, reached through the family's programs instead of the skill's.
 - **A lone `.git` of the user's takes the method app's commit without a question.** The skill confirmed a pristine commit into a repository that already existed, because the commit landed on the user's branch, on top of their history, with `add -A` sweeping their worktree in. The initializer refuses a repository with commits (`repository-has-history`) or with a staged file (`repository-has-staged-files`) and commits the template's files alone, so none of the three grounds holds. Branch B still asks, since `commit-pristine.sh` commits on top of history.
@@ -21,6 +21,8 @@ Each is named in the pull request, as box G requires. The first four are the fam
 - **The port is `make serve`'s to choose.** It takes the first port from 4300 to 4309 that no other directory holds, and refuses with `port-held` when all are; the skill stepped up one port at a time with `port-check`. A server the user started with `make dev` is reported as `already-serving` and left running, where the skill asked whether to stop it. The report's stop command is the one the verdict names, `make stop`, instead of an `lsof` loop, and `curl` and `pgrep` are no longer prerequisites.
 - **`references/version-managers.md` looks for `uv` through `asdf` and `mise`**, and its warning that the harness must be restarted before `/pipelex-integrate` follows any runtime reached through a `PATH` prefix rather than naming `nvm` and `fnm` alone.
 - **`commit-pristine.sh` unstages a `.env` or a `node_modules/` an initializer had staged** before the script's `.gitignore` lines, when the last commit does not hold it.
+- **`refused: no-key` stops, and neither way on is taken until the user picks one.** The row offered a harness restarted from a shell that exports the key, or `--no-create` and a `.env.local` the user writes, and an unattended model took `--no-create` itself, writing the template into the user's directory.
+- **A cause the harness's own sandbox imposes is handed to the user, and `make serve` never follows a `make create` that failed.** Under Codex's `workspace-write` sandbox, a denied `ps` turned the template's `make all` red, and the model served the copy anyway; the reference had said a red `make all` is fixed and never handed off, which a sandbox makes impossible (`L-260923-e82e4a`).
 
 ## Rows
 

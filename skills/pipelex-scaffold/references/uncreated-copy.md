@@ -1,6 +1,6 @@
 # A copy of the method app that `make create` has not run in
 
-Read this when a copy of the method-app template stands and has not been made the user's, before running anything in it: the user stands in one (its `package.json` still says `pipelex-method-webapp-js`, and `scripts/create.mts` is still there), or the family's initializer printed `copied` (after `--dry-run` or `--no-create`) or `failed: create`. What makes the copy the user's is its own `make create`, which this file runs directly; `/pipelex-scaffold` then goes on at branch A's step 2, `make serve`. None of `make create`'s work is reimplemented here: the copy's `docs/create.md` says what it does, until the gesture removes that document along with itself.
+Read this when a copy of the method-app template stands and has not been made the user's, before running anything in it: the user stands in one (its `package.json` still says `pipelex-method-webapp-js`, and `scripts/create.mts` is still there), or the family's initializer printed `copied` (after `--dry-run` or `--no-create`) or `failed: create`. What makes the copy the user's is its own `make create`, which this file runs directly; `/pipelex-scaffold` then goes on at branch A's step 2, `make serve`. **Never run `make serve` on a copy whose `make create` failed** until that failure is fixed as below: it would serve a copy that is not finished. None of `make create`'s work is reimplemented here: the copy's `docs/create.md` says what it does, until the gesture removes that document along with itself.
 
 ## After the initializer
 
@@ -10,7 +10,18 @@ The copy and its pristine commit stand, so go straight to [Run `make create`](#r
 - **`copied` after `--no-create`**, because the shell had no key: the user writes `<dir>/.env.local` themselves, in their own editor — `cp .env.example .env.local`, then the key and the base URL of the plane that issued it. `make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back, and the report says it was kept.
 - **`failed: create`**: the end of the log the initializer named says which of two cases it is.
   - **A refusal before `make create` wrote anything** changed no tracked file, so it can run again; the dependencies it installed stay, and the next run skips that install. Relay the message, supply a value it asks for from the conversation or by asking the user once, and run it again. A refusal naming a capability the API does not serve means the plane it ran against does not serve what codegen needs yet: say so, point at the template README's line on which plane does, and stop there.
-  - **A failure after the scaffold** cannot be undone by running `make create` again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off.
+  - **A failure after the scaffold** cannot be undone by running `make create` again, because the copy has become a project and the gesture refuses it. Fix the cause, never by editing `src/generated/`, then run the steps its message names (`npm install --package-lock-only`, `make all`, `rm -rf .claude/skills/bootstrap`). A red `make all` is fixed, never handed off, but for the one cause below.
+
+**A cause the harness's own sandbox imposes is the user's to lift, never yours to work around**, in either case: a denied `ps`, which the template's tests and `make serve` both need, or an npm cache the sandbox will not let npm write. Nothing in the copy fixes it. Name it, say that the user lifts the sandbox or runs the steps the failure named, then `make serve`, in a terminal of their own, and stop.
+
+**A copy the user stands in is one of these when its own repository already holds the pristine commit**, whose subject opens `Start from Pipelex/pipelex-method-apps/webapp-js`, as the one this file makes by hand does too. Read it before anything else, since the user seldom says who made the copy. This prints the commit, and prints nothing for a copy that is not its own repository's root or holds no such commit, which is [a copy the initializer did not make](#a-copy-the-initializer-did-not-make):
+
+```bash
+[ -z "$(git -C <dir> rev-parse --show-cdup 2>/dev/null || echo outside)" ] &&
+  git -C <dir> log --format='%h %s' | grep -m1 -E '^[0-9a-f]+ Start from Pipelex/pipelex-method-apps/webapp-js '
+```
+
+A commit it prints is the pristine one, and the report names it as found; go straight to [Run `make create`](#run-make-create), with the method the user gave.
 
 ## A copy the initializer did not make
 
@@ -51,8 +62,8 @@ echo "its warnings:"; grep -E '^(warning: |! )' "$log" | LC_ALL=C sort -u | grep
 
 `<method>` is what the user has. A bundle, a `.mthds` file or a directory of them, is **given as an absolute path**, because the gesture reads a relative path from the directory make runs in, which is `<dir>` and not where the user stood. A catalog id is `mt_…`, and a package address is `github.com/<owner>/<repo>[/<package>][@<tag>]`. Add `NAME`, `TITLE`, `DESCRIPTION`, `AUTHOR_NAME`, `AUTHOR_EMAIL`, `REPO_URL`, `LICENSE`, `LICENSE_HOLDER` and `LICENSE_YEAR` only with a value the user gave, and `METHOD_NAME`, `PIPE` and `LABEL` to answer a refusal that names them. Every value goes in single quotes, with a quote inside one spelled `'\''`, because the shell reads the line before make does.
 
-`make create` reads `PIPELEX_API_KEY` from the shell environment, or from an `.env.local` already in the project, and refuses without one. Give it several minutes: on a fresh copy it installs the dependencies, and it ends with a production build. It commits nothing. It names variables and never prints their values, so the log's tail is safe to read; the `.env.local` it wrote is not.
+`make create` reads `PIPELEX_API_KEY` from the shell environment, or from an `.env.local` already in the project, and refuses without one. **Run the block in the foreground with a long timeout**, never in the background: on a fresh copy it installs the dependencies and ends with a production build, which takes minutes, and its exit decides what comes next. It commits nothing. It names variables and never prints their values, so the log's tail is safe to read; the `.env.local` it wrote is not.
 
 **The gesture's warnings are read from the whole log, not from its tail.** `make create` prints its own warnings as `! …` and the bootstrap's as `warning: …`, all before `make all`, whose output fills the tail, and it runs the bootstrap twice, so the block's last line lists each distinct warning once. Every one goes into the report with what answers it. An MIT project whose user named no copyright holder always gets `warning: LICENSE copyright line left untouched — pass --license-holder to claim it.`: the project's `LICENSE` still names the template's copyright holder, and since the gesture refuses a project it has already made, the answer is now an edit of that line, by the user, or by you with the holder they name.
 
-A non-zero exit is one of the two cases under [After the initializer](#after-the-initializer). On `0`, go on to `make serve`. The report is the method app's, and its git outcome is the pristine commit you made or found.
+A non-zero exit is one of the two cases under [After the initializer](#after-the-initializer), and `make serve` waits until it is fixed. On `0`, go on to `make serve`. The report is the method app's, and its git outcome is the pristine commit you made or found.

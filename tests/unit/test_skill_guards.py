@@ -223,6 +223,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
         "never substitute a base URL the user did not declare",
         "a git identity is the user's to set, never yours",
+        "running neither until the user picks",
     ),
     "pipelex-synthetic-inputs": (
         "It never edits `inputs.json`, never uploads anything, and never starts a run",
