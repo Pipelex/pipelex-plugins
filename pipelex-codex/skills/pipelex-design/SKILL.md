@@ -5,7 +5,7 @@ description: Design a MTHDS method bundle (.mthds files) top-down, contract-firs
 
 # Design a MTHDS bundle top-down at the right depth
 
-Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
+Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method, or finishing its scaffold, is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
 
 ## Requirements
 
@@ -54,13 +54,13 @@ Branch on the **structured verdict** from its Markdown summary, never on transpo
 
 ### 6. The runnable gate and delivery
 
-For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
+For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead, unless it finishes a scaffold. Then:
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
 3. **Present the flow**: the interactive method graph where the host rendered it, else a concise text flow.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
-5. **Hand off**: `/pipelex-inputs` prepares real inputs, then `/pipelex-run` runs the method; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`) with generated types and a typed call site, and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
+5. **Hand off**: `/pipelex-inputs` prepares real inputs, then `/pipelex-run` runs the method; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
 6. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
 **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
@@ -69,7 +69,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry or to finish a scaffold. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
