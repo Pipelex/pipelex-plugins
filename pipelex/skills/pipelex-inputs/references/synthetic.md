@@ -29,7 +29,7 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 |---|---|
 | `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `docx` / `xlsx` when the method asks for those |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
-| `target` | `<output_dir>/inputs/<input_variable>.<ext>` |
+| `target` | `<output_dir>/inputs/<input_variable>.<ext>`, with an index per item for a list input (`<input_variable>_1.<ext>`) |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |
 
 It writes the file, verifies it, and returns the path. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.

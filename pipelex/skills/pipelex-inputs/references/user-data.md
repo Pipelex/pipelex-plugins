@@ -4,7 +4,7 @@ Read this at step 3 when the strategy is User data, or Mixed, before matching an
 
 In interactive mode, ask which of the user's files goes to which input wherever that is ambiguous, and any specific values or constraints the user wants on a field.
 
-## 1. Inventory
+## Inventory
 
 Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. Determine each one's type:
 
@@ -24,7 +24,7 @@ Collect every file the user has provided: explicit paths, folders, and files men
 
 **A folder**: list its files — non-recursively by default, recursively if the user asks — keep the supported types, group them by detected type, and match them to list inputs (`Image[]`, `Document[]`, …). A folder `./invoices/` holding five PDFs, for a method expecting `documents: Document[]`, maps all five to that one input.
 
-## 2. Match
+## Match
 
 For each input variable of the template, apply these rules in order:
 
@@ -35,11 +35,11 @@ For each input variable of the template, apply these rules in order:
 5. **An unmatched file**: report it, and ask whether it should be ignored or mapped to a specific input.
 6. **An input still unfilled** after matching stays a placeholder or is filled with synthetic data, which is the Mixed strategy.
 
-## 3. Copy
+## Copy
 
-Copy — or symlink — each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. Use the input's name and keep the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. Create `inputs/` only when there is a file to copy.
+Copy — or symlink — each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files keep their own names (`inputs/shoe.jpg`, `inputs/hat.png`), and two that share a name get an index (`images_1.jpg`), so no copy overwrites another. Create `inputs/` only when there is a file to copy.
 
-## 4. Fill
+## Fill
 
 Set each matched input's light value:
 
@@ -49,11 +49,11 @@ Set each matched input's light value:
 - a Text from a `.txt` or `.md` file: the file's actual content as the string value;
 - a list, from a folder for instance: a list of those values, `"images": ["inputs/img_001.jpg", "inputs/img_002.jpg", "inputs/img_003.png"]`.
 
-Fill the step 2 template in place, save it as `<output_dir>/inputs.json` (step 4), and go on to step 5: the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and one prepare call then covers both sources' files.
+Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and one prepare call then covers both sources' files.
 
-## 5. Report
+## Report
 
-Show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; the final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which were synthesized, and which were uploaded.
+After the skill's step 5, and before its step 6 offers the run, show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; the final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which were synthesized, and which were uploaded.
 
 ## Worked examples
 

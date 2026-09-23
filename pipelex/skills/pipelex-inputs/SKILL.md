@@ -27,7 +27,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 ## Mode
 
-**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything, and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the current step interactive, and "looks good, go ahead" makes the rest automatic.
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the current step interactive, and "looks good, go ahead" makes the rest automatic.
 
 ## Guards
 
