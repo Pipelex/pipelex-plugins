@@ -270,7 +270,7 @@ Continue with [Prepare the inputs for a run](#prepare-the-inputs-for-a-run) — 
 Show the user:
 - Which files were matched to which inputs
 - Any unfilled inputs (offer synthetic or placeholder)
-- The final `inputs.json` content (after preparation) and which files were uploaded
+- The final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it
 - Path to the saved file
 
 ---
@@ -383,7 +383,7 @@ Everything past the user's yes is `/pipelex-run`'s: the drift check against the 
 
 For composite natives (`Page`, `TextAndImages`, `JSON`) and any structured concept, keep exactly the field structure the template gives you and fill the values in place. See [Native Content Types](../shared/native-content-types.md) for what each native content's attributes mean.
 
-That is the shape you *write*. After [prepare](#prepare-the-inputs-for-a-run) the file-ish values come back as canonical content dicts — `{"url": "pipelex-storage://…"}` instead of a bare path or URL string — and that rewritten form is what `inputs.json` holds from then on. Everything else keeps the shape above.
+That is the shape you *write*. After [prepare](#prepare-the-inputs-for-a-run) the file-ish values come back as canonical content dicts — `{"url": "pipelex-storage://…"}` instead of a bare path or URL string — and that run-ready form goes into `inputs.prepared.json`, while `inputs.json` keeps the shape above. Everything else keeps that shape in both files.
 
 ---
 
@@ -401,7 +401,7 @@ Call `mthds_inputs_template` with the bundle files; the template comes back as:
 }
 ```
 
-Save it (with a placeholder or real theme) directly to `methods/summarize_pdf/inputs.json`.
+Save it (with a placeholder or real theme) directly to `methods/haiku/inputs.json`.
 
 ### Example 2: Synthetic data for an image analysis pipeline
 
@@ -417,7 +417,7 @@ Save it (with a placeholder or real theme) directly to `methods/summarize_pdf/in
   "analysis_prompt": "Read this chart. Report the trend per region and name the strongest quarter."
 }
 ```
-5. Prepare: `chart` is a local path, so [prepare](#prepare-the-inputs-for-a-run) uploads it and rewrites `inputs.json` before the run is offered
+5. Prepare: `chart` is a local path, so [prepare](#prepare-the-inputs-for-a-run) uploads it and writes the run-ready form to `inputs.prepared.json`, leaving `inputs.json` as assembled, before the run is offered
 
 Had the method wanted a *photograph* of a street scene, the delegation would have come back with no path and an ask for a real file: code cannot render a photograph honestly. `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.
 
@@ -463,7 +463,7 @@ User says: "Use the photos in `./product-photos/`"
   "images": ["inputs/shoe.jpg", "inputs/hat.png", "inputs/bag.jpg"]
 }
 ```
-5. Prepare: all three are local paths — one [prepare](#prepare-the-inputs-for-a-run) call uploads the whole list and rewrites it to `[{"url": "pipelex-storage://…"}, …]`
+5. Prepare: all three are local paths — one [prepare](#prepare-the-inputs-for-a-run) call uploads the whole list, and `inputs.prepared.json` holds it as `[{"url": "pipelex-storage://…"}, …]` while `inputs.json` keeps the three paths
 
 ---
 

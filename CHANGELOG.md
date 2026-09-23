@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex-inputs` no longer says preparation rewrites `inputs.json`.** The value-shapes section, two worked examples and the report checklist still described the retired behaviour, against the skill's own prepare step: the run-ready form goes into `inputs.prepared.json`, and `inputs.json` keeps the source values, local paths and all, so it stays safe to commit. The haiku example also saves its inputs under `methods/haiku/` instead of a PDF summarizer's directory.
+
 ## [0.7.0] - 2026-09-23
 
 ### Added
