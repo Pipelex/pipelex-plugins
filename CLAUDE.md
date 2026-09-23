@@ -66,6 +66,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets — references/ and scripts/ — copied verbatim into every target, executable bits kept
 ├── pipelex-design/references/writing-mthds.md          # MTHDS authoring reference
 ├── pipelex-synthetic-inputs/references/                # pdf.md, png.md, office.md — runnable recipes, executed by tests/recipes
+├── pipelex-inputs/references/                          # synthetic.md, user-data.md — the strategies and their worked examples; published-address.md — a method_ref target; prepare-errors.md — prepare's input_domain errors, the size limit's terminal branch included; each read on its condition
 ├── pipelex-integrate/references/                       # typescript.md, python.md — detection, call-site templates, list narrowing, what the results carry; refresh.md, harness.md, signature-fallback.md, orphans.md, gate-failures.md — the branches, each read on its condition; codegen-check.mjs, codegen_check.py — the offline gates copied into TS and python-pydantic projects
 └── pipelex-scaffold/references/                        # starters.md, initializers.md — the method app, the gallery and the Python starter side by side; the ecosystem initializers
 pipelex/                       # Claude prod plugin (generated, checked in)
