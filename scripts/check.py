@@ -25,6 +25,24 @@ BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
+# The compaction ceiling (box C of `wip/skill-size-diet/design.md`). After a compaction Claude
+# Code re-attaches each invoked skill within 5,000 tokens, so a SKILL.md longer than that is
+# carried forward as its head alone and loses whatever its tail guarded. The ceiling is counted
+# in characters, which a check can count exactly, and derived from tokens in phase 0: 5,000
+# times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
+# target (2.77, the Claude 5 tokenizer), less a margin — `wip/skill-size-diet/facts.md`.
+SKILL_CEILING_CHARS = 13_000
+# Report mode until the diet's last phase brings every skill under the ceiling; then it fails.
+SKILL_CEILING_ENFORCED = False
+
+# A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
+MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
+FENCED_BLOCK_PATTERN = re.compile(r"^(```|~~~).*?^\1", re.MULTILINE | re.DOTALL)
+INLINE_CODE_PATTERN = re.compile(r"`[^`\n]*`")
+# Where a skill names one of its own scripts: after the skill-directory expression, whatever a
+# target spells it as, so the check keys on the `/scripts/<name>` tail that every spelling shares.
+SKILL_SCRIPT_MENTION_PATTERN = re.compile(r"/scripts/([A-Za-z0-9_.\-/]+)")
+
 TARGETS_DIR_NAME = "targets"
 
 # The version floors the skills state, and where a STATIC reference states one.
@@ -534,6 +552,98 @@ def check_build_error_markers(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_skill_ceiling(base_dir: Path) -> list[str]:
+    """Name every rendered SKILL.md longer than the compaction ceiling, on every target.
+
+    Returned sorted by size, largest first, so the report reads as the diet's remaining work.
+    """
+    over: list[tuple[int, str]] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            size = len(skill_md.read_text(encoding="utf-8"))
+            if size > SKILL_CEILING_CHARS:
+                rel = skill_md.relative_to(base_dir)
+                over.append((size, f"{rel}: {size} characters, {size - SKILL_CEILING_CHARS} over the {SKILL_CEILING_CHARS} ceiling"))
+    return [line for _, line in sorted(over, key=lambda item: -item[0])]
+
+
+def _markdown_prose(text: str) -> str:
+    """The text with fenced blocks and inline code blanked, so an example is never read as a link."""
+    text = FENCED_BLOCK_PATTERN.sub(lambda match: "\n" * match.group(0).count("\n"), text)
+    return INLINE_CODE_PATTERN.sub("``", text)
+
+
+def _heading_slugs(text: str) -> set[str]:
+    """The anchors GitHub-flavoured Markdown gives the file's headings.
+
+    Lowercased, every character that is not a letter, a digit, a space, a hyphen or an underscore
+    dropped, and each space turned into a hyphen — so `Step 8 — a method` becomes `step-8--a-method`.
+    """
+    slugs: set[str] = set()
+    for line in _markdown_prose(text).splitlines():
+        match = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
+        if match:
+            heading = re.sub(r"[^\w\- ]", "", match.group(1).lower())
+            slugs.add(heading.replace(" ", "-"))
+    return slugs
+
+
+def _link_targets(text: str) -> list[str]:
+    """Every relative link target in the prose of a Markdown file, anchors included."""
+    targets: list[str] = []
+    for match in MARKDOWN_LINK_PATTERN.finditer(_markdown_prose(text)):
+        target = match.group(1)
+        if re.match(r"^[a-z][a-z0-9+.\-]*:", target) or target.startswith("/"):
+            continue  # a URL, a mailto: or an absolute path is not a file of the plugin
+        targets.append(target)
+    return targets
+
+
+def check_skill_links(base_dir: Path) -> list[str]:
+    """Links resolve both ways in every target (box H of `wip/skill-size-diet/design.md`).
+
+    Forward: every relative link in a skill, a reference or a shared file names a file that
+    exists in the same target, and every anchor names a heading of the file it points into.
+    Backward: every file a skill ships under `references/` or `scripts/` is named by something the
+    model reads first — a reference by a SKILL.md link, a script by a SKILL.md or by a reference of
+    its own skill — and every shared file by a skill or a reference. A pointer to nothing sends the
+    model to a read that fails; a file named by nothing is a caveat no model will ever read.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        skills_dir = output_dir / "skills"
+        markdown_files = sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
+        named: set[Path] = set()
+        for md_file in markdown_files:
+            text = md_file.read_text(encoding="utf-8")
+            rel = md_file.relative_to(base_dir)
+            for target in _link_targets(text):
+                path_part, _, anchor = target.partition("#")
+                resolved = (md_file.parent / path_part).resolve() if path_part else md_file.resolve()
+                if path_part:
+                    if not resolved.is_file():
+                        errors.append(f"{rel}: link to `{target}` names no file in this target")
+                        continue
+                    if md_file.name == "SKILL.md" or resolved.parent.name == "scripts":
+                        named.add(resolved)
+                    elif resolved.parent.name == "shared":
+                        named.add(resolved)
+                if anchor and resolved.suffix == ".md" and anchor not in _heading_slugs(resolved.read_text(encoding="utf-8")):
+                    errors.append(f"{rel}: anchor `#{anchor}` names no heading of {resolved.name}")
+            skill_root = md_file.parent if md_file.name == "SKILL.md" else md_file.parent.parent
+            for match in SKILL_SCRIPT_MENTION_PATTERN.finditer(text):
+                script = (skill_root / "scripts" / match.group(1).rstrip(".")).resolve()
+                if script.is_file():
+                    named.add(script)
+        for asset in sorted(skills_dir.glob("*/references/**/*")) + sorted(skills_dir.glob("*/scripts/**/*")):
+            if asset.is_file() and asset.resolve() not in named:
+                errors.append(f"{asset.relative_to(base_dir)}: shipped but named by nothing the model reads")
+        for shared in sorted(skills_dir.glob("shared/*.md")):
+            if shared.resolve() not in named:
+                errors.append(f"{shared.relative_to(base_dir)}: shipped but named by no skill and no reference")
+    return errors
+
+
 def load_version_floors(base_dir: Path) -> dict[str, str]:
     """Read `[vars.floors]` from the target defaults."""
     defaults_path = base_dir / TARGETS_DIR_NAME / DEFAULTS_FILE
@@ -798,6 +908,23 @@ def _run_check(title: str, errors: list[str], failure_message: str, success_mess
     return False
 
 
+def _report_skill_ceiling(base_dir: Path) -> bool:
+    """Print the ceiling report; fail on it only once the ceiling is enforced."""
+    over = check_skill_ceiling(base_dir)
+    mode = "enforced" if SKILL_CEILING_ENFORCED else "report only"
+    print(f"Checking every SKILL.md against the {SKILL_CEILING_CHARS}-character compaction ceiling ({mode})...")
+    if not over:
+        print("  Every SKILL.md fits under the ceiling.")
+        return False
+    for line in over:
+        print(f"  OVER: {line}")
+    if SKILL_CEILING_ENFORCED:
+        print("FAIL: A SKILL.md is longer than the compaction ceiling.")
+        return True
+    print(f"  {len(over)} SKILL.md files over the ceiling; reporting only until the diet's last phase.")
+    return False
+
+
 def run_shared_checks(base_dir: Path) -> bool:
     """Run platform-agnostic repository checks."""
     failed = False
@@ -858,6 +985,13 @@ def run_shared_checks(base_dir: Path) -> bool:
         "FAIL: A shared include rendered its build-error branch (the including template set no variant, or misspelled one).",
         "  Every shared include resolved its variant.",
     )
+    failed |= _run_check(
+        "Checking that links resolve both ways in every target...",
+        check_skill_links(base_dir),
+        "FAIL: A link names no file or heading, or a shipped reference, script or shared file is named by nothing.",
+        "  Every link resolves, and every shipped reference, script and shared file is named.",
+    )
+    failed |= _report_skill_ceiling(base_dir)
     failed |= _run_check(
         "Checking all shared template files exist...",
         check_shared_files_exist(base_dir),

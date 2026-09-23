@@ -27,9 +27,10 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import sys
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -70,9 +71,15 @@ CODEX_DISCOVERY_MARKETPLACE_DST = Path(".agents/plugins/marketplace.json")
 # include-only partial ({% include %}-d by skill templates for their YAML
 # frontmatter), so it must exist as a file but should not be rendered standalone
 # (that would only ship a near-empty artifact).
+# The per-skill static asset directories under the repo-root `skills/<skill>/`, copied
+# verbatim into every target beside the rendered SKILL.md: `references/` holds what a
+# branch reads on demand, `scripts/` the programs a skill runs by path.
+STATIC_ASSET_DIRS = ("references", "scripts")
+
 SHARED_TEMPLATES = [
     "skills/shared/mthds-reference.md.j2",
     "skills/shared/native-content-types.md.j2",
+    "skills/shared/credentials.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
@@ -513,12 +520,14 @@ def setup_static_assets(
     templates_dir: Path,
     include_skills: list[str] | None,
 ) -> None:
-    """Copy static skill assets (per-skill references/) into the output directory.
+    """Copy static skill assets (per-skill `references/` and `scripts/`) into the output directory.
 
     The output dir must be self-contained: marketplace installs that copy a
     single plugin subdir (Codex's local marketplace, Claude's local plugin
     install) cannot follow symlinks pointing to siblings of the plugin root, so
-    references are copied, not symlinked.
+    the assets are copied, not symlinked. `shutil.copytree` copies with
+    `copy2`, which keeps a script's executable bit — a skill runs its scripts
+    by path, so a copy that lost the bit would fail on every target.
     """
     if include_skills is not None:
         skill_names = include_skills
@@ -532,15 +541,16 @@ def setup_static_assets(
     for skill_name in skill_names:
         skill_output = output_skills_dir / skill_name
         skill_output.mkdir(parents=True, exist_ok=True)
-        refs_src = skills_dir / skill_name / "references"
-        refs_dst = skill_output / "references"
-        if refs_src.is_dir():
-            _refresh_copy(refs_src, refs_dst)
-        elif refs_dst.is_dir() or refs_dst.is_symlink():
-            # A retired source directory must take its copies with it. Without this the
-            # build leaves stale references shipping in every target and `--check`
-            # reports an ORPHAN no rebuild can clear.
-            _remove(refs_dst)
+        for asset_dir in STATIC_ASSET_DIRS:
+            asset_src = skills_dir / skill_name / asset_dir
+            asset_dst = skill_output / asset_dir
+            if asset_src.is_dir():
+                _refresh_copy(asset_src, asset_dst)
+            elif asset_dst.is_dir() or asset_dst.is_symlink():
+                # A retired source directory must take its copies with it. Without this the
+                # build leaves stale assets shipping in every target and `--check`
+                # reports an ORPHAN no rebuild can clear.
+                _remove(asset_dst)
 
 
 def static_asset_mismatches(
@@ -549,13 +559,15 @@ def static_asset_mismatches(
     templates_dir: Path,
     include_skills: list[str] | None,
 ) -> list[str]:
-    """Compare the copied per-skill `references/` against their source.
+    """Compare the copied per-skill `references/` and `scripts/` against their source.
 
     `setup_static_assets` copies rather than renders, so these files never enter
     a BuildResult and freshness checking used to skip them entirely — a source
     reference edited without `make build` shipped stale while `--check` reported
-    everything fresh. The references are executable know-how, so a stale copy is
-    a plugin whose recipes differ from the ones the test suite ran.
+    everything fresh. The assets are executable know-how, so a stale copy is
+    a plugin whose recipes differ from the ones the test suite ran. A script is
+    compared by its executable bit as well as its bytes: the skill runs it by
+    path, so a copy that lost the bit is as broken as one that lost a line.
     """
     if output_dir == base_dir:
         return []  # root target: source and destination are the same tree
@@ -575,33 +587,55 @@ def static_asset_mismatches(
 
     problems: list[str] = []
     for skill_name in skill_names:
-        refs_src = base_dir / "skills" / skill_name / "references"
-        refs_dst = output_dir / "skills" / skill_name / "references"
-        if not refs_src.is_dir():
-            if refs_dst.is_dir():
-                problems.append(f"  ORPHAN: {label(refs_dst)} (no source in skills/{skill_name}/references)")
-            continue
-
-        expected: set[Path] = {path.relative_to(refs_src) for path in refs_src.rglob("*") if path.is_file()}
-        actual: set[Path] = set()
-        if refs_dst.is_dir():
-            actual = {path.relative_to(refs_dst) for path in refs_dst.rglob("*") if path.is_file()}
-
-        for rel in sorted(expected - actual):
-            problems.append(f"  MISSING: {label(refs_dst / rel)}")
-        for rel in sorted(actual - expected):
-            problems.append(f"  ORPHAN: {label(refs_dst / rel)} (no matching source file)")
-        for rel in sorted(expected & actual):
-            # An unreadable file is a finding, not a traceback: check_freshness runs
-            # under `make check`, where an OSError escaping here kills the whole gate.
-            try:
-                differs = (refs_src / rel).read_bytes() != (refs_dst / rel).read_bytes()
-            except OSError as exc:
-                problems.append(f"  UNREADABLE: {label(refs_dst / rel)} ({exc.strerror})")
-                continue
-            if differs:
-                problems.append(f"  STALE: {label(refs_dst / rel)}")
+        for asset_dir in STATIC_ASSET_DIRS:
+            problems.extend(_asset_dir_mismatches(base_dir, output_dir, skill_name, asset_dir, label))
     return problems
+
+
+def _asset_dir_mismatches(
+    base_dir: Path,
+    output_dir: Path,
+    skill_name: str,
+    asset_dir: str,
+    label: Callable[[Path], str],
+) -> list[str]:
+    """The freshness findings for one skill's copy of one static asset directory."""
+    asset_src = base_dir / "skills" / skill_name / asset_dir
+    asset_dst = output_dir / "skills" / skill_name / asset_dir
+    problems: list[str] = []
+    if not asset_src.is_dir():
+        if asset_dst.is_dir():
+            problems.append(f"  ORPHAN: {label(asset_dst)} (no source in skills/{skill_name}/{asset_dir})")
+        return problems
+
+    expected: set[Path] = {path.relative_to(asset_src) for path in asset_src.rglob("*") if path.is_file()}
+    actual: set[Path] = set()
+    if asset_dst.is_dir():
+        actual = {path.relative_to(asset_dst) for path in asset_dst.rglob("*") if path.is_file()}
+
+    for rel in sorted(expected - actual):
+        problems.append(f"  MISSING: {label(asset_dst / rel)}")
+    for rel in sorted(actual - expected):
+        problems.append(f"  ORPHAN: {label(asset_dst / rel)} (no matching source file)")
+    for rel in sorted(expected & actual):
+        # An unreadable file is a finding, not a traceback: check_freshness runs
+        # under `make check`, where an OSError escaping here kills the whole gate.
+        try:
+            differs = (asset_src / rel).read_bytes() != (asset_dst / rel).read_bytes()
+            mode_differs = _is_executable(asset_src / rel) != _is_executable(asset_dst / rel)
+        except OSError as exc:
+            problems.append(f"  UNREADABLE: {label(asset_dst / rel)} ({exc.strerror})")
+            continue
+        if differs:
+            problems.append(f"  STALE: {label(asset_dst / rel)}")
+        elif mode_differs:
+            problems.append(f"  MODE: {label(asset_dst / rel)} (executable bit differs from its source)")
+    return problems
+
+
+def _is_executable(path: Path) -> bool:
+    """Whether the owner may execute the file — the bit a skill's script is run by."""
+    return bool(path.stat().st_mode & stat.S_IXUSR)
 
 
 def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False) -> BuildResult:

@@ -8,7 +8,6 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
-
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
   - mcp__plugin_pipelex_pipelex__mthds_prepare_inputs
   - mcp__plugin_pipelex_pipelex__mthds_list_methods
@@ -20,18 +19,14 @@ Prepare input data for running MTHDS method bundles. This skill is the single en
 
 The target method comes in three forms, and every MCP call in this skill takes whichever one applies: a **local bundle** (a directory of `.mthds` files, submitted as `files`), a **registered method** from the Pipelex catalog (its `mt_…` id, passed as `method_id`), or a **published method** at its address (`method_ref`, e.g. `github.com/Pipelex/methods/documents@v0.1.0`). Only the first needs local files — the other two are resolved server-side, so no method source enters the conversation. Exactly one selector goes on any call; a second is refused at the extra field.
 
-**Submitting a local bundle.** Each `files` item is either a path or inline contents, and for workspace files the path form is preferred:
-
-- `{path: <absolute path to the .mthds file>}` — **prefer this.** It keeps the real path as provenance in diagnostics, and it spares you copying entire bundles into the request. The workshop resolves a path against **its own** working directory — wherever the harness launched it, which is not necessarily your bundle — so pass an absolute path rather than trusting a relative one to line up. (Same rule as the file *inputs* further down; anything you hand the server as a path follows it.)
-- `{content: <file content>, uri: <path relative to the bundle dir>}` — the inline fallback. Use it when the server can't read the path, and note it is the **only** form the hosted console accepts, since that deployment has no filesystem.
+**Submitting a local bundle.** Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. Anything else you hand the server as a path follows the same rule, the file *inputs* further down included.
 
 ## Requirements — the Pipelex MCP tools
 
 This skill extracts the method's input template through the **`mthds_inputs_template`** tool, served by the plugin's `pipelex` MCP server. It is required — never hand-derive the template from the `.mthds` source.
 
-- **If the tool is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."*
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Never silently improvise a template.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
+- **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
 - **`mthds_prepare_inputs`** is also **required**, whenever the assembled inputs carry a file-ish value (Image, Document) that is not already an `http(s)` URL or a `pipelex-storage://` reference — a local path, a `data:` URL, or inline bytes. It uploads those assets to Pipelex storage and rewrites the values, which is what makes them runnable: see [Prepare the inputs for a run](#prepare-the-inputs-for-a-run). Same discipline as above — an absent tool or a `config`-class error stops the skill; never hand-fake a storage reference. When every file-ish value is already pass-through, the step has nothing to do and may be skipped.
 - **`mthds_list_methods`** is optional: it resolves a saved method the user names without its `mt_…` id. When it is absent, work from a bundle or from an id the user gives; never stop for it.
 - The **run tools** are not this skill's. Running a method is `/pipelex-run`'s, and this skill ends by [offering one](#offer-to-run).

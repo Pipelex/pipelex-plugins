@@ -106,6 +106,7 @@ def template_tree(tmp_path: Path) -> Path:
     shared.mkdir(parents=True)
     (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
+    (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -132,6 +133,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     shared.mkdir(parents=True)
     (shared / "mthds-reference.md.j2").write_text("Ref.\n")
     (shared / "native-content-types.md.j2").write_text("Types.\n")
+    (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -636,6 +638,22 @@ class TestSkillFailureDiscipline:
         body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
         assert "applied but **unproven**" in body
 
+    @staticmethod
+    def _render_mcp_skills(target_name: str) -> tuple[dict[str, str], str]:
+        """The MCP-backed skills' rendered bodies for a target, and its rendered `shared/credentials.md`."""
+        repo_root = Path(__file__).parents[2]
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(
+            repo_root / "templates",
+            repo_root,
+            config.template_vars,
+            include_skills=list(MCP_SKILLS),
+            target_name=config.name,
+        )
+        bodies = {skill: next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md")) for skill in MCP_SKILLS}
+        credentials = next(content for path, content in rendered.items() if path.match("skills/shared/credentials.md"))
+        return bodies, credentials
+
     @pytest.mark.parametrize(
         "target_name, manifest_spawns",
         [
@@ -645,34 +663,31 @@ class TestSkillFailureDiscipline:
         ],
     )
     def test_absent_tools_stop_message_matches_platform(self, target_name: str, manifest_spawns: bool) -> None:
-        """The MCP-absent STOP guidance must quote the real launcher command and,
-        on Vibe (no plugin manifest, no auto-spawn), point at the shipped fragment
-        instead of a manifest spawn. Renders the real templates with real target vars."""
-        repo_root = Path(__file__).parents[2]
-        config = load_target_config(repo_root / "targets", target_name)
-        rendered = render_templates(
-            repo_root / "templates",
-            repo_root,
-            config.template_vars,
-            include_skills=list(MCP_SKILLS),
-            target_name=config.name,
-        )
-        for skill in MCP_SKILLS:
-            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert "npx -y @pipelex/mcp@latest" in body, f"{target_name}/{skill}: stale launcher command in STOP message"
-            if manifest_spawns:
-                assert "plugin manifest spawns" in body, f"{target_name}/{skill}: missing manifest-spawn diagnostic"
-            else:
-                assert "plugin manifest spawns" not in body, f"{target_name}/{skill}: Vibe has no manifest spawn"
-                assert "`mcp/vibe-mcp.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must point at the shipped MCP fragment"
-                assert "`env` table" in body, f"{target_name}/{skill}: Vibe STOP message must say where the key goes"
-                assert "to the end of `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe STOP message must say to append the entry"
-                assert "`mcp_servers = []`" in body, f"{target_name}/{skill}: Vibe STOP message must say to delete the inline empty array"
+        """The MCP-absent STOP stays in every MCP-backed skill and sends the model to
+        `shared/credentials.md` for what to tell the user (box F of the size diet).
+        That message must quote the real launcher command and, on Vibe (no plugin
+        manifest, no auto-spawn), point at the shipped fragment instead of a manifest
+        spawn. Renders the real templates with real target vars."""
+        bodies, credentials = self._render_mcp_skills(target_name)
+        for skill, body in bodies.items():
+            assert "the Pipelex MCP server isn't connected: STOP" in body, f"{target_name}/{skill}: the absent-tool stop left the skill"
+            assert "(../shared/credentials.md#the-tool-is-absent)" in body, f"{target_name}/{skill}: the stop must point at the connection reference"
+        assert "npx -y @pipelex/mcp@latest" in credentials, f"{target_name}: stale launcher command in the connection message"
+        if manifest_spawns:
+            assert "plugin manifest spawns" in credentials, f"{target_name}: missing manifest-spawn diagnostic"
+        else:
+            assert "plugin manifest spawns" not in credentials, f"{target_name}: Vibe has no manifest spawn"
+            assert "`mcp/vibe-mcp.toml`" in credentials, f"{target_name}: Vibe's message must point at the shipped MCP fragment"
+            assert "`env` table" in credentials, f"{target_name}: Vibe's message must say where the key goes"
+            assert "to the end of `~/.vibe/config.toml`" in credentials, f"{target_name}: Vibe's message must say to append the entry"
+            assert "`mcp_servers = []`" in credentials, f"{target_name}: Vibe's message must say to delete the inline empty array"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_credential_sentence_names_the_platform_channel(self, target_name: str) -> None:
         """Where the workshop gets its API key from differs per harness, so the
         sentence differs per harness — it used to be shared by Claude and Codex.
+        It lives in `shared/credentials.md`, read when a `config` error is about
+        the key, and no skill restates it.
 
         On Claude the canonical channel is the plugin configuration, whose value
         the launcher promotes into the spawn environment, and on Claude Desktop
@@ -681,30 +696,23 @@ class TestSkillFailureDiscipline:
         that cannot work. Codex forwards the session environment by name. Vibe
         spawns with a minimal environment and reads the server entry's own `env`
         table."""
-        repo_root = Path(__file__).parents[2]
-        config = load_target_config(repo_root / "targets", target_name)
-        rendered = render_templates(
-            repo_root / "templates",
-            repo_root,
-            config.template_vars,
-            include_skills=list(MCP_SKILLS),
-            target_name=config.name,
-        )
-        for skill in MCP_SKILLS:
-            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
-            if target_name == "prod":
-                assert "from the **plugin configuration**" in body, f"{target_name}/{skill}: Claude's canonical channel is the plugin configuration"
-                assert "OS keychain" in body, f"{target_name}/{skill}: say where the configured key is kept"
-                assert "Claude Desktop" in body, f"{target_name}/{skill}: name the host where the shell environment does not exist"
-                assert session_env_claim not in body, f"{target_name}/{skill}: the session environment is Claude's fallback, not its channel"
-            elif target_name == "codex":
-                assert session_env_claim in body, f"{target_name}/{skill}: Codex forwards the session environment"
-                assert "plugin configuration" not in body, f"{target_name}/{skill}: Codex has no plugin configuration prompt"
-            else:
-                assert "`env` table in `~/.vibe/config.toml`" in body, f"{target_name}/{skill}: Vibe reads the server entry's own env table"
-                assert "never from the session environment" in body, f"{target_name}/{skill}: Vibe passes no shell env to the server"
-                assert "plugin configuration" not in body, f"{target_name}/{skill}: Vibe has no plugin manifest to configure"
+        bodies, body = self._render_mcp_skills(target_name)
+        for skill, skill_body in bodies.items():
+            assert "(../shared/credentials.md#where-the-key-comes-from)" in skill_body, f"{target_name}/{skill}: the config stop must point at the key reference"
+            assert "The server authenticates to the API with" not in skill_body, f"{target_name}/{skill}: the credential sentence lives in shared/credentials.md"
+        session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
+        if target_name == "prod":
+            assert "from the **plugin configuration**" in body, f"{target_name}: Claude's canonical channel is the plugin configuration"
+            assert "OS keychain" in body, f"{target_name}: say where the configured key is kept"
+            assert "Claude Desktop" in body, f"{target_name}: name the host where the shell environment does not exist"
+            assert session_env_claim not in body, f"{target_name}: the session environment is Claude's fallback, not its channel"
+        elif target_name == "codex":
+            assert session_env_claim in body, f"{target_name}: Codex forwards the session environment"
+            assert "plugin configuration" not in body, f"{target_name}: Codex has no plugin configuration prompt"
+        else:
+            assert "`env` table in `~/.vibe/config.toml`" in body, f"{target_name}: Vibe reads the server entry's own env table"
+            assert "never from the session environment" in body, f"{target_name}: Vibe passes no shell env to the server"
+            assert "plugin configuration" not in body, f"{target_name}: Vibe has no plugin manifest to configure"
 
 
 class TestSharedSkillIncludes:
@@ -720,8 +728,9 @@ class TestSharedSkillIncludes:
 
     # A sentence from each shared block, and the include that owns it.
     SHARED_BLOCK_OWNERS: ClassVar[dict[str, str]] = {
-        "The Pipelex MCP server isn't connected —": "skills/shared/mcp-requirements.md.j2",
-        "The server authenticates to the API with": "skills/shared/mcp-requirements.md.j2",
+        "The Pipelex MCP server isn't connected —": "skills/shared/credentials.md.j2",
+        "The server authenticates to the API with": "skills/shared/credentials.md.j2",
+        "the Pipelex MCP server isn't connected: STOP": "skills/shared/mcp-requirements.md.j2",
         "**Formatting is automatic.**": "skills/shared/formatting-hook.md.j2",
         "Prefer the path form ": "skills/shared/validate-call.md.j2",
         "now stale and offer": "skills/shared/stale-types-notice.md.j2",
@@ -2410,3 +2419,60 @@ class TestCatalogIdInEverySkill:
         """`MCP_SKILLS` asserts a skill that stops without the workshop. Explain
         gained a third tool and still explains local source without any."""
         assert "pipelex-explain" not in MCP_SKILLS
+
+
+class TestSkillScriptsCopy:
+    """A skill's `scripts/` travels beside its `references/`, executable bit and all.
+
+    A skill runs its scripts by path, so the build must copy them into every
+    target, keep the bit that lets them run, and let the freshness check see a
+    copy that lost either its bytes or its bit (box E of the size diet's design).
+    """
+
+    @staticmethod
+    def _repo(tmp_path: Path) -> Path:
+        base = tmp_path / "repo"
+        (base / "templates" / "skills" / "demo").mkdir(parents=True)
+        (base / "templates" / "skills" / "demo" / "SKILL.md.j2").write_text("demo\n", encoding="utf-8")
+        scripts = base / "skills" / "demo" / "scripts"
+        scripts.mkdir(parents=True)
+        (scripts / "probe.sh").write_text("#!/bin/sh\necho probe-ok\n", encoding="utf-8")
+        (scripts / "probe.sh").chmod(0o755)
+        (base / "skills" / "demo" / "references").mkdir()
+        (base / "skills" / "demo" / "references" / "branch.md").write_text("branch\n", encoding="utf-8")
+        return base
+
+    def test_scripts_are_copied_executable_and_fresh(self, tmp_path: Path) -> None:
+        base = self._repo(tmp_path)
+        out = tmp_path / "out"
+        setup_static_assets(base, out, base / "templates", None)
+
+        copied = out / "skills" / "demo" / "scripts" / "probe.sh"
+        assert copied.read_bytes() == (base / "skills" / "demo" / "scripts" / "probe.sh").read_bytes()
+        assert os.access(copied, os.X_OK), "the build dropped the script's executable bit"
+        assert (out / "skills" / "demo" / "references" / "branch.md").is_file()
+        assert static_asset_mismatches(base, out, base / "templates", None) == []
+
+    def test_a_copy_that_lost_its_executable_bit_is_reported(self, tmp_path: Path) -> None:
+        base = self._repo(tmp_path)
+        out = tmp_path / "out"
+        setup_static_assets(base, out, base / "templates", None)
+
+        (out / "skills" / "demo" / "scripts" / "probe.sh").chmod(0o644)
+        problems = static_asset_mismatches(base, out, base / "templates", None)
+        assert any(problem.strip().startswith("MODE:") and "probe.sh" in problem for problem in problems), problems
+
+    def test_a_stale_or_orphan_script_is_reported_and_a_retired_directory_is_cleared(self, tmp_path: Path) -> None:
+        base = self._repo(tmp_path)
+        out = tmp_path / "out"
+        setup_static_assets(base, out, base / "templates", None)
+
+        copied = out / "skills" / "demo" / "scripts" / "probe.sh"
+        copied.write_text("#!/bin/sh\necho drift\n", encoding="utf-8")
+        assert any("STALE" in problem for problem in static_asset_mismatches(base, out, base / "templates", None))
+
+        shutil.rmtree(base / "skills" / "demo" / "scripts")
+        assert any("ORPHAN" in problem for problem in static_asset_mismatches(base, out, base / "templates", None))
+        setup_static_assets(base, out, base / "templates", None)
+        assert not (out / "skills" / "demo" / "scripts").exists(), "a retired scripts/ directory kept shipping"
+        assert static_asset_mismatches(base, out, base / "templates", None) == []

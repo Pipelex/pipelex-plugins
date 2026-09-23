@@ -1,11 +1,11 @@
 ---
 name: pipelex-explain
 description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose stored source it reads — or a published method's address, explained at the level of its contract. Strictly read-only — it explains in the conversation and writes nothing.
+
 allowed-tools:
   - Read
   - Grep
   - Glob
-
   - mcp__plugin_pipelex_pipelex__mthds_validate
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
   - mcp__plugin_pipelex_pipelex__mthds_get_method
@@ -31,9 +31,8 @@ A **catalog id** and a **published address** are the opposite case: nothing is o
 
 **`mthds_get_method` is the local workshop's alone**, and it is what turns a catalog id from a contract into a readable method. Where it is absent while the other tools answer, a catalog id is explained at contract level, exactly as an address is, and the explanation says which of the two readings it is. **Two causes present identically from here, so say both rather than picking one**: the hosted console, which reads no files and therefore serves neither catalog-write tool, and a local workshop that predates the tool, which `npx -y @pipelex/mcp@latest` refreshes. Naming only the console tells a workshop user to go looking for a host they are not on. That is a narrower explanation, not a stop.
 
-- **If the workshop is absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection (`/mcp`)."* That stop is only for a target that lives on the platform — a bundle directory on disk is still explained from its source, with the verdict line left out.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim. Same scope: on a local bundle a `config` error costs the verdict line and nothing else — carry on and say it was not checked.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the **plugin configuration**: the key entered when the plugin was enabled, kept in the OS keychain and handed to the launcher, which exports it for the server. That is the canonical channel — and on Claude Desktop the only one, since a GUI launch carries no shell environment — while a `PIPELEX_API_KEY` exported in your shell is the fallback, read only when the plugin's key field is left empty. So a `config`-class authentication error is answered by setting the key in the plugin's configuration, never by telling the user to export a shell variable.
+- **If the workshop is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. That stop is only for a target that lives on the platform — a bundle directory on disk is still explained from its source, with the verdict line left out.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Same scope: on a local bundle a `config` error costs the verdict line and nothing else — carry on and say it was not checked.
 
 ## Mode
 
@@ -55,7 +54,7 @@ This is the rule that decides whether the method is finished, so it is worth kno
 
 ## Step 3 — The verdict, when the workshop is there
 
-One `mthds_validate` call over the same files. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. It adds two things and nothing else:
+One `mthds_validate` call over the same files. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. It adds two things and nothing else:
 
 - **the verdict line** — whether the method is valid, whether it is runnable, and what is still pending;
 - **the main pipe's typed signature**, from the verdict's `main_pipe`: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.

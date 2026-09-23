@@ -1,7 +1,7 @@
 ---
 name: pipelex-run
 description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
-{% include "skills/shared/frontmatter.md.j2" %}
+{%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_run
   - mcp__plugin_pipelex_pipelex__mthds_run_status
@@ -68,7 +68,7 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 ### Step 3 — Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over every `.mthds` file beneath it, **except anything under a `runs/` directory** — that is where step 7 saves a completed run's artifacts, and a method that emits or echoes a `.mthds` file would otherwise have its own output submitted back as part of its source. The same exclusion holds for the `files` submission in step 5. {% include "skills/shared/validate-call.md.j2" %} The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
+For a **bundle directory**, one `mthds_validate` call over the bundle, and the same file set for the `files` submission in step 5. {% include "skills/shared/validate-call.md.j2" %} The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
 
 - valid and runnable → go on;
 - `is_valid: false`, or a non-empty `pending_signatures` (a scaffold has nothing to run yet) → report the verdict and route to `/pipelex-design`, or `/pipelex-edit` when the fix is contract-preserving. Never run a method that did not pass.

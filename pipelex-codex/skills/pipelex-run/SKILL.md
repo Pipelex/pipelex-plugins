@@ -1,7 +1,6 @@
 ---
 name: pipelex-run
 description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
-
 ---
 
 # Run an MTHDS method
@@ -17,12 +16,11 @@ What it does not do: prepare inputs (`/pipelex-inputs`), repair a method (`/pipe
 
 This skill runs through **`mthds_run`**, **`mthds_run_status`** and **`mthds_run_results`**, served by the plugin's `pipelex` MCP server. They are required: never report a run id, a status or a result that did not come from them.
 
-- **If the run tools are absent from this session** (the MCP server isn't connected), STOP and tell the user in one line: *"The Pipelex MCP server isn't connected — the plugin manifest spawns the local workshop (`npx -y @pipelex/mcp@latest`), so its absence usually means `node`/`npx` is unavailable or the spawn failed. Check the plugin's MCP connection."* Never improvise a run id, a status or an output.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim.
+- **If the run tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex. Never improvise a run id, a status or an output.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 - **`mthds_validate`** and **`mthds_inputs_template`** are required for [Start a run](#start-a-run) — they are what keeps this skill from spending credit on a method or an input set that cannot work. [Follow a run](#follow-a-run) uses neither.
 - **`mthds_download_artifacts`** is optional, and it is the one that goes missing on its own: it is absent wherever the workshop has no working directory to save into, which is the hosted console. Without it, report the run's stored references as they came back and say the files were not downloaded — never stop a run that has already completed.
 - **`mthds_list_methods`** is optional: it resolves a saved method the user names without its `mt_…` id. When it is absent, run by id or by files; never stop for it.
-- The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
 
 ## Mode
 
@@ -59,7 +57,7 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 ### Step 3 — Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over every `.mthds` file beneath it, **except anything under a `runs/` directory** — that is where step 7 saves a completed run's artifacts, and a method that emits or echoes a `.mthds` file would otherwise have its own output submitted back as part of its source. The same exclusion holds for the `files` submission in step 5. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
+For a **bundle directory**, one `mthds_validate` call over the bundle, and the same file set for the `files` submission in step 5. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`:
 
 - valid and runnable → go on;
 - `is_valid: false`, or a non-empty `pending_signatures` (a scaffold has nothing to run yet) → report the verdict and route to `/pipelex-design`, or `/pipelex-edit` when the fix is contract-preserving. Never run a method that did not pass.

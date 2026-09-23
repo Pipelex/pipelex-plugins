@@ -1,0 +1,76 @@
+"""The guard registry (box H of `wip/skill-size-diet/design.md`).
+
+A guard is a sentence a model must have read before it acts: skipping it loses something that
+cannot be recovered, sends something off the machine, spends credit, or leaves a result wrong with
+nothing later to say so. Box A keeps every guard in `SKILL.md`, once, at the step it governs — never
+in a reference, which a model reads only when a branch sends it there.
+
+So each guard is registered here by its canonical sentence, and the suite asserts, on every target,
+that the sentence appears **exactly once** in the skill's rendered `SKILL.md` and in **none** of the
+files the skill reads on demand: its own `references/` and the rendered `shared/` files. Presence
+and uniqueness are one assertion because both failures are the ones the diet exists to prevent —
+a guard moved into a reference is a guard that may not be read, and a guard stated twice is a guard
+whose two copies drift.
+
+A canonical sentence is the wording every target renders identically; where a platform branch
+changes a sentence, register the part the branches share. A skill phase registers its guards in the
+same change that places them.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+TARGET_OUTPUTS = ("pipelex", "pipelex-codex", "pipelex-vibe")
+
+GUARDS: dict[str, tuple[str, ...]] = {
+    "pipelex-design": (
+        "Never silently skip validation.",
+        "Offer that; never do it.",
+        "Never write or edit `pipelex-method.json`",
+    ),
+    "pipelex-edit": (
+        "Offer that; never do it.",
+        "Never write or edit `pipelex-method.json`",
+    ),
+    "pipelex-organize": (
+        "Offer that; never do it.",
+        "Never write or edit `pipelex-method.json`",
+    ),
+    "pipelex-run": ("Never improvise a run id, a status or an output.",),
+    "pipelex-scaffold": ("never report a URL",),
+}
+
+CASES = [(target, skill, guard) for target in TARGET_OUTPUTS for skill, guards in GUARDS.items() for guard in guards]
+
+
+def _on_demand_files(target: str, skill: str) -> list[Path]:
+    """What the skill reads only when a branch sends it there: its references and the shared files."""
+    skills_dir = REPO_ROOT / target / "skills"
+    references = [path for path in (skills_dir / skill / "references").rglob("*") if path.is_file()]
+    return references + sorted((skills_dir / "shared").glob("*.md"))
+
+
+@pytest.mark.parametrize(("target", "skill", "guard"), CASES)
+def test_a_guard_is_stated_exactly_once_in_its_skill(target: str, skill: str, guard: str) -> None:
+    skill_md = REPO_ROOT / target / "skills" / skill / "SKILL.md"
+    count = skill_md.read_text(encoding="utf-8").count(guard)
+    assert count == 1, f"{target}/skills/{skill}/SKILL.md states the guard {guard!r} {count} times; a guard lives in SKILL.md exactly once"
+
+
+@pytest.mark.parametrize(("target", "skill", "guard"), CASES)
+def test_a_guard_never_moves_to_a_file_read_on_demand(target: str, skill: str, guard: str) -> None:
+    for path in _on_demand_files(target, skill):
+        if path.suffix not in {".md", ".txt"}:
+            continue
+        assert guard not in path.read_text(encoding="utf-8"), (
+            f"{path.relative_to(REPO_ROOT)} carries the guard {guard!r}; a guard stays in SKILL.md, where it is read before acting"
+        )
+
+
+def test_the_registry_names_shipped_skills() -> None:
+    shipped = {path.parent.name for path in (REPO_ROOT / "templates" / "skills").glob("*/SKILL.md.j2")}
+    assert set(GUARDS) <= shipped, f"the registry names skills that do not exist: {sorted(set(GUARDS) - shipped)}"

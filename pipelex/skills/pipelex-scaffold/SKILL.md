@@ -8,7 +8,6 @@ allowed-tools:
   - Edit
   - Grep
   - Glob
-
 ---
 
 # Scaffold a project for Pipelex methods
