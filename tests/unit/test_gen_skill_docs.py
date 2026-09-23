@@ -887,10 +887,21 @@ class TestPipelexRunSkill:
 
     def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
         """The example is the most-copied part of a skill: one that still overwrites
-        `inputs.json` destroys the source form this change exists to preserve."""
-        body = self.inputs_skill
-        assert "written back over `inputs.json`" not in body
-        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in body
+        `inputs.json` destroys the source form this change exists to preserve. The size
+        diet moved the worked examples into the strategy references, so every file the
+        skill ships is held to it, and to the sentences `L-260922-e01c73` caught still
+        saying preparation rewrites `inputs.json`."""
+        references = self.REPO_ROOT / "skills" / "pipelex-inputs" / "references"
+        texts = {"SKILL.md.j2": self.inputs_skill} | {path.name: path.read_text(encoding="utf-8") for path in sorted(references.glob("*.md"))}
+        for name, text in texts.items():
+            for retired in (
+                "written back over `inputs.json`",
+                "rewrites `inputs.json`",
+                "is what `inputs.json` holds from then on",
+                "rewrites it to",
+            ):
+                assert retired not in text, f"{name} still says preparation rewrites inputs.json: {retired!r}"
+        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in texts["user-data.md"]
 
     def test_preparation_is_skipped_only_for_values_already_remote(self) -> None:
         """`data:` URLs and inline bytes are not local files but still need uploading,
@@ -1277,47 +1288,63 @@ class TestPipelexInputsSizeLimitDiscipline:
     The skill is executable guidance, so these assertions protect the exact
     behavioral boundary: size rejection stops, while an unreadable path may be
     corrected without changing the selected asset.
+
+    The size diet (`wip/skill-size-diet/`, phase 3) split the two halves by what a
+    model must have read before it acts. The file-fidelity rule is a guard — a
+    derived file uploaded in place of the user's is silently wrong — so it stays in
+    `SKILL.md`, once, at the prepare step. The failure branches announce themselves
+    by the error, so they moved to `references/prepare-errors.md`, which the stop
+    table points at, keyed on the error's `location`.
     """
 
     REPO_ROOT = Path(__file__).parents[2]
     TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-inputs" / "SKILL.md.j2"
-    SIZE_BRANCH = '`location: "inputs"` **and the response reports a storage size limit**'
-    NON_SIZE_BRANCH = '`location: "inputs"` **and the response is not a size-limit failure**'
+    REFERENCE = REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md"
+    SIZE_BRANCH = '## `location: "inputs"` and the response reports a storage size limit'
+    NON_SIZE_BRANCH = '## `location: "inputs"` and the response is not a size-limit failure'
     GUARDRAILS = (
         "A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset",
         "Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it",
         "Do not replace it with synthetic data, a public sample, another local file, or any derived file",
+        "The same prohibition applies after an upload failure.",
         "Never retry preparation with altered or substitute content to evade a storage limit",
-        "this is a terminal branch for the current preparation attempt",
-        "no run will be offered",
-        "Do not transform or substitute the asset and do not retry `mthds_prepare_inputs` with altered content",
     )
 
     @property
     def inputs_skill(self) -> str:
         return self.TEMPLATE.read_text(encoding="utf-8")
 
+    @property
+    def reference(self) -> str:
+        return self.REFERENCE.read_text(encoding="utf-8")
+
     def test_size_limit_is_terminal_without_asset_or_input_mutation(self) -> None:
         body = self.inputs_skill
         for guardrail in self.GUARDRAILS:
             assert guardrail in body
 
-        size_branch = body.split(self.SIZE_BRANCH, maxsplit=1)[1].split(self.NON_SIZE_BRANCH, maxsplit=1)[0]
+        size_branch = self.reference.split(self.SIZE_BRANCH, maxsplit=1)[1].split(self.NON_SIZE_BRANCH, maxsplit=1)[0]
+        assert "This is a terminal branch for the current preparation attempt." in size_branch
         assert "quote the tool's exact `message` and `hint` verbatim" in size_branch
         assert "actual file size and the allowed limit whenever the response provides them" in size_branch
-        assert "preparation failed, the inputs are not run-ready" in size_branch
+        assert "preparation failed, the inputs are not run-ready, and no run will be offered" in size_branch
         assert "preserve the user's original file" in size_branch
+        assert "write no `inputs.prepared.json`" in size_branch
         assert "`inputs.json` keeps its local-path form because prepare never rewrites it" in size_branch
+        assert "Continue only after the user supplies a different acceptable input or reference, or the service limit changes" in size_branch
         assert "resolve its path to absolute" not in size_branch
+        # The reference names the guard rather than restating it: a guard lives in SKILL.md once.
+        assert "The skill's file-fidelity guard holds throughout" in self.reference
         assert "surface both and fix *that value*" not in body
 
     def test_unreadable_path_recovery_preserves_the_asset(self) -> None:
-        non_size_branch = self.inputs_skill.split(self.NON_SIZE_BRANCH, maxsplit=1)[1]
+        non_size_branch = self.reference.split(self.NON_SIZE_BRANCH, maxsplit=1)[1]
         assert "For an unreadable local file" in non_size_branch
-        assert "resolve its path to absolute per step 1" in non_size_branch
+        assert "resolve its path to absolute as step 5 does" in non_size_branch
         assert "retry preparation with the file bytes unchanged" in non_size_branch
         assert "must not rewrite the local relative path in `inputs.json`" in non_size_branch
         assert "retry only when the documented error policy explicitly permits" in non_size_branch
+        assert "don't revalidate it" in non_size_branch
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_same_size_limit_guardrails(self, target_name: str) -> None:
@@ -1332,8 +1359,12 @@ class TestPipelexInputsSizeLimitDiscipline:
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
         for guardrail in self.GUARDRAILS:
             assert guardrail in body, f"{target_name}: missing oversized-asset guardrail: {guardrail}"
-        assert "For an unreadable local file" in body
-        assert "resolve its path to absolute per step 1" in body
+        # The stop table sends the model to the branch, and says the size limit is terminal on its own line.
+        stop_row = next(line for line in body.splitlines() if line.startswith("| prepare: `input_domain` at `inputs`"))
+        assert "](references/prepare-errors.md)" in stop_row
+        assert "a storage size limit at `inputs` is terminal for this attempt" in stop_row
+        shipped = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md"
+        assert shipped.read_bytes() == self.REFERENCE.read_bytes(), f"{target_name}: the shipped prepare-errors.md is stale"
 
 
 class TestAdaptiveDesignSkill:
@@ -1508,12 +1539,15 @@ class TestSyntheticInputsSkill:
         assert "pipelex-synthetic-inputs" in inputs
         assert "**`pipelex-synthetic-inputs` is the file factory**" in inputs
         assert "leave that one input unfilled, carry on with the others" in inputs
-        # The inline recipes moved out wholesale — no second home for "make a file".
-        assert "### PDF Documents" not in inputs
-        assert "## Document Generation" not in inputs
-        assert "**Fallback Strategy:**" not in inputs
-        assert "reportlab" not in inputs
-        assert "openpyxl" not in inputs
+        # The inline recipes moved out wholesale — no second home for "make a file",
+        # the synthetic strategy's reference included.
+        synthetic = (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "synthetic.md").read_text(encoding="utf-8")
+        for text in (inputs, synthetic):
+            assert "### PDF Documents" not in text
+            assert "## Document Generation" not in text
+            assert "**Fallback Strategy:**" not in text
+            assert "reportlab" not in text
+            assert "openpyxl" not in text
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_platform_renders_the_skill_and_its_references(self, target_name: str) -> None:
@@ -2130,21 +2164,30 @@ class TestPublishedAddressTarget:
             assert "`method_ref`" in body
             assert "github.com/<owner>/<repo>[/<selector>][@<tag>]" in body
 
+    @property
+    def inputs_address_reference(self) -> str:
+        """`pipelex-inputs`' address branch, read at step 1 when the target is a `method_ref` (size diet, phase 3)."""
+        return (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "published-address.md").read_text(encoding="utf-8")
+
     def test_an_untagged_address_is_accepted_everywhere_and_said_to_float(self) -> None:
         """Louis's amendment at ratification: no skill refuses an untagged address
         until the catalog supports versioning. The line that it floats is what the
-        user gets instead of a refusal, so its absence is the failure mode."""
-        for body in (self.inputs_skill, self.run_skill):
-            assert "floats" in body
+        user gets instead of a refusal, so its absence is the failure mode. In
+        `pipelex-inputs` the instruction to say so stays at step 1, and what floating
+        means is the address reference's, read before the first call."""
+        assert "**An address with no tag is accepted, and it floats**: say so in one line" in self.inputs_skill
+        for body in (self.inputs_address_reference, self.run_skill):
             assert "default branch at its head" in body
+        assert "never a reason to refuse the work" in self.inputs_address_reference
 
     def test_the_output_directory_of_an_address_drops_the_tag(self) -> None:
         """An address has no directory of its own, so one is derived — and the tag has
         to come off it, or `documents@v0.1.0` becomes a directory name carrying a
         version the next run has no reason to keep."""
-        body = self.inputs_skill
+        body = self.inputs_address_reference
         assert "last path segment with its tag dropped" in body
         assert "gives `./documents/`" in body
+        assert "](references/published-address.md) before the first call" in self.inputs_skill
 
     def test_an_address_pairs_with_no_other_selector(self) -> None:
         """`mthds_run` takes `files` + `method_id` together — the files run and the id
@@ -2184,8 +2227,10 @@ class TestPublishedAddressTarget:
         that added it, and a host validating against the older tool schema drops the
         argument before sending it — so the error arrives at `files` saying no selector
         was supplied, NOT at `method_ref`. An agent told to look for the latter reads a
-        stale workshop as a missing bundle and goes hunting for files that do not exist."""
-        body = self.inputs_skill
+        stale workshop as a missing bundle and goes hunting for files that do not exist.
+        The reading is the address reference's, and the stop table keys on the error."""
+        assert "`input_domain` at `files`" in self.inputs_skill
+        body = self.inputs_address_reference
         assert "Provide MTHDS files or a method_id" in body
         assert "npx -y @pipelex/mcp@latest" in body
         assert "predates the selector" in body
@@ -2203,7 +2248,8 @@ class TestPublishedAddressTarget:
         that, so a template call that succeeded rules nothing out, and the arm also
         covers a paywall, an unreachable API and a missing upload route. The credential
         stays the first thing checked, because it is the one the user can act on."""
-        body = self.inputs_skill
+        assert "`config` (the credential first, as the requirements say)" in self.inputs_skill
+        body = self.inputs_address_reference
         assert "in-process Python" in body
         assert "the credential first" in body
         assert "rules nothing out" in body
