@@ -56,7 +56,7 @@ class TestPipelexIntegrateSkill:
         # The containment reading is lexically wrong in both directions without resolving.
         "both resolved (`pwd -P`, `realpath`)",
         # A lock with no sidecar is also what this method's own interrupted run leaves.
-        "This method's own interrupted run (its default destination, no sidecar) is regenerated in place.",
+        "This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place.",
         # A multiple output is a ListContent, so it arrives wrapped and a parser applied to main_stuff whole
         # rejects it. One sentence carries both halves — that multiplicity decides the narrowing, and what the
         # envelope is — so a revert to "arrives as an array" fails here; the code is the references' to pin.
@@ -778,7 +778,7 @@ class TestPipelexIntegrateSkill:
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         assert "## The offline gate" in python
-        assert "Copy `references/codegen_check.py` verbatim to `scripts/codegen_check.py`" in python
+        assert "Copy `references/codegen_check.py` to `scripts/codegen_check.py` with step 10's `cp`, never by reading and rewriting it" in python
         assert "Run it from the project root with **the project's own environment**" in python
         assert "Do not add `pipelex` as a dependency to get a gate" in python
         assert "An interpreter without the SDK does not guess: it exits `2` and names the fix." in python
@@ -1455,14 +1455,15 @@ class TestPipelexIntegrateSkill:
         "**the drift gate of the refreshed method's language**, re-checked against step 10 on every refresh",
         "`scripts/codegen-check.mjs` for `ts-zod`, `scripts/codegen_check.py` for `python-pydantic`",
         "**a missing script is installed and wired as step 10 does**",
-        "**a script that differs byte for byte from the reference is re-copied verbatim**",
+        "**a script that differs byte for byte from the reference is re-copied with step 10's `cp`**, never read and written back",
         "**the refreshed method's generated directory is added to the gate command's arguments when it is not among them**",
         "each said in the report",
         "for `python-structures` there is no script to copy, so only the last applies, to its `pipelex codegen check` wiring",
     )
     REFRESH_REFERENCE_RULE = (
         "on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. "
-        "A refresh also re-copies the script when the project's copy differs from this reference, and installs it when the project has none"
+        "A refresh also re-copies the script, with the same `cp`, when the project's copy differs from this reference, "
+        "and installs it when the project has none"
     )
 
     @pytest.mark.parametrize("target_name", ["source", "prod", "codex", "mistral-vibe"])
@@ -1590,6 +1591,7 @@ class TestPipelexIntegrateSkill:
             "No `main_pipe` (": ("references/signature-fallback.md",),
             "- **`orphans[]` non-empty and `drifts[]` empty**": ("references/orphans.md",),
             "| a gate exits `2` |": ("references/gate-failures.md",),
+            "| `stale-source`": ("references/refresh.md",),
             "Read its language reference now:": ("references/typescript.md", "references/python.md"),
         }
         for decision, targets in at_the_decision.items():

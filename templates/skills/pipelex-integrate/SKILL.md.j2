@@ -48,7 +48,7 @@ Pass exactly one selector to every tool call:
 
 **The project** is {% include "skills/shared/project-root.md.j2" %}; several is a question, none means offering {% if platform == "claude" %}`/pipelex-scaffold`{% else %}the `pipelex-scaffold` skill (`../pipelex-scaffold/SKILL.md`){% endif %}. Read its language reference now: [typescript.md](references/typescript.md) or [python.md](references/python.md).
 
-**Check containment before writing anything**: the project root must sit under the directory this session was launched in, both resolved (`pwd -P`, `realpath`), or STOP: relaunch the harness from the project root{% if platform == "mistral-vibe" %}, or register the workshop there{% endif %}. **Never write the tree into the workshop's directory and move it across.**
+**Check containment before writing anything**: the project root must sit at or under the directory this session was launched in, both resolved (`pwd -P`, `realpath`), or STOP: relaunch the harness from the project root{% if platform == "mistral-vibe" %}, or register the workshop there{% endif %}. **Never write the tree into the workshop's directory and move it across.**
 
 Before step 2, read your branch: a `codegen` script or Makefile target, or a `sources.json` with a `derived` map → [references/harness.md](references/harness.md); this method's `sources.json` (`"generator": "pipelex-integrate"`), a refresh request or an editing skill's hand-off → [references/refresh.md](references/refresh.md).
 
@@ -72,7 +72,7 @@ State the target, the destination and the generator in one line. The target foll
 | `pyproject.toml`, no `pipelex` dependency | `python-pydantic` |
 | a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |
 
-The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/`, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
+The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/`, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
 
 ### 5. Tooling exclusions
 
@@ -85,7 +85,7 @@ Put the generated directory and the gate script step 10 copies in the formatter'
 - `status: "ok"`, `is_valid: true`, `output_dir` present → written; clean when `is_current: true` with an empty `orphans[]`.
 - **`orphans[]` non-empty and `drifts[]` empty** → carry on to step 7 and read [references/orphans.md](references/orphans.md). Read it off the two lists, never from `is_current` (`false` here too); `drifts[]` is present only when non-empty, so no `drifts` is the empty case.
 - **`output_dir already holds …, which this tool does not own`** → that file is the user's: never delete, move or clear it, and never offer to; choose or ask for another directory, before the call too.
-- anything else → the stops.
+- anything else (`drifts[]` included) → the stops.
 
 ### 7. The sidecar
 
@@ -103,7 +103,7 @@ Write this unstamped `sources.json` beside the lock:
 }
 ```
 
-`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes the raw bytes of every `.mthds` file beneath it (`shasum -a 256`); a `method_ref` or `method_id` has no `bundle_dir` and an empty `sources`.
+`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes the raw bytes of every `.mthds` file beneath it with SHA-256; a `method_ref` or `method_id` has no `bundle_dir` and an empty `sources`.
 
 ### 8. Dependencies
 
@@ -134,15 +134,15 @@ What was generated and where, the target and why, the call site's signature, the
 
 | Condition | Do this |
 |---|---|
-| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `validation_errors[]` to `/pipelex-design` or `/pipelex-edit` |
+| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `validation_errors[]` to `/pipelex-design` or `/pipelex-edit`, else finish it in `/pipelex-design` |
 | `input_domain` at `method_ref` / `method_id` | report it in the tool's words |
 | `runtime` | retry once (codegen: only if `retryable: true`, same `output_dir`), then report what landed |
 | `input_domain` at `output_dir`, outside the server's directory | step 1's containment: STOP, relaunch, say what is already written |
 | `is_current: false`, not step 6's orphans case | report `drifts[]` verbatim and stop; commit nothing |
 | no signature, by address or id | STOP as the fallback reference says; never guess the output concept |
 | `TS2835` | the TypeScript reference: yours in your module, the emitter's in `binder.ts` |
-| a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md); never regenerate |
-| `stale-source`: a file added, or no `bundle_dir` | refresh mode; never add its hash to `sources` by hand, which turns the gate green over types that do not cover it |
+| a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md) |
+| `stale-source`: a file added, or no `bundle_dir` | [refresh mode](references/refresh.md); never add its hash to `sources` by hand |
 
 ## References
 
