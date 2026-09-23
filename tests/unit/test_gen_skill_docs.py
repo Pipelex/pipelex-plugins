@@ -918,13 +918,32 @@ class TestPipelexRunSkill:
         """A skipped, declined or failed preparation writes no prepared file, and one an
         earlier pass left would still be read: `/pipelex-run` hands a not-current one back
         here, which skips again, and takes a current-looking one as run-ready. So the
-        deletion comes before the skip and before the user can decline the upload."""
+        deletion comes before the pass-through skip and before the user can decline the
+        upload, and after the Template strategy's skip: a template pass prepares nothing,
+        and the prepared file may be the only run-ready copy of values it just replaced."""
         body = self.inputs_skill
-        delete = body.index("**First delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
-        assert delete < body.index("Skip the call for the Template strategy")
+        delete = body.index("Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
+        assert body.index("Skip the call for the Template strategy") < delete
+        assert delete < body.index("Skip the call too **when every file-ish value is already")
         assert delete < body.index("If the user declines, stop before the call")
         errors = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md").read_text(encoding="utf-8")
         assert "the skill's step 5 deleted any earlier one before the call" in errors
+
+    def test_a_list_input_keeps_its_files_in_a_directory_of_its_own(self) -> None:
+        """An indexed list item `photo_1.png` is also the copy of a scalar input called
+        `photo_1`, and a list file kept under its own name `invoice.pdf` is also the
+        copy of an input called `invoice`: either way one file silently replaces the
+        other and two inputs upload the same bytes. A directory per list input leaves
+        no name two inputs can share."""
+        references = Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references"
+        user_data = (references / "user-data.md").read_text(encoding="utf-8")
+        synthetic = (references / "synthetic.md").read_text(encoding="utf-8")
+        assert "A list input's files go in a directory named after the input" in user_data
+        assert "`inputs/images/shoe_1.jpg`" in user_data
+        assert "`<output_dir>/inputs/<input_variable>/1.<ext>`" in synthetic
+        for text in (user_data, synthetic):
+            assert "`<input_variable>_1.<ext>`" not in text
+            assert "`images_1.jpg`" not in text
 
     def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
         """No prepared file is written when nothing needed uploading, so an offer that

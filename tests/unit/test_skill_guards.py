@@ -84,7 +84,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it.",
         "Do not replace it with synthetic data, a public sample, another local file, or any derived file.",
         "The same prohibition applies after an upload failure. Never retry preparation with altered or substitute content to evade a storage limit.",
-        "**First delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**",
+        "**first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**",
         "step 2's `pipe_ref` if it passed one",
         "**every local file path resolved to an absolute path**",
         "**write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**",
