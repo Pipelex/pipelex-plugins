@@ -1588,6 +1588,17 @@ class TestPipelexIntegrateSkill:
             # The copy command is code, which the link check does not read, so the index names each script as a link.
             assert f"[{script}](references/{script})" in body
 
+    def test_the_gate_copy_asks_before_replacing_a_file_it_did_not_write(self) -> None:
+        """`cp` replaces a same-named file without a word, and a project can keep its own script at that path —
+        the Python starter ships a different `scripts/codegen_check.py`. The copy and the refresh's re-copy go ahead
+        only over a file carrying the line both shipped scripts open with, so that line must stay in each of them."""
+        mark = "Copied verbatim into a project by /pipelex-integrate"
+        for script in ("codegen-check.mjs", "codegen_check.py"):
+            head = (self.REFERENCES_DIR / script).read_text(encoding="utf-8").splitlines()[:6]
+            assert any(mark in line for line in head), f"{script} no longer opens with its ownership line"
+        assert f"without the line `{mark}` is the user's: ask first." in self.the_line(self.integrate, "never by rewriting it")
+        assert f"and only when it carries step 10's line `{mark}`" in self.reference("refresh.md")
+
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_each_branch_is_pointed_at_where_it_is_taken(self, target_name: str) -> None:
         """Box A of the size diet: a branch moves to a reference only behind a pointer placed at the decision

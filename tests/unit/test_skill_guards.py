@@ -65,6 +65,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "The module never reads credentials and never uploads",
         "**Exactly one shared helper**",
         "never by rewriting it, and never format the copy",
+        "**A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**",
         "Format **only the files you wrote**",
         "report `drifts[]` verbatim and stop; commit nothing",
         "never guess the output concept",

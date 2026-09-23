@@ -21,7 +21,7 @@ Automatic unless the user asks to be walked through it, which confirms dependenc
 
 - **The write arm, always.** Every `mthds_codegen` call passes `output_dir`; a refused or failed write is a refusal, never a reason to write the returned bytes yourself.
 - **Generated files are never opened for editing, never formatted, never linted**; a failure inside the tree is reported, never patched.
-- **Never delete an orphan, and never offer to clean orphans up**: two generations can share a directory.
+- **Never delete an orphan, and never offer to clean orphans up**.
 - **Never generate from one source and run from another**: the call site runs the selector the sidecar records.
 - **A project that owns a codegen harness keeps it**: never a second generated layout beside its own.
 - **A `method_ref` is recorded exactly as it was passed, an absent tag included**, in a sidecar or a harness's manifest.
@@ -49,7 +49,7 @@ Before step 2, read your branch: a `codegen` script or Makefile target, or a `so
 
 ### 3. The signature
 
-Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain, since a namespaced one fails only on a real run.
+Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain.
 
 No `main_pipe` (a workshop at `@pipelex/mcp` 0.13.0 or earlier, for one) → read [references/signature-fallback.md](references/signature-fallback.md) before step 4.
 
@@ -106,7 +106,7 @@ One module per method from the language reference's template, in the project's s
 
 ### 10. The offline gate
 
-`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with `cp`, never by rewriting it, and never format the copy:
+`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with `cp`, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
 
 - `ts-zod`: `mkdir -p scripts && cp "<skill-dir>/references/codegen-check.mjs" scripts/codegen-check.mjs`
 - `python-pydantic`: `mkdir -p scripts && cp "<skill-dir>/references/codegen_check.py" scripts/codegen_check.py`

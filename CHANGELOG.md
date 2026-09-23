@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- **`pipelex-integrate` no longer overwrites a project's own gate script**: step 10 copies the drift gate to `scripts/codegen-check.mjs` or `scripts/codegen_check.py`, and a refresh re-copies one that differs from the reference, both without checking what was already there. Both now go ahead only over a file that opens with the gate's own line, `Copied verbatim into a project by /pipelex-integrate`, and ask over any other — such as the different `scripts/codegen_check.py` the Python starter ships.
 - **`pipelex-integrate` no longer calls a TypeScript integration done when plain Node cannot load it**: a project that type-checks under `moduleResolution` `bundler` but runs `tsc`'s ES module output with plain Node fails at runtime on the generated `binder.ts`'s extensionless import, with no `TS2835` to warn of it. The TypeScript reference now has the model read how the project runs its compiled code, report that the integration cannot execute until the emitter is fixed, and leave the build alone — a Codex session had added a bundler step to the user's build to make it load.
 - **Mistral Vibe loads `pipelex-design` and `pipelex-scaffold`**: both descriptions carried a `: ` that strict YAML reads as a second key, so Vibe, which parses a skill's frontmatter strictly, dropped the two skills with nothing but a warning in its log. The descriptions are reworded, and `make check` now parses every rendered skill's frontmatter as strict YAML and fails one that does not parse, or whose `name` is not its directory.
 
