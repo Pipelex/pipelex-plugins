@@ -8,7 +8,7 @@ This is a terminal branch for the current preparation attempt.
 
 1. Report the affected input and file; quote the tool's exact `message` and `hint` verbatim; and include the actual file size and the allowed limit whenever the response provides them, whether as fields or inside those diagnostics.
 2. State explicitly that preparation failed, the inputs are not run-ready, and no run will be offered.
-3. Make no follow-up file writes: preserve the user's original file and the copied file in `<output_dir>/inputs/` unchanged, and write no `inputs.prepared.json` — without one nothing downstream mistakes these inputs for run-ready, and `inputs.json` keeps its local-path form because prepare never rewrites it.
+3. Make no follow-up file writes: preserve the user's original file and the copied file in `<output_dir>/inputs/` unchanged, and write no `inputs.prepared.json` (the skill's step 5 deleted any earlier one before the call) — without one nothing downstream mistakes these inputs for run-ready, and `inputs.json` keeps its local-path form because prepare never rewrites it.
 4. Continue only after the user supplies a different acceptable input or reference, or the service limit changes.
 
 ## `location: "inputs"` and the response is not a size-limit failure

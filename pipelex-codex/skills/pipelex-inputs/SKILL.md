@@ -62,15 +62,15 @@ Fill the step 2 template in place, a composite native's fields included ([what t
 
 ### 5. Prepare the inputs for a run
 
-A run on the hosted API cannot read this disk, so `mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip it for the Template strategy: placeholders are not assets. **When every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**, nothing is uploaded, no prepared file is written, and a run reads `inputs.json`.
+A run on the hosted API cannot read this disk, so `mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. **First delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call for the Template strategy, whose placeholders are not assets, and **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
 **Send the exact file that was selected, generated, copied or referenced for an input — never a derived one**, whatever its type. A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset. Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it. Do not replace it with synthetic data, a public sample, another local file, or any derived file. The same prohibition applies after an upload failure. Never retry preparation with altered or substitute content to evade a storage limit.
 
-Call it with step 2's target, step 2's `pipe_ref` if it passed one (the signature decides which values are assets), and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path**, as for `files`, and no `explicit` flag. Only what you send changes: `inputs.json` keeps its relative paths.
+Call it with step 2's target, step 2's `pipe_ref` if it passed one (the signature decides which values are assets), and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path** in the request alone, as for `files`, and no `explicit` flag.
 
-On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: it is the source, and prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. `uploads[]` lists what this call uploaded. Leave the copies in `<output_dir>/inputs/` alone. When `<output_dir>` is in a git repository whose ignore rules do not cover it, add `inputs.prepared.json` to the nearest `.gitignore` and say so. Report it in one line: the files uploaded, and `inputs.prepared.json` written beside an unchanged `inputs.json`.
+On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: it is the source, and prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. When `<output_dir>` is in a git repository whose ignore rules do not cover it, add `inputs.prepared.json` to the nearest `.gitignore` and say so. Report it in one line: the files uploaded, and `inputs.prepared.json` written beside an unchanged `inputs.json`.
 
 `/pipelex-run` judges whether a prepared file is current, but a file moved over the original keeps its old timestamp and escapes it: **prepare again whenever a file was replaced in place.**
 
@@ -82,7 +82,7 @@ Say what is ready: the source values in `inputs.json`, the run-ready form in `in
 
 - no placeholder remains;
 - **every input the template asked for is filled** — one the factory could not make is absent, passes every other check and guarantees a failed run: say which input waits on the user, and why;
-- the inputs are run-ready: prepare wrote `inputs.prepared.json`, or was skipped because every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference. If prepare failed, report that and what fixing it takes.
+- the inputs are run-ready: prepare wrote `inputs.prepared.json`, or step 5 skipped it because nothing needed uploading. If prepare failed, report that and what fixing it takes.
 
 The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped — and the target: the bundle, or the id or the address itself.
 

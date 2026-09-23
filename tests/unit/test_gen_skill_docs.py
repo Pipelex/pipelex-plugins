@@ -908,10 +908,23 @@ class TestPipelexRunSkill:
         so a skip condition phrased as "no local file" blesses a set that
         `/pipelex-run` then refuses."""
         body = self.inputs_skill
-        assert "**When every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**" in body
-        assert "every file-ish value was already an `http(s)` URL or a `pipelex-storage://` reference" in body
+        assert "**when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**" in body
+        assert "Skip the call for the Template strategy" in body
+        assert "or step 5 skipped it because nothing needed uploading" in body
         assert "no input is a local file" not in body
         assert "no value was a local file" not in body
+
+    def test_an_earlier_prepared_file_is_deleted_before_preparing(self) -> None:
+        """A skipped, declined or failed preparation writes no prepared file, and one an
+        earlier pass left would still be read: `/pipelex-run` hands a not-current one back
+        here, which skips again, and takes a current-looking one as run-ready. So the
+        deletion comes before the skip and before the user can decline the upload."""
+        body = self.inputs_skill
+        delete = body.index("**First delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
+        assert delete < body.index("Skip the call for the Template strategy")
+        assert delete < body.index("If the user declines, stop before the call")
+        errors = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md").read_text(encoding="utf-8")
+        assert "the skill's step 5 deleted any earlier one before the call" in errors
 
     def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
         """No prepared file is written when nothing needed uploading, so an offer that
