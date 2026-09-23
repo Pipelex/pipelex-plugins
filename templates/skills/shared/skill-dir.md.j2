@@ -1,0 +1,22 @@
+{#- Where a skill's own files are: the definition of the `skill_dir` variable,
+   for the targets that need one.
+
+   A skill names a file it ships — a reference it copies verbatim, a script it
+   runs — by `{{ skill_dir }}/…`. On Claude that renders as
+   `${CLAUDE_SKILL_DIR}`, which Claude Code substitutes with the skill's
+   directory before the model reads the body, so nothing needs defining and
+   this partial renders nothing. Codex and Mistral Vibe substitute nothing in a
+   skill body, but both tell the model where a loaded `SKILL.md` lives (Codex
+   in the injected `<skill>` message, Vibe as "Base directory for this skill"),
+   so there `skill_dir` is the `<skill-dir>` placeholder and this sentence
+   defines it — `wip/skill-size-diet/facts.md`, sections 3 to 5.
+
+   A copy named this way is a `cp`, never a read and a rewrite: on Vibe the
+   model once copied a gate script by reading it and writing it back through
+   its own output, which is a copy only by luck and caps at the tool's size.
+
+   Include it just before the first sentence that uses `{{ skill_dir }}`. It
+   ends with a space and strips its own trailing newline (the closing comment
+   below), so the sentence it precedes follows on the same line. -#}
+{% if platform != "claude" %}`{{ skill_dir }}` stands for the directory holding this `SKILL.md`, the one {{ harness_name }} named when it loaded the skill. {% endif %}
+{#- -#}

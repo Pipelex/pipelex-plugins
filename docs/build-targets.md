@@ -52,6 +52,7 @@ Defines the variables shared by all targets. The CLI-free posture keeps this set
 marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
+skill_dir = "${CLAUDE_SKILL_DIR}"   # "<skill-dir>" on Codex and Mistral Vibe
 
 [vars.mcp_server]
 command = "npx"
@@ -206,10 +207,19 @@ All targets share the same version string in lockstep — `make check` fails on 
 |----------|-----------|---------|
 | `marketplace_name` | `defaults.toml` | reserved for skills/hooks that reference the marketplace |
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
-| `harness_name` | `defaults.toml` (overridden per target) | reserved for skills that name the harness |
+| `harness_name` | `defaults.toml` (overridden per target) | every template that names the harness to the user or the model: skill text and shared partials, the hook wrappers, `launch-pipelex-mcp.sh.j2` and `mcp/vibe-mcp.toml.j2` |
+| `skill_dir` | `defaults.toml` (`${CLAUDE_SKILL_DIR}`), overridden to `<skill-dir>` in `codex.toml` and `mistral-vibe.toml` | a sentence that names one of the skill's own files by path — today `pipelex-integrate`'s `cp` of its gate scripts. See below |
 | `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex. `mcp/vibe-mcp.toml.j2` renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
 | `floors` | `defaults.toml` (`[vars.floors]` table) | `pipelex-integrate` and `pipelex-scaffold`, which state the minimum versions to the user. See below |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
+
+### The skill directory
+
+A skill that copies one of its own files verbatim, or runs one of its scripts, names it by path, and the path of a skill's directory is known only at run time, differently on each harness (`wip/skill-size-diet/facts.md`, sections 2 to 5). Claude Code substitutes `${CLAUDE_SKILL_DIR}` in a skill body before the model reads it, so on Claude `skill_dir` is that token and the model reads a real path. Codex and Mistral Vibe substitute nothing, but each tells the model where a loaded `SKILL.md` lives — Codex in the `<skill>` message that injects the skill, Vibe as "Base directory for this skill" — so there `skill_dir` is the placeholder `<skill-dir>`, and the include-only partial `skill-dir.md.j2` defines it in one sentence, placed just before its first use. On Claude that partial renders nothing.
+
+Two rules come with it. **A verbatim copy is a `cp` from `{{ skill_dir }}/references/…`, run from the user's project**, never left to the model to read the file and write it back, which is how Vibe once copied `codegen-check.mjs`: identical by luck, and capped at the size its tools can carry. **A script is run by its absolute path, from the user's project, through its interpreter** (`sh "{{ skill_dir }}/scripts/x.sh" …`), because on Codex and Vibe the model otherwise changes into the skill's directory to run it, and a script acting on a project must run where the project is.
+
+`${CLAUDE_SKILL_DIR}` does not trip `check_skill_argument_placeholders`, which looks for the `$ARGUMENTS` and `$N` tokens Claude Code replaces with a skill's invocation arguments, and the link check finds a script named this way by its `/scripts/<name>` tail on every target. A reference named only inside a code span, as a `cp` command names it, is not a link, so the skill's reference index links it as well.
 
 ### Version floors
 
@@ -254,6 +264,7 @@ So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make chec
 | `catalog-id-bridge.md.j2` | how a file-based skill reaches a catalog id: the search over the link files, the several-hits question, the pull, and the refusal of a published address | `catalog_id_bridge_resume` (the step the skill resumes at, interpolated mid-sentence) |
 | `pipefunc-warning.md.j2` | that `PipeFunc` is experimental on the hosted plane and runs its Python in a network-blocked sandbox | none |
 | `project-root.md.j2` | where a project starts — the nearest directory holding one of the project markers — for design, integrate and catalog | none |
+| `skill-dir.md.j2` | on Codex and Vibe, the sentence defining the `<skill-dir>` placeholder as the directory of the `SKILL.md` the harness loaded; nothing on Claude, where `${CLAUDE_SKILL_DIR}` is substituted. Included just before the first sentence that uses `{{ skill_dir }}` | none |
 
 Two mechanics matter when writing one. A partial that may be included **mid-sentence** strips its own trailing newline, with a `{#- -#}` comment on its last line; the including template supplies the line break. And a parameter is passed by setting it in the including template before the include — block form reads best for a sentence of Markdown, and the closing tag swallows its own newline so the assignment leaves no blank line in the output:
 

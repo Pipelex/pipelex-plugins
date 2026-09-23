@@ -742,6 +742,7 @@ class TestSharedSkillIncludes:
         "**The saved method does not have this change.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
+        "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
