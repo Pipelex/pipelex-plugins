@@ -14,6 +14,7 @@ from typing import Any, cast
 import yaml
 
 from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
+from scripts.hook_bundle import HOOK_BUNDLE_PATH, read_bundle, read_provenance, unpublished_sources
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
@@ -754,6 +755,34 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
     return errors
 
 
+def check_hook_provenance(base_dir: Path) -> list[str]:
+    """Refuse a vendored hook bundle whose provenance no published source can reproduce.
+
+    The bundle is built in `pipelex-sdk-js` and its banner names what from, so two things are
+    readable here with no sibling checkout and no network: an engine bundled from an unreleased
+    `tools-wasm` build through `PIPELEX_TOOLS_WASM_PATH`, and an SDK built outside a git checkout,
+    whose commit the banner spells `unknown`. Either ships a hook nobody can rebuild. Whether the
+    bundle is *behind* its sources needs both, which is `make check-hook-fresh`, a release gate.
+
+    Only the template copy is read: the freshness check holds every target's copy to it byte for byte.
+    """
+    rel = HOOK_BUNDLE_PATH.as_posix()
+    bundle_path = base_dir / HOOK_BUNDLE_PATH
+    if not bundle_path.is_file():
+        return [f"{rel}: the vendored hook bundle is missing — run `make vendor-hook`, then `make build`"]
+    provenance = read_provenance(read_bundle(bundle_path))
+    if provenance is None:
+        return [
+            f"{rel}: line 3 is not the provenance line `npm run build:hook` writes, so nothing says what the bundle was built from "
+            "— re-vendor it with `make vendor-hook`, then `make build`"
+        ]
+    return [
+        f"{rel}: {problem} — re-vendor from the main checkout of pipelex-sdk-js with PIPELEX_TOOLS_WASM_PATH unset "
+        "(`make vendor-hook`), then `make build`"
+        for problem in unpublished_sources(provenance)
+    ]
+
+
 def check_shared_files_exist(base_dir: Path) -> list[str]:
     """Check that all expected shared template source files are present."""
     shared_dir = base_dir / "templates" / "skills" / "shared"
@@ -999,6 +1028,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_no_templates_in_output(base_dir),
         "FAIL: Found .j2 template files in output directories (should be in templates/).",
         "  No leaked templates found.",
+    )
+    failed |= _run_check(
+        "Checking the vendored hook bundle was built from published sources...",
+        check_hook_provenance(base_dir),
+        "FAIL: The vendored hook bundle names a source no published artifact reproduces.",
+        "  The hook bundle was built from a pipelex-sdk-js commit and @pipelex/tools-wasm from npm.",
     )
     failed |= _run_check(
         "Checking Mistral Vibe target artifacts...",
