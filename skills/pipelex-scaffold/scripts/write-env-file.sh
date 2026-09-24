@@ -41,6 +41,9 @@ dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory
 # The pristine commit left <dir> the root of a repository of its own, or new files inside another
 # repository's work tree, whose rules then judge `.env` as they judge every file of the project;
 # or a subtree that repository ignores, where the project's own rules judge it (see project_git).
+# A repository planted inside another's work tree, which it reports as `nested:`, is a root here,
+# judged by its own rules: they are <dir>'s .gitignore files, which the enclosing repository reads
+# too once the user removes <dir>/.git, so a `.env` they ignore stays ignored whichever they choose.
 # Outside every work tree git can judge no ignore rule, so nothing is written before that commit.
 prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || refuse not-a-repository
 own_rules=

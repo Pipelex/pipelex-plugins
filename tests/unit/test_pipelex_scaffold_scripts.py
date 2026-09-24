@@ -331,6 +331,35 @@ class TestCommitPristine:
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
         assert _staged_once_made_a_repository(project) == [".gitignore", "main.py"]
 
+    def test_a_repository_planted_inside_the_user_s_is_committed_in_by_nothing(self, tmp_path: Path) -> None:
+        """create-astro 5.2.4 runs `git init` and a commit even inside an enclosing work tree, since it
+        looks only for a `.git` of `<dir>`'s own, and a user can make one there too. `<dir>` then reads as
+        a repository's root, yet a commit there would leave the enclosing repository a pointer to it that
+        no clone can fetch, so the script commits in neither repository, says `nested:` with the enclosing
+        root, and leaves `<dir>/.git` for the user to remove or keep."""
+        outer = _repository(tmp_path / "their-repo")
+        (outer / "README.md").write_text("theirs\n", encoding="utf-8")
+        _git(outer, "add", "README.md")
+        _git(outer, "commit", "-q", "-m", "their commit")
+        head_before = _git(outer, "rev-parse", "HEAD")
+        project = _repository(outer / "new-app")
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+        (project / "main.js").write_text("//\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Astro project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == f"nested: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        assert (project / ".git").is_dir(), "the nested repository is the user's to remove, never the script's"
+        assert subprocess.run(["git", "-C", str(project), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert _git(project, "diff", "--cached", "--name-only") == ""
+        assert _git(outer, "rev-parse", "HEAD") == head_before
+        assert _git(outer, "diff", "--cached", "--name-only") == ""
+        # The .gitignore is written, and once the user removes `<dir>/.git` the enclosing repository reads it.
+        shutil.rmtree(project / ".git")
+        untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
+        assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.js"]
+
     def test_inside_another_repository_nothing_is_written_when_the_initializer_wrote_nothing(self, tmp_path: Path) -> None:
         outer = _repository(tmp_path / "their-repo")
         project = outer / "new-app"
@@ -671,6 +700,20 @@ class TestWriteEnvFile:
         assert ("!.env.example" in gitignore) == (how == "this-machine-s-exclude")
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
         assert _staged_once_made_a_repository(project) == [".env.example", ".gitignore"]
+
+    def test_a_repository_planted_inside_the_user_s_is_written_under_its_own_rules(self, tmp_path: Path) -> None:
+        """After the pristine commit's `nested:`, `<dir>` is still a repository of its own, which reads
+        only `<dir>`'s `.gitignore` files, so a line there is what keeps `.env` out while it stays one,
+        and the enclosing repository reads the same line once the user removes `<dir>/.git`."""
+        outer = _repository(tmp_path / "their-repo")
+        (outer / ".gitignore").write_text(".env\n", encoding="utf-8")
+        project = _repository(outer / "app")
+        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
+        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
+        assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
 
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"

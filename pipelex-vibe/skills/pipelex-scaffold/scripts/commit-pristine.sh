@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The pristine commit of /pipelex-scaffold's initializer branch: the repository test, a
 # .gitignore that keeps the dependency tree out, the staging and the one commit, all held to
-# the project directory. Inside another repository's work tree, ignored there or not, it writes
-# the .gitignore alone.
+# the project directory. Inside another repository's work tree, ignored there or not, and in a
+# repository planted there, it writes the .gitignore alone.
 #
 # Usage: commit-pristine.sh <dir> <message>
 #
@@ -16,11 +16,15 @@
 #   ignored: <root>              <dir> lies in the work tree of the repository at <root>, which
 #                                ignores it: nothing was initialized, staged or committed, and no
 #                                repository versions the project
+#   nested: <root>               <dir> is the root of a repository that lies in the work tree of the
+#                                repository at <root>, planted there by the initializer or the user:
+#                                nothing was staged or committed in either, and <dir>/.git is left
+#                                where it is, since removing it is the user's choice
 #   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
 #                                no-directory, init-failed, write-failed, stage-failed,
 #                                nothing-to-commit, commit-failed; git's own message, if any,
 #                                goes to stderr
-# The exit code is presentation: 0 for committed, kept, inside and ignored, 1 for refused.
+# The exit code is presentation: 0 for committed, kept, inside, ignored and nested, 1 for refused.
 
 set -u
 
@@ -45,7 +49,8 @@ message=$2
 # needs no path comparison and so survives symlinks and letter case. Three outcomes:
 #   - outside every work tree, <dir> becomes a repository of its own, and the commit follows;
 #   - at a repository's root, the one the initializer made or the user's lone .git, the commit
-#     lands there (the skill asks first when the repository was the user's);
+#     lands there (the skill asks first when the repository was the user's), unless that root
+#     itself lies in another repository's work tree, which the last case below covers;
 #   - inside another repository's work tree, <dir> gets no repository and no commit, as the method
 #     app's initializer gives it none: a repository planted there is one the enclosing repository
 #     sees as embedded, and `git -C` sets git's working directory without scoping anything, so a
@@ -57,7 +62,16 @@ message=$2
 # dotfiles repository ignoring `*`), no `git add` of the user's takes the project, which then
 # prints `ignored:` rather than `inside:`, and still gets no repository: whether to make it one is
 # the user's choice.
+# A repository root can lie inside another work tree too, when an initializer ran `git init`
+# there anyway (create-astro tests only for a .git of <dir>'s own) or the user made one. The empty
+# prefix reads as a root like any other, so the parent directory is asked as well. That repository
+# gets no commit, for the reason above: once it has one, the enclosing repository stages it as a
+# pointer to that commit, which no clone can fetch, and stops carrying the project's files. It
+# prints `nested:`, its .gitignore is written by its own rules, which are <dir>'s .gitignore files
+# that the enclosing repository reads as well once <dir>/.git is gone, and neither its index nor
+# its .git is touched: removing that is the user's choice, never this script's.
 enclosing=
+nested=
 own_rules=
 no_index=
 if prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null); then
@@ -67,6 +81,8 @@ if prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null); then
       own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)
       no_index=--no-index
     fi
+  else
+    nested=$(git -C "$dir/.." rev-parse --show-toplevel 2> /dev/null)
   fi
 else
   error=$(git -C "$dir" init -q -b main 2>&1) || refuse init-failed "$error"
@@ -77,8 +93,8 @@ fi
 # holds of either and HEAD does not, before those lines are read: a path the user committed is
 # theirs, and stays tracked. `-f` because a file rewritten since it was staged, as `npm install`
 # rewrites node_modules/.package-lock.json, is otherwise refused; `--cached` leaves the file itself.
-# An enclosing repository's index is the user's, and is left alone.
-if [ -z "$enclosing" ]; then
+# An enclosing repository's index is the user's, and is left alone, and so is a nested one's.
+if [ -z "$enclosing" ] && [ -z "$nested" ]; then
   for staged_early in .env node_modules; do
     [ -n "$(git -C "$dir" ls-files --cached -- "$staged_early")" ] || continue
     git -C "$dir" rev-parse -q --verify "HEAD:$staged_early" > /dev/null 2>&1 && continue
@@ -127,6 +143,10 @@ if [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
 fi
 [ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
 
+if [ -n "$nested" ]; then
+  printf 'nested: %s\n' "$nested"
+  exit 0
+fi
 if [ -n "$enclosing" ]; then
   if [ -n "$own_rules" ]; then
     printf 'ignored: %s\n' "$enclosing"

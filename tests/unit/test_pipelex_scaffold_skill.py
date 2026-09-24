@@ -284,12 +284,12 @@ class TestPipelexScaffoldSkill:
             # commit, as the method app does, and the report says the project is new files of it.
             # An ignored `<dir>` gets the same treatment and a verdict of its own, since the report cannot
             # call ignored files new files of the repository: its words are the initializers reference's.
-            assert "`inside:` and `ignored:` name the enclosing repository, where it commits nothing" in body
+            assert "`inside:`, `ignored:` and `nested:` name the enclosing repository, where it commits nothing" in body
             assert "the pristine commit and who made it, or on `inside:` that the project is new files of that repository" in body
             assert (
-                "the `ignored:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL"
-                in body
-            )
+                "the `ignored:`, `nested:` and env verdicts in the words "
+                "[references/initializers.md](references/initializers.md) gives each, never the URL"
+            ) in body
             # The method app's report still reads the plane by a test, never an echo, and only of the file
             # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
             assert f"the plane of the `.env.local` `make create` wrote, `{PLANE_TEST}`" in body
@@ -304,6 +304,15 @@ class TestPipelexScaffoldSkill:
             in initializers
         )
         assert "making it a repository is the user's choice, which this skill does not make for them" in initializers
+        # Review round of 2026-09-25: a repository an initializer plants inside the user's work tree anyway
+        # (create-astro does) reads as a root, and was committed in. The script now says `nested:`, and the
+        # report offers the removal of `<dir>/.git` without performing it, since it may hold history.
+        assert "**`nested:`**, from the pristine-commit script" in initializers
+        assert "Offer, never perform, the removal of `<dir>/.git`, which deletes whatever history it holds" in initializers
+        assert (
+            "**An initializer not in the tables below that would run `git init` gets its no-git flag when `<dir>` lies inside another work tree**"
+            in initializers
+        )
         for word in ("**`filled`**", "**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
             assert word in initializers, f"the reference does not say what {word} means"
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
@@ -383,6 +392,7 @@ class TestPipelexScaffoldSkill:
         )
         assert "the pristine-commit script's `inside:` verdict" in github
         assert "On `ignored:`, that repository ignores the project, so its remote carries none of it" in github
+        assert "Treat `nested:` as `inside:`" in github
         assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
