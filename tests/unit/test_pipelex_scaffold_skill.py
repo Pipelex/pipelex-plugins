@@ -282,9 +282,14 @@ class TestPipelexScaffoldSkill:
             assert "`kept:` names the commit the initializer made itself" in body
             # Ruled 2026-09-24: inside another repository's work tree, branch B makes no repository and no
             # commit, as the method app does, and the report says the project is new files of it.
-            assert "`inside:` names the enclosing repository, where it commits nothing" in body
+            # An ignored `<dir>` gets the same treatment and a verdict of its own, since the report cannot
+            # call ignored files new files of the repository: its words are the initializers reference's.
+            assert "`inside:` and `ignored:` name the enclosing repository, where it commits nothing" in body
             assert "the pristine commit and who made it, or on `inside:` that the project is new files of that repository" in body
-            assert "the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL" in body
+            assert (
+                "the `ignored:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL"
+                in body
+            )
             # The method app's report still reads the plane by a test, never an echo, and only of the file
             # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
             assert f"the plane of the `.env.local` `make create` wrote, `{PLANE_TEST}`" in body
@@ -293,6 +298,12 @@ class TestPipelexScaffoldSkill:
             assert "cp -n" not in body
         initializers = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
         assert "**Inside another repository's work tree it initializes nothing and commits nothing**" in initializers
+        assert "the script does the same and prints `ignored:` instead" in initializers
+        assert (
+            "**`ignored:`**, from the pristine-commit script: say that the enclosing repository ignores the project, so nothing versions it"
+            in initializers
+        )
+        assert "making it a repository is the user's choice, which this skill does not make for them" in initializers
         for word in ("**`filled`**", "**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
             assert word in initializers, f"the reference does not say what {word} means"
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
@@ -371,6 +382,7 @@ class TestPipelexScaffoldSkill:
             in github
         )
         assert "the pristine-commit script's `inside:` verdict" in github
+        assert "On `ignored:`, that repository ignores the project, so its remote carries none of it" in github
         assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
@@ -388,6 +400,10 @@ class TestPipelexScaffoldSkill:
         # class as the `uv add` parentheses above, one command earlier.
         assert "uv init --package --no-workspace <dir>" in initializers
         assert "uv init --app --no-workspace <dir>" in initializers
+        # `pdm init` runs `git init` even inside another repository's work tree (PDM 2.29.2), which would
+        # plant the nested repository the pristine-commit script refuses to make.
+        assert "`pdm init --non-interactive --no-git`" in initializers
+        assert "pdm: yes, even inside another repository, and `--no-git` skips it" in initializers
         assert "`--no-workspace` is on every `uv init` above" in initializers
         # npm resolves the project it writes to upward exactly as uv does, and unlike uv it finds the
         # parent and silently succeeds, so every follow-on install is scoped too.

@@ -10,7 +10,7 @@
 ### Changed
 
 - **One MTHDS language reference**: `pipelex-design`, `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` all read `skills/shared/writing-mthds.md`, which replaces both design's own `references/writing-mthds.md` and the shared `mthds-reference.md`, now removed. What only the removed file said is folded in: model references, the batch naming convention, the search filters, the template categories, and the aspect-ratio values with the models that support them.
-- **`pipelex-scaffold` plants no repository inside another**: a project the initializer branch creates inside another repository's work tree used to be given a repository of its own and its pristine commit; it now gets neither, as a method app already did, and the report says its files are new files of the enclosing repository, for the user to review and commit there. Its `.gitignore` still keeps the dependency tree, the virtual environment and `.env` out of that repository.
+- **`pipelex-scaffold` plants no repository inside another**: a project the initializer branch creates inside another repository's work tree used to be given a repository of its own and its pristine commit; it now gets neither, as a method app already did, and the report says its files are new files of the enclosing repository, for the user to review and commit there, or, when that repository ignores the project's directory, that nothing versions the project and that making it a repository is the user's choice. Its `.gitignore` still keeps the dependency tree, the virtual environment and `.env` out, judged in an ignored directory by the project's own rules, and the pdm recipe passes `--no-git`, since `pdm init` otherwise makes a repository even inside another.
 
 ### Fixed
 

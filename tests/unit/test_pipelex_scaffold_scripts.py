@@ -95,6 +95,34 @@ def _ignored_only_on_this_machine(tmp_path: Path, project: Path, where: str, pat
         exclude.write_text(f"{pattern}\n", encoding="utf-8")
 
 
+# How a user's repository comes to ignore the directory a project is scaffolded in.
+IGNORING_REPOSITORIES = {
+    "an-ignored-tmp": (".gitignore", "tmp/\n", "tmp/new-app"),
+    "a-dotfiles-repository": (".gitignore", "*\n!.gitignore\n", "new-app"),
+    "this-machine-s-exclude": (".git/info/exclude", "*\n", "new-app"),
+}
+
+
+def _ignoring_repository(tmp_path: Path, how: str) -> tuple[Path, Path]:
+    """A user's repository, with its ignore rule committed where a clone carries one, and the project
+    directory it ignores, not yet created."""
+    rule_file, rule, project = IGNORING_REPOSITORIES[how]
+    outer = _repository(tmp_path / "their-repo")
+    (outer / rule_file).write_text(rule, encoding="utf-8")
+    (outer / "README.md").write_text("theirs\n", encoding="utf-8")
+    _git(outer, "add", "-f", "README.md", *([rule_file] if rule_file == ".gitignore" else []))
+    _git(outer, "commit", "-q", "-m", "their commit")
+    return outer, outer / project
+
+
+def _staged_once_made_a_repository(project: Path) -> list[str]:
+    """What a `git add -A` would take if the user later made the project a repository of its own,
+    which is when its own `.gitignore` is the only rule that keeps anything out."""
+    _git(project, "init", "-q", "-b", "main")
+    _git(project, "add", "-A")
+    return sorted(_git(project, "diff", "--cached", "--name-only").splitlines())
+
+
 def _dotenv_reading(text: str) -> dict[str, str]:
     """An env file resolved the way dotenv readers resolve it: the later of two assignments wins."""
     resolved: dict[str, str] = {}
@@ -281,6 +309,27 @@ class TestCommitPristine:
         # tree and the `.env` out of the user's own `git add`.
         untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
         assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.py"]
+
+    @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
+    def test_a_directory_the_user_s_repository_ignores_is_versioned_by_nothing(self, tmp_path: Path, how: str) -> None:
+        """An ignored `<dir>` gets no repository either, and its own verdict: the report cannot call the
+        project new files of a repository that ignores them. Its `.gitignore` is judged by its own rules,
+        which the enclosing rule hides, so that a repository the user makes there later keeps the
+        dependency tree and the `.env` out."""
+        outer, project = _ignoring_repository(tmp_path, how)
+        head_before = _git(outer, "rev-parse", "HEAD")
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+        (project / ".gitignore").write_text("build/\n", encoding="utf-8")
+        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == f"ignored: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        assert not (project / ".git").exists(), "a repository was planted inside the user's"
+        assert _git(outer, "rev-parse", "HEAD") == head_before
+        assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
+        assert _staged_once_made_a_repository(project) == [".gitignore", "main.py"]
 
     def test_inside_another_repository_nothing_is_written_when_the_initializer_wrote_nothing(self, tmp_path: Path) -> None:
         outer = _repository(tmp_path / "their-repo")
@@ -606,6 +655,23 @@ class TestWriteEnvFile:
         assert not (project / ".gitignore").exists()
         assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
 
+    @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
+    def test_a_directory_the_user_s_repository_ignores_is_written_under_its_own_rules(self, tmp_path: Path, how: str) -> None:
+        """The enclosing rule hides every `.gitignore` below it, so read through it `.env` would pass for
+        ignored by a rule no repository of the project carries, or, where only this machine ignores the
+        directory, never read as ignored at all and refuse the key. The project's own rules judge it."""
+        outer, project = _ignoring_repository(tmp_path, how)
+        project.mkdir(parents=True)
+        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "filled base-url=file plane=production\n"
+        gitignore = (project / ".gitignore").read_text(encoding="utf-8")
+        assert ".env" in gitignore.splitlines()
+        # Only a rule of the project's own sees the example, so the enclosing one never earns it a negation.
+        assert ("!.env.example" in gitignore) == (how == "this-machine-s-exclude")
+        assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
+        assert _staged_once_made_a_repository(project) == [".env.example", ".gitignore"]
+
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"
         project.mkdir()
@@ -638,12 +704,18 @@ def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Pa
 def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     """The helper is copied into each script, which runs alone, so the copies are held together here."""
 
-    def helper(script: Path) -> str:
+    def helpers(script: Path) -> str:
         text = script.read_text(encoding="utf-8")
-        start = text.index("ignored_by_the_project() {")
-        return text[start : text.index("\n}\n", start)]
+        start = text.index("# git over <dir> as its ignore rules are judged.")
+        end = text.index("\n}\n", text.index("ignored_by_the_project() {"))
+        return text[start:end]
 
-    assert helper(COMMIT_PRISTINE) == helper(WRITE_ENV_FILE)
+    assert helpers(COMMIT_PRISTINE) == helpers(WRITE_ENV_FILE)
+    # And each decides the same way whether the project's own rules are the ones judged.
+    for script in (COMMIT_PRISTINE, WRITE_ENV_FILE):
+        text = script.read_text(encoding="utf-8")
+        assert 'git -C "$dir" check-ignore -q .' in text
+        assert 'own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)\n' in text
 
 
 @pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)

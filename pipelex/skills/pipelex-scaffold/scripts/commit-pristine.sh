@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The pristine commit of /pipelex-scaffold's initializer branch: the repository test, a
 # .gitignore that keeps the dependency tree out, the staging and the one commit, all held to
-# the project directory. Inside another repository's work tree it writes the .gitignore alone.
+# the project directory. Inside another repository's work tree, ignored there or not, it writes
+# the .gitignore alone.
 #
 # Usage: commit-pristine.sh <dir> <message>
 #
@@ -12,11 +13,14 @@
 #   inside: <root>               <dir> lies in the work tree of the repository at <root> and is not
 #                                its root: nothing was initialized, staged or committed, and the
 #                                project is new files of that repository, as the method app's is
+#   ignored: <root>              <dir> lies in the work tree of the repository at <root>, which
+#                                ignores it: nothing was initialized, staged or committed, and no
+#                                repository versions the project
 #   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
 #                                no-directory, init-failed, write-failed, stage-failed,
 #                                nothing-to-commit, commit-failed; git's own message, if any,
 #                                goes to stderr
-# The exit code is presentation: 0 for committed, kept and inside, 1 for refused.
+# The exit code is presentation: 0 for committed, kept, inside and ignored, 1 for refused.
 
 set -u
 
@@ -49,9 +53,21 @@ message=$2
 #     that repository, left for the user to review and commit, and its index and HEAD are never
 #     touched: only the .gitignore below is written, so that the user's own `git add` never takes
 #     the dependency tree or a `.env`.
+# The last case splits in two. When the enclosing repository ignores <dir> (an ignored tmp/, a
+# dotfiles repository ignoring `*`), no `git add` of the user's takes the project, which then
+# prints `ignored:` rather than `inside:`, and still gets no repository: whether to make it one is
+# the user's choice.
 enclosing=
+own_rules=
+no_index=
 if prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null); then
-  [ -z "$prefix" ] || enclosing=$(git -C "$dir" rev-parse --show-toplevel)
+  if [ -n "$prefix" ]; then
+    enclosing=$(git -C "$dir" rev-parse --show-toplevel)
+    if git -C "$dir" check-ignore -q .; then
+      own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)
+      no_index=--no-index
+    fi
+  fi
 else
   error=$(git -C "$dir" init -q -b main 2>&1) || refuse init-failed "$error"
 fi
@@ -70,12 +86,25 @@ if [ -z "$enclosing" ]; then
   done
 fi
 
+# git over <dir> as its ignore rules are judged. In a subtree the enclosing repository ignores,
+# that repository's rule hides every .gitignore below it and no clone carries the project, so the
+# rules judged are <dir>'s own, which a repository made there later reads: the enclosing git
+# directory takes <dir> as its work tree, and `$no_index` keeps its index, whose paths are not
+# <dir>'s, out of `check-ignore`.
+project_git() {
+  if [ -n "$own_rules" ]; then
+    git -C "$dir" --git-dir="$own_rules" --work-tree="$dir" "$@"
+  else
+    git -C "$dir" "$@"
+  fi
+}
+
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
 # repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
 # only this machine ignores.
 ignored_by_the_project() {
-  git -C "$dir" -c core.excludesFile=/dev/null check-ignore -q -- "$1" || return 1
-  source=$(git -C "$dir" -c core.excludesFile=/dev/null check-ignore -v -- "$1")
+  project_git -c core.excludesFile=/dev/null check-ignore $no_index -q -- "$1" || return 1
+  source=$(project_git -c core.excludesFile=/dev/null check-ignore $no_index -v -- "$1")
   case ${source%%:*} in .gitignore | */.gitignore) return 0 ;; esac
   return 1
 }
@@ -99,7 +128,11 @@ fi
 [ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
 
 if [ -n "$enclosing" ]; then
-  printf 'inside: %s\n' "$enclosing"
+  if [ -n "$own_rules" ]; then
+    printf 'ignored: %s\n' "$enclosing"
+  else
+    printf 'inside: %s\n' "$enclosing"
+  fi
   exit 0
 fi
 

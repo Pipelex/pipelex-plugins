@@ -39,9 +39,16 @@ refuse() {
 [ $# -eq 1 ] || refuse usage
 dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory
 # The pristine commit left <dir> the root of a repository of its own, or new files inside another
-# repository's work tree, whose rules then judge `.env` as they judge every file of the project.
+# repository's work tree, whose rules then judge `.env` as they judge every file of the project;
+# or a subtree that repository ignores, where the project's own rules judge it (see project_git).
 # Outside every work tree git can judge no ignore rule, so nothing is written before that commit.
-git -C "$dir" rev-parse --show-prefix > /dev/null 2>&1 || refuse not-a-repository
+prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || refuse not-a-repository
+own_rules=
+no_index=
+if [ -n "$prefix" ] && git -C "$dir" check-ignore -q .; then
+  own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)
+  no_index=--no-index
+fi
 example="$dir/.env.example"
 env="$dir/.env"
 
@@ -67,21 +74,34 @@ else
   add_missing_lines "$example"
 fi
 
-# An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
-# hidden example is never reviewed, committed or carried by a clone.
-if git -C "$dir" check-ignore -q -- .env.example; then
-  printf '\n!.env.example\n' >> "$dir/.gitignore" || refuse write-failed
-fi
+# git over <dir> as its ignore rules are judged. In a subtree the enclosing repository ignores,
+# that repository's rule hides every .gitignore below it and no clone carries the project, so the
+# rules judged are <dir>'s own, which a repository made there later reads: the enclosing git
+# directory takes <dir> as its work tree, and `$no_index` keeps its index, whose paths are not
+# <dir>'s, out of `check-ignore`.
+project_git() {
+  if [ -n "$own_rules" ]; then
+    git -C "$dir" --git-dir="$own_rules" --work-tree="$dir" "$@"
+  else
+    git -C "$dir" "$@"
+  fi
+}
 
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
-# repository's info/exclude never travel with a clone, so a teammate's `git add` would take a
-# `.env` that only this machine ignores.
+# repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
+# only this machine ignores.
 ignored_by_the_project() {
-  git -C "$dir" -c core.excludesFile=/dev/null check-ignore -q -- "$1" || return 1
-  source=$(git -C "$dir" -c core.excludesFile=/dev/null check-ignore -v -- "$1")
+  project_git -c core.excludesFile=/dev/null check-ignore $no_index -q -- "$1" || return 1
+  source=$(project_git -c core.excludesFile=/dev/null check-ignore $no_index -v -- "$1")
   case ${source%%:*} in .gitignore | */.gitignore) return 0 ;; esac
   return 1
 }
+
+# An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
+# hidden example is never reviewed, committed or carried by a clone.
+if project_git check-ignore $no_index -q -- .env.example; then
+  printf '\n!.env.example\n' >> "$dir/.gitignore" || refuse write-failed
+fi
 
 # `.env` is ignored before a key can reach it, and nothing is written when it cannot be.
 if ! ignored_by_the_project .env; then
