@@ -10,8 +10,8 @@
   "hooks": "./hooks/codex-hooks.json",
   "interface": {
     "displayName": "Pipelex",
-    "shortDescription": "Build and work with AI methods following the MTHDS standard.",
-    "longDescription": "Pipelex skills and hooks for the MTHDS open standard \u2014 read, reason about, and validate AI methods (.mthds bundles). Backed by the hosted Pipelex API and MCP server; no local CLI required.",
+    "shortDescription": "Build and run AI methods from Codex with Pipelex.",
+    "longDescription": "Build and run AI methods from Codex with Pipelex. Skills design a method in MTHDS, prepare its inputs, run it, save it to your Pipelex account and wire it into your code, and a hook checks every .mthds edit. Export PIPELEX_API_KEY with a key from your console at app.pipelex.com; there is nothing else to install.",
     "developerName": "Pipelex",
     "category": "Developer Tools",
     "websiteURL": "https://pipelex.com",
@@ -21,7 +21,7 @@
     ]
   },
   "name": "pipelex",
-  "description": "Skills and hooks for working with AI methods following the MTHDS standard.",
+  "description": "Build and run AI methods from your agent with Pipelex: skills that write them in MTHDS, a hook that checks every edit, and the Pipelex tools.",
   "version": "0.7.0",
   "mcpServers": {
     "pipelex": {

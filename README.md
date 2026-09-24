@@ -1,163 +1,140 @@
 # pipelex-plugins
 
-Pipelex plugins — **skills and hooks for working with MTHDS methods** (`.mthds` bundles) — packaged for **Claude Code**, **Codex**, and **Mistral Vibe**, and served through the Pipelex plugins marketplace.
+The Pipelex plugin for Claude Code and Codex: build and run AI methods from your agent, with skills that write them, a hook that checks every edit, and the Pipelex tools.
 
-This is the plugin generation that pairs with the hosted Pipelex API and the (closed-source) MCP server. Unlike the earlier `mthds-plugins`, it carries **no local-CLI dependency and no install/upgrade/env-check machinery** — install is just a marketplace add.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
 
-> **Status:** foundation in progress. See the workspace-root tracker `wip/devx/pipelex-plugins-foundations.md` for the phase plan.
+<!-- onboarding: front-door -->
+<!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door--open_source-plugin.md — do not edit it here. -->
+## Quick start
 
-## What's inside
+Pipelex runs your AI methods — write a method once, then run it from your agent via MCP, turn it into a webapp, or use it via API in any software.
 
-- **Skills** — Pipelex skills for working with MTHDS bundles: `pipelex-explain` (read and explain a bundle directory — its contract, its flow and every pipe in it, saying up front whether the method is complete or a scaffold with a backlog; a registered method's source is fetched and explained the same way, since it belongs to the organization asking, while a published address is explained at the level of its contract, its internals staying in the repository it names; strictly read-only — nothing is ever written to disk — and the workshop is optional for a bundle on disk), `pipelex-design` (design a method contract-first with a complexity-adaptive workflow: build a fully understood shallow graph directly as a coherent runnable bundle, or use validated signature-driven refinement for deep, uncertain, staged, or resumable work), `pipelex-organize` (regroup a construction-shaped or otherwise awkward layout into coherent module files — or a single file when the method is simple — proven equivalent through the MCP validation verdict; automatically follows `pipelex-design` only when the converged layout needs it), `pipelex-edit` (contract-preserving edits to an existing bundle — prompts, model references, mechanical renames — proven with a before/after MCP validation verdict; structural or contract changes route to `/pipelex-design`, which re-enters the affected region directly or through signatures according to its complexity). Each of those three works on files and takes a catalog id too, resolving it to the directory already linked to that method or handing the pull to `pipelex-catalog` first, and each ends by saying when the saved copy does not have the change it just made — offering the update and never making it, `pipelex-inputs` (prepare an `inputs.json` for a method — placeholder template, synthetic data, user files, or a mix — from the input template the MCP server projects; targets a local bundle, a registered catalog method by its `mt_…` id or a published method at its `github.com/…` address, keeps the user's own files out of git with a `.gitignore` entry, uploads any local files to Pipelex storage and writes the run-ready values to `inputs.prepared.json` beside the source `inputs.json`, which it never rewrites, and closes by offering the run), `pipelex-run` (the run lifecycle, and only that: start a run from a bundle directory, a catalog id or a published method's address with inputs that are already run-ready, or follow a run by its id alone — its status, its results, or the files it produced, which stay fetchable days later; it prints the run id the moment the run starts, files a run of a linked directory under its saved method so it appears in that method's history, routes a failure back to the skill that owns the repair, and never bisects a pipeline or starts a run nobody asked for), `pipelex-lab` (the experiment loop around a method: frame a use case into candidate methods with what the platform can and cannot do, write each test case's answer key before its first run, agree a budget, then run every case, score each run against its key and log it under `lab/<method>/` in the project, fixing the method round after round until it meets the pass bar or a stop — the budget, a failing line traced to the inputs, a round that scores worse than the best so far; it designs, prepares inputs, runs and edits through the skills that own those steps, and the workshop is needed by its loop alone), `pipelex-catalog` (carry a method between a bundle directory and the organization's Pipelex catalog: list what is saved, save a directory as a new method or update the one its `pipelex-method.json` link names, and pull a saved method's files back to disk — the save validates and stores one bundle in a single call, states before it runs that an update reaches every caller of the id, refuses to overwrite a change it has not seen, and never deletes), `pipelex-synthetic-inputs` (render the files a method needs when the user has none — PDFs through reportlab, PNGs through Pillow and matplotlib as charts, diagrams, scanned-looking pages or app screenshots, plus Word and Excel; `pipelex-inputs` delegates to it for every file-typed input), `pipelex-integrate` (wire a method into an existing TypeScript or Python codebase: the workshop's `mthds_codegen` writes drift-proof generated types into one directory per method, the skill excludes that tree from formatters, records a `sources.json` sidecar, wires the offline drift check into the project's gate, and writes one typed call site that runs the method through `@pipelex/sdk` or `pipelex-sdk`; a project made from a Pipelex template keeps its own codegen harness), and `pipelex-scaffold` (start a project where none exists: a TypeScript web app around a method comes from the demo-free method-app template, created for the method by the template family's own initializer and left running by the template's `make serve`, with its URL reported; every other project, a Python CLI or service included, comes from the ecosystem's initializer, is committed and given its env file by the skill's own scripts, and is handed to `pipelex-integrate`).
-  `pipelex-synthetic-inputs` is the plugin's MCP-free skill for everything but a photograph (`pipelex-scaffold` is the other — the skill itself needs only git, the method-app family's initializer and `make serve`, the ecosystem's initializers and its own two scripts, although the method-app template's `make create` calls the hosted API with the user's key). It renders PDFs, PNGs and Office files from code — no image-generation model — using only packages whose licences are compatible with MIT, and it installs them itself, through `uv`'s ephemeral environments or an isolated venv under your cache directory when `uv` is absent. Nothing is installed into your project, and installing a *tool* always asks first. Handwriting on a scanned form is simulated glyph by glyph from a handwriting-style font, and the skill says it reads more easily than a real hand. A photograph, which code cannot render convincingly, is generated by `gpt-image-2` through the workshop with the facts the test needs planted in its description; that one file needs the API key and spends a little inference credit.
+**1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
-- **Hooks** — a CLI-free validation hook that checks `.mthds` files on edit (Claude/Codex `PostToolUse`, Mistral Vibe `post_tool`). On every target, lint and format run locally through a bundled WASM engine (offline, no credentials — the file is also auto-formatted in place), and full semantic validation calls the hosted Pipelex API when `PIPELEX_API_KEY` is set. Everything fails open: no Node → the hook no-ops; no key / API unreachable → only the validate stage is skipped. See [docs/hooks.md](docs/hooks.md).
-- **MCP server declaration** — on Claude Code and Codex the plugin declares the `pipelex-mcp` server as the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio; tools `mthds_validate` for bundle validation (its verdict carries the main pipe's signature, which `pipelex-integrate` types call sites from), `mthds_inputs_template` for input templates, `mthds_codegen` to project a method's concepts into typed code (`ts-zod`, `python-pydantic`, `python-structures`) and, with `output_dir`, write the tree to disk, `mthds_prepare_inputs` to upload a filled template's file values to Pipelex storage so a run can reach them, and the `mthds_run` family for durable runs — each takes submitted file contents or a registered method's catalog id (`mt_…`) as `method_id`, operating on the method's current stored content; by-id calls require an API key since the catalog is org-scoped), which the MCP-backed skills require. The harness spawns it automatically at session start, and it authenticates to the Pipelex API with the key from the plugin configuration (prompted at enable time on Claude Code) or, as a fallback, `PIPELEX_API_KEY` from your session environment — the same credential the hook uses. On Mistral Vibe, which has no plugin manifest, the target ships the same launcher as a config fragment instead: nothing is spawned until you add it to `~/.vibe/config.toml`, and the server takes its key only from that entry's `env` table, never from your shell (see [Mistral Vibe](#mistral-vibe)). Unlike the fail-open hook, the MCP-backed skills stop with a setup instruction when the tools are absent. The hosted console is never baked into the plugin — see [One install, one server](#one-install-one-server--workshop-vs-console) and [docs/decisions.md](docs/decisions.md).
-- **Language reference** — the shared MTHDS language reference docs that ground the skills (the *language* stays MTHDS — that's the standard; Pipelex is the tooling, product, and service).
+**2. Install the Pipelex plugin in your agent, or add the Pipelex MCP to your chatbot.**
 
-## Install
+<details open><summary><b>Claude Code</b></summary>
 
-Install is a marketplace add — no `npm install -g`, no bootstrap, no PATH setup. (Requires the repo to be public.)
-
-### Claude Code
-
-```
+```bash
 claude plugin marketplace add Pipelex/pipelex-plugins
 claude plugin install pipelex@pipelex-plugins
 ```
 
-The `.mthds` validation hook loads automatically and needs no local toolchain beyond Node.js (which Claude Code already requires): lint runs and canonical formatting is applied locally on every `.mthds` edit, offline and credential-free.
+Claude Code asks for an API key when you enable the plugin, and stores it in your OS keychain — create one in your console at [app.pipelex.com](https://app.pipelex.com). The skills, the hook that checks every edit and the Pipelex tools load with it; nothing else to install.
 
-To also get full semantic validation (bundle load, cross-file resolution, dry-run) on every edit, give the plugin an API key. When you enable the plugin, Claude prompts for it via the **plugin configuration** dialog (get a key at https://app.pipelex.com; it is stored in your OS keychain, and an optional base URL field covers self-hosted / non-default deployments). Alternatively, the session environment still works as a fallback:
+Claude Code also loads what you have added to your Claude account, so if the Pipelex MCP is there, turn it off in Claude Code with `/mcp`: an agent with the plugin never takes both, since they register the same tool names.
+
+</details>
+
+<details><summary><b>Codex</b></summary>
 
 ```bash
-export PIPELEX_API_KEY=...            # fallback channel — the plugin config dialog is preferred
-export PIPELEX_BASE_URL=...           # optional — defaults to https://api.pipelex.com
-```
-
-A value set in the plugin configuration wins over the environment; an empty plugin config leaves the environment in charge. The plugin-config channel is what makes **Claude Desktop** work — GUI-launched apps carry no shell environment, so an `export` in your shell profile never reaches them.
-
-Everything fails open: with no key (or the API unreachable) the local lint/format verdicts still apply and only the validate stage is skipped — no blocked edits, no nagging. **Privacy note:** with a key set, the `.mthds` files around the edited one are sent to the API on each validate call; leave the key unset (both channels) to keep validation fully local (lint/format only).
-
-The plugin also declares the **`pipelex-mcp` server** as the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio), which the MCP-backed skills (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog`, `pipelex-integrate`) use for validation, input templates, codegen, runs, and the method catalog. Claude Code spawns it automatically at session start — no extra install: Node.js is already required by the harness, and the spawned server authenticates with the same plugin-config values (falling back to `PIPELEX_API_KEY` / `PIPELEX_BASE_URL` from the session environment). Without a key the tools still connect, but validation calls return a `config` no-verdict explaining how to set one. To use a local `pipelex-mcp` checkout instead, edit the `[vars.mcp_server]` block in `targets/defaults.toml` (e.g. `command = "node"`, `args = ["/path/to/pipelex-mcp/dist/local/main.js"]`) and rebuild via the dogfood loop below.
-
-### Codex
-
-```
 codex plugin marketplace add Pipelex/pipelex-plugins
-# Restart Codex, then run /plugins to install pipelex
+export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
 ```
 
-The bundled `.mthds` validation hook loads automatically — the `hooks` feature is Stable and on by default in Codex 0.141+, so there is nothing to enable. On first run, **trust** the plugin hook (Codex persists trusted hashes under `[hooks.state]`). It is CLI-free: lint/format run through the bundled WASM engine, and semantic validation uses the Pipelex API when `PIPELEX_API_KEY` is set (a network-sandboxed session simply skips the validate stage). Requires Codex 0.141+ (matured hook engine; verified in live sessions against 0.144.4). See [docs/hooks.md](docs/hooks.md).
+Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
 
-**MCP server (automatic):** the plugin manifest declares the `pipelex-mcp` server as the **local workshop launcher** (`npx -y @pipelex/mcp@latest`, stdio), so Codex spawns it on its own — the tools reach the model as `mcp__pipelex__mthds_validate` / `mcp__pipelex__mthds_inputs_template`, and `codex mcp list` shows the `pipelex` entry. Codex spawns MCP servers with a minimal whitelist environment (the shell env is *not* passed through), so the manifest forwards `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` **by name** into the spawn via `env_vars` — export them in your shell exactly as for the hook. Point sessions at a different server with a same-named override, which outranks the plugin declaration:
+</details>
 
-```toml
-# ~/.codex/config.toml
-[mcp_servers.pipelex]
-command = "node"
-args = ["/path/to/pipelex-mcp/dist/local/main.js"]   # e.g. a local checkout
+<details><summary><b>Chatbots — ChatGPT, Claude</b></summary>
 
-[mcp_servers.pipelex.env]
-PIPELEX_API_KEY = "plx_sk_..."
-```
-
-(or per invocation: `codex -c 'mcp_servers.pipelex.command="node"' …`). The MCP-backed skills stop with a setup instruction when the tools are absent.
-
-### Mistral Vibe
-
-Vibe loads skills via `skill_paths` and hooks via `hooks.toml`. In `~/.vibe/config.toml`:
-
-```toml
-skill_paths = ["/absolute/path/to/pipelex-vibe/skills"]
-```
-
-Then wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml` (or a trusted project's `.vibe/hooks.toml` — a project-level entry overrides a user-level entry with the same `name`). If the hook file is not next to the generated target, set its command to the absolute script path:
-
-```toml
-[[hooks]]
-name = "check-mthds"
-type = "post_tool"
-match = "re:^(edit|write_file)$"
-command = "/absolute/path/to/pipelex-vibe/hooks/check-mthds-vibe.sh"
-timeout = 15.0
-strict = false
-description = "Validate .mthds files after Vibe file edits."
-```
-
-Requires Mistral Vibe 2.21.0+ (stable hooks API — `post_tool`, no opt-in flag).
-
-**MCP server (for the MCP-backed skills):** Vibe has no plugin manifest, so the target bakes the local workshop launcher (`npx -y @pipelex/mcp@latest`, stdio) into a config fragment instead: `pipelex-vibe/mcp/vibe-mcp.toml`. Install it in `~/.vibe/config.toml` (`$VIBE_HOME/config.toml` when you set `VIBE_HOME`): delete the `mcp_servers = []` line Vibe writes into a new config, and any `pipelex` server you registered by hand, then append the fragment's `[[mcp_servers]]` entry to the end of the file and write your key into its `env` table:
-
-```toml
-[[mcp_servers]]
-name = "pipelex"
-transport = "stdio"
-command = "npx"
-args = ["-y", "@pipelex/mcp@latest"]
-startup_timeout_sec = 60.0
-
-[mcp_servers.env]
-PIPELEX_API_KEY = "plx_sk_..."
-PIPELEX_BASE_URL = ""                # optional — empty means the hosted API
-```
-
-The key has to be written there: Vibe spawns stdio MCP servers with a minimal environment and expands no variables in its config, so a `PIPELEX_API_KEY` exported in your shell never reaches the server. The plugin's validation hook does read your shell, so keep exporting the key there as well for the hook's validate stage. Add any other variable `npx` needs to the same table, such as `HTTPS_PROXY` behind a proxy. Both deletions matter, because either leftover stops Vibe from starting: TOML cannot add a `[[mcp_servers]]` table after `mcp_servers = []`, and Vibe refuses two servers of the same name. The entry goes at the end because a TOML table header claims every plain setting below it: pasted above `skill_paths`, the `[mcp_servers.env]` header would turn that setting into an environment variable of the server. Vibe also records its whole configuration, this `env` table included, in every session log under `~/.vibe/logs/session/`, so redact the key before you share a session log. The raised `startup_timeout_sec` covers the first-ever `npx` spawn, which fills the npm cache and outlasts Vibe's 10-second default. Keep the name `pipelex` so the tools reach the model as `pipelex_mthds_validate`, `pipelex_mthds_inputs_template` and so on. The MCP-backed skills stop with a setup instruction when the tools are absent.
-
-## One install, one server — workshop vs console
-
-`pipelex-mcp` ships the same tools in two deployments: the **local workshop** (npm `@pipelex/mcp`, stdio — resolves `{ path }` files straight from your working directory) and the **hosted console** (streamable HTTP, for hosts without a filesystem). This plugin always installs the **workshop**: builder hosts edit local `.mthds` files, and submitting local files through a hosted server would mean hand-copying every file into the model's context. The hosted console is never baked into the plugin — it is a **connector** you add in a host's own UI:
-
-| Host | Server | How to connect |
-|---|---|---|
-| Claude Code | Local workshop | this plugin (spawned automatically) |
-| ChatGPT desktop (Codex mode) | Local workshop | this plugin (spawned automatically) |
-| Mistral Vibe (TUI) | Local workshop | this plugin's `mcp/vibe-mcp.toml`, appended to `~/.vibe/config.toml` (see above) |
-| Cursor | Local workshop | `~/.cursor/mcp.json` — no plugin target; the snippet is in the `pipelex-mcp` README |
-| Claude Desktop (Cowork mode) | **Dual** — console for consumers, workshop for builders | Connector, or this plugin |
-| Claude Desktop (chat mode) | Hosted console | Connector in the app UI |
-| claude.ai (web + mobile) | Hosted console | Connector (custom URL) |
-| ChatGPT (web) | Hosted console | Apps directory |
-
-To reach the hosted console, add it as a custom connector by its plain URL, then sign in with your Pipelex account when the host prompts you. There is no key to paste:
+Add the Pipelex MCP in your chatbot's settings by the address below — in Claude, that is **Add custom connector** — then sign in with your Pipelex account when asked. Nothing to install and no key: the Pipelex MCP runs on your signed-in session.
 
 ```
-https://pipelex-mcp-a3c6a115.alpic.live/mcp
+https://mcp.pipelex.com/mcp
 ```
 
-Sign-in is OAuth, and the host drives the handshake itself — ChatGPT, claude.ai, Claude Desktop, Cowork and Cursor all do — including picking the organization you work in. The console holds no server-side key and has no keyless mode: every call runs on your signed-in session, so the catalog you see and the runs you spend are your own. When a session expires or is revoked, calls come back as a `config` no-verdict telling you to reconnect the connector and sign in again.
+</details>
 
-> **Upgrading from a `?api_key=` connector.** Bring-your-own-key was removed from the console in `@pipelex/mcp` 0.12.0. A connector still registered with `?api_key=plx_sk_...`, or with an `Authorization: Bearer plx_sk_...` header, no longer connects at all: remove it, re-add it by the plain URL above, and revoke the key it carried, since a key that sat in a connector URL may have reached browser history, copied links and proxy logs. ChatGPT caches a connector's configuration when it is added, so re-adding is the only way through there.
+**3. Ask for the method you want.**
 
-**Claude Desktop note:** GUI apps don't inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches Desktop sessions — set the key through the **plugin configuration** dialog instead (prompted when you enable the plugin); it flows to both the spawned workshop and the validation hook. The hosted-console connector remains the alternative when `node`/`npx` is unavailable on your PATH: add it and sign in as described above.
+> Design a method that reads an invoice PDF and returns the supplier, the total and the line items. Then run it on `~/Downloads/invoice.pdf` and save it to my Pipelex account.
 
-**Connect each host to exactly one Pipelex server.** Both deployments register identical tool names, so a host connected to both gets ambiguous routing and contradictory schemas under the same names (the workshop accepts `{ path }`, the console rejects it). The trap to know about: **a claude.ai Pipelex connector syncs into Claude Code automatically** — if you run this plugin (workshop) in Claude Code and also added a Pipelex connector on claude.ai, disable the connector for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers` in `.claude/settings.json`, or global `disableClaudeAiConnectors: true`).
+`/pipelex-design` writes the method, the hook checks it on every edit, `/pipelex-run` starts it and prints a run id you can come back to, and `/pipelex-catalog` saves it to your account, where your chatbot can run it too.
 
-## Local development
+**In your chatbot**, where methods are run rather than built:
 
-The build renders every target from Jinja2 templates. Never edit generated output directly.
+> What methods do I have?
+>
+> Run the invoice method on https://example.com/invoice.pdf
 
+You get a run id straight away, and you can ask for its status, its results or the files it produced at any time.
+
+Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it to the conversation instead and ask for a run on it; Claude has no way yet to hand the Pipelex MCP a file you attached.
+
+**The other two ways.** Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps), or use it via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+
+**Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
+
+This repository is the Pipelex plugin — what it holds, the other agents it installs in and how to work on it are below.
+<!-- /onboarding -->
+
+## What the plugin holds
+
+### Skills
+
+Your agent picks the skill your request calls for, and you can also name one yourself.
+
+- **`/pipelex-design`** designs a method contract-first and writes it as `.mthds` files, directly when the method is simple and step by step when it is not.
+- **`/pipelex-edit`** makes an edit that keeps a method's contract, such as a prompt, a model or a rename, and proves it with a validation before and after.
+- **`/pipelex-organize`** regroups a method's files into a layout you can browse, without changing what the method does.
+- **`/pipelex-explain`** explains a method in plain language, its contract, its flow and every pipe, and writes nothing.
+- **`/pipelex-inputs`** prepares a method's inputs from your files, from synthetic data or from a template, ready to run.
+- **`/pipelex-synthetic-inputs`** makes the test files a method needs when you have none: PDFs, images, Word and Excel files rendered from code, and photographs from an image model.
+- **`/pipelex-run`** runs a method on the hosted Pipelex API, prints its run id at once, and follows a run to its status, its results and its files.
+- **`/pipelex-catalog`** saves a method to your Pipelex account, lists what is saved there, and pulls a saved method back to disk.
+- **`/pipelex-lab`** frames a use case into candidate methods, writes each test case's answer before the first run, then runs, scores, logs and fixes the method round after round within a budget you agree.
+- **`/pipelex-integrate`** wires a method into your TypeScript or Python code, with generated types and one typed call through `@pipelex/sdk` or `pipelex-sdk`.
+- **`/pipelex-scaffold`** starts a new project around a method: a web app from the method-app template, or any other project from its language's own initializer.
+
+The skills share a reference for MTHDS, the language a method is written in. [Each skill in detail, and what it needs](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md).
+
+### The hook
+
+After every edit to a `.mthds` file, the hook lints it and formats it in place on your machine, offline, then validates the whole method on the hosted Pipelex API when a key is set. A failed check returns to your agent with the line to fix. [How the hook works](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/hooks.md).
+
+### The Pipelex tools
+
+The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, with nothing else to install. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
+
+## Other agents
+
+The plugin also installs in **Mistral Vibe** 2.21.0 or later, from a clone of this repository: Vibe loads the skills from a path in its config, the hook from its `hooks.toml`, and the Pipelex tools from a config entry that carries your key. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
+
+**Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. Set the key in the plugin configuration dialog, which opens when you enable the plugin.
+
+Which Pipelex product each app takes, and every agent's install in detail, are in [Install the plugin, agent by agent](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md).
+
+## Configuration
+
+- **API key.** In Claude Code, enter it in the plugin configuration dialog, which stores it in your OS keychain; `PIPELEX_API_KEY` in your environment is the fallback, and a value set in the dialog wins. Codex reads `PIPELEX_API_KEY` from your shell. Create a key in your console at [app.pipelex.com](https://app.pipelex.com).
+- **Base URL.** Optional, for a deployment other than the hosted API: the dialog's base URL field, or `PIPELEX_BASE_URL`. It defaults to `https://api.pipelex.com`.
+- **Without a key**, the hook still lints and formats every edit and skips only the validation, and the skills that need the Pipelex tools stop and say how to set one. The hook never blocks an edit because Node.js is missing or the API is unreachable.
+- **Privacy.** With a key set, each validation sends the `.mthds` files around the edited one to the Pipelex API. Leave the key unset, in the dialog and in your environment, to keep the hook's checks on your machine.
+
+## Documentation
+
+- [Install the plugin, agent by agent](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md): Claude Code, Codex and Mistral Vibe in detail, and which Pipelex product each app takes.
+- [The skills and the Pipelex tools](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md): what each skill does and needs, and the tools it calls.
+- [The validation hook](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/hooks.md): the checks it runs, on each agent, and what it does when something is missing.
+- [Develop the plugin](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/development.md): the build, the checks, and running your changes in your own agent.
+- [The multi-target build](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/build-targets.md), [continuous integration](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/ci.md) and [the decisions behind the plugin](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/decisions.md).
+- [The Pipelex documentation](https://docs.pipelex.com/) and [the MTHDS standard](https://mthds.ai/).
+
+## Develop
+
+The plugin is rendered from the Jinja2 templates in `templates/` into one output per agent. Edit the templates, never the generated `pipelex/`, `pipelex-codex/` or `pipelex-vibe/` trees.
+
+```bash
+make build         # render every target
+make agent-check   # fix imports, format, lint, then the checks CI runs
+make agent-test    # the unit tests, quiet unless one fails
 ```
-make build      # render all targets (prod + codex + mistral-vibe)
-make check      # freshness + marketplace/version consistency + lint/type checks
-make test       # unit tests
-```
 
-### Dogfood loop
-
-**Claude Code** — point the marketplace at this checkout, then iterate with `make build` + `/reload-plugins`:
-
-```
-/plugin marketplace remove pipelex-plugins
-/plugin marketplace add /absolute/path/to/pipelex-plugins
-/plugin install pipelex@pipelex-plugins
-/reload-plugins
-```
-
-Session-only alternative that leaves global config untouched: `claude --plugin-dir /absolute/path/to/pipelex-plugins/pipelex`.
-
-**Codex** — `make codex-use-local` points the Codex marketplace at this checkout (restart Codex to pick it up); `make codex-use-official` switches back to the published GitHub marketplace; `make codex-refresh` re-syncs the plugin cache after editing `pipelex-codex/`.
+To run your changes in Claude Code or Codex before they are released, see [the dogfood loop](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/development.md#run-your-changes-in-your-agent).
 
 ## License
 
-[Apache 2.0](./LICENSE).
+Apache 2.0. See [LICENSE](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE).

@@ -28,7 +28,7 @@ Controls which `pipelex-mcp` build this plugin's declared MCP server spawns, and
 - `pipelex-vibe/mcp/vibe-mcp.toml` — the `[[mcp_servers]]` fragment Vibe users copy into `~/.vibe/config.toml`, since Vibe has no manifest
 - every MCP-backed `SKILL.md` across all three targets — their "server isn't connected" line renders `{{ mcp_server.command }} {{ mcp_server.args | join(" ") }}`, so the quoted launcher tracks the config automatically
 
-That fan-out is why a switch is never a one-file edit, and why it shows up as a wide diff. Prose docs (`README.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`) quote the launcher too, but they describe **what ships** — see "Changing the shipped default" for the only case where they move.
+That fan-out is why a switch is never a one-file edit, and why it shows up as a wide diff. Prose docs (`docs/install.md`, `docs/development.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`) quote the launcher too, but they describe **what ships** — see "Changing the shipped default" for the only case where they move.
 
 The critical distinction this skill exists to protect: **a dev switch is temporary local state, not a change to the plugin.** It dirties generated files across every target, and a pinned version or an absolute local path is meaningless on anyone else's machine. It must never reach a commit.
 
@@ -79,7 +79,7 @@ Verify the generated outputs came back clean: `git status --porcelain targets/de
 
 Rare, and the only case where prose docs move. This is a real change to the plugin — a new package name, a different launcher command, or a deliberate reversal of the `@latest` posture.
 
-Do the switch steps above, then propagate to the docs that quote the launcher as *current fact*: `README.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`. Grep for `@pipelex/mcp@` and `npx -y @pipelex` to find them rather than trusting this list.
+Do the switch steps above, then propagate to the docs that quote the launcher as *current fact*: `docs/install.md`, `docs/development.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`. Grep for `@pipelex/mcp@` and `npx -y @pipelex` to find them rather than trusting this list.
 
 **Do not rewrite** `CHANGELOG.md`, `TODOS.md`, or anything under `wip/` — those are historical records of what was true at the time, and editing them destroys the record. Add a new `CHANGELOG.md` entry describing the change instead. Amend `docs/decisions.md` where the change contradicts a recorded decision, so the reasoning stays discoverable; this repo treats decisions as durable, so supersede the entry with the new rationale rather than deleting it.
 
