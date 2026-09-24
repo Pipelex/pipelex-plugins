@@ -39,6 +39,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      # `tests/unit/test_hook_corpus.py` runs the vendored hook bundle, built for
+      # node22, over the MTHDS Test Corpus. It fails under `CI` when no `node` is
+      # on the PATH rather than skipping, so this step is what lets it run.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install uv (with cache)
         uses: astral-sh/setup-uv@v7
         with:
