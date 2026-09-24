@@ -56,6 +56,8 @@ aspect_ratio = "landscape_4_3"
 
 Its description says what changes (the side, the angle, the damage) and repeats what must stay (the colour, the plate, the setting, the light). Say "no badges, logos or brand names" in it again: a reference photo pulls the model towards the real make it resembles.
 
+**A room seen from two places keeps its materials and loses its walls.** The model draws what the description puts on the left and the right of the frame, but as a view straight down the room, wherever the photographer was said to stand. A second view "from the opposite corner", with the windows on its left and the fireplace on its right, therefore puts the two on facing walls, when the first photograph had them side by side. Write the room's plan before the first description, naming what is on each wall, and describe the second view by the wall it faces and what stands on the walls to its left and right: "facing the fireplace wall, the two windows on the right-hand wall, a bare wall on the left".
+
 Follow each run with `mthds_run_status` at the hint it gives, then `mthds_run_results` once it is terminal. A failed run is reported with its `failure_message` verbatim, and that photograph is left without a path; do not retry it with a reworded description on a guess.
 
 ## 3. Save it
@@ -64,7 +66,7 @@ Call `mthds_download_artifacts` with the run id and `dir` set to the target's di
 
 ## 4. Verify
 
-Look at the saved picture. Where the harness can show an image to the model (Claude's `Read` tool can), check each planted fact from step 1 against what the picture shows, one by one, and that the photographs of one subject show the same one. A fact the picture does not show, or shows wrongly, earns one more run with a sharper description that names it first; after that second attempt, keep the better picture and report the fact it misses, so the user knows the test does not cover it. Where the harness cannot show images, say that the facts were not checked by eye.
+Look at the saved picture. Where the harness can show an image to the model (Claude's `Read` tool can), check each planted fact from step 1 against what the picture shows, one by one, and that the photographs of one subject show the same one. For a room, read the plan back out of each photograph, which wall every fixed feature is on and what it stands beside, and compare it with the plan you wrote: two views can match feature by feature and still disagree on the walls, and a method comparing them then chases a mismatch the test planted. A fact the picture does not show, or shows wrongly, a feature on the wrong wall included, earns one more run with a sharper description that names it first; after that second attempt, keep the better picture and report the fact it misses, so the user knows the test does not cover it. Where the harness cannot show images, say that the facts were not checked by eye.
 
 ## 5. Report
 

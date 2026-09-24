@@ -120,12 +120,16 @@ class TestPipelexSyntheticInputsSkillShape:
     def test_a_set_of_photographs_of_one_subject_shares_a_reference(self) -> None:
         """Photographs of one subject generated from words alone show a different car each time, which plants a
         mismatch nobody asked for; the proof lab (L-260923-9d0b53) saw three of five drift. The first photograph
-        becomes the reference image of the others, through a second inline bundle with an `Image` input."""
+        becomes the reference image of the others, through a second inline bundle with an `Image` input. A room
+        drifts even then: the reference kept its materials and the model redrew its walls, so a room's set is
+        described from a plan by the wall each view faces, and checked by reading the plan back out."""
         text = self.reference("photograph.md")
         assert "**Several photographs of one subject**" in text
         assert 'inputs       = { reference = "Image", description = "Text" }' in text
         assert 'prompt       = "Reference photo: $reference\\n\\n$description"' in text
         assert "the photographs of one subject show the same one" in text
+        assert "**A room seen from two places keeps its materials and loses its walls.**" in text
+        assert "read the plan back out of each photograph" in text
 
     def test_a_document_a_method_extracts_is_made_as_a_pdf(self) -> None:
         """Extraction on the hosted plane reads no Office format, and the proof lab (L-260923-9d0b53) saw a Word
