@@ -91,11 +91,11 @@ The skills share a reference for MTHDS, the language a method is written in. [Ea
 
 ### The hook
 
-After every edit to a `.mthds` file, the hook lints it and formats it in place on your machine, offline, then validates the whole method on the hosted Pipelex API when a key is set. A failed check returns to your agent with the line to fix. [How the hook works](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/hooks.md).
+After every edit to a `.mthds` file, the hook lints it and formats it in place on your machine, offline, then validates the whole method on the hosted Pipelex API when a key is set. A failed check returns to your agent with the line to fix. The hook runs on Node.js, which must be on your `PATH`. [How the hook works](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/hooks.md).
 
 ### The Pipelex tools
 
-The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, with nothing else to install. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
+The tools the skills call to validate a method, prepare its inputs, run it, generate typed code and reach your saved methods start with your agent, which runs them through `npx`, so like the hook they need nothing installed beyond Node.js on your `PATH`. [The tools, one by one](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md#the-pipelex-tools).
 
 ## Other agents
 
