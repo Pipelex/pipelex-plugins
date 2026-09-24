@@ -180,10 +180,10 @@ class TestLabTriggers:
 class TestIntegrationPoints:
     """The other skills point at the lab where a builder reaches it without asking for it (phase 2 of
     `wip/lab-skill/plan.md`). Design's hand-off names it beside the test files it already offers. A run the lab did
-    not start is still credit spent, and "run it again" belongs to `/pipelex-run`, so that skill offers the lab when
-    the project has a lab for the bundle. The file factory lists every file's planted facts, which a key takes as
-    they are. Every one of those skills sits at the size ceiling, so each point is one sentence, pinned here so that
-    a later trim cannot drop it without saying so."""
+    not start is still credit spent, and "run it again" belongs to `/pipelex-run`, so that skill offers the lab a run
+    of a lab case, and the lab logs it outside its rounds. The file factory lists every file's planted facts, which a
+    key takes as they are. Every one of those skills sits at the size ceiling, so each point is one sentence, pinned
+    here so that a later trim cannot drop it without saying so."""
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_design_hands_off_to_the_lab(self, target_name: str) -> None:
@@ -191,9 +191,24 @@ class TestIntegrationPoints:
         assert "`/pipelex-lab` writes answer keys and scores the runs" in hand_off
 
     @pytest.mark.parametrize("target_name", TARGETS)
-    def test_a_run_the_lab_did_not_start_is_offered_to_it(self, target_name: str) -> None:
+    def test_a_run_of_a_case_the_lab_did_not_start_is_offered_to_it(self, target_name: str) -> None:
+        """Only a run on a case's inputs is offered: a run on any other inputs has no key to be scored against, and
+        the lab would have to improvise one with the output already in view."""
         results = render(target_name, "pipelex-run").split("### 7. ", 1)[1].split("\n### ", 1)[0]
-        assert "When the project has `lab/<bundle directory name>/` and the lab did not start this run, offer `/pipelex-lab`" in results
+        assert (
+            "When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab`" in results
+        )
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_lab_logs_a_run_it_is_handed_outside_its_rounds(self, target_name: str) -> None:
+        """A run the lab is handed has already spent its credit. It is scored and logged, and it starts nothing; it
+        belongs to no round, so it moves neither a series' budget nor its best round."""
+        loop = the_move(render(target_name), 3)
+        assert "**A run of a case that the lab did not start**, handed over by `/pipelex-run`" in loop
+        assert "it starts no run and makes no fix" in loop
+        log = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "log.md").read_text(encoding="utf-8")
+        assert "## A run the loop did not start" in log
+        assert "in no round: a series' budget, its best round and the fifth stop read only the runs of its rounds" in log
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_factory_reports_every_files_planted_facts(self, target_name: str) -> None:

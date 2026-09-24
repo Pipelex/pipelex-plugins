@@ -85,7 +85,7 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 `mthds_run_results`, then report the main output. When it references stored files — an image, a PDF or a document as a `pipelex-storage://` URI — their links expire within the hour, so call `mthds_download_artifacts` with the run id and `dir: "runs/<run_id>"`, **relative to the workshop's own working directory**, never an absolute path such as `<bundle_dir>/runs/<run_id>/`. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
 
-When the project has `lab/<bundle directory name>/` and the lab did not start this run, offer `/pipelex-lab` to score and log it.
+When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
 ### 8. A failed run is reported, then routed, never bisected
 
