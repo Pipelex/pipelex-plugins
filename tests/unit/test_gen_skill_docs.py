@@ -746,6 +746,8 @@ class TestSharedSkillIncludes:
         "read [the catalog-id reference](../shared/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
+        "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
+        "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -812,6 +814,31 @@ class TestSharedSkillIncludes:
             if "PipeFunc" in line and "sandbox" in line
         ]
         assert offenders == [], f"the sandbox fact reaches a skill through the include or not at all: {offenders}"
+
+    @pytest.mark.parametrize("skill", ["pipelex-inputs", "pipelex-lab", "pipelex-run"])
+    def test_the_ignore_procedure_reaches_every_skill_that_writes_the_user_s_data(self, skill: str) -> None:
+        """Three skills write what holds the user's data into a project that is usually a
+        repository: `pipelex-inputs` the copies of the user's files, `pipelex-lab` a case of
+        them and its key, and `pipelex-run` the saved output, which carries the facts the run
+        extracted from them. Each keeps it out of version control with the same procedure,
+        and each used to word it for itself until run needed it too. The partial is the one
+        source, and each skill names only what it checks and the entry it writes."""
+        body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert body.count('include "skills/shared/git-ignore.md.j2"') == 1
+        assert "{% set git_ignore_paths %}" in body
+        assert "{% set git_ignore_entry %}" in body
+
+    def test_no_skill_restates_the_ignore_check(self) -> None:
+        """The one-source test is blind to a paraphrase: a fourth skill that words the check
+        for itself passes it while dropping the tracked-path guard. `git check-ignore` reaches
+        a skill template through the partial or not at all; the scaffold's scripts run it
+        themselves and are not templates."""
+        offenders = [
+            str(path.relative_to(self.REPO_TEMPLATES))
+            for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
+            if "check-ignore" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == [], f"the ignore check reaches a skill through skills/shared/git-ignore.md.j2 alone: {offenders}"
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:

@@ -99,6 +99,25 @@ class TestPipelexRunSkill:
         assert rows, f"{target_name}: the stop table has no rows"
         assert len(rows) == len([line for line in table.splitlines() if line.startswith("| ") and not line.startswith("| Condition")])
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_saved_run_is_kept_out_of_version_control_before_it_is_saved(self, target_name: str) -> None:
+        """Step 7 saves every completed run into `runs/<run_id>/` under the workshop's working
+        directory, usually a project root in a repository, and `main_stuff.json` holds the facts
+        the run extracted from the user's files. So in a git repository the save waits for
+        `runs/<run_id>/` to be ignored, the entry anchored so that a source directory named
+        `runs` elsewhere is left alone, and a path git still does not report ignored is not
+        written until the user says so. Follow a run's save goes through step 7, so it is held
+        to the same guard days later."""
+        body = self.render(target_name)
+        guard = self.the_line(body, "**A saved run stays out of version control**")
+        assert guard in self.the_step(body, 7), f"{target_name}: the ignore guard is not at the step that saves"
+        assert guard.startswith("**A saved run stays out of version control**: in a git repository, ")
+        assert "`git check-ignore -q` `runs/<run_id>/` before saving." in guard
+        assert "add `/runs/` to the nearest `.gitignore`, relative to that file's directory, say so, and check again" in guard
+        assert guard.endswith("**git never ignores a tracked path, so one still not ignored is not written until the user says so.**")
+        follow = body.split("## Follow a run", 1)[1].split("\n## ", 1)[0]
+        assert "`mthds_download_artifacts`, as step 7 says" in follow, f"{target_name}: a later save no longer goes through step 7's guard"
+
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one
         ships as literal braces; and each opens by naming the condition that sends the model to it."""

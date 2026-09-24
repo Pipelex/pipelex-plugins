@@ -1,0 +1,23 @@
+{#- How a path is kept out of version control before a skill writes it: the
+   check, the `.gitignore` entry, the check again, and the guard that git never
+   ignores a tracked path. `pipelex-inputs` says it for the copies of the user's
+   files, `pipelex-lab` for a case of the user's own files, and `pipelex-run` for
+   the `runs/` folder a save writes into; they used to carry the procedure in
+   their own words, and one wording keeps the three guarantees from drifting
+   apart: the entry goes in the nearest `.gitignore`, relative to that file's
+   directory; it is confirmed with `git check-ignore -q`; and a path still not
+   ignored, which a tracked one never is, waits for the user.
+
+   Each skill keeps its own bold subject ("… stays out of version control")
+   before the include, and sets what it words differently with `{% set %}`:
+
+     git_ignore_paths — what is checked and when, e.g. "each copy's path before
+                        writing it"; it follows `git check-ignore -q` directly
+     git_ignore_entry — the `.gitignore` entry written when a path is not ignored
+
+   Neither has a default: strict mode fails the build naming the one left unset.
+
+   Included mid-sentence, after the skill's subject, so it strips its own
+   trailing newline (the closing comment below). -#}
+in a git repository, `git check-ignore -q` {{ git_ignore_paths }}. For a path not ignored, add {{ git_ignore_entry }} to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
+{#- -#}
