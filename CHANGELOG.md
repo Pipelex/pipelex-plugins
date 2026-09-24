@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The unit tests sweep the edit hook over the MTHDS Test Corpus**: `tests/data/mthds-corpus/` is a vendored copy of the whole corpus, and `tests/unit/test_hook_corpus.py` runs the hook's offline stages over every entry, expecting a block exactly when the entry's fault is one the schema catches and a silent pass otherwise. A vendored hook whose schema refuses a form the standard allows, the way the bundle before 0.8.0 refused intent hints, now fails the unit tests, and CI installs Node so that the sweep runs there rather than skips.
+
 ## [0.8.0] - 2026-09-24
 
 ### Highlights

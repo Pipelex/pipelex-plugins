@@ -5,7 +5,7 @@ Everything this repo runs on GitHub lives in `.github/workflows/`. Some of it ru
 | Workflow | Status check | Runs on | What it runs |
 | --- | --- | --- | --- |
 | `checks.yml` | `Checks` | every pull request | `make check` |
-| `tests.yml` | `Unit tests` | every pull request | `make agent-test` |
+| `tests.yml` | `Unit tests` | every pull request | `make agent-test`, with Node 22 installed for the hook corpus sweep |
 | `guard-branches.yml` | `Gate main` / `Gate release` / `Gate dev` | a pull request opened, edited, reopened or pushed to (`pull_request_target`) | the branch-flow rules, no checkout |
 | `changelog-check.yml` | `Changelog entry` | a pull request into `main` | `CHANGELOG.md` carries the version being shipped |
 | `version-check.yml` | `Version check` | a pull request into `main` or into `release/vX.Y.Z` | the version in the files is the version in the branch name |
@@ -19,9 +19,9 @@ The status check column is the name GitHub reports, which is the job's name and 
 
 It is `make check` and deliberately not `make agent-check`: the agent target begins with `fix-unused-imports`, `format` and `lint`, which rewrite files. A check reports; it does not repair. Run `make agent-check` locally, before pushing, and let CI run the read-only half — which now reports everything the agent target would have fixed, the unused imports included.
 
-One thing `Checks` cannot see: the **vendored hook bundle**. `make check` compares each target's `hooks/check.mjs` against `templates/hooks/assets/check.mjs`, so a target that fell behind the template goes red — but nothing compares the template copy against what `npm run build:hook` in `pipelex-sdk-js` would produce today. `make vendor-hook` reaches into a sibling checkout and CI has none, so a stale bundle ships green. That remains a hand gesture, and deliberately not a gate: the release skill says so under **Particulars**, where "A release does not refresh the vendored hook bundle" spells out that no gate and no build step runs it, and that shipping a newer hook means running `make vendor-hook` and `make build` on purpose before the gates.
+One thing `Checks` cannot see: the **vendored hook bundle**. `make check` compares each target's `hooks/check.mjs` against `templates/hooks/assets/check.mjs`, so a target that fell behind the template goes red — but nothing compares the template copy against what `npm run build:hook` in `pipelex-sdk-js` would produce today. `make vendor-hook` reaches into a sibling checkout and CI has none, so a stale bundle ships green. That remains a hand gesture, and deliberately not a gate: the release skill says so under **Particulars**, where "A release does not refresh the vendored hook bundle" spells out that no gate and no build step runs it, and that shipping a newer hook means running `make vendor-hook` and `make build` on purpose before the gates. `Unit tests` now catches the failure a stale bundle produces wherever the MTHDS Test Corpus exercises it, a hook that refuses a form the standard allows, but it cannot see a bundle that is behind on anything the corpus does not exercise, such as a change to the hook's own source.
 
-**`Unit tests` runs `make agent-test`** — the pytest suite, quiet unless something fails, so a green run is a few lines rather than a screenful. `pyproject.toml`'s `addopts = "-m 'not recipes'"` deselects the recipe suite; `recipes.yml` is what runs that one.
+**`Unit tests` runs `make agent-test`** — the pytest suite, quiet unless something fails, so a green run is a few lines rather than a screenful. The job installs Node 22 first, because `tests/unit/test_hook_corpus.py` runs the vendored hook bundle over the vendored MTHDS Test Corpus and fails rather than skips under `CI` when no `node` is on the PATH: a gate skipped in CI is a green light for nothing. `docs/hooks.md` ("Checks") says what the sweep expects of each entry. `pyproject.toml`'s `addopts = "-m 'not recipes'"` deselects the recipe suite; `recipes.yml` is what runs that one.
 
 ## The branch-flow guard
 
