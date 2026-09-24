@@ -103,7 +103,7 @@ The tools the skills call to validate a method, prepare its inputs, run it, gene
 
 The plugin also installs in **Mistral Vibe** 2.21.0 or later, from a clone of this repository: Vibe loads the skills from a path in its config, the hook from its `hooks.toml`, and the Pipelex tools from a config entry that carries your key. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
 
-**Claude Desktop** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. Set the key in the plugin configuration dialog, which opens when you enable the plugin.
+**Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. Set the key in the plugin configuration dialog, which opens when you enable the plugin.
 
 Which Pipelex product each app takes, and every agent's install in detail, are in [Install the plugin, agent by agent](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md).
 

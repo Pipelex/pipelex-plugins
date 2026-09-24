@@ -8,11 +8,11 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 
 | App | Takes | How to connect |
 |---|---|---|
-| Claude Code | The Pipelex plugin | [Claude Code](#claude-code) |
+| Claude Code, in the terminal, your editor or the Claude desktop app | The Pipelex plugin | [Claude Code](#claude-code) |
 | Codex, in the terminal or the ChatGPT desktop app | The Pipelex plugin | [Codex](#codex) |
 | Mistral Vibe | The Pipelex plugin | [Mistral Vibe](#mistral-vibe) |
 | ChatGPT | The Pipelex MCP | Apps directory, or [by its address](#the-pipelex-mcp-for-chatbots) |
-| Claude, on the web, on mobile and in the desktop app | The Pipelex MCP | **Add custom connector**, [by its address](#the-pipelex-mcp-for-chatbots) |
+| Claude chat, on the web, on mobile and in the desktop app | The Pipelex MCP | **Add custom connector**, [by its address](#the-pipelex-mcp-for-chatbots) |
 
 Cursor takes no plugin. Registering the Pipelex tools there by hand is described in the [`pipelex-mcp` developer reference](https://github.com/Pipelex/pipelex-mcp#local-workshop-install--register).
 
@@ -43,7 +43,7 @@ export PIPELEX_API_KEY=plx_sk_...     # the plugin configuration dialog is prefe
 
 `PIPELEX_BASE_URL` sets the base URL the same way and defaults to `https://api.pipelex.com`. A value set in the dialog wins over the environment, and an empty field leaves the environment in charge.
 
-**Claude Desktop.** An app launched from the desktop carries no shell environment, so when the plugin runs in the Claude desktop app, an `export` in your shell profile never reaches it: the plugin configuration dialog is the only way the key gets there. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
+**Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the plugin configuration dialog is the only way the key gets there. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
 
 **What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, with the same key. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
 
