@@ -51,7 +51,7 @@ $0.21 · 64 s · 9 of 11 lines · pass bar met: no
 
 ## Regressions and the best round
 
-- **A regression** is a line of a case that passed in an earlier run of that case and does not pass now. Name the run where it last passed. Compare only with runs made since the case's key last changed.
+- **A regression** is a line of a case that passed in an earlier run of that case and does not pass now. Name the run where it last passed. Compare only with runs made since that line last changed: a key change restarts the history of the lines it rewrites or adds, and every other line keeps its own.
 - **A round's score** is the number of Must and Must not lines passed across all its cases. The best round is the one with the highest score in the series. The loop's fifth stop compares each new round with it.
 
 ## A key changes
@@ -63,7 +63,7 @@ When the user changes a key, append an entry before the next run:
 M4 now reads "…", because ….
 ```
 
-Rounds before it are no longer compared with rounds after it: regressions and the best round count from here.
+The lines it rewrites or adds start their history here. Every other line of the case keeps its own, so a line the change left alone is still named when it regresses. The best round counts from here, since the rounds before it were scored on different lines.
 
 ## The scorecard
 
