@@ -11,6 +11,8 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
@@ -22,6 +24,24 @@ STALE_REF_PATTERN = re.compile(r"references/(?:" + "|".join(re.escape(stem) for 
 BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
+
+# The compaction ceiling (box C of `wip/skill-size-diet/design.md`). After a compaction Claude
+# Code re-attaches each invoked skill within 5,000 tokens, so a SKILL.md longer than that is
+# carried forward as its head alone and loses whatever its tail guarded. The ceiling is counted
+# in characters, which a check can count exactly, and derived from tokens in phase 0: 5,000
+# times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
+# target (2.77, the Claude 5 tokenizer), less a margin — `wip/skill-size-diet/facts.md`.
+SKILL_CEILING_CHARS = 13_000
+
+# A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
+MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
+# A fenced block, indented or not (a list item indents its fences), closed by a fence of the same
+# character at least as long as the one that opened it, so a four-backtick fence can wrap a three.
+FENCED_BLOCK_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,}).*?^[ \t]*(?P=fence)[`~]*[ \t]*$", re.MULTILINE | re.DOTALL)
+INLINE_CODE_PATTERN = re.compile(r"`[^`\n]*`")
+# Where a skill names one of its own scripts: after the skill-directory expression, whatever a
+# target spells it as, so the check keys on the `/scripts/<name>` tail that every spelling shares.
+SKILL_SCRIPT_MENTION_PATTERN = re.compile(r"/scripts/([A-Za-z0-9_.\-/]+)")
 
 TARGETS_DIR_NAME = "targets"
 
@@ -82,21 +102,6 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
         "skills/pipelex-integrate/references/codegen_check.py",
         r"pipelex-sdk (\d+\.\d+\.\d+) or later is not importable",
         "pipelex_sdk_py",
-    ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "Node \u2265 the `engines\\.node` field of `package\\.json` \\((\\d+\\.\\d+) at writing\\)",
-        "node",
-    ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "a Python inside `requires-python` of `pyproject\\.toml` \\((\\d+\\.\\d+)\u2013\\d+\\.\\d+ at writing\\)",
-        "python_min",
-    ),
-    (
-        "skills/pipelex-scaffold/references/starters.md",
-        "a Python inside `requires-python` of `pyproject\\.toml` \\(\\d+\\.\\d+\u2013(\\d+\\.\\d+) at writing\\)",
-        "python_max",
     ),
 ]
 
@@ -479,6 +484,41 @@ def check_skill_argument_placeholders(base_dir: Path) -> list[str]:
     return errors
 
 
+def check_skill_frontmatter(base_dir: Path) -> list[str]:
+    """Check that every rendered SKILL.md opens with frontmatter strict YAML accepts.
+
+    Mistral Vibe parses a skill's frontmatter with `yaml.safe_load` and drops a skill that fails,
+    with nothing but a warning in its log; Codex repairs such a line and Claude Code tolerates it,
+    so the loss shows on one harness only. The usual cause is a `: ` inside an unquoted
+    `description:`, which strict YAML reads as a second mapping. The frontmatter must also carry a
+    string `name` equal to the skill's directory and a string `description`.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            rel = skill_md.relative_to(base_dir)
+            text = skill_md.read_text(encoding="utf-8")
+            end = text.find("\n---\n", 4)
+            if not text.startswith("---\n") or end == -1:
+                errors.append(f"{rel}: no `---` frontmatter block at the top")
+                continue
+            try:
+                data = yaml.safe_load(text[4:end])
+            except yaml.YAMLError as exc:
+                reason = str(exc).splitlines()[0]
+                errors.append(f"{rel}: frontmatter is not valid YAML ({reason}); Mistral Vibe drops this skill")
+                continue
+            if not isinstance(data, dict):
+                errors.append(f"{rel}: frontmatter is not a mapping")
+                continue
+            fields = cast(dict[str, Any], data)
+            if fields.get("name") != skill_md.parent.name:
+                errors.append(f"{rel}: frontmatter `name` is {fields.get('name')!r}, not the skill's directory {skill_md.parent.name!r}")
+            if not isinstance(fields.get("description"), str) or not fields["description"].strip():
+                errors.append(f"{rel}: frontmatter carries no string `description`")
+    return errors
+
+
 def check_build_error_markers(base_dir: Path) -> list[str]:
     """Check that no generated file carries a shared include's build-error marker.
 
@@ -494,6 +534,114 @@ def check_build_error_markers(base_dir: Path) -> list[str]:
                 if BUILD_ERROR_MARKER in line:
                     rel = skill_md.relative_to(base_dir)
                     errors.append(f"{rel}:{idx}: {line.strip()}")
+    return errors
+
+
+def check_skill_ceiling(base_dir: Path) -> list[str]:
+    """Name every rendered SKILL.md longer than the compaction ceiling, on every target.
+
+    Returned sorted by size, largest first, so the report reads as the diet's remaining work.
+    """
+    over: list[tuple[int, str]] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
+            size = len(skill_md.read_text(encoding="utf-8"))
+            if size > SKILL_CEILING_CHARS:
+                rel = skill_md.relative_to(base_dir)
+                over.append((size, f"{rel}: {size} characters, {size - SKILL_CEILING_CHARS} over the {SKILL_CEILING_CHARS} ceiling"))
+    return [line for _, line in sorted(over, key=lambda item: -item[0])]
+
+
+def _without_fenced_blocks(text: str) -> str:
+    """The text with fenced blocks blanked, line count kept, so a `#` comment in code is never a heading."""
+    return FENCED_BLOCK_PATTERN.sub(lambda match: "\n" * match.group(0).count("\n"), text)
+
+
+def _markdown_prose(text: str) -> str:
+    """The text with fenced blocks and inline code blanked, so an example is never read as a link."""
+    return INLINE_CODE_PATTERN.sub("``", _without_fenced_blocks(text))
+
+
+def _heading_slugs(text: str) -> set[str]:
+    """The anchors GitHub-flavoured Markdown gives the file's headings.
+
+    Lowercased, every character that is not a letter, a digit, a space, a hyphen or an underscore
+    dropped, and each space turned into a hyphen — so `Step 8 — a method` becomes `step-8--a-method`.
+    Inline code keeps its text and loses only its backticks, as on GitHub, so a heading naming a tool
+    keeps the tool's name in its anchor.
+    """
+    slugs: set[str] = set()
+    seen: dict[str, int] = {}
+    for line in _without_fenced_blocks(text).splitlines():
+        match = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
+        if match:
+            slug = re.sub(r"[^\w\- ]", "", match.group(1).lower()).replace(" ", "-")
+            # A repeated heading's later occurrences are `slug-1`, `slug-2`, … on GitHub.
+            count = seen.get(slug, 0)
+            seen[slug] = count + 1
+            slugs.add(slug if count == 0 else f"{slug}-{count}")
+    return slugs
+
+
+def _link_targets(text: str) -> list[str]:
+    """Every relative link target in the prose of a Markdown file, anchors included."""
+    targets: list[str] = []
+    for match in MARKDOWN_LINK_PATTERN.finditer(_markdown_prose(text)):
+        target = match.group(1)
+        if re.match(r"^[a-z][a-z0-9+.\-]*:", target) or target.startswith("/"):
+            continue  # a URL, a mailto: or an absolute path is not a file of the plugin
+        targets.append(target)
+    return targets
+
+
+def check_skill_links(base_dir: Path) -> list[str]:
+    """Links resolve both ways in every target (box H of `wip/skill-size-diet/design.md`).
+
+    Forward: every relative link in a skill, a reference or a shared file names a file that
+    exists in the same target, and every anchor names a heading of the file it points into.
+    Backward: every file a skill ships under `references/` or `scripts/` is named by something the
+    model reads first — a reference by a SKILL.md link, a script by a SKILL.md or by a reference of
+    its own skill — and every shared file by a skill or a reference. A pointer to nothing sends the
+    model to a read that fails; a file named by nothing is a caveat no model will ever read.
+    """
+    errors: list[str] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        skills_dir = output_dir / "skills"
+        target_root = output_dir.resolve()
+        markdown_files = (
+            sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
+        )
+        named: set[Path] = set()
+        for md_file in markdown_files:
+            text = md_file.read_text(encoding="utf-8")
+            rel = md_file.relative_to(base_dir)
+            for target in _link_targets(text):
+                path_part, _, anchor = target.partition("#")
+                resolved = (md_file.parent / path_part).resolve() if path_part else md_file.resolve()
+                if path_part:
+                    if not resolved.is_relative_to(target_root):
+                        errors.append(f"{rel}: link to `{target}` leaves the target, whose installed copy does not carry it")
+                        continue
+                    if not resolved.is_file():
+                        errors.append(f"{rel}: link to `{target}` names no file in this target")
+                        continue
+                    if md_file.name == "SKILL.md" or resolved.parent.name == "scripts":
+                        named.add(resolved)
+                    elif resolved.parent.name == "shared":
+                        named.add(resolved)
+                if anchor and resolved.suffix == ".md" and anchor not in _heading_slugs(resolved.read_text(encoding="utf-8")):
+                    errors.append(f"{rel}: anchor `#{anchor}` names no heading of {resolved.name}")
+            skill_root = skills_dir / md_file.relative_to(skills_dir).parts[0]
+            for match in SKILL_SCRIPT_MENTION_PATTERN.finditer(text):
+                script = (skill_root / "scripts" / match.group(1).rstrip(".")).resolve()
+                if script.is_file():
+                    named.add(script)
+        for asset in sorted(skills_dir.glob("*/references/**/*")) + sorted(skills_dir.glob("*/scripts/**/*")):
+            if asset.is_file() and asset.resolve() not in named:
+                errors.append(f"{asset.relative_to(base_dir)}: shipped but named by nothing the model reads")
+        for shared in sorted(skills_dir.glob("shared/*.md")):
+            if shared.resolve() not in named:
+                errors.append(f"{shared.relative_to(base_dir)}: shipped but named by no skill and no reference")
     return errors
 
 
@@ -555,9 +703,8 @@ def check_version_floors(base_dir: Path) -> list[str]:
                 f"{rel_path}: the sentence stating the `{key}` floor was reworded — re-anchor VERSION_FLOOR_STATIC_REFS in this same change"
             )
             continue
-        # Every occurrence, not the first: `starters.md` states the Node floor once per
-        # template column, so a second one left behind by a bump is exactly the drift
-        # this rule exists to catch.
+        # Every occurrence, not the first: a reference that states a floor twice, and a
+        # second one left behind by a bump, is exactly the drift this rule exists to catch.
         for match in matches:
             if match.group(1) != expected:
                 line = text[: match.start()].count("\n") + 1
@@ -761,6 +908,19 @@ def _run_check(title: str, errors: list[str], failure_message: str, success_mess
     return False
 
 
+def _report_skill_ceiling(base_dir: Path) -> bool:
+    """Print the ceiling report, and fail when any SKILL.md is over the ceiling."""
+    over = check_skill_ceiling(base_dir)
+    print(f"Checking every SKILL.md against the {SKILL_CEILING_CHARS}-character compaction ceiling...")
+    if not over:
+        print("  Every SKILL.md fits under the ceiling.")
+        return False
+    for line in over:
+        print(f"  OVER: {line}")
+    print("FAIL: A SKILL.md is longer than the compaction ceiling.")
+    return True
+
+
 def run_shared_checks(base_dir: Path) -> bool:
     """Run platform-agnostic repository checks."""
     failed = False
@@ -810,11 +970,24 @@ def run_shared_checks(base_dir: Path) -> bool:
         "  No argument placeholders found.",
     )
     failed |= _run_check(
+        "Checking every SKILL.md frontmatter parses as strict YAML...",
+        check_skill_frontmatter(base_dir),
+        "FAIL: A SKILL.md frontmatter is not valid YAML, or lacks its name or description. Quote the value or reword it.",
+        "  Every SKILL.md frontmatter is valid YAML with its name and description.",
+    )
+    failed |= _run_check(
         "Checking for unresolved shared-include variants...",
         check_build_error_markers(base_dir),
         "FAIL: A shared include rendered its build-error branch (the including template set no variant, or misspelled one).",
         "  Every shared include resolved its variant.",
     )
+    failed |= _run_check(
+        "Checking that links resolve both ways in every target...",
+        check_skill_links(base_dir),
+        "FAIL: A link names no file or heading, or a shipped reference, script or shared file is named by nothing.",
+        "  Every link resolves, and every shipped reference, script and shared file is named.",
+    )
+    failed |= _report_skill_ceiling(base_dir)
     failed |= _run_check(
         "Checking all shared template files exist...",
         check_shared_files_exist(base_dir),

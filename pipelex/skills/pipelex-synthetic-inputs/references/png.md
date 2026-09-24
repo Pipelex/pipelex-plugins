@@ -1,5 +1,7 @@
 # PNG recipes — Pillow and matplotlib
 
+Read this at step 4 of the skill when the format is `png`, before writing any code; its **Verify** section is step 5's check.
+
 Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
 
 `Pillow` is MIT-CMU, `matplotlib` PSF-style and `numpy` BSD; every recipe below was executed and looked at under Pillow 12.3.0, matplotlib 3.11.1 and numpy 2.5.2 before it was committed.
@@ -11,11 +13,8 @@ Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a compl
 | a bar, line, pie or scatter chart of some data | `chart` | [Chart (matplotlib)](#chart-matplotlib) |
 | a flowchart, process, architecture or org chart | `diagram` | [Diagram (Pillow)](#diagram-pillow) |
 | a scanned or photographed page — an invoice, receipt, form, letter — for OCR or document understanding | `document_scan` | [Scanned document (Pillow)](#scanned-document-pillow) |
+| a printed form someone wrote on — ticks, a corrected quantity, a remark, a signature | `document_scan` | [Handwritten marks (Pillow)](#handwritten-marks-pillow) |
 | an app or web screen — a dashboard, a list, a settings page — for UI understanding | `screenshot` | [App screenshot (Pillow)](#app-screenshot-pillow) |
-
-**Not covered:** `photograph` and `handwritten`. Code cannot render either to a standard a vision model would mistake for the real thing, and an imitation is worse than nothing — it lets a method run on the wrong kind of input and report success. Say so and ask the user for a real file for that input; there is no public-image last resort here, and since the dead `w3.org` PDF was removed there is none for `pdf` either.
-
-A brief that sounds like a photograph is sometimes a `document_scan` in disguise: "a photo of a receipt" is a scanned document, and that recipe covers it. Read what the method actually does with the image before refusing.
 
 ## Conventions shared by every recipe
 
@@ -500,6 +499,191 @@ Turn the dials in `scannerize()` down to `angle=0.2, grain=3, blur=0.4` for a cl
 
 To render a letter or a form instead of an invoice, drop the column-header block (`WIDTHS` through the `COLUMNS` loop), the item loop and the totals block, and keep the letterhead, the paragraph flow and the footer — nothing below them depends on any of the three. Drop the column header too, not just the rows: keeping it leaves a grey `Description | Qty | Unit price | Amount` bar with nothing under it. `SELLER` and `BUYER` are then just the sender and the addressee; rename them if it helps you keep the content straight, since only the content block names them. To fill several pages, render each page and save them as separate files; a multi-page TIFF is not covered here.
 
+## Handwritten marks (Pillow)
+
+A printed form that someone has written on: ticks in a column, a corrected quantity, a remark, a signature. This is a `document_scan` whose brief has handwriting in it — a delivery note checked at the goods-in door, a signed form, an annotated receipt. The handwriting is simulated: each glyph of a handwriting-style font gets its own size, tilt, baseline and ink pressure, the line is slanted, and the page is then scanned like any other. It reads more easily than a real hand, and the skill says so to the user in one line.
+
+The font comes from the first family of `HAND_FAMILIES` the machine has: macOS ships Bradley Hand, Noteworthy and Chalkboard SE, Windows Segoe Print, Ink Free and Comic Sans MS. A machine with none of them, which is most Linux machines, falls back to DejaVu Sans Oblique, bundled with matplotlib; the recipe prints a note when it does, and the report must pass it on, because slanted print is a weaker test than a hand. To write on another recipe's page — the invoice of [Scanned document (Pillow)](#scanned-document-pillow), say — copy `hand_font()`, `ink()`, `handwrite()` and `tick()` with their imports (`ImageChops` joins the `PIL` line) and the three module-level names they read, `HAND_FAMILIES`, `HAND` and `INK`, renaming this `INK` to `HAND_INK` in its definition and in `ink()`, since the invoice has an `INK` of its own; then paste their layers onto the page before `scannerize()`.
+
+```bash
+uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+import logging
+import os
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from matplotlib import font_manager
+
+logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)  # several hand fonts ship a bold face only
+OUT = "<output_dir>/inputs/test_handwritten.png"
+assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
+Path(OUT).parent.mkdir(parents=True, exist_ok=True)
+# Render beside the target and rename on success, so a crash never truncates an existing file.
+PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
+
+# --- content -----------------------------------------------------------
+TITLE = "GOODS RECEIVED NOTE"
+HEADER = [("Supplier", "Acme Hardware Supply"), ("Delivery note", "DN-2026-0117"),
+          ("Received at", "Example Constructions, Dijon site")]
+COLUMNS = ["Item", "Description", "Shipped", "Received"]
+ROWS = [                      # item, description, quantity shipped, quantity received by hand (None = a tick)
+    ("AHS-1001", "M8 hex bolts, zinc plated, box of 100", 12, None),
+    ("AHS-2210", "Safety goggles, clear polycarbonate", 25, 22),
+    ("AHS-3002", "Wood screws 4x40, box of 200", 8, None),
+]
+REMARK = "3 goggles cracked - sent back"
+SIGNATURE = "J. Example"
+DATE = "12.03.26"
+INK = (22, 42, 156)           # blue ballpoint; (35, 35, 40) for black
+SEED = 20260924
+# -----------------------------------------------------------------------
+
+WIDTH, HEIGHT = 1240, 874     # A5 landscape at 150 dpi
+MARGIN = 80
+TEXT = "#1b1b1b"
+HAND_FAMILIES = ["Bradley Hand", "Noteworthy", "Chalkboard SE", "Segoe Print", "Ink Free", "Comic Sans MS"]
+
+_FONTS = {}
+
+
+def font(size, bold=False):
+    """DejaVu Sans, bundled with matplotlib; Pillow's built-in face as a fallback."""
+    key = (size, bold)
+    if key not in _FONTS:
+        try:
+            path = font_manager.findfont("DejaVu Sans:bold" if bold else "DejaVu Sans")
+            _FONTS[key] = ImageFont.truetype(path, size)
+        except Exception:
+            _FONTS[key] = ImageFont.load_default(size=size)
+    return _FONTS[key]
+
+
+def hand_font():
+    """The first handwriting family installed, or DejaVu Sans Oblique with a note to pass on."""
+    for family in HAND_FAMILIES:
+        try:
+            return font_manager.findfont(font_manager.FontProperties(family=family), fallback_to_default=False)
+        except ValueError:
+            continue
+    print("note: no handwriting font on this machine; the marks fall back to DejaVu Sans Oblique, "
+          "which reads as slanted print rather than a hand")
+    return font_manager.findfont("DejaVu Sans:italic")
+
+
+HAND = hand_font()
+
+
+def ink(mask, rng, slant):
+    """Turn a coverage mask into pen ink: a slant, a soft edge, uneven pressure, cropped to the strokes."""
+    mask = mask.transform(mask.size, Image.AFFINE, (1, slant, -slant * mask.height, 0, 1, 0), resample=Image.BICUBIC)
+    alpha = np.asarray(mask.filter(ImageFilter.GaussianBlur(0.55)), dtype=np.float32)
+    pressure = rng.normal(0.0, 1.0, alpha.shape).astype(np.float32)
+    pressure = np.asarray(Image.fromarray(np.clip(128 + 60 * pressure, 0, 255).astype(np.uint8))
+                          .filter(ImageFilter.GaussianBlur(3)), dtype=np.float32) / 255.0
+    alpha *= 0.7 + 0.5 * pressure
+    rgba = np.zeros(alpha.shape + (4,), dtype=np.uint8)
+    rgba[..., :3] = INK
+    rgba[..., 3] = np.clip(alpha, 0, 255).astype(np.uint8)
+    layer = Image.fromarray(rgba, "RGBA")
+    return layer.crop(layer.getbbox())
+
+
+def handwrite(text, size, rng, slant=0.18):
+    """Write text glyph by glyph, each with its own size, tilt, baseline and darkness."""
+    mask = Image.new("L", (int(size * 0.9 * len(text)) + 4 * size, 3 * size), 0)
+    x, wander = float(size), 0.0
+    for character in text:
+        face = ImageFont.truetype(HAND, max(10, int(round(size * rng.uniform(0.92, 1.08)))))
+        advance = face.getlength(character)
+        if not character.isspace():
+            glyph = Image.new("L", (int(advance) + 2 * size, 3 * size), 0)
+            ImageDraw.Draw(glyph).text((size, 2 * size), character, font=face, anchor="ls",
+                                       fill=int(255 * rng.uniform(0.8, 1.0)))
+            glyph = glyph.rotate(rng.uniform(-5, 5), resample=Image.BICUBIC, center=(size + advance / 2, 2 * size))
+            wander = float(np.clip(wander + rng.normal(0, 0.8), -3, 3))
+            placed = Image.new("L", mask.size, 0)
+            placed.paste(glyph, (int(x - size), int(wander)))
+            mask = ImageChops.lighter(mask, placed)
+        x += advance * rng.uniform(0.9, 1.03)
+    return ink(mask, rng, slant)
+
+
+def tick(rng, size=30):
+    """A quick check mark: a short stroke down, a long flick up to the right."""
+    mask = Image.new("L", (3 * size, 3 * size), 0)
+    start, turn, end = (0.7 * size, 1.6 * size), (1.1 * size, 2.2 * size), (2.4 * size, 0.6 * size)
+    points = [(start[0] + (turn[0] - start[0]) * t, start[1] + (turn[1] - start[1]) * t) for t in np.linspace(0, 1, 8)]
+    points += [(turn[0] + (end[0] - turn[0]) * t + rng.normal(0, 0.5), turn[1] + (end[1] - turn[1]) * t + 3 * np.sin(np.pi * t))
+               for t in np.linspace(0, 1, 14)]
+    ImageDraw.Draw(mask).line(points, fill=235, width=3, joint="curve")
+    return ink(mask, rng, slant=0.05)
+
+
+def scannerize(image, seed=0, angle=0.7, grain=7.0, blur=0.7, tint=(1.0, 0.985, 0.955)):
+    """Make a crisply rendered page look photocopied: skew, paper tint, grain, vignette."""
+    image = image.convert("RGB")
+    rng = np.random.default_rng(seed)
+    image = image.rotate(rng.uniform(-angle, angle), resample=Image.BICUBIC, fillcolor=(246, 244, 238))
+    image = image.filter(ImageFilter.GaussianBlur(blur))
+    pixels = np.asarray(image, dtype=np.float32)
+    pixels *= np.array(tint, dtype=np.float32)
+    pixels += rng.normal(0.0, grain, pixels.shape).astype(np.float32)
+    height, width = pixels.shape[:2]
+    ys, xs = np.mgrid[0:height, 0:width]
+    radius = np.sqrt(((xs / width - 0.5) * 2) ** 2 + ((ys / height - 0.5) * 2) ** 2)
+    pixels *= (1.0 - 0.16 * np.clip(radius - 0.35, 0, None) ** 2)[..., None]
+    return Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), "RGB")
+
+
+rng = np.random.default_rng(SEED)
+page = Image.new("RGB", (WIDTH, HEIGHT), "#ffffff")
+draw = ImageDraw.Draw(page)
+right = WIDTH - MARGIN
+y = MARGIN
+
+draw.text((MARGIN, y), TITLE, font=font(32, bold=True), fill=TEXT)
+y += 56
+for key, value in HEADER:
+    draw.text((MARGIN, y), f"{key}:", font=font(19), fill="#444444")
+    draw.text((MARGIN + 190, y), value, font=font(19, bold=True), fill=TEXT)
+    y += 28
+y += 20
+
+WIDTHS = [170, 570, 170, 170]
+xs = [MARGIN]
+for width in WIDTHS[:-1]:
+    xs.append(xs[-1] + width)
+draw.rectangle([MARGIN, y, right, y + 38], fill="#ececec")
+for index, title in enumerate(COLUMNS):
+    draw.text((xs[index] + 10, y + 10), title, font=font(19, bold=True), fill=TEXT)
+y += 38
+for item, description, shipped, received in ROWS:
+    draw.text((xs[0] + 10, y + 12), item, font=font(19), fill=TEXT)
+    draw.text((xs[1] + 10, y + 12), description, font=font(19), fill=TEXT)
+    draw.text((xs[2] + 10, y + 12), str(shipped), font=font(19), fill=TEXT)
+    mark = tick(rng) if received is None else handwrite(str(received), 42, rng)
+    page.paste(mark, (xs[3] + 30 + int(rng.uniform(-6, 6)), y + 26 - mark.height // 2 + int(rng.uniform(-3, 3))), mark)
+    y += 52
+    draw.line([(MARGIN, y), (right, y)], fill="#b6b6b6", width=1)
+y += 40
+
+for label, text, size in [("Remarks:", REMARK, 30), ("Signature:", SIGNATURE, 40), ("Date:", DATE, 28)]:
+    draw.text((MARGIN, y + 8), label, font=font(19), fill=TEXT)
+    draw.line([(MARGIN + 150, y + 36), (right - 300, y + 36)], fill="#9a9a9a", width=1)
+    mark = handwrite(text, size, rng, slant=0.3 if label == "Signature:" else 0.18)
+    page.paste(mark, (MARGIN + 165 + int(rng.uniform(0, 20)), y + 36 - int(mark.height * 0.8)), mark)
+    y += 64
+assert y < HEIGHT - MARGIN // 2, f"the form overruns the page (ends at y={y}); drop rows or raise HEIGHT"
+
+scannerize(page, seed=SEED).save(PART, format="PNG")
+os.replace(PART, OUT)
+print("wrote", OUT, (WIDTH, HEIGHT))
+PYEOF
+```
+
+Keep the marks where a person would put them: a number in the cell it corrects, a remark on the remarks line, a signature over its line. A mark the method must read is only a fact of the test if it is legible to a person looking at the page, so look at it at step 5 before handing it back.
+
 ## App screenshot (Pillow)
 
 Window chrome, a sidebar, a header with an action button, a row of stat tiles, and either a table or a card grid. `LAYOUT` chooses the last one.
@@ -657,11 +841,9 @@ Column widths are fixed shares, not measured, so a long cell will overlap its ne
 ## Verify
 
 ```bash
-uv run --quiet --no-project --with pillow python -c "from PIL import Image; im = Image.open('<output_dir>/inputs/<name>.png'); print(im.format, im.size, im.mode)"
+uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<output_dir>/inputs/<name>.png"
 ```
 
 Expect `PNG`, the size the recipe declares, and `RGB` — or `RGBA` from the chart recipe, which is matplotlib's doing and not a fault. Then look at the file: on Claude Code, open it with the `Read` tool and check it reads as its category — a chart with the series drafted, a diagram whose arrows go where the process goes, a page that looks scanned and whose totals add up, a screen that looks like an app. Fix the content block and rerun if it does not; the recipes are seeded, so nothing else moves.
 
-A failed render must leave nothing behind, but only what it created: remove `<target>` when this run is what put it there, and never on a path that already held a file (Step 4 makes you confirm before overwriting one).
-
-There is no last-resort public image, by design (see "Not covered" above), and no last-resort public PDF either. When the environment cannot be resolved, the answer is the skill's Step 2 table: say what is missing and ask the user for a file.
+A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.

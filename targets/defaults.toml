@@ -12,6 +12,14 @@ marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
 
+# Where a skill's own files are, for a sentence that names one: a reference the
+# skill copies verbatim, a script it runs. Claude Code substitutes
+# ${CLAUDE_SKILL_DIR} in a skill body before the model reads it; Codex and
+# Mistral Vibe substitute nothing, so they override this with a <skill-dir>
+# placeholder that `templates/skills/shared/skill-dir.md.j2` defines in one
+# sentence (wip/skill-size-diet/facts.md, sections 3 to 5).
+skill_dir = "${CLAUDE_SKILL_DIR}"
+
 # Version floors the skills state to the user. One table, so a bump is one edit
 # rather than a hunt through prose. These are VALUE substitutions — the kind the
 # trimmed-variable rule allows — not switches a skill branches on: nothing reads
@@ -43,9 +51,9 @@ harness_name = "Claude Code"
 #                    in a validate verdict — the one floor stated as "and earlier",
 #                    so a bump here means the signature arrived in a later release
 #                    than this one and the sentence naming it has to be re-read
-#   node             the Node the JS templates' `engines.node` names
-#   python_min/max   the range the Python starter's `requires-python` names
-#   method_app_port  the port pipelex-method-apps' webapp-js template serves on
+#   node             the Node the method app's `engines.node` names
+#   python_min/max   the range `pipelex-sdk`'s `requires-python` names, which the
+#                    initializer branch's Python project must be created on
 [vars.floors]
 pipelex_sdk_js = "0.18.0"
 pipelex_sdk_py = "0.10.2"
@@ -53,7 +61,6 @@ pipelex_mcp = "0.13.0"
 node = "22.12"
 python_min = "3.11"
 python_max = "3.14"
-method_app_port = "4300"
 
 # The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
 # (stdio) — definitive, not a BYOK workaround: builders authoring local files

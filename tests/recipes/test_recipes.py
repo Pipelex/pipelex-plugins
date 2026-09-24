@@ -39,6 +39,11 @@ REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "references
 # so reading a target directory would let this suite certify a stale copy. The
 # blocks it reads carry no Jinja, which `test_skill_blocks_carry_no_jinja` pins.
 SKILL_TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-synthetic-inputs" / "SKILL.md.j2"
+# The venv rung, read when `uv` is absent. Its one block is the environment's setup,
+# which the venv tests below create, reuse and repair; it is not a recipe, so the
+# recipe collectors skip this file and `test_every_bash_block_is_runnable_or_a_template`
+# holds it to that one block.
+VENV_REFERENCE = REFERENCES_DIR / "venv.md"
 
 OUTPUT_DIR_PLACEHOLDER = "<output_dir>"
 # A block carrying this placeholder is a template the agent fills in (the
@@ -60,6 +65,7 @@ EXPECTED_RECIPES = {
     ("png.md", "Chart (matplotlib)"),
     ("png.md", "Diagram (Pillow)"),
     ("png.md", "Scanned document (Pillow)"),
+    ("png.md", "Handwritten marks (Pillow)"),
     ("png.md", "App screenshot (Pillow)"),
 }
 
@@ -116,9 +122,14 @@ def _is_runnable(script: str) -> bool:
     return script.startswith("uv run") and TEMPLATE_PLACEHOLDER not in script
 
 
+def _recipe_references() -> list[Path]:
+    """Every reference but the venv rung's, whose block sets up the environment."""
+    return [reference for reference in sorted(REFERENCES_DIR.glob("*.md")) if reference != VENV_REFERENCE]
+
+
 def _collect_recipes() -> list[RecipeBlock]:
     recipes: list[RecipeBlock] = []
-    for reference in sorted(REFERENCES_DIR.glob("*.md")):
+    for reference in _recipe_references():
         text = reference.read_text(encoding="utf-8")
         for block in BASH_BLOCK.finditer(text):
             script = block.group(1)
@@ -170,6 +181,10 @@ def _skill_blocks() -> list[str]:
     return [block.group(1) for block in BASH_BLOCK.finditer(skill)]
 
 
+def _venv_blocks() -> list[str]:
+    return [block.group(1) for block in BASH_BLOCK.finditer(VENV_REFERENCE.read_text(encoding="utf-8"))]
+
+
 class TestRecipes:
     """Every recipe block runs and writes the file it declares, in the format
     and at the size it declares — on both rungs of the environment ladder."""
@@ -186,8 +201,12 @@ class TestRecipes:
         assert {(recipe.reference, recipe.heading) for recipe in RECIPES} == EXPECTED_RECIPES
 
     def test_every_bash_block_is_runnable_or_a_template(self) -> None:
-        """No block may fall between the two categories unnoticed."""
-        for reference in sorted(REFERENCES_DIR.glob("*.md")):
+        """No block may fall between the two categories unnoticed, and the venv
+        reference, which the collectors skip, holds its setup block and nothing else."""
+        venv_blocks = _venv_blocks()
+        assert len(venv_blocks) == 1, f"{VENV_REFERENCE.name} must hold exactly one ```bash block, the venv setup; found {len(venv_blocks)}"
+        assert venv_blocks[0].startswith('VENV="'), f"{VENV_REFERENCE.name}'s block is no longer the venv setup:\n{venv_blocks[0]}"
+        for reference in _recipe_references():
             text = reference.read_text(encoding="utf-8")
             for block in BASH_BLOCK.finditer(text):
                 script = block.group(1)
@@ -281,7 +300,7 @@ class TestRecipes:
 
         # Rung 2 fills one venv with the whole allowlist, so a package added to
         # Step 2 and not to that install line is a format that works only on uv.
-        install = next(line for block in _skill_blocks() for line in block.splitlines() if "pip install" in line)
+        install = next(line for block in _venv_blocks() for line in block.splitlines() if "pip install" in line)
         assert documented <= set(install.split()), f"the venv rung never installs: {sorted(documented - set(install.split()))}"
 
     def test_skill_blocks_carry_no_jinja(self) -> None:
@@ -305,10 +324,10 @@ class TestRecipes:
         assert announced == {"pdf", "png"}, f"preflights announced {sorted(announced)}"
 
     def test_preflight_falls_through_quietly_when_uv_is_absent(self, tmp_path: Path) -> None:
-        """Rung 1's guard is `command -v uv >/dev/null && …`, and the whole Step 2
-        decision table depends on that failing *silently* so the agent drops to
-        rung 2 instead of reading a shell error as a package problem. Needs
-        neither uv nor the network, so it runs everywhere."""
+        """Rung 1's guard is `command -v uv >/dev/null && …`, and the skill's pointer
+        to the venv rung ("the preflight prints nothing") depends on that failing
+        *silently* so the agent drops to rung 2 instead of reading a shell error as a
+        package problem. Needs neither uv nor the network, so it runs everywhere."""
         bash = shutil.which("bash")
         assert bash is not None, "these tests already require bash"
         for preflight in [block for block in _skill_blocks() if block.startswith("command -v uv")]:
@@ -398,4 +417,4 @@ class TestRecipes:
 
     @staticmethod
     def _venv_setup() -> str:
-        return next(block for block in _skill_blocks() if block.startswith('VENV="'))
+        return next(block for block in _venv_blocks() if block.startswith('VENV="'))

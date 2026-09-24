@@ -3,9 +3,10 @@
    a catalog id reaches them through a directory on disk — the one already
    linked to that method, or the one `/pipelex-catalog` pulls it into.
 
-   One include for the three, because the bridge is the same gesture in all
-   three and only the step it hands back to differs; that step is named by
-   `catalog_id_bridge_resume`, which every including skill sets.
+   One block for the three, because the bridge is the same gesture in all
+   three. It is included by `catalog-id.md.j2` alone, the shared reference the
+   three skills point at, which sets `catalog_id_bridge_resume` to the step it
+   hands back to: the pointing skill's own, just after its pointer.
 
    The parameter is interpolated bare on purpose. The renderer runs under
    `StrictUndefined`, so an unset or misspelled `catalog_id_bridge_resume`
@@ -13,7 +14,7 @@
    variable — an earlier and more precise failure than a marker only
    `scripts/check.py` would catch later. An `{% if catalog_id_bridge_resume is
    defined %}` guard would suppress exactly that failure, and the parameter is
-   never legitimately absent: all three including skills set it. -#}
+   never legitimately absent: its one includer sets it. -#}
 This skill works on files, so a **catalog id** (`mt_…`) is not a target it can act on directly: it is resolved to a directory on disk first, and everything after that is the ordinary file-based flow.
 
 1. **Look for a directory already linked to that method.** One search over the link files, from the working directory down: `grep -rl '<the mt_… id>' --include=pipelex-method.json .`. Exactly one hit is the directory to work in — say which one, and go to {{ catalog_id_bridge_resume }}.

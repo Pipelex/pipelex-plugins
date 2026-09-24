@@ -1,7 +1,0 @@
-{#- The validation hook formats every `.mthds` write, so no skill hand-formats.
-   `formatting_hook_write_clause` opens the instruction: the default tells a
-   skill that writes whole files to just write them; a skill that only moves
-   declarations around sets the shorter clause. Strips its own trailing
-   newline (the closing comment below). -#}
-**Formatting is automatic.** Every write of a `.mthds` file triggers the plugin's validation hook: it lints, rewrites the file in canonical formatting, and blocks on syntax errors. {{ formatting_hook_write_clause | default("Just write the files — don't hand-format") }}, and re-read a file before editing it again after the hook reformatted it.
-{#- -#}

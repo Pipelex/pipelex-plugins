@@ -10,6 +10,7 @@ from typing import ClassVar
 import pytest
 
 from scripts.check import (
+    SKILL_CEILING_CHARS,
     VERSION_FLOOR_STATIC_REFS,
     check_build_error_markers,
     check_codex_marketplace_plugins,
@@ -19,6 +20,9 @@ from scripts.check import (
     check_no_templates_in_output,
     check_shared_files_exist,
     check_skill_argument_placeholders,
+    check_skill_ceiling,
+    check_skill_frontmatter,
+    check_skill_links,
     check_stale_references,
     check_target_plugin_versions,
     check_version_floors,
@@ -96,7 +100,7 @@ def skill_tree(tmp_path: Path) -> Path:
     """Create a minimal valid skill directory structure with target configs."""
     template_shared = tmp_path / "templates" / "skills" / "shared"
     template_shared.mkdir(parents=True)
-    for name in ["mthds-reference.md.j2", "native-content-types.md.j2"]:
+    for name in ["mthds-reference.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"]:
         (template_shared / name).write_text("# placeholder\n")
 
     (tmp_path / "pipelex" / "skills" / "shared").mkdir(parents=True)
@@ -699,7 +703,7 @@ class TestSharedFilesExist:
     def test_all_missing(self, tmp_path: Path) -> None:
         (tmp_path / "templates" / "skills" / "shared").mkdir(parents=True)
         errors = check_shared_files_exist(tmp_path)
-        assert len(errors) == len(["mthds-reference.md.j2", "native-content-types.md.j2"])
+        assert len(errors) == len(["mthds-reference.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"])
 
 
 class TestNoTemplatesInOutput:
@@ -731,3 +735,201 @@ class TestNoTemplatesInOutput:
     def test_missing_targets_dir_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="Targets directory not found"):
             check_no_templates_in_output(tmp_path)
+
+
+class TestSkillFrontmatter:
+    """Mistral Vibe drops a skill whose frontmatter strict YAML rejects, so `make check` parses it the same way."""
+
+    def test_a_valid_frontmatter_passes(self, skill_tree: Path) -> None:
+        assert check_skill_frontmatter(skill_tree) == []
+
+    def test_a_colon_in_an_unquoted_description_fails(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-test\ndescription: Design a method. Construction is adaptive: a graph is written.\n---\n\n# Test\n")
+        errors = check_skill_frontmatter(skill_tree)
+        assert len(errors) == 1
+        assert "not valid YAML" in errors[0]
+        assert "Mistral Vibe drops this skill" in errors[0]
+
+    def test_the_name_must_be_the_skill_directory(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-other\ndescription: A test.\n---\n")
+        assert check_skill_frontmatter(skill_tree) == [
+            "pipelex/skills/pipelex-test/SKILL.md: frontmatter `name` is 'pipelex-other', not the skill's directory 'pipelex-test'"
+        ]
+
+    def test_a_missing_description_or_block_fails(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("---\nname: pipelex-test\n---\n")
+        assert check_skill_frontmatter(skill_tree) == ["pipelex/skills/pipelex-test/SKILL.md: frontmatter carries no string `description`"]
+        skill_md.write_text("# No frontmatter\n")
+        assert check_skill_frontmatter(skill_tree) == ["pipelex/skills/pipelex-test/SKILL.md: no `---` frontmatter block at the top"]
+
+
+class TestSkillCeiling:
+    """Box C of the size diet: every rendered SKILL.md fits in what a compaction keeps."""
+
+    def test_a_skill_under_the_ceiling_is_not_reported(self, skill_tree: Path) -> None:
+        assert check_skill_ceiling(skill_tree) == []
+
+    def test_a_skill_over_the_ceiling_is_named_with_its_size(self, skill_tree: Path) -> None:
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "x" * SKILL_CEILING_CHARS)
+        over = check_skill_ceiling(skill_tree)
+        assert len(over) == 1
+        assert "pipelex-test/SKILL.md" in over[0]
+        assert f"{len(VALID_FRONTMATTER)} over" in over[0]
+
+    def test_the_ceiling_counts_the_whole_file(self, skill_tree: Path) -> None:
+        """The frontmatter counts: the check measures the rendered file, which is conservative."""
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text("x" * SKILL_CEILING_CHARS)
+        assert check_skill_ceiling(skill_tree) == []
+        skill_md.write_text("x" * (SKILL_CEILING_CHARS + 1))
+        assert len(check_skill_ceiling(skill_tree)) == 1
+
+
+class TestSkillLinks:
+    """Box H of the size diet: pointers resolve, and nothing shipped is named by nothing."""
+
+    @staticmethod
+    def _skill(base: Path) -> Path:
+        return base / "pipelex" / "skills" / "pipelex-test"
+
+    @staticmethod
+    def _shared_named(base: Path) -> None:
+        """Give the fixture's shared files a skill that names them, so they do not trip the backward check."""
+        shared = base / "pipelex" / "skills" / "shared"
+        (shared / "mthds-reference.md").write_text("# MTHDS\n\n## PipeLLM\n")
+        skill_md = base / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(VALID_FRONTMATTER + "\nSee [the reference](../shared/mthds-reference.md).\n")
+
+    def test_the_fixture_is_clean(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        assert check_skill_links(skill_tree) == []
+
+    def test_a_link_to_a_missing_reference_fails(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "On a refresh, read [references/refresh.md](references/refresh.md) first.\n")
+        errors = check_skill_links(skill_tree)
+        assert any("references/refresh.md" in error and "names no file" in error for error in errors), errors
+
+    def test_an_anchor_must_name_a_heading(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "## Step 8 — a method that is not on disk\n\n"
+            + "See [step 8](#step-8--a-method-that-is-not-on-disk) and [gone](#gone) and [LLM](../shared/mthds-reference.md#pipellm).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#gone` names no heading of SKILL.md"], errors
+
+    def test_a_reference_named_by_nothing_fails(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        references = self._skill(skill_tree) / "references"
+        references.mkdir()
+        (references / "orphan.md").write_text("# Orphan\n")
+        errors = check_skill_links(skill_tree)
+        assert any("references/orphan.md" in error and "named by nothing" in error for error in errors), errors
+
+    def test_a_reference_named_only_by_another_reference_fails(self, skill_tree: Path) -> None:
+        """References are one level deep: a reference reached only through another is never read on a branch."""
+        self._shared_named(skill_tree)
+        references = self._skill(skill_tree) / "references"
+        references.mkdir()
+        (references / "first.md").write_text("# First\n\nThen read [second](second.md).\n")
+        (references / "second.md").write_text("# Second\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "On a refresh, read [references/first.md](references/first.md) first.\n")
+        errors = check_skill_links(skill_tree)
+        assert [error for error in errors if "named by nothing" in error] == [
+            "pipelex/skills/pipelex-test/references/second.md: shipped but named by nothing the model reads"
+        ], errors
+
+    def test_a_script_is_named_by_its_path_in_the_skill_or_a_reference(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        scripts = self._skill(skill_tree) / "scripts"
+        scripts.mkdir()
+        (scripts / "acquire.sh").write_text("#!/bin/sh\n")
+        (scripts / "env-file.sh").write_text("#!/bin/sh\n")
+        (scripts / "unused.sh").write_text("#!/bin/sh\n")
+        references = self._skill(skill_tree) / "references"
+        references.mkdir()
+        (references / "branch.md").write_text("# Branch\n\nRun `${CLAUDE_SKILL_DIR}/scripts/env-file.sh`.\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "Run `${CLAUDE_SKILL_DIR}/scripts/acquire.sh <dir>`. On branch B, read [references/branch.md](references/branch.md).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/scripts/unused.sh: shipped but named by nothing the model reads"], errors
+
+    def test_a_shared_file_named_by_nothing_fails(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        (skill_tree / "pipelex" / "skills" / "shared" / "credentials.md").write_text("# Credentials\n")
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/shared/credentials.md: shipped but named by no skill and no reference"], errors
+
+    def test_a_link_inside_code_is_an_example_not_a_pointer(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "```md\n[x](references/nope.md)\n```\n\nInline `[y](references/nope.md)` too.\n")
+        assert check_skill_links(skill_tree) == []
+
+    def test_an_indented_or_longer_fence_is_code_too(self, skill_tree: Path) -> None:
+        """A list item indents its fences, and a four-backtick fence wraps a three-backtick example."""
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "1. Write it:\n\n   ```ts\n   handlers[kind](payload)\n   ```\n\n"
+            + "````md\n```ts\n[x](references/nope.md)\n```\n[y](references/gone.md)\n````\n\nAfter the fence.\n"
+        )
+        assert check_skill_links(skill_tree) == []
+
+    def test_an_anchor_keeps_the_text_of_inline_code(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "### Step 5 — `mthds_run`, and print the run id first\n\n"
+            + "See [step 5](#step-5--mthds_run-and-print-the-run-id-first) and [wrong](#step-5---and-print-the-run-id-first).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#step-5---and-print-the-run-id-first` names no heading of SKILL.md"], errors
+
+    def test_a_repeated_heading_takes_a_numbered_anchor(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text()
+            + "## Prerequisites\n\n## Prerequisites\n\n"
+            + "See [A](#prerequisites), [B](#prerequisites-1) and [none](#prerequisites-2).\n"
+        )
+        errors = check_skill_links(skill_tree)
+        assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#prerequisites-2` names no heading of SKILL.md"], errors
+
+    def test_a_link_leaving_the_target_fails(self, skill_tree: Path) -> None:
+        """A file outside the target exists here but not in the installed plugin, so the link fails there."""
+        self._shared_named(skill_tree)
+        (skill_tree / "README.md").write_text("# Readme\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "See [the readme](../../../README.md).\n")
+        errors = check_skill_links(skill_tree)
+        assert errors == [
+            "pipelex/skills/pipelex-test/SKILL.md: link to `../../../README.md` leaves the target, whose installed copy does not carry it"
+        ], errors
+
+    def test_a_script_named_by_a_nested_reference_is_named(self, skill_tree: Path) -> None:
+        self._shared_named(skill_tree)
+        scripts = self._skill(skill_tree) / "scripts"
+        scripts.mkdir()
+        (scripts / "probe.sh").write_text("#!/bin/sh\n")
+        nested = self._skill(skill_tree) / "references" / "sub"
+        nested.mkdir(parents=True)
+        (nested / "x.md").write_text("# X\n\nRun `${CLAUDE_SKILL_DIR}/scripts/probe.sh`.\n")
+        skill_md = self._skill(skill_tree) / "SKILL.md"
+        skill_md.write_text(skill_md.read_text() + "On a branch, read [references/sub/x.md](references/sub/x.md).\n")
+        assert check_skill_links(skill_tree) == []

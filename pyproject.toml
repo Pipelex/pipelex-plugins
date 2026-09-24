@@ -17,7 +17,11 @@ dev = [
   "pytest>=8.0.0,<9.0.0",
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
+  # `scripts/check.py` parses every rendered SKILL.md frontmatter as strict YAML: Mistral Vibe does,
+  # and drops a skill that fails it.
+  "pyyaml>=6.0.2",
   "ruff==0.16.4",
+  "types-pyyaml>=6.0.12",
 ]
 
 [build-system]

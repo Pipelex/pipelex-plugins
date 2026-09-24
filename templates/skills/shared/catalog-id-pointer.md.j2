@@ -1,0 +1,14 @@
+{#- The pointer a file-based skill (design, edit, organize) places where it
+   meets a catalog id or a published address, before reading any file. It sends
+   the model to the rendered shared reference `catalog-id.md`, which carries the
+   bridge, and keeps the bridge's two guards itself, because a guard never lives
+   only in a file read on demand.
+
+   It is its own include so the three skills say it in the same words: the
+   shared reference resumes "just after its pointer to this file", and a pointer
+   that drifted in one skill would still pass every test pinned to the others.
+
+   Strips its own trailing newline (the closing comment below), so the
+   including template supplies the paragraph break. -#}
+**For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
+{#- -#}
