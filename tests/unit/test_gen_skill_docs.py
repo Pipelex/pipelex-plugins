@@ -1356,8 +1356,28 @@ class TestPipelexCatalogSkill:
         body = self.catalog_skill
         assert "{% set validate_call_inline %}" in body
         assert "**a save takes the path form**" in body
-        assert "say the save cannot be linked from this session, and save inline only on the user's yes" in body
+        assert "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes" in body
         assert "Never pass `link_dir`" in body
+        # The update arm too: an inline update leaves the link's `synced_updated_at` behind the catalog, so the
+        # directory's next save is refused at `expected_updated_at`, a conflict with this session's own save.
+        assert "a method updated that way keeps the link's old sync time" in body
+
+    def test_a_conflict_with_this_session_s_own_save_is_not_called_somebody_else_s(self) -> None:
+        """A save whose link write failed, an inline one always, leaves the link's sync time behind the
+        catalog, so the next save from the directory is refused as though somebody had saved over the
+        method. The reference recognises the case by the stored `updated_at` this session's own save
+        reported, says so, and carries the save on with that `updated_at` as the expectation; step 5
+        names the cure for the stale link, a pull into the same directory, rather than a bare save again."""
+        conflict = self.catalog_reference("conflict.md")
+        own = conflict.split("**First, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        assert "never say that somebody saved over the method" in own
+        assert "with `expected_updated_at` set to that stored `updated_at`" in own
+        assert "relaunched from a directory holding the bundle" in own
+        assert conflict.index("**First, is it this session's own save?**") < conflict.index("somebody saved over this method")
+        body = self.catalog_skill
+        assert "unless it finds this session's own save, give the user both timestamps" in body
+        assert "a pull of this method into this directory rewrites the link alone while the files still match what was saved" in body
+        assert "fix whatever blocked the write and save again" not in body
 
     def test_python_is_chosen_and_never_swept(self) -> None:
         """The workshop gates on the `.py` extension and on bundle containment and
