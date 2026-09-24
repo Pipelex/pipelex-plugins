@@ -15,7 +15,7 @@ allowed-tools:
 
 # Prepare Inputs for MTHDS methods
 
-The one entry point for a method's inputs — placeholders, synthetic data, the user's files, or a mix — through to run-ready inputs. **Not** a runner: that is `/pipelex-run`, which this skill ends by offering.
+The one entry point for a method's inputs — placeholders, synthetic data, the user's files, or a mix — through to run-ready inputs.
 
 ## Requirements
 
@@ -23,16 +23,17 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
 - **`mthds_prepare_inputs`** is required at step 5, under the same two stops; never hand-fake a storage reference.
-- **`mthds_list_methods`** is optional: it resolves a saved method named without its `mt_…` id. When it is absent, work from a bundle or an id the user gives; never stop for it.
+- **`mthds_list_methods`** is optional, resolving a saved method named without its `mt_…` id; without it, ask for the id.
 
 ## Mode
 
-**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the current step interactive, and "looks good, go ahead" makes the rest automatic.
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
 
 ## Guards
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
+- **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` each copy's path before writing it, and `inputs.json` when a value holds a file's text. For a path not ignored, add `<output_dir>/inputs/` or `inputs.json` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 ## Process
 
@@ -43,8 +44,6 @@ The target takes three forms, and every call takes exactly one selector; a secon
 - **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: its current stored content, which needs the API key. `<output_dir>` is a directory the user names, by default a new `./<method_id>/`.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
-
-`inputs.json` goes in `<output_dir>`, data files in `<output_dir>/inputs/`, created only when there are files to store.
 
 ### 2. The template
 
@@ -72,7 +71,7 @@ Fill the step 2 template in place, a composite native's fields included ([what t
 
 ### 5. Prepare the inputs for a run
 
-A run on the hosted API cannot read this disk, so `mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip the call for the Template strategy, whose placeholders are not assets. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip the call for the Template strategy, whose placeholders are not assets. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
@@ -82,11 +81,11 @@ Call it with step 2's target, step 2's `pipe_ref` if it passed one (the signatur
 
 On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: it is the source, and prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. When `<output_dir>` is in a git repository whose ignore rules do not cover it, add `inputs.prepared.json` to the nearest `.gitignore` and say so. Report it in one line: the files uploaded, and `inputs.prepared.json` written beside an unchanged `inputs.json`.
 
-`/pipelex-run` judges whether a prepared file is current, but a file moved over the original keeps its old timestamp and escapes it: **prepare again whenever a file was replaced in place.**
+A file moved over the original keeps its old timestamp, which `/pipelex-run`'s currency check misses: **prepare again whenever a file was replaced in place.**
 
 ### 6. Offer the run
 
-Say what is ready: the source values in `inputs.json`, the run-ready form in `inputs.prepared.json` where prepare wrote one, or the Template strategy's placeholders still to fill. When the workspace holds a codebase (a `package.json` or a `pyproject.toml`) the method is not wired into, add that `/pipelex-integrate` gives it generated types and a typed call site.
+Say what is ready: the source values in `inputs.json`, the run-ready form in `inputs.prepared.json` where prepare wrote one, or the Template strategy's placeholders still to fill. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `/pipelex-integrate` wires it in.
 
 **Offer the run, never start it**: it spends inference credit, so the user's yes buys it, and everything past that yes is `/pipelex-run`'s; never call a run tool here. Offer only when:
 

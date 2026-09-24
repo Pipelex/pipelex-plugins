@@ -29,7 +29,7 @@ Which lines must pass for the case to pass.
 
 ## The lines
 
-- **Planted facts** are what the case's inputs hold that the method must find. For files from `/pipelex-synthetic-inputs`, take them from the content it drafted before rendering, or from its report for a photograph, then open each file and confirm that it shows them. For the user's own files, read the files and write down what they show. A diagnosis checks a failing line against these first.
+- **Planted facts** are what the case's inputs hold that the method must find. For files from `/pipelex-synthetic-inputs`, take them from its report, which lists them for every file, then open each file and confirm that it shows them. For the user's own files, read the files and write down what they show. A diagnosis checks a failing line against these first.
 - **One checkable fact per line**, stated as what the output shows: a field and its value, a count, an order, something present or something absent. "The totals are right" is not a line, but "`total_approved` is 786.57" is.
 - **Name the output field** wherever the method's output concept has one. Read the bundle's output concept first. A line that names its field can be scored by quoting that field, and later by a judge method, without the session that wrote the key.
 - **Give a tolerance** where rounding or wording can vary: "within 0.01", "in any wording that names both parties".

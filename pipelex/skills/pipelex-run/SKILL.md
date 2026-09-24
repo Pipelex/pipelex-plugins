@@ -19,7 +19,7 @@ allowed-tools:
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle, and only that, through two entries and no third: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which stays good long after the session that started it. A dry run is not a third entry: it is Start a run's step 3, shown to the user as a numbered flow. It does not prepare inputs (`/pipelex-inputs`), repair a method (`/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one), or bisect a failing pipeline pipe by pipe.
+This skill owns the run lifecycle, and only that, through two entries and no third: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which stays good long after the session that started it. A dry run is not a third entry: it is Start a run's step 3, shown to the user as a numbered flow. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
 
 ## Requirements
 
@@ -85,6 +85,8 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 `mthds_run_results`, then report the main output. When it references stored files — an image, a PDF or a document as a `pipelex-storage://` URI — their links expire within the hour, so call `mthds_download_artifacts` with the run id and `dir: "runs/<run_id>"`, **relative to the workshop's own working directory**, never an absolute path such as `<bundle_dir>/runs/<run_id>/`. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
 
+When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
+
 ### 8. A failed run is reported, then routed, never bisected
 
 Give `failure_message` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Nothing upstream of the run could have caught it, since validation never resolves the function. Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
@@ -93,7 +95,7 @@ Give `failure_message` **verbatim** first, then read [failed-run.md](references/
 
 A run id alone, with no method and no inputs: nothing is validated or prepared.
 
-- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's two readings hold here as well: a status marked `degraded` is only last-known, and one still `RUNNING` long after `created_at` may be slow or stuck, which the status cannot tell apart.
+- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's two readings hold here as well: `degraded` is only last-known, and a long `RUNNING` may be slow or stuck, which the status cannot tell apart.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
 - **"download the files from run X"** → `mthds_download_artifacts`, as step 7 says; it works days after the run.
 
