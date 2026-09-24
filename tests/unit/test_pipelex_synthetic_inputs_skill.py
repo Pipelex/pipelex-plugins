@@ -127,6 +127,12 @@ class TestPipelexSyntheticInputsSkillShape:
         assert 'prompt       = "Reference photo: $reference\\n\\n$description"' in text
         assert "the photographs of one subject show the same one" in text
 
+    def test_a_document_a_method_extracts_is_made_as_a_pdf(self) -> None:
+        """Extraction on the hosted plane reads no Office format, and the proof lab (L-260923-9d0b53) saw a Word
+        transcript made for a method that extracts it fail the run at its first step."""
+        rule = self.the_line(self.render("prod"), "A `Document` a method extracts is a `pdf`")
+        assert "even when the user's originals are Word or Excel files" in rule
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_way_out_without_a_file_hands_back_no_path(self, target_name: str) -> None:
         """`/pipelex-inputs` leaves an input unfilled when the factory returns no path, so both ways the skill

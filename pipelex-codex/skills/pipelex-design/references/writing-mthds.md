@@ -143,7 +143,7 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 |------|-------------|
 | `Text` | A string. |
 | `Image` | A binary image (JPEG, PNG, ...). |
-| `Document` | Any document (PDF, Word, web page URL). |
+| `Document` | A document file or a web page URL. `PipeExtract` reads a PDF, an image or a web page, and nothing else: see its section before designing over Word, Excel or PowerPoint files. |
 | `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF). |
 | `Html` | HTML content. |
 | `TextAndImages` | Mixed text + images. |
@@ -374,6 +374,8 @@ When the target field expects a content object (a concept-typed field), the obje
 
 ### PipeExtract — extract pages from a Document or Image
 
+**It reads a PDF, an image or a web page, and nothing else.** A Word, Excel or PowerPoint file passes validation and preparation, then fails the run at this step with an extraction error naming the formats it accepts. When the user's files are Office documents, say so at the contract and design for the PDF they export from them (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed): the input stays a `Document`, its description says PDF, and the test inputs are PDFs too.
+
 ```toml
 [pipe.extract_document]
 type        = "PipeExtract"
@@ -398,7 +400,7 @@ output      = "Page[]"
 | Field | What it does |
 |-------|--------------|
 | `model` | Which extraction model to use, e.g. `"@default-text-from-pdf"` or `"@default-extract-web-page"`. |
-| `page_views` | PDFs only: renders every page as an image and puts it in that `Page`'s `page_view`. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, or a Word or PowerPoint file, the run fails when it reaches the render, after the extraction has been paid for. |
+| `page_views` | PDFs only: renders every page as an image and puts it in that `Page`'s `page_view`. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, the run fails when it reaches the render, after the extraction has been paid for. |
 | `page_views_dpi` | Resolution of those renders; omitted, the runtime's `default_page_views_dpi` applies (72 unless configured otherwise). Only has an effect alongside `page_views = true`. |
 | `max_page_images` | How many of the images embedded in the pages the extraction keeps: `0` keeps none, and a positive `N` caps them — per page on some models, across the whole document on others. Omitted, the model preset's own limit applies; the default models have none, so every image is kept. |
 | `page_image_captions` | Requires a model that captions the images it pulls out: on any other, the run fails with a capability error. It does not switch captioning on — a caption-capable model returns its captions whether or not this is set — so it only guards a method that depends on captions against the wrong model. |

@@ -26,7 +26,7 @@ A Python this skill can reach: `uv` on `PATH`, or `python3` with `venv` and `pip
 
 A request carries four fields: explicit when `/pipelex-inputs` calls, otherwise inferred from the conversation, confirming only what is genuinely ambiguous.
 
-- `format`: `pdf`, `png` with its category, `docx` or `xlsx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`).
+- `format`: `pdf`, `png` with its category, `docx` or `xlsx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`). A `Document` a method extracts is a `pdf` even when the user's originals are Word or Excel files: extraction reads no Office format, so the test file is the PDF they would export.
 - `brief`: one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it. Derive it from the method's purpose and the input's description, or ask for it — one question, then proceed.
 - `target`: the path to write; by default `<output_dir>/inputs/<input_variable>.<ext>`, standalone `./inputs/<name>.<ext>`.
 - `constraints`: page count, pixel size, language, anything the input's description pins; otherwise the recipe's defaults.
