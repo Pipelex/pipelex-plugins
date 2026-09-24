@@ -32,8 +32,6 @@ ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 # times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
 # target (2.77, the Claude 5 tokenizer), less a margin — `wip/skill-size-diet/facts.md`.
 SKILL_CEILING_CHARS = 13_000
-# Report mode until the diet's last phase brings every skill under the ceiling; then it fails.
-SKILL_CEILING_ENFORCED = False
 
 # A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
 MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
@@ -911,20 +909,16 @@ def _run_check(title: str, errors: list[str], failure_message: str, success_mess
 
 
 def _report_skill_ceiling(base_dir: Path) -> bool:
-    """Print the ceiling report; fail on it only once the ceiling is enforced."""
+    """Print the ceiling report, and fail when any SKILL.md is over the ceiling."""
     over = check_skill_ceiling(base_dir)
-    mode = "enforced" if SKILL_CEILING_ENFORCED else "report only"
-    print(f"Checking every SKILL.md against the {SKILL_CEILING_CHARS}-character compaction ceiling ({mode})...")
+    print(f"Checking every SKILL.md against the {SKILL_CEILING_CHARS}-character compaction ceiling...")
     if not over:
         print("  Every SKILL.md fits under the ceiling.")
         return False
     for line in over:
         print(f"  OVER: {line}")
-    if SKILL_CEILING_ENFORCED:
-        print("FAIL: A SKILL.md is longer than the compaction ceiling.")
-        return True
-    print(f"  {len(over)} SKILL.md files over the ceiling; reporting only until the diet's last phase.")
-    return False
+    print("FAIL: A SKILL.md is longer than the compaction ceiling.")
+    return True
 
 
 def run_shared_checks(base_dir: Path) -> bool:

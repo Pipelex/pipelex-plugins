@@ -10,21 +10,21 @@ Resolve the binary once, keep its directory, and prefix **every** later command 
 
 - `nvm`: `ls "$NVM_DIR"/versions/node/*/bin/node`
 - `volta`: `volta which node`
-- `mise`: `mise which node`
-- `asdf`: `asdf which node`
+- `mise`: `mise which node`, or `mise which uv`
+- `asdf`: `asdf which node`, or `asdf which uv`
 - `fnm`: `fnm exec --using=<v> -- which node`
 
-Every later command means every one: the method app's `make create` and `make dev`, the initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
+Every later command means every one: the method app's initializer and `make serve`, the ecosystem's initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
 
-Verify the runtime answers under that prefix **before** anything is created, so that a machine you cannot actually reach stops while nothing exists yet. Discovering it later means the pristine commit has already been spent.
+Verify the runtime answers under that prefix, `node --version` or `uv --version`, **before** anything is created, so that a machine you cannot actually reach stops while nothing exists yet. Discovering it later means the pristine commit has already been spent.
 
 ## What this does not license
 
 - **A shim is not a runtime.** `asdf` and `mise` put a `node` on the `PATH` that exists and then fails with "no version set". The test is that `node --version` *answers*, not that the binary resolves. A shim that does not answer is a stop, not a manager to activate.
 - **The floor still applies.** A manager holding Node 18 does not satisfy the method app's `engines` floor, and "a runtime the machine already has" never means a version below it.
 - **`volta` and `mise` install on first use.** `volta run`, `mise x` and `mise use` fetch a version they do not have, which is the toolchain install the skill forbids. Use only a version the manager already holds, and stop rather than let it download one.
-- **`nvm`, `fnm` and `volta` manage Node alone.** None of them can supply `uv`.
+- **`nvm`, `fnm` and `volta` manage Node alone.** None of them can supply `uv`; `asdf` and `mise` can, when they already hold one.
 
 ## What it means for the hand-off
 
-The Pipelex workshop that `/pipelex-integrate` uses is spawned with `npx` on the **harness's** own `PATH`, which no prefix of yours reaches. So a `node` that only `nvm` or `fnm` can reach means no workshop at all. The report says so instead of the usual hand-off: the harness must be restarted from a shell where the runtime is active before `/pipelex-integrate` can run.
+The Pipelex workshop that `/pipelex-integrate` uses is spawned with `npx` on the **harness's** own `PATH`, which no prefix of yours reaches. So a `node` reached only through a `PATH` prefix means no workshop at all, whichever manager supplied it, `asdf` and `mise` included. The report says so instead of the usual hand-off: the harness must be restarted from a shell where the runtime is on the `PATH` before `/pipelex-integrate` can run.
