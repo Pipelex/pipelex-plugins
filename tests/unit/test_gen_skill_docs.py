@@ -873,13 +873,16 @@ class TestPipelexRunSkill:
         partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
         assert "except anything under a `runs/` directory" in partial
 
-    def test_the_artifact_directory_is_relative_and_a_refusal_is_retried(self) -> None:
+    def test_a_refused_dir_is_retried_into_the_default_folder(self) -> None:
         """`dir` is relative to the workshop's own working directory and an absolute
-        path is refused before the run is read, so an absolute bundle path would make
-        a completed run read as a failed download."""
+        path is refused before the run is read. Since `@pipelex/mcp` 0.18.0 an omitted
+        `dir` saves into `runs/<run_id>/`, not the working directory itself, so the retry
+        without it lands where step 7 would have saved, and a completed run must not
+        read as a failed save."""
         body = self.run_skill
-        assert "relative to the workshop's own working directory" in body
-        assert "A refused `dir` is not a failed download" in body
+        assert "Pass `dir` only for a folder the user named, relative to that directory." in body
+        assert "refuses a `dir` the user named | call again without it, which saves into `runs/<run_id>/`" in body
+        assert "A refused `dir` is not a failed save" in body
 
     def test_user_values_are_laid_over_a_prepared_set(self) -> None:
         """Restating one input of a filled set is ordinary; without the merge it drops
@@ -975,10 +978,19 @@ class TestPipelexRunSkill:
         assert "Do not prepare inputs here." in body
         assert "inputs.prepared.json" in body, "the run reads the prepared file; it does not write one"
 
-    def test_artifacts_land_beside_the_bundle_when_the_workshop_can_reach_it(self) -> None:
+    def test_every_completed_run_is_saved_whole(self) -> None:
+        """A run whose output references no stored file used to leave nothing on disk,
+        and a model asked for the results as files retyped them (the proof lab of
+        2026-09-24). `mthds_download_artifacts` now writes the whole output as
+        `main_stuff.json` into `runs/<run_id>/` by default, so step 7 saves every
+        completed run with the run id alone and passes no `dir` of its own."""
         body = self.run_skill
-        assert "`<bundle_dir>/runs/<run_id>/`" in body
+        assert "save the run, file or no file" in body
+        assert "with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/`" in body
+        assert 'dir: "runs/<run_id>"' not in body, "the default folder is the tool's; the skill no longer passes it"
         assert "report the paths the tool returns" in body
+        assert '**"save run X"**' in body
+        assert "download the files from run X" not in body
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_run_tools_left_pipelex_inputs(self, target_name: str) -> None:
