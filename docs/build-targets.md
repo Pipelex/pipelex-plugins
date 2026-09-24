@@ -81,7 +81,7 @@ Each target defines plugin identity and can override any default variable:
 [plugin]
 name = "pipelex"
 version = "0.1.0"
-description = "Skills and hooks for working with AI methods following the MTHDS standard."
+description = "Build and run AI methods from your agent with Pipelex: skills that write them in MTHDS, a hook that checks every edit, and the Pipelex tools."
 source = "pipelex/"     # output directory
 
 [vars]
