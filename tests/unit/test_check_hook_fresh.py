@@ -11,9 +11,11 @@ from scripts.check_hook_fresh import (
     EXIT_CURRENT,
     EXIT_STALE,
     EXIT_UNANSWERED,
+    LOCAL_ENGINE_VARIABLE,
     body_findings,
     engine_findings,
     main,
+    npm_latest_version,
     sibling_refusals,
 )
 from scripts.hook_bundle import Provenance, first_body_difference, read_bundle, read_provenance
@@ -163,6 +165,39 @@ class TestCheckHookFresh:
         refusals = sibling_refusals(sibling)
         assert len(refusals) == 1
         assert "holds commits origin/dev does not" in refusals[0]
+
+    @pytest.mark.parametrize(
+        ("error", "reason"),
+        [
+            (subprocess.TimeoutExpired(cmd="git", timeout=120), "`git symbolic-ref --quiet --short HEAD` did not finish within"),
+            (FileNotFoundError("git"), "no `git` on the PATH"),
+        ],
+        ids=["timeout", "no-git"],
+    )
+    def test_a_git_that_cannot_answer_is_a_refusal_not_a_stale_verdict(
+        self, mocker: MockerFixture, sibling: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], error: Exception, reason: str
+    ) -> None:
+        bundle = tmp_path / "check.mjs"
+        bundle.write_text(_bundle(), encoding="utf-8")
+        mocker.patch("scripts.check_hook_fresh.subprocess.run", side_effect=error)
+        exit_code = main(["--sdk-js-dir", str(sibling), "--bundle", str(bundle)])
+        output = capsys.readouterr().out
+        assert exit_code == EXIT_UNANSWERED
+        assert f"REFUSED: {reason}" in output
+
+    # npm, in the sibling checkout.
+
+    def test_npm_runs_without_the_local_engine_override(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Inherited, the override would make the rebuild bundle an unreleased engine instead of npm's."""
+        monkeypatch.setenv(LOCAL_ENGINE_VARIABLE, str(tmp_path / "tools-wasm"))
+        run = mocker.patch(
+            "scripts.check_hook_fresh.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="0.3.0\n", stderr=""),
+        )
+        assert npm_latest_version(tmp_path) == "0.3.0"
+        env = run.call_args.kwargs["env"]
+        assert LOCAL_ENGINE_VARIABLE not in env
+        assert "PATH" in env
 
     # The gate end to end, offline.
 

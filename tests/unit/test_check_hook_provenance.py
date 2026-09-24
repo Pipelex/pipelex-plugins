@@ -19,8 +19,10 @@ class TestHookProvenance:
         (assets / "check.mjs").write_text(f"{self.BANNER_HEAD}{provenance}\nvar __create = Object.create;\n", encoding="utf-8")
         return tmp_path
 
-    def test_a_bundle_built_from_published_sources_passes(self, tmp_path: Path) -> None:
-        base = self._bundle(tmp_path, "// Provenance: @pipelex/sdk 0.23.0 (63e9ba5) + @pipelex/tools-wasm 0.3.0 (npm)")
+    @pytest.mark.parametrize("sdk_commit", ["63e9", "63e9ba5", "63e9ba5" + "0" * 33], ids=["core-abbrev-4", "default", "full"])
+    def test_a_bundle_built_from_published_sources_passes(self, tmp_path: Path, sdk_commit: str) -> None:
+        """`core.abbrev` can shorten the commit `git rev-parse --short` prints to four characters."""
+        base = self._bundle(tmp_path, f"// Provenance: @pipelex/sdk 0.23.0 ({sdk_commit}) + @pipelex/tools-wasm 0.3.0 (npm)")
         assert check_hook_provenance(base) == []
 
     def test_an_engine_from_a_local_checkout_is_refused(self, tmp_path: Path) -> None:

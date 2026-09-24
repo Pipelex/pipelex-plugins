@@ -27,9 +27,9 @@ PROVENANCE_PATTERN = re.compile(
 # The engine origin the build writes when it bundled the npm devDependency. Anything else is
 # `local checkout <sha>`, which `PIPELEX_TOOLS_WASM_PATH` produces from an unreleased engine build.
 NPM_ORIGIN = "npm"
-# `git rev-parse --short HEAD` at its shortest, up to a full SHA. Outside a git checkout the build
-# writes `unknown` instead.
-COMMIT_PATTERN = re.compile(r"[0-9a-f]{7,40}")
+# `git rev-parse --short HEAD`, which `core.abbrev` can shorten to four characters, up to a full
+# SHA-256 object name. Outside a git checkout the build writes `unknown` instead.
+COMMIT_PATTERN = re.compile(r"[0-9a-f]{4,64}")
 
 
 class Provenance(NamedTuple):

@@ -23,6 +23,7 @@ Exit status: 0 when the bundle is current, 1 when it is behind, 2 when the gate 
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -47,6 +48,9 @@ GIT_TIMEOUT_SECONDS = 120
 # How much of a failed command's output a refusal quotes.
 OUTPUT_TAIL_LINES = 30
 REVENDOR = "`make vendor-hook`, then `make build`, on a branch into dev"
+# Set, it makes `npm run build:hook` bundle an unreleased engine build instead of the npm package,
+# so the rebuild would describe something no re-vendor from published sources produces.
+LOCAL_ENGINE_VARIABLE = "PIPELEX_TOOLS_WASM_PATH"
 
 EXIT_CURRENT = 0
 EXIT_STALE = 1
@@ -62,13 +66,18 @@ def _tail(output: str) -> str:
 
 
 def _git(sdk_js_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(sdk_js_dir), *args],
-        capture_output=True,
-        text=True,
-        timeout=GIT_TIMEOUT_SECONDS,
-        check=False,
-    )
+    try:
+        return subprocess.run(
+            ["git", "-C", str(sdk_js_dir), *args],
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise GateError("no `git` on the PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise GateError(f"`git {' '.join(args)}` did not finish within {GIT_TIMEOUT_SECONDS} seconds in {sdk_js_dir}") from exc
 
 
 def sibling_refusals(sdk_js_dir: Path) -> list[str]:
@@ -108,11 +117,17 @@ def sibling_refusals(sdk_js_dir: Path) -> list[str]:
     return []
 
 
+def _npm_env() -> dict[str, str]:
+    """This environment without the local-engine override, so the rebuild bundles what `npm ci` installed."""
+    return {name: value for name, value in os.environ.items() if name != LOCAL_ENGINE_VARIABLE}
+
+
 def _run_npm(sdk_js_dir: Path, *args: str) -> str:
     try:
         result = subprocess.run(
             ["npm", *args],
             cwd=sdk_js_dir,
+            env=_npm_env(),
             capture_output=True,
             text=True,
             timeout=NPM_TIMEOUT_SECONDS,
@@ -207,7 +222,10 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_UNANSWERED
 
     print(f"Checking that {sdk_js_dir} can stand for what re-vendoring would produce...")
-    refusals = sibling_refusals(sdk_js_dir)
+    try:
+        refusals = sibling_refusals(sdk_js_dir)
+    except GateError as exc:
+        refusals = [str(exc)]
     if refusals:
         for refusal in refusals:
             print(f"REFUSED: {refusal}")
