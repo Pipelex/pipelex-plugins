@@ -128,6 +128,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "never hand-fake a storage reference",
         "**The template is authoritative**: fill its values; never invent shapes it doesn't have.",
         "**A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**",
+        "**The user's own files stay out of version control**",
         "**Say what is about to leave the machine, before it does**",
         "If the user declines, stop before the call and report that the inputs stay local and are not runnable.",
         "**Send the exact file that was selected, generated, copied or referenced for an input — never a derived one**",

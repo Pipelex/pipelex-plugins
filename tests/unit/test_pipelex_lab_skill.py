@@ -177,6 +177,35 @@ class TestLabTriggers:
         assert f'"{phrase}"' not in description("pipelex-lab")
 
 
+class TestIntegrationPoints:
+    """The other skills point at the lab where a builder reaches it without asking for it (phase 2 of
+    `wip/lab-skill/plan.md`). Design's hand-off names it beside the test files it already offers. A run the lab did
+    not start is still credit spent, and "run it again" belongs to `/pipelex-run`, so that skill offers the lab when
+    the project has a lab for the bundle. The file factory lists every file's planted facts, which a key takes as
+    they are. Every one of those skills sits at the size ceiling, so each point is one sentence, pinned here so that
+    a later trim cannot drop it without saying so."""
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_design_hands_off_to_the_lab(self, target_name: str) -> None:
+        hand_off = render(target_name, "pipelex-design").split("5. **Hand off**:", 1)[1].split("\n", 1)[0]
+        assert "`/pipelex-lab` writes answer keys and scores the runs" in hand_off
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_run_the_lab_did_not_start_is_offered_to_it(self, target_name: str) -> None:
+        results = render(target_name, "pipelex-run").split("### 7. ", 1)[1].split("\n### ", 1)[0]
+        assert "When the project has `lab/<bundle directory name>/` and the lab did not start this run, offer `/pipelex-lab`" in results
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_factory_reports_every_files_planted_facts(self, target_name: str) -> None:
+        """Only a photograph's report listed its planted facts, so the key of a code-rendered file had to take them
+        from a draft in the scrollback. The report now lists them for every file, and the lab's key reference reads
+        them from there."""
+        report = render(target_name, "pipelex-synthetic-inputs").split("### Step 6: Report", 1)[1].split("\n## ", 1)[0]
+        assert "the facts planted in it, from step 3's draft" in report
+        key = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "key.md").read_text(encoding="utf-8")
+        assert "take them from its report, which lists them for every file" in key
+
+
 class TestCapabilityMap:
     """The capability map in `frame.md` is what the lab tells a builder the platform can do, before a method exists,
     and a wrong claim there sends a design to its first run to fail — as a Word-transcript method did in the proof

@@ -5,7 +5,7 @@ description: Prepare inputs for MTHDS methods. Use when user says "prepare input
 
 # Prepare Inputs for MTHDS methods
 
-The one entry point for a method's inputs — placeholders, synthetic data, the user's files, or a mix — through to run-ready inputs. **Not** a runner: that is `/pipelex-run`, which this skill ends by offering.
+The one entry point for a method's inputs — placeholders, synthetic data, the user's files, or a mix — through to run-ready inputs.
 
 ## Requirements
 
@@ -23,6 +23,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
+- **The user's own files stay out of version control**: in a git repository, before copying one in, add `<output_dir>/inputs/` to the nearest `.gitignore`, and `inputs.json` when a value holds a file's text, unless the ignore rules already cover them; say so.
 
 ## Process
 
@@ -33,8 +34,6 @@ The target takes three forms, and every call takes exactly one selector; a secon
 - **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: its current stored content, which needs the API key. `<output_dir>` is a directory the user names, by default a new `./<method_id>/`.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
-
-`inputs.json` goes in `<output_dir>`, data files in `<output_dir>/inputs/`, created only when there are files to store.
 
 ### 2. The template
 
@@ -62,7 +61,7 @@ Fill the step 2 template in place, a composite native's fields included ([what t
 
 ### 5. Prepare the inputs for a run
 
-A run on the hosted API cannot read this disk, so `mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip the call for the Template strategy, whose placeholders are not assets. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip the call for the Template strategy, whose placeholders are not assets. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
