@@ -57,8 +57,8 @@ Say first whether it is **complete** or a **scaffold with a backlog**, from step
 
 | Pipe | How to read it |
 |---|---|
-| `PipeSequence` | follow `steps` in order |
-| `PipeBatch` | name `batch_over` and `batch_as`, then explain the inner pipe once |
+| `PipeSequence` | follow `steps` in order; a step with `batch_over` and `batch_as` runs its pipe once per item |
+| `PipeBatch` | name `input_list_name` and `input_item_name`, then explain the `branch_pipe_code` pipe once |
 | `PipeParallel` | list the branches and say what is combined at the end |
 | `PipeCondition` | map each condition to the pipe it routes to |
 
@@ -95,5 +95,5 @@ Output: final_output
 ## References
 
 - [not-on-disk.md](references/not-on-disk.md): a catalog id or a published address, before the first call on it.
-- [MTHDS reference](../shared/mthds-reference.md): a concept definition or a syntax question.
+- [MTHDS reference](../shared/writing-mthds.md): a concept definition or a syntax question.
 - [Native content types](../shared/native-content-types.md): what data flows through a pipe, such as the attributes a `Page` or an `Image` carries.

@@ -111,4 +111,4 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 - [synthetic.md](references/synthetic.md), [user-data.md](references/user-data.md): step 3, by strategy; both for Mixed.
 - [published-address.md](references/published-address.md): a `method_ref` target.
 - [prepare-errors.md](references/prepare-errors.md): prepare's `input_domain` errors.
-- [Native content types](../shared/native-content-types.md), [MTHDS reference](../shared/mthds-reference.md): natives' fields, concepts.
+- [Native content types](../shared/native-content-types.md), [MTHDS reference](../shared/writing-mthds.md): natives' fields, concepts.

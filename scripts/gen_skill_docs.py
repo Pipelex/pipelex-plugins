@@ -69,16 +69,18 @@ CODEX_DISCOVERY_MARKETPLACE_DST = Path(".agents/plugins/marketplace.json")
 STATIC_ASSET_DIRS = ("references", "scripts")
 
 # Shared reference files, rendered standalone per target: the MTHDS language
-# references that ground the skills, and the files a skill reads when one of its
-# stops fires or one of its branches is taken, such as `credentials.md` and
-# `catalog-id.md`. Paths are relative to the templates/ directory.
+# reference (`writing-mthds.md`, the one every skill that reads or writes a bundle
+# points at) and the native content types that ground the skills, and the files a
+# skill reads when one of its stops fires or one of its branches is taken, such as
+# `credentials.md` and `catalog-id.md`. Paths are relative to the templates/
+# directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
 # shared blocks — are deliberately NOT listed here: they are {% include %}-d by
 # skill templates, so they must exist as files but should not be rendered
 # standalone (that would only ship a fragment).
 SHARED_TEMPLATES = [
-    "skills/shared/mthds-reference.md.j2",
+    "skills/shared/writing-mthds.md.j2",
     "skills/shared/native-content-types.md.j2",
     "skills/shared/credentials.md.j2",
     "skills/shared/catalog-id.md.j2",

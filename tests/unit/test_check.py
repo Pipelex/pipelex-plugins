@@ -100,7 +100,7 @@ def skill_tree(tmp_path: Path) -> Path:
     """Create a minimal valid skill directory structure with target configs."""
     template_shared = tmp_path / "templates" / "skills" / "shared"
     template_shared.mkdir(parents=True)
-    for name in ["mthds-reference.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"]:
+    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"]:
         (template_shared / name).write_text("# placeholder\n")
 
     (tmp_path / "pipelex" / "skills" / "shared").mkdir(parents=True)
@@ -451,7 +451,7 @@ class TestStaleReferences:
     @pytest.mark.parametrize(
         "ref_path",
         [
-            "references/mthds-reference.md",
+            "references/writing-mthds.md",
             "references/native-content-types",
         ],
     )
@@ -464,7 +464,7 @@ class TestStaleReferences:
 
     def test_ignores_correct_shared_path(self, skill_tree: Path) -> None:
         skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
-        skill_md.write_text(VALID_FRONTMATTER + "\nSee [ref](../shared/mthds-reference.md)\n")
+        skill_md.write_text(VALID_FRONTMATTER + "\nSee [ref](../shared/writing-mthds.md)\n")
         assert check_stale_references(skill_tree) == []
 
 
@@ -534,7 +534,7 @@ class TestSkillArgumentPlaceholders:
         references = skill_tree / "pipelex" / "skills" / "pipelex-test" / "references"
         references.mkdir()
         (references / "recipes.md").write_text("Dollar amounts (`$100`) and `print $9`.\n")
-        (skill_tree / "pipelex" / "skills" / "shared" / "mthds-reference.md").write_text("Dollar amounts (`$100`).\n")
+        (skill_tree / "pipelex" / "skills" / "shared" / "writing-mthds.md").write_text("Dollar amounts (`$100`).\n")
         assert check_skill_argument_placeholders(skill_tree) == []
 
     def test_scans_every_target(self, skill_tree: Path) -> None:
@@ -639,11 +639,11 @@ class TestVersionFloors:
         assert len(errors) == 1
         assert "[vars.floors] is missing or empty" in errors[0]
 
-    # Two numbers under `skills/` equal a floor and mean something else entirely. They
-    # are the reason the anchors are written against prose instead of swept numerically,
-    # and naming them here is what lets the sweep below refuse every other stray match.
+    # A number under `skills/` that equals a floor and means something else entirely. Such
+    # numbers are the reason the anchors are written against prose instead of swept
+    # numerically, and naming them here is what lets the sweep below refuse every other
+    # stray match.
     UNRELATED_FLOOR_LOOKALIKES: ClassVar[set[tuple[str, str]]] = {
-        ("skills/pipelex-design/references/writing-mthds.md", "3.14"),
         ("skills/pipelex-synthetic-inputs/references/png.md", "3.11"),
     }
 
@@ -695,15 +695,15 @@ class TestSharedFilesExist:
         assert check_shared_files_exist(skill_tree) == []
 
     def test_missing_file(self, skill_tree: Path) -> None:
-        (skill_tree / "templates" / "skills" / "shared" / "mthds-reference.md.j2").unlink()
+        (skill_tree / "templates" / "skills" / "shared" / "writing-mthds.md.j2").unlink()
         errors = check_shared_files_exist(skill_tree)
         assert len(errors) == 1
-        assert "mthds-reference.md.j2" in errors[0]
+        assert "writing-mthds.md.j2" in errors[0]
 
     def test_all_missing(self, tmp_path: Path) -> None:
         (tmp_path / "templates" / "skills" / "shared").mkdir(parents=True)
         errors = check_shared_files_exist(tmp_path)
-        assert len(errors) == len(["mthds-reference.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"])
+        assert len(errors) == len(["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"])
 
 
 class TestNoTemplatesInOutput:
@@ -800,9 +800,9 @@ class TestSkillLinks:
     def _shared_named(base: Path) -> None:
         """Give the fixture's shared files a skill that names them, so they do not trip the backward check."""
         shared = base / "pipelex" / "skills" / "shared"
-        (shared / "mthds-reference.md").write_text("# MTHDS\n\n## PipeLLM\n")
+        (shared / "writing-mthds.md").write_text("# MTHDS\n\n## PipeLLM\n")
         skill_md = base / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
-        skill_md.write_text(VALID_FRONTMATTER + "\nSee [the reference](../shared/mthds-reference.md).\n")
+        skill_md.write_text(VALID_FRONTMATTER + "\nSee [the reference](../shared/writing-mthds.md).\n")
 
     def test_the_fixture_is_clean(self, skill_tree: Path) -> None:
         self._shared_named(skill_tree)
@@ -821,7 +821,7 @@ class TestSkillLinks:
         skill_md.write_text(
             skill_md.read_text()
             + "## Step 8 — a method that is not on disk\n\n"
-            + "See [step 8](#step-8--a-method-that-is-not-on-disk) and [gone](#gone) and [LLM](../shared/mthds-reference.md#pipellm).\n"
+            + "See [step 8](#step-8--a-method-that-is-not-on-disk) and [gone](#gone) and [LLM](../shared/writing-mthds.md#pipellm).\n"
         )
         errors = check_skill_links(skill_tree)
         assert errors == ["pipelex/skills/pipelex-test/SKILL.md: anchor `#gone` names no heading of SKILL.md"], errors

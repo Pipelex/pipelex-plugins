@@ -7,8 +7,15 @@
 - **The unit tests sweep the edit hook over the MTHDS Test Corpus**: `tests/data/mthds-corpus/` is a vendored copy of the whole corpus, and `tests/unit/test_hook_corpus.py` runs the hook's offline stages over every entry, expecting a block exactly when the entry's fault is one the schema catches and a silent pass otherwise. A vendored hook whose schema refuses a form the standard allows, the way the bundle before 0.8.0 refused intent hints, now fails the unit tests, and CI installs Node so that the sweep runs there rather than skips.
 - **A release refuses a stale hook bundle**: `make check-hook-fresh`, which the release skill now runs before anything else, fails when the vendored `check.mjs` embeds an older `@pipelex/tools-wasm` than npm's latest or when a rebuild in the `pipelex-sdk-js` checkout would change it, and names the re-vendor that cures it. `make check` separately refuses, in CI too, a bundle whose provenance names an unreleased engine or no SDK commit.
 
+### Changed
+
+- **One MTHDS language reference**: `pipelex-design`, `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` all read `skills/shared/writing-mthds.md`, which replaces both design's own `references/writing-mthds.md` and the shared `mthds-reference.md`, now removed. What only the removed file said is folded in: model references, the batch naming convention, the search filters, the template categories, and the aspect-ratio values with the models that support them.
+
 ### Fixed
 
+- **The MTHDS language reference agrees with the standard**: a `PipeParallel`'s declared `output` is the combination, `Composite` or a structured concept whose fields are the branches' `result` names, and there is no `combined_output` field; a bare-string structure field is a required text field; a domain-qualified pipe reference is valid wherever a pipe is referenced; a sequence step's `result` is optional, and a step may set `nb_output` or `multiple_output`; a `PipeCompose` sets `category` inside its `template` table; and a `PipeCondition` that can reach `"continue"` declares its output optional with `?`.
+- **`pipelex-explain` reads a `PipeBatch` by its own fields**: it names `input_list_name` and `input_item_name` and explains the `branch_pipe_code` pipe, where it looked for `batch_over` and `batch_as`, the fields of a batching step in a `PipeSequence`.
+- **The native content types cover every native concept**: `YesNo`, `Date`, `Time` and `Composite` are documented beside the others, with their fields and input JSON; an `Image` carries `width` and `height` rather than a `size`; and an `Html`'s `css_class` is optional.
 - **The plugin says it needs Node.js**: the README and the Codex listing said the Pipelex tools needed nothing else to install, but the hook runs on Node.js and each agent starts the tools through `npx`, so without Node.js on the `PATH` the hook passes every edit unchecked and the skills that call the tools stop. The README, the Codex listing and each agent's install section now say that Node.js must be on the `PATH`.
 
 ## [0.8.0] - 2026-09-24

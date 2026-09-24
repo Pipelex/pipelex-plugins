@@ -144,4 +144,4 @@ What was generated and where, the target and why, the call site's signature, the
 - [orphans.md](references/orphans.md): orphans, no drift.
 - [gate-failures.md](references/gate-failures.md): a gate exits `2`.
 - [codegen-check.mjs](references/codegen-check.mjs), [codegen_check.py](references/codegen_check.py): step 10's gates.
-- [MTHDS reference](../shared/mthds-reference.md): the fallback's bundle reading.
+- [MTHDS reference](../shared/writing-mthds.md): the fallback's bundle reading.

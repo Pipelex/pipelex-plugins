@@ -63,11 +63,10 @@ TARGETS_DIR_NAME = "targets"
 # statement left off this list drifts silently on the next bump.
 #
 # Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
-# bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
-# `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python
-# floor. A reworded reference fails this check instead of passing silently, which
-# is the right way round — re-anchor the pattern in the same change that rewords
-# the sentence.
+# bare numeric sweep would read `png.md`'s matplotlib `3.11` as the Python
+# floor. A reworded reference fails this check instead of passing silently,
+# which is the right way round — re-anchor the pattern in the same change that
+# rewords the sentence.
 VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
     (
         "skills/pipelex-integrate/references/typescript.md",

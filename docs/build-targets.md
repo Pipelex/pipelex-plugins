@@ -9,7 +9,7 @@ This is the **CLI-free** plugin generation. Unlike the `mthds-plugins` predecess
 ```
 templates/                      source of truth (all .j2 files)
 ├── skills/*/SKILL.md.j2        skill templates
-├── skills/shared/*.md.j2       shared language references + the include-only partials
+├── skills/shared/*.md.j2       the shared references (the MTHDS language reference among them) + the include-only partials
 ├── hooks/*.j2                  per-platform hook wiring + `.mthds` validation scripts
 └── mcp/vibe-mcp.toml.j2         the workshop launcher as a Vibe [[mcp_servers]] fragment
        |
@@ -123,7 +123,7 @@ pipelex/                       (prod target)
     ├── pipelex-explain/
     │   └── SKILL.md           rendered with the target's variables
     └── shared/
-        ├── mthds-reference.md         rendered per target
+        ├── writing-mthds.md           rendered per target
         └── native-content-types.md    rendered per target
 ```
 
@@ -239,9 +239,9 @@ Strict mode is also the only guard that sees **every** use site. A check over th
 - **A static reference left behind by a bump.** `VERSION_FLOOR_STATIC_REFS` pins each reference sentence to a floor key with a regex capturing the number, and every occurrence is checked, not the first, since a reference may state a floor more than once.
 - **A template that spells a floor instead of reading it.** No `.j2` may contain a floor's literal value: strict rendering fires on an expression that is present and misspelled, never on one somebody replaced with its own value, and the presence check above is satisfied by any other sentence that still reads the table — so a hardcoded row renders correctly today and drifts silently at the next bump. Two rows of `pipelex-integrate`'s troubleshooting table were exactly that. The check names the template and the line, and the cure is to write `{{ floors.<key> }}`.
 
-**The anchor list is hand-kept, so the way it fails is by omission**: a floor stated in a static file that nobody adds an entry for drifts silently on the next bump, with the whole check still green. `tests/unit/test_check.py::TestVersionFloors::test_every_static_statement_of_a_floor_is_anchored` sweeps the static tree for each floor's literal and requires every occurrence to be captured by an anchor, or listed in that test as a number meaning something else — which today is `writing-mthds.md`'s `3.14` and `png.md`'s matplotlib `3.11`. Adding a static statement of a floor means adding its anchor in the same change.
+**The anchor list is hand-kept, so the way it fails is by omission**: a floor stated in a static file that nobody adds an entry for drifts silently on the next bump, with the whole check still green. `tests/unit/test_check.py::TestVersionFloors::test_every_static_statement_of_a_floor_is_anchored` sweeps the static tree for each floor's literal and requires every occurrence to be captured by an anchor, or listed in that test as a number meaning something else — which today is `png.md`'s matplotlib `3.11`. Adding a static statement of a floor means adding its anchor in the same change.
 
-The patterns are **anchored on the prose around the number**, never on the number alone, and that is load-bearing: a bare numeric sweep reads `writing-mthds.md`'s JSON `"number"` example of `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python floor. The cost is that rewording a pinned sentence fails the check — which is the right way round. Re-anchor the pattern in the same change that rewords the sentence; a silent pass would mean nobody is holding that sentence to anything any more.
+The patterns are **anchored on the prose around the number**, never on the number alone, and that is load-bearing: a bare numeric sweep reads `png.md`'s matplotlib `3.11` as the Python floor. The cost is that rewording a pinned sentence fails the check — which is the right way round. Re-anchor the pattern in the same change that rewords the sentence; a silent pass would mean nobody is holding that sentence to anything any more.
 
 So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make check` — and the check names every static reference still saying the old number.
 
@@ -249,7 +249,7 @@ So the bump procedure is: edit `[vars.floors]`, run `make build`, run `make chec
 
 `templates/skills/shared/` holds two kinds of file, told apart by the `SHARED_TEMPLATES` list in `gen_skill_docs.py`.
 
-**Rendered standalone.** The files listed there — the MTHDS language references; `credentials.md`, which says how to connect the workshop and where its key comes from on each harness; and `catalog-id.md`, which resolves a catalog id or a published address given to a file-based skill — are rendered per target and written to `skills/shared/`, where a skill body links to them. They are references in the size diet's sense: a skill reads one when a condition sends it there, so each is named by a pointer at that condition. A shared reference can carry an include-only partial whole — `catalog-id.md.j2` is little more than the `catalog-id-bridge.md.j2` include with a generic resume step — which is how a block needed only on a condition leaves the skills that used to carry it inline without gaining a second source. It never carries a guard alone: a skill that points at one states the guards it holds at the pointer itself.
+**Rendered standalone.** The files listed there — `writing-mthds.md`, the one MTHDS language reference, which design reads before every write and edit, explain, inputs and integrate point at for a syntax question, and `native-content-types.md` beside it; `credentials.md`, which says how to connect the workshop and where its key comes from on each harness; and `catalog-id.md`, which resolves a catalog id or a published address given to a file-based skill — are rendered per target and written to `skills/shared/`, where a skill body links to them. They are references in the size diet's sense: a skill reads one when a condition sends it there, so each is named by a pointer at that condition. A shared reference can carry an include-only partial whole — `catalog-id.md.j2` is little more than the `catalog-id-bridge.md.j2` include with a generic resume step — which is how a block needed only on a condition leaves the skills that used to carry it inline without gaining a second source. It never carries a guard alone: a skill that points at one states the guards it holds at the pointer itself. A shared reference is a template like any other, which is why the language reference lives here rather than among a skill's static references: it includes the `PipeFunc` warning partial instead of holding a copy of the sentence, and the Jinja its prose must show literally — the prompt shorthands' expansions, an `expression_template` — sits inside `{% raw %}` blocks.
 
 **Include-only partials.** Every other file there is `{% include %}`-d by the skill templates and never rendered on its own, so it ships as part of whichever skills include it and nowhere else. They exist so that a block several skills say word for word has one source: the credential sentence used to sit in five templates, and correcting it meant five edits and a test that asserted two of them were identical.
 

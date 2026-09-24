@@ -105,7 +105,7 @@ def template_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
+    (shared / "writing-mthds.md.j2").write_text("# MTHDS Language Reference {{ marketplace_name }}\n")
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
@@ -133,7 +133,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("Ref.\n")
+    (shared / "writing-mthds.md.j2").write_text("Ref.\n")
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
@@ -185,9 +185,9 @@ class TestRenderTemplates:
 
     def test_renders_shared_templates(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
-        ref_output = template_tree / "skills" / "shared" / "mthds-reference.md"
+        ref_output = template_tree / "skills" / "shared" / "writing-mthds.md"
         assert ref_output in results
-        assert "MTHDS Reference pipelex-plugins" in results[ref_output]
+        assert "MTHDS Language Reference pipelex-plugins" in results[ref_output]
 
     def test_frontmatter_not_rendered_standalone(self, template_tree: Path) -> None:
         """frontmatter.md.j2 is an include-only partial — it must never be
@@ -203,7 +203,7 @@ class TestRenderTemplates:
         _create_shared_templates(templates_dir)
         results = render_templates(templates_dir, tmp_path, DEFAULT_VARS)
         output_names = {path.name for path in results}
-        assert "mthds-reference.md" in output_names
+        assert "writing-mthds.md" in output_names
         assert "native-content-types.md" in output_names
 
     def test_preserves_frontmatter(self, template_tree: Path) -> None:
@@ -300,7 +300,7 @@ class TestRenderTemplates:
     def test_empty_skill_filter_still_renders_shared(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS, include_skills=["nonexistent-skill"])
         output_names = {path.name for path in results}
-        assert "mthds-reference.md" in output_names
+        assert "writing-mthds.md" in output_names
 
     def test_template_vars_injected(self, template_tree: Path) -> None:
         templates_dir = template_tree / "templates"
@@ -613,7 +613,7 @@ class TestPluginManifests:
         codex_manifest = tree / "pipelex-vibe" / ".codex-plugin" / "plugin.json"
         assert claude_manifest not in result.files
         assert codex_manifest not in result.files
-        assert any(path.name == "mthds-reference.md" for path in result.files)
+        assert any(path.name == "writing-mthds.md" for path in result.files)
 
     def test_build_claude_target_writes_claude_plugin_dir(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
@@ -775,19 +775,24 @@ class TestSharedSkillIncludes:
         assert include in explain
         assert include in run
 
-    def test_the_authoring_reference_carries_the_same_warning(self) -> None:
-        """The reference is where a designer reads what a PipeFunc is; a warning
-        absent there is a warning the author never meets. It is a static asset
-        copied verbatim into every target and never rendered, so it cannot
-        include the partial — this test is what holds the two in step, and it
-        reads the partial rather than restating it, so that rewording the shared
-        sentence and leaving the reference behind fails here instead of shipping
-        a plugin whose skill and whose reference disagree."""
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_language_reference_carries_the_same_warning(self, target_name: str) -> None:
+        """The language reference is where a designer reads what a PipeFunc is; a
+        warning absent there is a warning the author never meets. It used to be a
+        static asset of `pipelex-design`, copied verbatim and never rendered, so it
+        held a copy of the sentence that only this test kept in step. It is now a
+        rendered shared reference, so it includes the partial like any skill, and
+        the rendered file is held to the partial's own body."""
+        reference_template = (self.REPO_TEMPLATES / "skills" / "shared" / "writing-mthds.md.j2").read_text(encoding="utf-8")
+        assert 'include "skills/shared/pipefunc-warning.md.j2"' in reference_template
         partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
         warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
         assert warning, "the partial rendered to nothing — its comment wrapper moved"
-        reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
-        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=[], target_name=config.name)
+        reference = next(content for path, content in rendered.items() if path.match("skills/shared/writing-mthds.md"))
+        assert warning in reference, f"{target_name}: the rendered language reference lost the PipeFunc warning"
 
     def test_no_skill_restates_the_sandbox_beside_a_pipefunc(self) -> None:
         """The one-source test proves a block has one source; it is blind to a

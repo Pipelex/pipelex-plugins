@@ -28,11 +28,14 @@ class TestPipelexDesignSkill:
 
     REPO_ROOT = Path(__file__).parents[2]
     REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-design" / "references"
-    # The references the diet wrote, each read on a branch. `writing-mthds.md` predates the diet,
-    # is read before every write, and is kept as it was (phase 4 answered the question of splitting
-    # it: no), so it is shipped and indexed but not held to the branch references' opening.
+    # The references the diet wrote, each read on a branch, and the only files the skill ships of
+    # its own. The language reference it reads before every write, `writing-mthds.md`, is the one
+    # design, edit and explain share: a rendered shared file, `skills/shared/writing-mthds.md`,
+    # pointed at like the other shared files and not held to the branch references' opening.
     BRANCH_REFERENCES = ("stepwise.md", "re-entry.md")
-    SHIPPED = (*BRANCH_REFERENCES, "writing-mthds.md")
+    SHIPPED = BRANCH_REFERENCES
+    LANGUAGE_REFERENCE = "../shared/writing-mthds.md"
+    LANGUAGE_REFERENCE_TEMPLATE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
 
     def render(self, target_name: str) -> str:
         """The skill as the named target renders it — what a user of that harness installs."""
@@ -62,11 +65,11 @@ class TestPipelexDesignSkill:
         point, read before acting — a pointer only in the closing index is a caveat that will not be read."""
         body = self.render(target_name)
         at_the_decision = {
-            "Read [writing-mthds.md]": ("references/writing-mthds.md",),
+            "Read [writing-mthds.md]": (self.LANGUAGE_REFERENCE,),
             "- **Stepwise** otherwise": ("references/stepwise.md",),
             "**If the design would need a placeholder": ("references/stepwise.md",),
             "**For a catalog id (`mt_…`) or a published address**": ("../shared/catalog-id.md",),
-            "Then read [re-entry.md]": ("references/re-entry.md", "references/writing-mthds.md", "references/stepwise.md"),
+            "Then read [re-entry.md]": ("references/re-entry.md", self.LANGUAGE_REFERENCE, "references/stepwise.md"),
         }
         for decision, targets in at_the_decision.items():
             line = self.the_line(body, decision)
@@ -76,6 +79,7 @@ class TestPipelexDesignSkill:
         index = body.split("## References", 1)[1]
         for name in self.SHIPPED:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
+        assert f"({self.LANGUAGE_REFERENCE})" in index, f"{target_name}: the reference index does not name the language reference"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_runnable_gate_holds_for_a_completed_method_only(self, target_name: str) -> None:
@@ -116,7 +120,7 @@ class TestPipelexDesignSkill:
     def test_the_authoring_reference_says_extraction_reads_no_office_format(self) -> None:
         """A Word file passes validation and preparation and then fails the run at the extraction; the proof lab
         (L-260923-9d0b53) designed a method over Word transcripts because the reference said `Document` covers Word."""
-        text = self.reference("writing-mthds.md")
+        text = self.LANGUAGE_REFERENCE_TEMPLATE.read_text(encoding="utf-8")
         assert "**It reads a PDF, an image or a web page, and nothing else.**" in text
         assert "Any document (PDF, Word" not in text
         assert "a Word or PowerPoint file, the run fails when it reaches the render" not in text
@@ -138,7 +142,7 @@ class TestPipelexDesignSkill:
         both from the same line, and `re-entry.md` names the stepwise one in words where that mode is taken."""
         for name in self.BRANCH_REFERENCES:
             text = self.reference(name)
-            for other in self.SHIPPED:
+            for other in (*self.SHIPPED, "writing-mthds.md"):
                 if other != name:
                     assert other not in text, f"references/{name} sends the model on to references/{other}"
             for target in re.findall(r"\]\(([^)]+)\)", text):

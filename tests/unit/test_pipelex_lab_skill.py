@@ -227,7 +227,7 @@ class TestCapabilityMap:
     lab. So each row names a pipe that the MTHDS reference documents, and the claims that carry a limit are held to
     the reference's own words, so the two cannot drift apart."""
 
-    MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "mthds-reference.md.j2"
+    MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
 
     def rows(self) -> list[list[str]]:
         frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
@@ -241,7 +241,7 @@ class TestCapabilityMap:
         assert rows, "the capability map has no rows"
         for _, pipe, _ in rows:
             name = pipe.strip("`")
-            assert f"\n### {name} - " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
+            assert f"\n### {name} — " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
 
     OFFICE_LIMIT = (
         "Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them."
