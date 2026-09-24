@@ -83,9 +83,9 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 ### 7. Results, and the saved run
 
-`mthds_run_results`, then report the main output and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
+`mthds_run_results`, then report the main output and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
 
-**A saved run stays out of version control**: in a git repository, `git check-ignore -q` `runs/<run_id>/` before saving. For a path not ignored, add `/runs/` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
+**A saved run stays out of version control**: in a git repository, `git check-ignore -q` `runs/<run_id>/` before saving, not for a `dir` the user named. For a path not ignored, add the workshop's `runs/`, anchored (`/runs/`, or `/app/runs/` for a workshop in `app/`), to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
@@ -101,7 +101,7 @@ A run id alone, with no method and no inputs: nothing is validated or prepared.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
 - **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says; it works days after the run. Saving a run twice adds copies.
 
-An unknown run id is reported in the tool's own words: runs are scoped to the key's organization, so another organization's run reads exactly like a miss.
+An unknown run id is reported in the tool's own words.
 
 ## Stops
 

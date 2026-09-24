@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -120,6 +123,39 @@ class TestPipelexLabSkill:
         assert "naming `cases/<case>/` as the directory of its inputs" in the_move(body, 3)
         assert "usually the one holding `main.mthds`, unless the caller names another" in render(target_name, "pipelex-inputs")
         assert "They sit beside the bundle unless the caller named another directory" in render(target_name, "pipelex-run")
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_case_is_kept_out_of_version_control_by_its_directory(self, target_name: str) -> None:
+        """The case directory will hold the key, whose facts come from the user's files, and `inputs.json`, so it is
+        the directory that is checked: a copied PDF under a `.gitignore` of `*.pdf` reads ignored, and a check of
+        the copies would add no entry and leave the key and `inputs.json` to the next `git add .`."""
+        move = the_move(render(target_name), 2)
+        assert (
+            "**A case of the user's own files stays out of version control**: in a git repository, "
+            "`git check-ignore -q` `lab/<method>/cases/<case>/` itself, never a file in it, before anything is copied into it. "
+            "For a path not ignored, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`"
+        ) in move
+        assert "the case's paths" not in move
+
+    @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
+    def test_git_reads_the_case_directory_as_the_lab_needs(self, tmp_path: Path) -> None:
+        """The two readings the lab relies on: a rule that ignores the copies does not ignore the case directory, and
+        a case directory not yet created reads ignored under a lab git already ignores, so it gains no second entry."""
+
+        def ignored(path: str) -> bool:
+            # This machine's excludes file is left out, so that a developer's own rules cannot change the reading.
+            command = ["git", "-c", f"core.excludesFile={os.devnull}", "-C", str(tmp_path), "check-ignore", "-q", path]
+            return subprocess.run(command, check=False).returncode == 0
+
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        gitignore = tmp_path / ".gitignore"
+        gitignore.write_text("*.pdf\n", encoding="utf-8")
+        assert ignored("lab/m/cases/c/inputs/lease.pdf")
+        assert not ignored("lab/m/cases/c/")
+        gitignore.write_text("*.pdf\nlab/m/cases/c/\n", encoding="utf-8")
+        assert ignored("lab/m/cases/c/")
+        gitignore.write_text("lab/\n", encoding="utf-8")
+        assert ignored("lab/m/cases/new-case/")
 
     def test_the_lab_reads_runs_and_never_starts_one(self) -> None:
         """The lab hands every run to `/pipelex-run`, which owns the credit guard and the run id, and every fix to
