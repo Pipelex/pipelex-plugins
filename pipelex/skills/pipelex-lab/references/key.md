@@ -9,7 +9,7 @@ Read this at the second move, before writing a case's key. A key lists the right
 ```
 # Key: <case>
 
-Inputs: what the case holds, in one or two sentences. Regenerate: the command that makes the inputs again, when they were made from code.
+Inputs: what the case holds, in one or two sentences, and where it came from: the user's files, or `/pipelex-synthetic-inputs`.
 
 ## Planted facts
 F1. …
@@ -29,7 +29,7 @@ Which lines must pass for the case to pass.
 
 ## The lines
 
-- **Planted facts** are what the case's inputs hold that the method must find. For files from `/pipelex-synthetic-inputs`, take them from its report. For the user's own files, read the files and write down what they show. A diagnosis checks a failing line against these first.
+- **Planted facts** are what the case's inputs hold that the method must find. For files from `/pipelex-synthetic-inputs`, take them from the content it drafted before rendering, or from its report for a photograph, then open each file and confirm that it shows them. For the user's own files, read the files and write down what they show. A diagnosis checks a failing line against these first.
 - **One checkable fact per line**, stated as what the output shows: a field and its value, a count, an order, something present or something absent. "The totals are right" is not a line, but "`total_approved` is 786.57" is.
 - **Name the output field** wherever the method's output concept has one. Read the bundle's output concept first. A line that names its field can be scored by quoting that field, and later by a judge method, without the session that wrote the key.
 - **Give a tolerance** where rounding or wording can vary: "within 0.01", "in any wording that names both parties".
@@ -48,7 +48,7 @@ This is adapted from an expense-audit method that the proof lab keyed. The case 
 ```
 # Key: chicago-trip
 
-Inputs: six receipts from one trip — a hotel folio, a restaurant bill with a handwritten tip, a taxi, a deli lunch photographed twice, and a client dinner for two. Regenerate: `uv run cases/chicago-trip/make_inputs.py`.
+Inputs: six receipts from one trip — a hotel folio, a restaurant bill with a handwritten tip, a taxi, a deli lunch photographed twice, and a client dinner for two, made by `/pipelex-synthetic-inputs`.
 
 ## Planted facts
 F1. Receipt 2's total is handwritten, 105.40, over a printed subtotal of 90.40.

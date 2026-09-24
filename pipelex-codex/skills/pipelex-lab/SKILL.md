@@ -18,7 +18,7 @@ Framing and setting up need only the project's files. The loop needs the worksho
 
 ## The lab directory
 
-The lab's subject is a bundle directory, and its lab is `<project>/lab/<method>/`: `<project>` is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory, or the working directory when there is none, and `<method>` is the bundle directory's name.
+The lab's subject is a bundle directory, and its lab is `<project>/lab/<method>/`: `<project>` is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory, or else the working directory, or the bundle's parent when the working directory is the bundle or inside it; `<method>` is the bundle directory's name.
 
 ```
 lab/<method>/
@@ -37,16 +37,18 @@ lab/<method>/
 
 ## 1. Frame the use case
 
-This move is for a use case that has no method yet. Read [frame.md](references/frame.md) before asking anything: it holds the questions to ask, what the platform can and cannot do, and the shape of a candidate. **State no capability that frame.md does not state**: a method designed around one the platform lacks fails at its first run, after credit is spent.
+Read [frame.md](references/frame.md) before asking anything: it holds the questions to ask, what the platform can and cannot do, the shape of a candidate, and the brief. **State no capability that frame.md does not state**: a method designed around one the platform lacks fails at its first run, after credit is spent.
 
-Propose two or three candidates, and recommend the one whose output can be checked against a key and whose inputs can be made safely. Once the user picks, write `brief.md` with what "right" means for the chosen method, which seeds its keys, and hand the brief to `/pipelex-design`. The setup follows once the method validates.
+For a use case with no method yet, propose two or three candidates, and recommend the one whose output can be checked against a key and whose inputs can be made safely. Once the user picks, write `lab/<method>/brief.md` with what "right" means for the chosen method, which seeds its keys, `<method>` being the `domain` you give `/pipelex-design` in the project language's casing. Hand the brief to `/pipelex-design`, and if the directory it makes is named otherwise, rename `lab/<method>/` to match. The setup follows once the method validates.
+
+A method that already exists and has no brief gets the short form frame.md gives, with no candidates, before the setup.
 
 ## 2. Set up the experiment
 
 Read [key.md](references/key.md) before writing a key.
 
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
-2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it reports into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another.
+2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another.
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.

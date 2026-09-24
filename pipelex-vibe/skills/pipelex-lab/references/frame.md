@@ -45,9 +45,13 @@ Give each candidate these points, in this order:
 
 Recommend the candidate whose output can be checked against a key and whose inputs can be made safely, from code or with facts planted in them, without the builder's confidential files. A candidate whose right answer is a matter of taste, such as a tagline or a tone of voice, makes a poor first experiment: nothing in its key can fail cleanly. It can come second, once the loop has proved itself on a method that can be scored.
 
+## A method that already exists
+
+A method the user brings with no brief gets one before its keys, and no candidates. Read the bundle's main pipe, its inputs and its output concept, then ask the last two questions above: who checks the output today, and what a mistake costs. Write the brief's use case, Right means and rough cost of one run, counting the cost from the method's steps that call a model, and leave out Candidates and Chosen.
+
 ## The brief
 
-`lab/<method>/brief.md`, written once the user picks:
+`lab/<method>/brief.md`, written once the user picks, or in the short form above for a method that already exists:
 
 ```
 # Brief: <method>
