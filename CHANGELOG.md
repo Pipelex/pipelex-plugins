@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.0] - 2026-09-24
+
+### Highlights
+
+**The edit hook accepts today's MTHDS**: the `.mthds` hook no longer blocks the expanded input-slot form and intent hints. **`pipelex-lab` is new**: the experiment loop that writes answer keys before the first run, then runs, scores, logs and fixes a method within a budget. **Every skill survives a compaction**, and **`pipelex-run` saves every completed run to disk**.
 
 ### Added
 
@@ -33,10 +37,6 @@
 - **A run's artifacts stay out of the bundle**: `pipelex-design`, `pipelex-edit`, `pipelex-organize`, `pipelex-explain` and `pipelex-inputs` gather, read and submit every `.mthds` file of a bundle directory except those under `runs/`, where `/pipelex-run` saves a completed run's artifacts, so a method that produces a `.mthds` file no longer has its own output validated or explained as its source, and `pipelex-organize` never deletes one.
 - **What to tell the user about the workshop and its key lives in one shared file**: an MCP-backed skill keeps its stops on an absent Pipelex tool and on a `config`-class error, and reads the new `shared/credentials.md` for the harness-specific connection and key instructions, which each skill used to carry in full.
 
-### Removed
-
-- **`pipelex-scaffold` no longer starts a project from `pipelex-starter-js` or `pipelex-starter-python`**: a TypeScript web app comes from the method app as before, and every other project, a Python CLI or service included, comes from the language's own initializer and is handed to `/pipelex-integrate`. A user who names a starter is told so and offered the method app or the initializer.
-
 ### Fixed
 
 - **The edit hook accepts the expanded input-slot form and intent hints**: the hook every target runs on a `.mthds` edit embedded a lint engine whose schema predated `inputs = { x = { concept = "…", hints = { … } } }` and `hints` on concepts and structure fields, so it blocked those valid forms with a schema error the server never raised; its bundle is rebuilt on `@pipelex/tools-wasm` 0.3.0, and malformed hints are still blocked. The rebuild brings the hook's other changes since it was last vendored: a schema or semantic diagnostic names the pipe or concept it is about beside its line and column, a folder the hook cannot read no longer risks a false invalid verdict from validating a partial bundle, and the validate call is abandoned cleanly at its timeout instead of left running.
@@ -54,6 +54,10 @@
 - **`pipelex-synthetic-inputs` makes a photo of a receipt or a form as a scanned document**: the skill refused photographs at its first step, before reading the PNG reference that says such a photo is a `document_scan`, which the skill makes. It now recognises one at the step where it decides the refusal.
 - **`pipelex-synthetic-inputs` leaves nothing behind when a recipe crashes mid-save**: every recipe renders to a hidden partial file beside the target and renames it on success, and the cleanup after a failed render removed only the target, so the partial file stayed. The cleanup now removes it too.
 - **Mistral Vibe loads `pipelex-design` and `pipelex-scaffold`**: both descriptions carried a `: ` that strict YAML reads as a second key, so Vibe, which parses a skill's frontmatter strictly, dropped the two skills with nothing but a warning in its log. The descriptions are reworded, and `make check` now parses every rendered skill's frontmatter as strict YAML and fails one that does not parse, or whose `name` is not its directory.
+
+### Removed
+
+- **`pipelex-scaffold` no longer starts a project from `pipelex-starter-js` or `pipelex-starter-python`**: a TypeScript web app comes from the method app as before, and every other project, a Python CLI or service included, comes from the language's own initializer and is handed to `/pipelex-integrate`. A user who names a starter is told so and offered the method app or the initializer.
 
 ## [0.7.0] - 2026-09-23
 
