@@ -36,7 +36,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 The target takes three forms, and every call takes exactly one selector; a second is refused at the extra field.
 
-- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`. {% include "skills/shared/validate-call.md.j2" %}
+- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. {% include "skills/shared/validate-call.md.j2" %}
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: its current stored content, which needs the API key. `<output_dir>` is a directory the user names, by default a new `./<method_id>/`.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 

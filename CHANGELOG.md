@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`pipelex-lab`, the experiment loop around a method**: a new skill that frames a use case into candidate methods, with what the platform can and cannot do, writes each test case's answer key before its first run, and agrees a budget in a turn of its own. On the user's go, it runs every case through `/pipelex-run`, scores each run against its key, logs it under `lab/<method>/` in the project with its run id and cost, and makes one fix per round through `/pipelex-edit` or `/pipelex-design`. It stops at the pass bar, at the budget, at a failing line traced to the inputs, and at a round that scores worse than the best so far or two rounds that fail to beat it.
+- **`pipelex-lab`, the experiment loop around a method**: a new skill that frames a use case into candidate methods, with what the platform can and cannot do, writes each test case's answer key before its first run, and agrees a budget in a turn of its own. On the user's go, it runs every case through `/pipelex-run`, scores each run against its key, logs it under `lab/<method>/` in the project with its run id and cost, and makes one fix per round through `/pipelex-edit` or `/pipelex-design`. It stops at the pass bar, at the budget, at a failing line traced to the inputs, and at a round that scores worse than the best so far or two rounds that fail to beat it. `pipelex-inputs` and `pipelex-run` now take a directory the caller names for a local bundle's inputs, which the lab uses to give each case its own.
 
 ### Changed
 

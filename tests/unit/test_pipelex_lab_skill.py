@@ -14,17 +14,17 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 REPO_ROOT = Path(__file__).parents[2]
 
 
-def render(target_name: str) -> str:
+def render(target_name: str, skill: str = "pipelex-lab") -> str:
     """The skill as the named target renders it — what a user of that harness installs."""
     config = load_target_config(REPO_ROOT / "targets", target_name)
     rendered = render_templates(
         REPO_ROOT / "templates",
         REPO_ROOT,
         config.template_vars,
-        include_skills=["pipelex-lab"],
+        include_skills=[skill],
         target_name=config.name,
     )
-    return next(content for path, content in rendered.items() if path.match("skills/pipelex-lab/SKILL.md"))
+    return next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
 
 
 def description(skill: str) -> str:
@@ -109,6 +109,17 @@ class TestPipelexLabSkill:
         else:
             assert "mcp__" not in body
             assert "open that skill's `SKILL.md` beside this one and follow it" in body
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_each_case_is_its_own_inputs_directory(self, target_name: str) -> None:
+        """Two cases written beside the bundle overwrite each other's `inputs.json`, inside the directory the lab
+        must stay out of. So the lab names each case's directory to `/pipelex-inputs` and to `/pipelex-run`, and
+        both of them take a directory the caller names for a local bundle."""
+        body = render(target_name)
+        assert "each case's directory, `cases/<case>/`, as its `<output_dir>`" in the_move(body, 2)
+        assert "naming `cases/<case>/` as the directory of its inputs" in the_move(body, 3)
+        assert "usually the one holding `main.mthds`, unless the caller names another" in render(target_name, "pipelex-inputs")
+        assert "They sit beside the bundle unless the caller named another directory" in render(target_name, "pipelex-run")
 
     def test_the_lab_reads_runs_and_never_starts_one(self) -> None:
         """The lab hands every run to `/pipelex-run`, which owns the credit guard and the run id, and every fix to

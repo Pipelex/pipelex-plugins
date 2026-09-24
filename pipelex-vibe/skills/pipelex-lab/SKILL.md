@@ -46,7 +46,7 @@ Propose two or three candidates, and recommend the one whose output can be check
 Read [key.md](references/key.md) before writing a key.
 
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
-2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it reports into the key. `/pipelex-inputs` writes each case's `inputs.json` into `cases/<case>/`, with its files under `cases/<case>/inputs/`.
+2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it reports into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another.
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. With no estimate yet, say that the first round sets one.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.
@@ -55,7 +55,7 @@ Read [key.md](references/key.md) before writing a key.
 
 Read [log.md](references/log.md) before the first entry: it holds the entry format, the regression rule, how a round is scored and the scorecard. The go opens a series in the log, with its budget. Then, round after round, until a stop:
 
-1. **Run every case once** through `/pipelex-run`'s Start a run, with the case's inputs. The go is the consent that skill needs.
+1. **Run every case once** through `/pipelex-run`'s Start a run, naming `cases/<case>/` as the directory of its inputs. The go is the consent that skill needs.
 2. **Read each whole output** with `mthds_run_results`, by its run id, and look at any file a key line is about once `/pipelex-run` has downloaded it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
 3. **Score every key line** as pass, fail or partial, quoting the field and the value you relied on. A reading the key lists as also acceptable passes.
 4. **Log each run** as log.md says: its id, its case, its cost, its duration, its score and the regressions.
