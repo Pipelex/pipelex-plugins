@@ -280,6 +280,10 @@ class TestPipelexScaffoldSkill:
             assert "`nothing-to-commit`: the initializer wrote nothing in `<dir>`; read its output and rerun it" in body
             assert "`committed:` names it and lists the staged paths" in body
             assert "`kept:` names the commit the initializer made itself" in body
+            # Ruled 2026-09-24: inside another repository's work tree, branch B makes no repository and no
+            # commit, as the method app does, and the report says the project is new files of it.
+            assert "`inside:` names the enclosing repository, where it commits nothing" in body
+            assert "the pristine commit and who made it, or on `inside:` that the project is new files of that repository" in body
             assert "the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL" in body
             # The method app's report still reads the plane by a test, never an echo, and only of the file
             # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
@@ -288,6 +292,7 @@ class TestPipelexScaffoldSkill:
             assert ">> <dir>/.env" not in body
             assert "cp -n" not in body
         initializers = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
+        assert "**Inside another repository's work tree it initializes nothing and commits nothing**" in initializers
         for word in ("**`filled`**", "**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
             assert word in initializers, f"the reference does not say what {word} means"
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
@@ -360,8 +365,12 @@ class TestPipelexScaffoldSkill:
         assert "**state the exact command and confirm before running it**" in github
         assert "gh repo create <owner>/<name> --private --source <dir> --remote origin" in github
         assert "--template" in github and "--template Pipelex/" not in github
-        # `gh` refuses a directory inside another work tree and hints at the nested `git init` the family refuses.
-        assert "**A method app inside another repository's work tree has neither a repository nor a pristine commit of its own**" in github
+        # `gh` refuses a directory inside another work tree and hints at the nested `git init` both branches refuse.
+        assert (
+            "**A project inside another repository's work tree has neither a repository nor a pristine commit of its own**, on either branch"
+            in github
+        )
+        assert "the pristine-commit script's `inside:` verdict" in github
         assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
@@ -385,8 +394,18 @@ class TestPipelexScaffoldSkill:
         for recipe in ("(cd <dir> && npm install)", "(cd <dir> && npm install express && npm install --save-dev @types/express)"):
             assert recipe in initializers, f"npm install not scoped to the project: {recipe}"
         assert "**Every follow-on `npm install` above is parenthesised" in initializers
-        # The minimal TS default is the very resolution the emitter defect breaks.
-        assert "is exactly the shape that meets the ts-zod emitter's extensionless-import defect" in initializers
+        # The minimal TS default meets the emitter defect, and a bundler resolution only moves it from the
+        # type check to runtime when `tsc`'s ES module output runs under plain Node, as
+        # `pipelex-integrate`'s TypeScript reference says. The CommonJS emit is the minimal shape it
+        # does not touch, and `tsc --init`'s `verbatimModuleSyntax: true` refuses that shape (TS1295).
+        assert "meets the ts-zod emitter's extensionless-import defect whichever ES module resolution it uses" in initializers
+        assert "so a bundler resolution is no cure for a project whose code `node` runs from `dist/`" in initializers
+        assert (
+            "which the defect does not touch" in initializers and "`--moduleResolution bundler`, which the defect does not touch" not in initializers
+        )
+        assert 'set `"verbatimModuleSyntax": false`' in initializers
+        integrate_typescript = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "typescript.md").read_text(encoding="utf-8")
+        assert "meets the same `ERR_MODULE_NOT_FOUND` at runtime with no `TS2835` to warn of it" in integrate_typescript
         # `tsc --init` writes an active `"types": []`, which switches off the @types/node the line
         # before it installed — the integrate call site then fails TS2591 on node:path and process.
         assert '`tsc --init` writes `"types": []` as an active key' in initializers

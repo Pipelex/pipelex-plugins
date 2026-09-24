@@ -15,8 +15,8 @@
 #     <plane>   production when the base URL `.env` resolves to is https://api.pipelex.com, or
 #               when it names none; other for any other URL
 #   refused: <reason>   no key was written, and <reason> is one of usage, no-directory,
-#                       not-a-repository (<dir> is not the root of a repository of its own),
-#                       not-ignored, write-failed (a file in <dir> could not be written, or
+#                       not-a-repository (no repository holds <dir>: the pristine commit has not
+#                       run), not-ignored, write-failed (a file in <dir> could not be written, or
 #                       `.env` could not be closed to other users before the key reached it)
 # The exit code is presentation: 0 unless refused.
 #
@@ -38,9 +38,10 @@ refuse() {
 
 [ $# -eq 1 ] || refuse usage
 dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory
-# The pristine commit made <dir> the root of a repository of its own. Inside the user's repository
-# instead, `.gitignore` and `.env` would be judged and written by their rules, in their worktree.
-prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) && [ -z "$prefix" ] || refuse not-a-repository
+# The pristine commit left <dir> the root of a repository of its own, or new files inside another
+# repository's work tree, whose rules then judge `.env` as they judge every file of the project.
+# Outside every work tree git can judge no ignore rule, so nothing is written before that commit.
+git -C "$dir" rev-parse --show-prefix > /dev/null 2>&1 || refuse not-a-repository
 example="$dir/.env.example"
 env="$dir/.env"
 

@@ -245,25 +245,50 @@ class TestCommitPristine:
         assert result.stdout == "refused: write-failed\n"
         assert subprocess.run(["git", "-C", str(project), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
 
-    def test_a_directory_inside_the_user_s_repository_gets_its_own(self, tmp_path: Path) -> None:
-        """`git -C <dir>` scopes nothing: with no `.git` of its own, `<dir>` is governed by the user's
-        repository, and a staging there would sweep their worktree into this commit. `uv init` makes a
-        workspace member rather than a repository in exactly this case, so the test is never inferred
-        from which initializer ran."""
+    @pytest.mark.parametrize("history", [False, True], ids=["unborn", "with-a-commit"])
+    def test_a_directory_inside_the_user_s_repository_is_new_files_of_it(self, tmp_path: Path, history: bool) -> None:
+        """Ruled by Louis on 2026-09-24: the initializer branch follows the method app. A `<dir>` inside
+        another repository's work tree gets no repository and no commit, since a repository planted there
+        is one the enclosing repository sees as embedded, and a staging through `git -C <dir>` would sweep
+        the user's worktree in. `uv init` initializes nothing in exactly this case, so the test is never
+        inferred from which initializer ran. The project's `.gitignore` is still written, so the user's
+        own `git add` never takes the dependency tree or a `.env`."""
         outer = _repository(tmp_path / "their-repo")
+        if history:
+            (outer / "README.md").write_text("theirs\n", encoding="utf-8")
+            _git(outer, "add", "README.md")
+            _git(outer, "commit", "-q", "-m", "their commit")
+        head_before = _git(outer, "rev-parse", "-q", "--verify", "HEAD") if history else None
         (outer / "notes.md").write_text("mine\n", encoding="utf-8")
         (outer / "staged.md").write_text("staged by them\n", encoding="utf-8")
         _git(outer, "add", "staged.md")
         project = outer / "new-app"
-        project.mkdir()
+        (project / "node_modules" / "x").mkdir(parents=True)
+        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
         (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, "new-app", "Scaffold Python project", cwd=outer)
         assert result.returncode == 0, result.stderr
-        assert (project / ".git").is_dir()
-        assert sorted(_git(project, "ls-files").splitlines()) == [".gitignore", "main.py"]
-        # The user's repository is exactly as they left it: nothing committed, their staging intact.
-        assert subprocess.run(["git", "-C", str(outer), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert result.stdout == f"inside: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        assert not (project / ".git").exists(), "a repository was planted inside the user's"
+        # The user's repository is exactly as they left it: HEAD where it was, their staging intact.
+        if history:
+            assert _git(outer, "rev-parse", "HEAD") == head_before
+        else:
+            assert subprocess.run(["git", "-C", str(outer), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
         assert _git(outer, "diff", "--cached", "--name-only") == "staged.md"
+        # The project is new, untracked files of that repository, and its .gitignore keeps the dependency
+        # tree and the `.env` out of the user's own `git add`.
+        untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
+        assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.py"]
+
+    def test_inside_another_repository_nothing_is_written_when_the_initializer_wrote_nothing(self, tmp_path: Path) -> None:
+        outer = _repository(tmp_path / "their-repo")
+        project = outer / "new-app"
+        project.mkdir()
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.stdout == "refused: nothing-to-commit\n"
+        assert list(project.iterdir()) == []
 
     def test_a_repository_the_user_made_is_committed_on_and_never_reinitialized(self, tmp_path: Path) -> None:
         """The lone-`.git` directory: the user's own repository, with their history, gets the commit."""
@@ -552,14 +577,34 @@ class TestWriteEnvFile:
         assert result.stdout == "refused: write-failed\n"
         assert result.returncode == 1
 
-    def test_a_directory_inside_the_user_s_repository_is_refused(self, tmp_path: Path) -> None:
-        """Step 3 refused before its `git init`, so `<dir>` is still governed by the user's repository."""
+    def test_a_directory_inside_the_user_s_repository_is_written_under_its_rules(self, tmp_path: Path) -> None:
+        """The pristine commit leaves such a `<dir>` as new files of the enclosing repository, so `.env` is
+        ignored by a `.gitignore` of the project's own, and nothing is written outside `<dir>`."""
         outer = _repository(tmp_path / "their-repo")
+        (outer / "staged.md").write_text("staged by them\n", encoding="utf-8")
+        _git(outer, "add", "staged.md")
         project = outer / "app"
         project.mkdir()
+        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "refused: not-a-repository\n"
-        assert list(project.iterdir()) == [] and not (outer / ".gitignore").exists()
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
+        assert subprocess.run(["git", "-C", str(outer), "check-ignore", "-q", "app/.env"], check=False).returncode == 0
+        assert not (outer / ".gitignore").exists()
+        assert _git(outer, "diff", "--cached", "--name-only") == "staged.md"
+
+    def test_an_enclosing_repository_s_own_rule_is_the_project_s(self, tmp_path: Path) -> None:
+        """A `.gitignore` of the enclosing repository travels with every clone of it, which is where the
+        project's files live, so it counts and no second line is written."""
+        outer = _repository(tmp_path / "their-repo")
+        (outer / ".gitignore").write_text(".env\n", encoding="utf-8")
+        project = outer / "app"
+        project.mkdir()
+        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "filled base-url=file plane=production\n"
+        assert not (project / ".gitignore").exists()
+        assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
 
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"

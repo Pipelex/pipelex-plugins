@@ -8,7 +8,7 @@ description: Start a new project that calls MTHDS methods through Pipelex, in Ty
 Give a user with no project one that runs their method, or one ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
 
 - **The method app**, for a web app around a method in TypeScript. The `pipelex-method-apps` family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
-- **The ecosystem's own initializer** for every other project: Python of any shape, and TypeScript that is not a web app. You run it and never assemble a project by hand, and this skill's two scripts make its pristine commit and its env file.
+- **The ecosystem's own initializer** for every other project: Python of any shape, and TypeScript that is not a web app. You run it and never assemble a project by hand.
 
 **The starters are not scaffolded from**: a user who names `pipelex-starter-js` or `pipelex-starter-python` is told so and offered the method app or the initializer. This skill is not a template engine (no cookiecutter, no copier, no framework matrix of its own), a runner or a deployer, and it needs no MCP tool.
 
@@ -41,7 +41,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 `git`; `node` at 22.12 or later with `npm`, for the method app and for TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
 
-**On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**, since `pipelex-sdk` installs into no other. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
+**On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
 ## Branch A — the method app
 
@@ -66,13 +66,13 @@ It starts the dev server in the background, on loopback, and requests the page. 
 ## Branch B — the ecosystem's initializer
 
 1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync` from inside `<dir>`**, because `/pipelex-integrate` reads no lock file as `pip install`.
-2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`, since the commit lands on the user's branch. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. Run the script, never its steps by hand:
+2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. Run the script, never its steps by hand:
 
    ```bash
    bash "<skill-dir>/scripts/commit-pristine.sh" '<dir>' 'Scaffold <framework or language> project'
    ```
 
-   It makes `<dir>` its own repository when it is not one, keeps the dependency tree and `.env` out, and commits `<dir>` alone: the **one commit this skill makes**. `committed:` names it and lists the staged paths; `kept:` names the commit the initializer made itself.
+   It keeps the dependency tree and `.env` out, makes `<dir>` a repository when none holds it, and commits `<dir>` alone: the **one commit this skill makes**. `committed:` names it and lists the staged paths; `kept:` names the commit the initializer made itself; `inside:` names the enclosing repository, where it commits nothing.
 3. Write the env file. The script prints one line and never a value, `<key> base-url=<origin> plane=<plane>`:
 
    ```bash
@@ -85,7 +85,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
 
 **On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that `make serve` inside the project restarts it. Then say what was created and where, with its name and title; the template's version and the git outcome, which is no commit when `<dir>` sits in another repository's work tree; that `make create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `make create` wrote, `u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other`; and `make add-method METHOD=…` for a second method, `npm run codegen` after a bundle edit.
 
-**On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL. A key reported `filled` was taken from the environment **and not validated**.
+**On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it, or on `inside:` that the project is new files of that repository; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the env verdict in the words [references/initializers.md](references/initializers.md) gives each, never the URL. A key reported `filled` was taken from the environment **and not validated**.
 
 Two lines close it. **The project's own instructions and skills load in a session started inside it**: `cd <dir>`, then Mistral Vibe there. **`/pipelex-integrate` works from here meanwhile**, unless `node` was missing from the `PATH` and came through a version manager, whose hand-off [references/version-managers.md](references/version-managers.md) gives: `../pipelex-integrate/SKILL.md` with the method, or `/pipelex-design` first without one.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The pristine commit of /pipelex-scaffold's initializer branch: the repository test, a
 # .gitignore that keeps the dependency tree out, the staging and the one commit, all held to
-# the project directory.
+# the project directory. Inside another repository's work tree it writes the .gitignore alone.
 #
 # Usage: commit-pristine.sh <dir> <message>
 #
@@ -9,11 +9,14 @@
 #   committed: <sha> <subject>   this script made the commit; the staged paths follow, one per line
 #   kept: <sha> <subject>        nothing was left to stage, because the initializer committed the
 #                                tree itself (create-next-app does); that commit is the pristine one
+#   inside: <root>               <dir> lies in the work tree of the repository at <root> and is not
+#                                its root: nothing was initialized, staged or committed, and the
+#                                project is new files of that repository, as the method app's is
 #   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
 #                                no-directory, init-failed, write-failed, stage-failed,
 #                                nothing-to-commit, commit-failed; git's own message, if any,
 #                                goes to stderr
-# The exit code is presentation: 0 for committed and kept, 1 for refused.
+# The exit code is presentation: 0 for committed, kept and inside, 1 for refused.
 
 set -u
 
@@ -32,14 +35,24 @@ message=$2
 # below alone would read as a scaffold. A lone .git is the user's repository, not a scaffold.
 [ -n "$(ls -A "$dir" | grep -vx '\.git')" ] || refuse nothing-to-commit
 
-# The repository test, never inferred from which initializer ran. <dir> must be the root of a
-# repository of its own: with no .git of its own it is governed by whatever repository encloses
-# it, which is the user's, and `git -C` sets git's working directory without scoping anything,
-# so the staging below would sweep the user's worktree into this commit. `uv init` initializes a
-# repository only when no enclosing one exists, so the list of initializers that `git init` is
-# not a substitute. `--show-prefix` prints nothing at a repository's root, which needs no path
-# comparison and so survives symlinks and letter case.
-if ! prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || [ -n "$prefix" ]; then
+# The repository test, never inferred from which initializer ran: `uv init` and create-next-app
+# initialize a repository only when no enclosing one exists, so the list of initializers that
+# `git init` is not a substitute. `--show-prefix` prints nothing at a repository's root, which
+# needs no path comparison and so survives symlinks and letter case. Three outcomes:
+#   - outside every work tree, <dir> becomes a repository of its own, and the commit follows;
+#   - at a repository's root, the one the initializer made or the user's lone .git, the commit
+#     lands there (the skill asks first when the repository was the user's);
+#   - inside another repository's work tree, <dir> gets no repository and no commit, as the method
+#     app's initializer gives it none: a repository planted there is one the enclosing repository
+#     sees as embedded, and `git -C` sets git's working directory without scoping anything, so a
+#     staging there would sweep the user's worktree into this commit. The project is new files of
+#     that repository, left for the user to review and commit, and its index and HEAD are never
+#     touched: only the .gitignore below is written, so that the user's own `git add` never takes
+#     the dependency tree or a `.env`.
+enclosing=
+if prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null); then
+  [ -z "$prefix" ] || enclosing=$(git -C "$dir" rev-parse --show-toplevel)
+else
   error=$(git -C "$dir" init -q -b main 2>&1) || refuse init-failed "$error"
 fi
 
@@ -48,11 +61,14 @@ fi
 # holds of either and HEAD does not, before those lines are read: a path the user committed is
 # theirs, and stays tracked. `-f` because a file rewritten since it was staged, as `npm install`
 # rewrites node_modules/.package-lock.json, is otherwise refused; `--cached` leaves the file itself.
-for staged_early in .env node_modules; do
-  [ -n "$(git -C "$dir" ls-files --cached -- "$staged_early")" ] || continue
-  git -C "$dir" rev-parse -q --verify "HEAD:$staged_early" > /dev/null 2>&1 && continue
-  error=$(git -C "$dir" rm -r -q -f --cached -- "$staged_early" 2>&1) || refuse stage-failed "$error"
-done
+# An enclosing repository's index is the user's, and is left alone.
+if [ -z "$enclosing" ]; then
+  for staged_early in .env node_modules; do
+    [ -n "$(git -C "$dir" ls-files --cached -- "$staged_early")" ] || continue
+    git -C "$dir" rev-parse -q --verify "HEAD:$staged_early" > /dev/null 2>&1 && continue
+    error=$(git -C "$dir" rm -r -q -f --cached -- "$staged_early" 2>&1) || refuse stage-failed "$error"
+  done
+fi
 
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
 # repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
@@ -81,6 +97,11 @@ if [ -d "$dir/node_modules" ] && ! ignored_by_the_project node_modules; then
   printf '\nnode_modules/\n' >> "$dir/.gitignore" || refuse write-failed
 fi
 [ ! -e "$dir/.env" ] || ignored_by_the_project .env || printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
+
+if [ -n "$enclosing" ]; then
+  printf 'inside: %s\n' "$enclosing"
+  exit 0
+fi
 
 # The pathspec is on both commands. `add -A -- .` bounds what is staged, and a commit without
 # one would commit the whole index, anything the user had staged included.
