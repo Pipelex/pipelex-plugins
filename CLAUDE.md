@@ -47,7 +47,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │       ├── catalog-id.md.j2           # A catalog id or a published address given to a file-based skill: the bridge include, whole (rendered per target; read by pipelex-design, pipelex-edit and pipelex-organize)
 │       ├── frontmatter.md.j2          # Common YAML frontmatter (include-only)
 │       ├── mcp-requirements.md.j2     # The MCP-backed skills' two stops, each pointing at credentials.md (include-only)
-│       ├── validate-call.md.j2        # How a bundle is submitted: the file set (runs/ excluded) and the path form of `files` (include-only)
+│       ├── validate-call.md.j2        # How a bundle is submitted: the file set (runs/ excluded), the path form of `files` and the workshop's refusal of a path outside its directory; the catalog's save sets what it says of the inline form (include-only)
 │       ├── project-root.md.j2         # Where a project starts: the project markers design, integrate and catalog share (include-only)
 │       ├── git-ignore.md.j2           # Keeping the user's data out of git before it is written: check, `.gitignore` entry, check again, tracked-path guard — inputs, lab and run (include-only)
 │       ├── skill-dir.md.j2            # Codex and Vibe: defines the `<skill-dir>` placeholder a skill names its own files by; nothing on Claude (include-only)

@@ -840,6 +840,35 @@ class TestSharedSkillIncludes:
         ]
         assert offenders == [], f"the ignore check reaches a skill through skills/shared/git-ignore.md.j2 alone: {offenders}"
 
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_submission_convention_names_the_workshop_s_path_containment(self, target_name: str) -> None:
+        """`L-260923-019e50`: the local workshop refuses a `{ path }` item that resolves
+        outside its own working directory, an absolute one included (`pipelex-mcp`,
+        `src/local/files.ts`). The include used to say "pass an absolute one" as though
+        that were enough, so a session launched below or beside the bundle met the
+        refusal with no cure. Every skill that submits a bundle now names the refusal
+        and the relaunch that cures it. All but the catalog keep the inline fallback: a
+        save is the one submission the inline form leaves unlinked."""
+        includers = sorted(
+            path.parent.name
+            for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
+            if 'include "skills/shared/validate-call.md.j2"' in path.read_text(encoding="utf-8")
+        )
+        assert "pipelex-catalog" in includers
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
+        fallback = "is the fallback, and the only form the hosted console accepts."
+        for skill in includers:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
+            assert "relaunching the harness from a directory holding the bundle cures that" in body, f"{target_name}/{skill}: the cure is unnamed"
+            assert "pass an absolute one" not in body, f"{target_name}/{skill}: an absolute path outside the workshop is refused too"
+            if skill == "pipelex-catalog":
+                assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
+            else:
+                assert fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
         body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -1125,6 +1154,19 @@ class TestPipelexCatalogSkill:
         partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
         assert "except anything under a `runs/` directory" in partial
         assert "root file first" in body
+
+    def test_a_save_takes_the_path_form_and_an_unlinkable_one_waits_for_a_yes(self) -> None:
+        """The workshop writes `pipelex-method.json` only beside a `{ path }` root file
+        (`pipelex-mcp`, `src/capabilities/catalog-write.ts`, `linkDirectoryOf`), and
+        `link_dir` is bounded by the same working directory as a path is. So a method
+        created from inline files is linked to nothing, and the directory's next save
+        creates a second one, which only an admin can delete. The skill says it through
+        the include's parameter rather than a pasted variant of the convention."""
+        body = self.catalog_skill
+        assert "{% set validate_call_inline %}" in body
+        assert "**a save takes the path form**" in body
+        assert "say the save cannot be linked from this session, and save inline only on the user's yes" in body
+        assert "Never pass `link_dir`" in body
 
     def test_python_is_chosen_and_never_swept(self) -> None:
         """The workshop gates on the `.py` extension and on bundle containment and

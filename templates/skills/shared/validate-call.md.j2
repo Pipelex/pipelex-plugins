@@ -7,6 +7,18 @@
    `/pipelex-run` saves a completed run's artifacts. `pipelex-integrate` sets
    `validate_call_file_set = false` and states its own set, because the set it
    submits is the set its generated call site loads at runtime, and that is
-   the call site's to define. -#}
-{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. {% endif %}Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+   the call site's to define.
+
+   The local workshop resolves a `{ path }` item against its own working
+   directory and refuses one that resolves outside it (`pipelex-mcp`,
+   `src/local/files.ts`), an absolute path included, so the sentence names the
+   refusal and its cure rather than promising that any absolute path works.
+
+   `validate_call_inline` is what the last sentence says of the inline form,
+   after the form itself. Every skill but `pipelex-catalog` leaves it to its
+   default, the fallback the hosted console needs. The catalog sets it, because
+   `mthds_save_method` is the workshop's alone and writes `pipelex-method.json`
+   only beside a `{ path }` root file: for a save, the inline form is the one
+   that leaves the method unlinked. -#}
+{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback, and the only form the hosted console accepts.") }}
 {#- -#}
