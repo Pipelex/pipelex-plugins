@@ -1133,7 +1133,8 @@ class TestPipelexRunSkill:
         read as a failed save."""
         body = self.run_skill
         assert "Pass `dir` only for a folder the user named, relative to that directory." in body
-        assert "refuses a `dir` the user named | call again without it, which saves into `runs/<run_id>/`" in body
+        # The ignore check exempts a `dir` the user named, so the fallback into `runs/<run_id>/` takes it first.
+        assert ("refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`") in body
         assert "A refused `dir` is not a failed save" in body
 
     def test_user_values_are_laid_over_a_prepared_set(self) -> None:
@@ -1273,7 +1274,15 @@ class TestPipelexRunSkill:
         assert "leave `inputs.json` exactly as it is" in body
         assert "prepare never rewrites it" in body
         assert "no envelope, no hash and no sidecar" in body
-        assert "add `inputs.prepared.json` to the nearest `.gitignore`" in body
+        # The prepared file's references are scoped to one organization on one plane, and it carries every
+        # other value of `inputs.json` word for word, so it takes the shared ignore procedure, second check
+        # and tracked-path guard included, rather than a rule of step 5's own.
+        assert (
+            "{% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, "
+            "and `inputs.prepared.json` before step 5's call{% endset -%}"
+        ) in body
+        assert "`inputs.json` or `inputs.prepared.json`{% endset -%}" in body
+        assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
 
     def test_design_points_at_the_run_without_running(self) -> None:
         design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")

@@ -149,7 +149,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**",
         'never "simplify" it back to a string',
         "Leave the copies in `<output_dir>/inputs/` alone.",
-        "add `inputs.prepared.json` to the nearest `.gitignore`",
+        "and `inputs.prepared.json` before step 5's call",
         "**prepare again whenever a file was replaced in place.**",
         "**Offer the run, never start it**",
         "never call a run tool here",

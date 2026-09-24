@@ -128,6 +128,10 @@ class TestPipelexRunSkill:
         body = self.render(target_name)
         guard = self.the_line(body, "**A saved run stays out of version control**")
         assert guard in self.the_step(body, 7), f"{target_name}: the ignore guard is not at the step that saves"
+        step = self.the_step(body, 7)
+        assert step.index(guard) < step.index("`mthds_download_artifacts` with the run id alone"), (
+            f"{target_name}: the ignore check reads after the save it guards"
+        )
         assert guard.startswith("**A saved run stays out of version control**: in a git repository, ")
         assert "`git check-ignore -q` `runs/<run_id>/` before saving, not for a `dir` the user named." in guard
         assert (
