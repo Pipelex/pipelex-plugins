@@ -191,6 +191,19 @@ class TestIntegrationPoints:
         assert "`/pipelex-lab` writes answer keys and scores the runs" in hand_off
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_case_is_handed_to_inputs_with_no_run_offer(self, target_name: str) -> None:
+        """The lab hands each case to `/pipelex-inputs` at its second setup item, before the third writes the case's
+        key, and that skill ends by offering the run. A yes to the offer would run the case before its key exists,
+        which breaks the lab's first guard. So the lab asks it to stop at run-ready, and the inputs skill waives the
+        offer on a calling skill's request, the one exemption among the offer's conditions."""
+        setup = the_move(render(target_name), 2)
+        hand_off = next(line for line in setup.splitlines() if line.startswith("2. **Inputs.**"))
+        assert "**Ask it to stop at run-ready, with no run offer**" in hand_off
+        offer = render(target_name, "pipelex-inputs").split("### 6. Offer the run", 1)[1].split("\n## ", 1)[0]
+        conditions = offer.split("Offer only when:", 1)[1]
+        assert "- no calling skill asked to stop at run-ready" in conditions
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_run_of_a_case_the_lab_did_not_start_is_offered_to_it(self, target_name: str) -> None:
         """Only a run on a case's inputs is offered: a run on any other inputs has no key to be scored against, and
         the lab would have to improvise one with the output already in view."""

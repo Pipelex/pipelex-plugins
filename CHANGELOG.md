@@ -17,6 +17,7 @@
 - **`pipelex-explain` reads a `PipeBatch` by its own fields**: it names `input_list_name` and `input_item_name` and explains the `branch_pipe_code` pipe, where it looked for `batch_over` and `batch_as`, the fields of a batching step in a `PipeSequence`.
 - **The native content types cover every native concept**: `YesNo`, `Date`, `Time` and `Composite` are documented beside the others, with their fields and input JSON; an `Image` carries `width` and `height` rather than a `size`; and an `Html`'s `css_class` is optional.
 - **The plugin says it needs Node.js**: the README and the Codex listing said the Pipelex tools needed nothing else to install, but the hook runs on Node.js and each agent starts the tools through `npx`, so without Node.js on the `PATH` the hook passes every edit unchecked and the skills that call the tools stop. The README, the Codex listing and each agent's install section now say that Node.js must be on the `PATH`.
+- **`pipelex-lab` never lets a test case run before its answer key exists**: the lab hands each case to `pipelex-inputs` before it writes the case's key, and that skill's closing run offer let a yes run the case with no key to score it against. A calling skill can now ask `pipelex-inputs` to stop at run-ready with no offer, and the lab does; a user who says not to run is still offered the run, since the offer starts nothing.
 
 ## [0.8.0] - 2026-09-24
 
