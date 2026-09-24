@@ -67,7 +67,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
 3. **Present the flow**: the interactive method graph where the host rendered it, else a concise text flow.
 4. **Warn again for a `PipeFunc`**, naming its pipes: {% include "skills/shared/pipefunc-warning.md.j2" %}
-5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
+5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
 6. {% include "skills/shared/stale-types-notice.md.j2" %}
 
 {% include "skills/shared/saved-copy-notice.md.j2" %}

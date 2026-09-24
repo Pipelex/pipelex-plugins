@@ -48,7 +48,7 @@ A method that already exists and has no brief gets the short form frame.md gives
 Read [key.md](references/key.md) before writing a key.
 
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
-2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **A case of the user's own files stays out of version control**: in a git repository, add `lab/<method>/cases/<case>/` to the nearest `.gitignore` before anything is copied into it, and say so, since its key holds facts from those files too.
+2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **A case of the user's own files stays out of version control**: in a git repository, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`, relative to that file's directory, before anything is copied into it, and say so, since its key holds facts from those files too. Confirm it with `git check-ignore -q` on the case's paths: **git never ignores a tracked path, so nothing is copied over one it does not report ignored until the user says so.**
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.
@@ -75,6 +75,8 @@ Read [log.md](references/log.md) before the first entry: it holds the entry form
 7. the user interrupts.
 
 A new go opens a new series, with its own budget.
+
+**A run of a case that the lab did not start**, handed over by `/pipelex-run`, is read, scored and logged as steps 2 to 4 say, in an entry outside any round: read [log.md](references/log.md) first. It needs no go, since it has already run, and it starts no run and makes no fix.
 
 ## Stops
 

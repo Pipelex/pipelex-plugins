@@ -33,6 +33,22 @@ Failed: M3 (the memo puts the relocation clause below the medium items). Partial
 - **A failed run** is logged with the status and the first line of its `failure_message`, as `FAILED · …`, and scores nothing.
 - **An unfinished run** is logged as `UNFINISHED · still RUNNING after …`, with its run id, so that `/pipelex-run` can follow it later.
 
+## A run the loop did not start
+
+`/pipelex-run` hands over a run of a case that the lab did not start, such as one the user asked for with "run it again". It gets an entry of its own, between rounds or between series, in the same run format:
+
+```
+## Outside the loop · 2026-09-24
+Changed: nothing since round 3.
+
+### run_… · problem-invoice
+$0.21 · 64 s · 9 of 11 lines · pass bar met: no
+```
+
+- **Changed** says what differs from the last run the lab logged: a fix made outside the loop, or nothing.
+- **It counts in the log's total**, since it spent credit, and in no round: a series' budget, its best round and the fifth stop read only the runs of its rounds.
+- **Regressions compare with it**, like any other run of its case.
+
 ## Regressions and the best round
 
 - **A regression** is a line of a case that passed in an earlier run of that case and does not pass now. Name the run where it last passed. Compare only with runs made since the case's key last changed.

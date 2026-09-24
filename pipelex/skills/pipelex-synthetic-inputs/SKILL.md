@@ -12,7 +12,7 @@ allowed-tools:
 
 # Generate synthetic input files
 
-Make the files a method needs to run when the user has none — a PDF for a `native.Document` input, a PNG for a `native.Image` input, a Word or Excel file when the method asks for one — rendered by Python code this skill writes and runs, from packages whose licences are compatible with MIT. This skill is the plugin's file factory: `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never runs the method it makes files for — the first two belong to `/pipelex-inputs`, the run to `/pipelex-run`. Its one run of its own is the image generation that makes a `photograph`, and that run waits for the user's go.
+Make the files a method needs to run when the user has none — a PDF for a `native.Document` input, a PNG for a `native.Image` input, a Word or Excel file when the method asks for one — rendered by Python code this skill writes and runs. This skill is the plugin's file factory: `/pipelex-inputs` calls it whenever its synthetic strategy reaches a file-typed input; users call it for a one-off sample file. It writes files and reports on them. It never edits `inputs.json`, never uploads anything, and never runs the method it makes files for — the first two belong to `/pipelex-inputs`, the run to `/pipelex-run`. Its one run of its own is the image generation that makes a `photograph`, and that run waits for the user's go.
 
 It makes `pdf` (letters, multi-page reports, tables, invoices); `png` as a `chart` (bar, line, pie, scatter), a `diagram` (flowcharts, architecture and org charts), a `document_scan` (scanned-looking invoices, receipts, forms and letters for OCR, with handwritten marks when the brief has them) or a `screenshot` (dashboards, settings pages, lists); `docx` and `xlsx`; and a `photograph`. **A photograph is generated, never drawn:** code cannot render one honestly, so it comes from an image model through the workshop, as [photograph.md](references/photograph.md) says, and never from a procedural scene or a public image. A photo of a receipt or a form is a `document_scan`, which code makes; read what the method does with the image before generating one. **Handwriting is simulated** on a `document_scan`, glyph by glyph from a handwriting-style font, as `png.md` says; tell the user in one line that it reads more easily than a real hand, so a pass proves the method's logic and not its reading of a hard hand.
 
@@ -81,7 +81,7 @@ Reopen the file with its reference's verify command, through step 2's interprete
 
 ### Step 6: Report
 
-One line per file: path, format, dimensions or page count, and a sentence on its content. Name any fallback as one. Then:
+Per file: path, format, dimensions or page count, a sentence on its content, and the facts planted in it, from step 3's draft. Name any fallback as one. Then:
 
 - **Called from `/pipelex-inputs`**: hand the path back, **with the caveat of a simulated or generated file** (handwriting reads more easily than a real hand; a photograph is AI-generated), which that skill's report repeats, and stop — that skill writes `inputs.json`, uploads the file with `mthds_prepare_inputs`, and offers the run. After a refusal or a graceful stop, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues.
 - **Direct invocation**: mention that `/pipelex-inputs` is where the file becomes a runnable input.
