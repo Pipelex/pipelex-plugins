@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import ClassVar
 
@@ -15,6 +16,7 @@ from scripts.check import (
     check_build_error_markers,
     check_codex_marketplace_plugins,
     check_codex_no_claude_artifacts,
+    check_credential_wiring,
     check_marketplace_plugins,
     check_matched_target_versions,
     check_no_templates_in_output,
@@ -30,6 +32,7 @@ from scripts.check import (
     load_version_floors,
     resolve_target_var,
 )
+from scripts.gen_skill_docs import build_target, list_targets, load_target_config
 
 MARKETPLACE = "pipelex-plugins"
 
@@ -425,6 +428,79 @@ class TestVibeTargetArtifacts:
         assert any("not valid TOML" in error for error in errors)
 
 
+class TestCredentialWiring:
+    """Each generated target must carry the credential wiring `targets/defaults.toml` declares.
+
+    The expectation comes from the defaults, never from a target's merged variables: a target whose
+    override lost `env_vars` or `user_config` renders files that agree with it, so the freshness
+    check passes them. The trees below are the real targets rendered from the real templates.
+    """
+
+    REPO_ROOT = Path(__file__).parents[2]
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/local/main.js"]\n'
+
+    def _built_tree(self, tmp_path: Path, override: str = "") -> Path:
+        """The repository's targets, `override` appended to each, built from its templates into `tmp_path`."""
+        targets = tmp_path / "targets"
+        shutil.copytree(self.REPO_ROOT / "targets", targets)
+        for name in list_targets(targets):
+            with (targets / f"{name}.toml").open("a", encoding="utf-8") as target_toml:
+                target_toml.write(override)
+            config = load_target_config(targets, name)
+            for path, content in build_target(self.REPO_ROOT, config, dry_run=True).files.items():
+                if path.name == "check.mjs":
+                    continue  # the vendored bundle carries no credential wiring, and weighs megabytes
+                destination = tmp_path / path.relative_to(self.REPO_ROOT)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(content, encoding="utf-8")
+        return tmp_path
+
+    def test_the_built_targets_carry_the_wiring(self, tmp_path: Path) -> None:
+        assert check_credential_wiring(self._built_tree(tmp_path)) == []
+
+    def test_the_dev_override_on_every_target_keeps_the_wiring(self, tmp_path: Path) -> None:
+        """A table override used to replace the defaults' whole: the Claude manifest lost its
+        `userConfig` and launcher, the Codex manifest its forwarded names, the Vibe fragment its
+        `env` keys, and the hook and launcher their promotions, with every check green."""
+        assert check_credential_wiring(self._built_tree(tmp_path, self.DEV_OVERRIDE)) == []
+
+    @pytest.mark.parametrize(
+        ("generated", "old", "new", "expected"),
+        [
+            ("pipelex/.claude-plugin/plugin.json", '"userConfig"', '"userConfigGone"', "userConfig offers no `api_key` option"),
+            ("pipelex/.claude-plugin/plugin.json", '"sensitive": true', '"sensitive": false', "userConfig `api_key` is no longer sensitive"),
+            ("pipelex/.claude-plugin/plugin.json", '"${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"', '"npx"', "does not spawn"),
+            ("pipelex/.claude-plugin/plugin.json", '"PIPELEX_PLUGIN_BASE_URL"', '"PIPELEX_BASE_URL"', "does not set PIPELEX_PLUGIN_BASE_URL"),
+            (
+                "pipelex/hooks/check-mthds.sh",
+                'export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"',
+                ": dropped",
+                "hooks/check-mthds.sh: does not promote CLAUDE_PLUGIN_OPTION_API_KEY to PIPELEX_API_KEY",
+            ),
+            (
+                "pipelex/hooks/launch-pipelex-mcp.sh",
+                'if [[ -n "${PIPELEX_PLUGIN_API_KEY:-}" ]]; then',
+                "if true; then",
+                "hooks/launch-pipelex-mcp.sh: does not promote PIPELEX_PLUGIN_API_KEY to PIPELEX_API_KEY when it is non-empty",
+            ),
+            ("pipelex-codex/.codex-plugin/plugin.json", '"env_vars"', '"env_vars_gone"', "forwards no PIPELEX_API_KEY, PIPELEX_BASE_URL"),
+            ("pipelex-vibe/mcp/vibe-mcp.toml", 'PIPELEX_API_KEY = ""\n', "", "the env table has no `PIPELEX_API_KEY` key"),
+            ("pipelex-vibe/mcp/vibe-mcp.toml", 'PIPELEX_API_KEY = ""', 'PIPELEX_API_KEY = "sk-baked"', "ships a value for `PIPELEX_API_KEY`"),
+        ],
+    )
+    def test_a_target_that_lost_its_wiring_fails(self, tmp_path: Path, generated: str, old: str, new: str, expected: str) -> None:
+        tree = self._built_tree(tmp_path)
+        path = tree / generated
+        text = path.read_text(encoding="utf-8")
+        assert old in text, f"the fixture no longer renders {old!r} in {generated}"
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+        errors = check_credential_wiring(tree)
+        assert any(expected in error and generated in error for error in errors), errors
+
+    def test_defaults_without_a_launcher_expect_nothing(self, skill_tree: Path) -> None:
+        assert check_credential_wiring(skill_tree) == []
+
+
 class TestResolveTargetVar:
     def test_default_value(self, skill_tree: Path) -> None:
         assert resolve_target_var(skill_tree, "prod", "marketplace_name") == MARKETPLACE
@@ -469,21 +545,40 @@ class TestStaleReferences:
 
 
 class TestBuildErrorMarkers:
-    """A shared include that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
-    including template set no variant or misspelled one. Jinja's default `Undefined` compares unequal
-    to everything without raising, so without the marker the block would render as the empty string
-    and the skill would ship with it silently missing — build, freshness check and tests all green."""
+    """A partial that selects one of several blocks by a parameter's value ends its chain in an
+    `{% else %}` emitting `PIPELEX_BUILD_ERROR`, so a value that names no branch fails the check.
+    An unset or misspelled parameter name never gets that far: the renderer's `StrictUndefined`
+    fails the build on it. Without the marker, a wrong value would drop the block from the output
+    with the build, the freshness check and the tests all green."""
+
+    MARKER_LINE = 'PIPELEX_BUILD_ERROR: stale_types_variant must be one of edit, design, organize — got "edti"'
 
     def test_clean_tree(self, skill_tree: Path) -> None:
         assert check_build_error_markers(skill_tree) == []
 
     def test_reports_the_marker_with_its_line(self, skill_tree: Path) -> None:
         skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
-        skill_md.write_text(VALID_FRONTMATTER + '\nPIPELEX_BUILD_ERROR: stale_types_variant must be one of edit, design, organize — got "edti"\n')
+        skill_md.write_text(VALID_FRONTMATTER + f"\n{self.MARKER_LINE}\n")
         errors = check_build_error_markers(skill_tree)
         assert len(errors) == 1
         assert "SKILL.md:8" in errors[0]
         assert "edti" in errors[0]
+
+    @pytest.mark.parametrize(
+        "generated", ["skills/shared/writing-mthds.md", "hooks/check-mthds.sh", "mcp/vibe-mcp.toml", ".claude-plugin/plugin.json"]
+    )
+    def test_every_generated_file_is_read_not_only_the_skills(self, skill_tree: Path, generated: str) -> None:
+        """The check read `SKILL.md` alone while its account said any generated file: a shared
+        reference, a hook script and the MCP fragment are rendered from templates too."""
+        path = skill_tree / "pipelex" / generated
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"first line\n{self.MARKER_LINE}\n", encoding="utf-8")
+        assert check_build_error_markers(skill_tree) == [f"pipelex/{generated}:2: {self.MARKER_LINE}"]
+
+    def test_a_binary_file_is_skipped_rather_than_failing_the_check(self, skill_tree: Path) -> None:
+        (skill_tree / "pipelex" / "hooks").mkdir()
+        (skill_tree / "pipelex" / "hooks" / "engine.wasm").write_bytes(b"\x00asm\xff\xfe\x80")
+        assert check_build_error_markers(skill_tree) == []
 
 
 class TestSkillArgumentPlaceholders:
@@ -731,6 +826,14 @@ class TestNoTemplatesInOutput:
         assert len(errors) == 1
         assert "pipelex-codex" in errors[0]
         assert "LEAKED TEMPLATE" in errors[0]
+
+    @pytest.mark.parametrize("leaked", ["pipelex/mcp/vibe-mcp.toml.j2", "pipelex/.claude-plugin/plugin.json.j2", "mcp/vibe-mcp.toml.j2"])
+    def test_detects_leaked_j2_outside_skills_and_hooks(self, skill_tree: Path, leaked: str) -> None:
+        """A target's whole directory is output, `mcp/` included, and the root's `mcp/` is where a root target renders its fragment."""
+        path = skill_tree / leaked
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("leaked\n")
+        assert check_no_templates_in_output(skill_tree) == [f"LEAKED TEMPLATE: {leaked} (should be in templates/)"]
 
     def test_missing_targets_dir_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="Targets directory not found"):

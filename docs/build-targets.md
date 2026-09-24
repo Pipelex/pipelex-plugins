@@ -41,6 +41,8 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
 
 **`skills/`** at the repo root (if present) holds only static per-skill assets — `references/`, read on a branch, and `scripts/`, run by path — that are copied into every target, a script's executable bit included. Most skills use it — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs` and `codegen_check.py`, the scripts the skill copies verbatim into TypeScript and Python projects, so a reference edit is followed by `make build` and, for a script, by running it — `tests/unit/test_pipelex_integrate_skill.py` executes both, and pyright type-checks the Python one against the real `pipelex-sdk`. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
 
+**The build owns each target's output directory.** After `make build`, a target's directory holds exactly what the build produces — the rendered skills, shared references, hook files and MCP fragment, the generated manifest, the vendored `check.mjs` and the copied `references/` and `scripts/` — and the build removes anything else, printing each file it removes: the output of a template that was renamed or retired, a whole skill directory whose template is gone, the other platform's manifest after a target changed platform, a stray file. Two kinds of file are never removed. A `.j2` template is a source written in the wrong place, perhaps somebody's work, so `--check` names it as a leaked template for its author to move under `templates/`. A file git ignores, such as the `.DS_Store` Finder leaves, never ships, so it is neither removed nor reported. A file placed in a target's directory by hand is therefore removed by the next build: add it under `templates/` or `skills/` instead. Because the build deletes inside that directory, it refuses a target whose `source` is not a directory of its own inside the repository, one that holds or sits inside one of the repository's own directories (`REPOSITORY_OWN_PATHS` in `scripts/gen_skill_docs.py`: `templates/`, `skills/`, `targets/`, `docs/` and the rest), or one that overlaps another target's output. A target written to the repository root (`source = "./"`) is the exception: the root holds every source beside the output, so the build prunes nothing there, and `--check` reports a skill whose template is gone with the cure of deleting it. [decisions.md](decisions.md), "The build owns its target directories, and a target's table merges into the defaults'", records why the build prunes rather than asking for each file to be deleted.
+
 ## Target configuration
 
 ### defaults.toml
@@ -71,7 +73,7 @@ title = "Pipelex API base URL"
 description = "..."
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` config entry on Codex; a target's own `[vars.mcp_server]` merges into this table, as "Variable resolution" below says, so the override keeps the rest of it). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
@@ -108,6 +110,8 @@ Variables are resolved in this order (last wins):
 
 All variables are available in all `.j2` templates as `{{ variable_name }}`.
 
+**A table merges; anything else replaces.** A target's table is laid over the defaults' table of the same name key by key, recursively, while a string, a boolean or an array the target sets replaces the default's whole (`merge_template_vars` in `scripts/gen_skill_docs.py`). So a target that sets `[vars.mcp_server] command` and `args` keeps the defaults' `env_vars` and `user_config`, and a target that sets `[vars.mcp_server.user_config.api_key] title` keeps that option's `type`, `description` and `sensitive`; a target that sets `env_vars` replaces the list rather than extending it. A target can give a key the defaults define another value, but has no way to remove it. So the dev override cannot drop the Claude manifest's `userConfig`, its launcher or the hook's credential promotion, nor the names the Codex manifest forwards, and `make check` fails a target whose generated files lost that wiring all the same, as "Checks over the generated targets" below says.
+
 ## Output directories
 
 Each target specifies a `source` directory where its output is written. Claude/Codex targets produce complete plugin directories:
@@ -118,13 +122,16 @@ pipelex/                       (prod target)
 │   └── plugin.json           generated (inherits author/repo/license from plugin-base.json)
 ├── hooks/
 │   ├── hooks.json            PostToolUse wiring (Write|Edit → check-mthds.sh)
-│   └── check-mthds.sh        .mthds validation script (executable; silent-pass when CLIs absent)
+│   ├── check-mthds.sh        .mthds validation wrapper (executable; fail-open)
+│   ├── check.mjs             the vendored validation bundle, copied verbatim from templates/hooks/assets/
+│   └── launch-pipelex-mcp.sh the workshop launcher the manifest's MCP entry spawns (executable)
 └── skills/
     ├── pipelex-explain/
-    │   └── SKILL.md           rendered with the target's variables
+    │   ├── SKILL.md           rendered with the target's variables
+    │   └── references/        copied from skills/pipelex-explain/references/
     └── shared/
         ├── writing-mthds.md           rendered per target
-        └── native-content-types.md    rendered per target
+        └── native-content-types.md    rendered per target, like every file SHARED_TEMPLATES lists
 ```
 
 References under a skill's `references/` directory are **copied** (not symlinked) so each output directory is self-contained — a marketplace install that copies a single plugin subdir cannot follow symlinks to siblings of the plugin root.
@@ -149,11 +156,25 @@ These checks hold the shape:
 - **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It fails on any skill over the ceiling on any target: it reported without failing while the size diet brought each skill under, and has failed since the diet's last phase.
 - **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target — a link that climbs out of it names a file the installed plugin does not carry — and every anchor a heading of the file it points into, slugged as GitHub does, inline code keeping its text; code, fenced or inline, is an example and never a link; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
 - **The guard registry.** `tests/unit/test_skill_guards.py` lists each skill's guards by their canonical sentence and asserts, on every target, that each appears exactly once in the rendered `SKILL.md` and in no reference or shared file. A skill phase registers its guards in the change that places them.
-- **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`.
+- **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`, and so does any file of a target that no source produces, a reference or a script among them ("Checks over the generated targets" below).
 
 ## Codex marketplace discovery
 
 Codex resolves `codex plugin marketplace add Pipelex/pipelex-plugins` by scanning `.agents/plugins/marketplace.json` (preferred) or `.claude-plugin/marketplace.json`. The canonical Codex packaging spec is `packaging/codex-marketplace.json`; the build syncs a byte-identical copy to `.agents/plugins/marketplace.json` on every run. The freshness check fails if the copy drifts from the canonical source.
+
+## Checks over the generated targets
+
+`scripts/gen_skill_docs.py --target all --check`, which `make check` runs, re-renders every target without writing anything and compares each target's **whole directory** with what the build would produce. Each finding names its own cure:
+
+- `MISSING`, `STALE`, `NOT EXECUTABLE` and, for a copied script, `MODE` are cured by `make build`.
+- `ORPHAN` names a file of the target's directory that no template or source produces — under `skills/`, `hooks/`, `mcp/`, a manifest directory or anywhere else — and `make build` removes it, since the build owns the directory ("Template vs output directories" above). At the repository root, where the build prunes nothing, the finding says to delete the file instead.
+- `LEAKED TEMPLATE` names a `.j2` file in a target, `mcp/` included. The build never deletes one, so the cure is to move it under `templates/`, or delete it.
+
+A file git ignores is left out of the comparison, as it is left out of the pruning. `scripts/check.py` (`make check-shared`) adds the checks that read the generated files rather than compare them:
+
+- **The credential wiring.** Every target must carry the wiring `[vars.mcp_server]` in `targets/defaults.toml` declares, read from the defaults and never from a target's own variables, since a target whose override lost `env_vars` or `user_config` renders files that agree with it and passes the freshness check. On Claude, the manifest's `userConfig` offers every option of `user_config`, a sensitive one still sensitive; its `pipelex` server spawns `launch-pipelex-mcp.sh` with each option substituted into `PIPELEX_PLUGIN_<KEY>`; and both the launcher and the `check-mthds.sh` hook wrapper promote their variable to `PIPELEX_<KEY>` only when it is non-empty. On Codex, the manifest's `pipelex` server forwards every `env_vars` name. On Mistral Vibe, the `mcp/vibe-mcp.toml` fragment's `env` table names every `env_vars` name with an empty value for the user to fill in.
+- **The build-error marker** (`PIPELEX_BUILD_ERROR`, see "Shared template files" below) in any text file of any target — a shared reference, a hook script, the MCP fragment and a manifest as well as a skill.
+- **Leaked templates** anywhere in a target's directory, and under the root's `skills/`, `hooks/` and `mcp/`.
 
 ## Per-target skill overlays
 
@@ -187,7 +208,7 @@ python scripts/gen_skill_docs.py --target prod --check # freshness check
 
 ## Adding a new target
 
-1. Create `targets/<name>.toml` with a `[plugin]` section (name, version, description, source).
+1. Create `targets/<name>.toml` with a `[plugin]` section (name, version, description, source). The `source` is a directory of its own inside the repository, which the build owns and prunes, so it may overlap neither the repository's own directories nor another target's output.
 2. Set `[vars].platform` when the target is not Claude.
 3. Add Claude targets to `.claude-plugin/marketplace.json`; add Codex targets to `packaging/codex-marketplace.json`; do not add Mistral Vibe targets to either marketplace.
 4. Run `make build` — the output directory is created with rendered files and copied static assets.
@@ -209,7 +230,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | every template that names the harness to the user or the model: skill text and shared partials, the hook wrappers, `launch-pipelex-mcp.sh.j2` and `mcp/vibe-mcp.toml.j2` |
 | `skill_dir` | `defaults.toml` (`${CLAUDE_SKILL_DIR}`), overridden to `<skill-dir>` in `codex.toml` and `mistral-vibe.toml` | a sentence that names one of the skill's own files by path — today `pipelex-integrate`'s `cp` of its gate scripts. See below |
-| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex. `mcp/vibe-mcp.toml.j2` renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
+| `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target, key by key) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: point `command`/`args` at a local checkout, in the defaults or in a target's own `[vars.mcp_server]`, + `make build` on Claude, or a same-named `[mcp_servers.pipelex]` entry in `~/.codex/config.toml` on Codex; the target's table merges into the defaults', so `env_vars` and `user_config` stay, and `make check` fails a target that lost the credential wiring anyway. `mcp/vibe-mcp.toml.j2`, the Vibe target's one MCP template (`MCP_TEMPLATES_BY_PLATFORM`), renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
 | `floors` | `defaults.toml` (`[vars.floors]` table) | `pipelex-integrate` and `pipelex-scaffold`, which state the minimum versions to the user. See below |
 | `plugin_name` | derived from `[plugin].name` | available in all templates |
 
@@ -278,6 +299,6 @@ Two mechanics matter when writing one. A partial that may be included **mid-sent
 
 A parameter left unset falls back to the partial's own default, so a skill sets only what it says differently. `tests/unit/test_gen_skill_docs.py::TestSharedSkillIncludes` fails when a skill pastes one of these blocks instead of including it.
 
-**A parameter with no default is left bare, because strict mode is the guard.** Under `StrictUndefined` an unset or misspelled name raises at render time and `_render_or_die` names the template and the variable, so a parameter with no default needs no marker for the absent case — and an `{% if x is defined %}` guard around one would suppress that failure rather than add to it, trading a precise build error for a marker caught later. What strict mode cannot see is a name that is **present and wrong**: a partial that selects one of several blocks by a parameter's value falls off the end of its chain on a misspelled value and drops the block entirely, so such a chain ends in an `{% else %}` that emits `PIPELEX_BUILD_ERROR`, which `scripts/check.py` refuses in any generated file. No partial branches on a value today — `stale_types_variant` did until the size diet unified its three wordings — and the check stays for the next one. `catalog_id_bridge_resume` is interpolated rather than branched on, so it has no wrong-value case to catch.
+**A parameter with no default is left bare, because strict mode is the guard.** Under `StrictUndefined` an unset or misspelled name raises at render time and `_render_or_die` names the template and the variable, so a parameter with no default needs no marker for the absent case — and an `{% if x is defined %}` guard around one would suppress that failure rather than add to it, trading a precise build error for a marker caught later. What strict mode cannot see is a name that is **present and wrong**: a partial that selects one of several blocks by a parameter's value falls off the end of its chain on a misspelled value and drops the block entirely, so such a chain ends in an `{% else %}` that emits `PIPELEX_BUILD_ERROR`, which `scripts/check.py` refuses in any text file of any target, not only in a skill, since a shared reference, a hook script and the MCP fragment are rendered from templates too. No partial branches on a value today — `stale_types_variant` did until the size diet unified its three wordings — and the check stays for the next one. `catalog_id_bridge_resume` is interpolated rather than branched on, so it has no wrong-value case to catch.
 
-Hook templates (`templates/hooks/`) are rendered per target. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch` and `Bash`, a patch run through the shell being reported as `Bash`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
+Hook templates (`templates/hooks/`, listed per platform in `HOOK_TEMPLATES_BY_PLATFORM`) are rendered per target, and so is the MCP template (`templates/mcp/`, in `MCP_TEMPLATES_BY_PLATFORM`), which only the Vibe target has, since the Claude and Codex manifests declare the workshop themselves. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch` and `Bash`, a patch run through the shell being reported as `Bash`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
