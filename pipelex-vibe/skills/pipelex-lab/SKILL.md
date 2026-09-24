@@ -5,16 +5,16 @@ description: Experiment with an MTHDS method the way a lab would — frame a use
 
 # Experiment with a method
 
-This skill owns the loop around a method: [frame](#1-frame-the-use-case) a use case, [set up](#2-set-up-the-experiment) test cases whose right answers are written down before anything runs, and [run the loop](#3-run-the-loop) of run, score, log and fix within a budget. It writes the brief, the keys and the log, and nothing else. The method is designed by `/pipelex-design`, the inputs are prepared by `/pipelex-inputs` with files made by `/pipelex-synthetic-inputs`, each run is started by `/pipelex-run`, and each fix is made by `/pipelex-edit` or `/pipelex-design`. Mistral Vibe has no cross-skill invocation, so wherever this skill hands a step to another, open that skill's `SKILL.md` beside this one and follow it.
+This skill owns the loop around a method: [frame](#1-frame-the-use-case) a use case, [set up](#2-set-up-the-experiment) test cases whose right answers are written down before anything runs, and [run the loop](#3-run-the-loop) of run, score, log and fix within a budget. It writes the brief, the keys and the log. The method is designed by `/pipelex-design`, the inputs are prepared by `/pipelex-inputs` with files made by `/pipelex-synthetic-inputs`, each run is started by `/pipelex-run`, and each fix is made by `/pipelex-edit` or `/pipelex-design`. Mistral Vibe has no cross-skill invocation, so wherever this skill hands a step to another, open that skill's `SKILL.md` beside this one and follow it.
 
-Start where the project stands: when `lab/<method>/` exists, read it and take up the move it has reached. A log already there is continued, never restarted.
+Start where the project stands: when `lab/<method>/` exists, read it and take up the move it has reached. A log already there is continued, never restarted, and **a series it leaves without a scorecard is closed with one first: the loop runs again only on a new go.**
 
 ## Requirements
 
-Framing and setting up need only the project's files. The loop needs the workshop: `/pipelex-run` starts and follows each run, and this skill reads each result with **`mthds_run_results`**, and with `mthds_run_status` and `mthds_download_artifacts`.
+The loop needs the workshop: `/pipelex-run` starts and follows each run, and this skill reads each result with **`mthds_run_results`**, and with `mthds_run_status` and `mthds_download_artifacts`.
 
-- **If those tools are absent from this session**, frame and set up, then stop before the loop and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe.
-- **If a call returns an error of class `config`**, stop the loop the same way and surface the error's `hint` verbatim.
+- **If those tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe. That stop comes at the loop: framing and setting up need no tool, so frame and set up, then stop before the loop.
+- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 
 ## The lab directory
 
@@ -48,7 +48,7 @@ A method that already exists and has no brief gets the short form frame.md gives
 Read [key.md](references/key.md) before writing a key.
 
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
-2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another.
+2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **A case of the user's own files stays out of version control**: in a git repository, add `lab/<method>/cases/<case>/` to the nearest `.gitignore` before anything is copied into it, and say so, since its key holds facts from those files too.
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.
@@ -71,7 +71,7 @@ Read [log.md](references/log.md) before the first entry: it holds the entry form
 3. a failing line traces to the inputs, because the inputs and the keys were part of the go, and changing either one changes the experiment;
 4. there is no fix in sight, or the only one would change a key, the inputs, or what the main pipe takes or produces;
 5. **a round passes fewer key lines than the best round so far, or two rounds in a row pass no more than it**: name the fix it followed, and leave keeping or undoing that fix to the user;
-6. a run fails for a reason that is not the method's, according to `/pipelex-run`'s routing of a failed run, or a run is left unfinished;
+6. a run fails for a reason that is not the method's, ending `TIMED_OUT`, `CANCELLED` or `TERMINATED`, or with a failure that names a provider, a quota or the platform rather than a pipe; or a run is left unfinished;
 7. the user interrupts.
 
 A new go opens a new series, with its own budget.
@@ -80,6 +80,7 @@ A new go opens a new series, with its own budget.
 
 | Condition | Do this |
 |---|---|
+| The bundle has a `PipeFunc` over a `.py` of its own | no files run carries that Python, and the loop runs only files: stop before the go and say so; `/pipelex-catalog` saves it with its Python, outside the lab |
 | `/pipelex-inputs` leaves one of a case's inputs unfilled | the case cannot run: ask for the file, or leave the case out of the go with the user's say-so |
 | `/pipelex-run` stops waiting on a run that is still `RUNNING` | log the run as unfinished with its run id, which `/pipelex-run` can follow later, and stop the loop |
 

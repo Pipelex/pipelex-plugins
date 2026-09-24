@@ -250,6 +250,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never fabricate a file, and never substitute a document the brief did not ask for.",
     ),
     "pipelex-lab": (
+        "**a series it leaves without a scorecard is closed with one first: the loop runs again only on a new go.**",
         "**Never put the lab inside the bundle directory**",
         "**The loop runs the directory, never an `mt_…` id or an address**",
         "a deployment the loop never makes",
@@ -257,6 +258,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Every run is logged**, failed and unfinished ones included",
         "**A failing line is checked against the case's inputs before the method is touched**",
         "**State no capability that frame.md does not state**",
+        "**A case of the user's own files stays out of version control**",
         "**Show every key, the budget and a round's estimated cost, then end the turn there**",
         "the user's go on them is the only go the loop gets",
         "**A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**",
