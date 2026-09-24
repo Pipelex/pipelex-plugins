@@ -112,7 +112,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Check containment before writing anything**",
         "**Never write the tree into the workshop's directory and move it across.**",
         "never a signature derived from the source",
-        "**`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**",
+        "**The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**",
         "**A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**",
         "never relocate silently or clear it",
         "**Do this before step 6**",

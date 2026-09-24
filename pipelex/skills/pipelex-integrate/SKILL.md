@@ -60,7 +60,7 @@ Before step 2, read your branch: a `codegen` script or Makefile target, or a `so
 
 ### 3. The signature
 
-Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain.
+Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**: `PIPE_CODE` keeps the domain.
 
 No `main_pipe` (a workshop at `@pipelex/mcp` 0.13.0 or earlier, for one) → read [references/signature-fallback.md](references/signature-fallback.md) before step 4.
 

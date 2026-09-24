@@ -92,6 +92,18 @@ class TestPipelexRunSkill:
         assert "RUNNING" not in self.reference("failed-run.md")
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_pipe_other_than_the_main_one_runs_by_its_qualified_ref(self, target_name: str) -> None:
+        """`mthds_run` takes `pipe_code` as a qualified `domain.pipe_code`, the value the template and prepare
+        calls take as `pipe_ref`, and the runtime refuses a bare code two domains of the bundle declare. So
+        the pipe step 1 settles is qualified by its own file's domain, and step 5 passes that same ref; the
+        skill once said to pass "a pipe's code", which a model reads as the bare one."""
+        body = self.render(target_name)
+        assert "**carry its `pipe_ref` through every call**, the code qualified by its own file's domain." in self.the_step(body, 1)
+        assert "for another pipe, pass step 1's `pipe_ref` as `pipe_code`." in self.the_step(body, 5)
+        assert "a pipe's code" not in body
+        assert "Running the main pipe `summarize.summarize_pdf` from" in self.the_step(body, 4)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_stop_table_holds_only_what_a_tool_reports(self, target_name: str) -> None:
         """Each other condition is stated once, at its step: a row restating a step is a second copy that drifts."""
         table = self.render(target_name).split("## Stops", 1)[1].split("\n## ", 1)[0]

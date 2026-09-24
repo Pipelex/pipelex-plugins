@@ -45,7 +45,7 @@ import { parseDocumentSummary } from "../generated/summarize-pdf/binder";
 import type { DocumentSummary } from "../generated/summarize-pdf/types";
 import { getPipelexClient } from "./client";
 
-const PIPE_CODE = "summarize_pdf";
+const PIPE_CODE = "summarize.summarize_pdf";
 const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");
 
 /** Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`. A bundle is one
@@ -82,6 +82,8 @@ export async function summarizePdf(inputs: SummarizePdfInputs): Promise<Summariz
   return { output: parseDocumentSummary(results.main_stuff), results };
 }
 ```
+
+**`PIPE_CODE` is the verdict's `main_pipe.pipe_ref`, verbatim**: the value the sidecar's `pipe` record holds, with the whole of its domain, even a dotted one (`legal.contracts.summarize`). The run resolves it as an exact `domain.pipe_code`. Stripped to the bare code, it still runs until two domains of the bundle declare that code, and from then on every run fails as ambiguous, which neither the type checker nor the gate can see.
 
 **`SummarizePdfInputs` is a `type`, not an `interface`, and that is load-bearing.** The SDK takes `inputs: Record<string, unknown>`, and TypeScript gives a type alias of an object type an implicit index signature while an `interface` gets none — so an interface here fails with `TS2322: Index signature for type 'string' is missing`. It fails on every resolution, bundler included, and it is the first thing a `tsc --noEmit` would have caught. Keep it a `type`.
 
