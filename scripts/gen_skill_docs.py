@@ -679,7 +679,10 @@ def check_output_dir(base_dir: Path, config: TargetConfig) -> None:
     directory must hold nothing else: it must sit inside the repository, and neither hold nor sit
     inside one of the repository's own directories (`REPOSITORY_OWN_PATHS`) or another target's
     output directory. A target written to the repository root is the one exception, and the build
-    prunes nothing there.
+    prunes nothing there; its output is instead every top-level directory its templates render
+    into, one per directory directly under `templates/` (`skills/`, `hooks/`, `mcp/`), so another
+    target may neither hold nor sit inside one of those, or its pruning would delete the root
+    target's files.
     """
     if config.is_root:
         return
@@ -689,6 +692,8 @@ def check_output_dir(base_dir: Path, config: TargetConfig) -> None:
         msg = f"{config.name}: [plugin].source {config.source!r} is not a directory inside the repository, so the build cannot own it"
         raise SystemExit(msg)
     others: dict[str, Path] = {f"the repository's {name}/": root / name for name in REPOSITORY_OWN_PATHS}
+    templates_dir = base_dir / TEMPLATES_DIR_NAME
+    root_output_names = sorted(path.name for path in templates_dir.iterdir() if path.is_dir()) if templates_dir.is_dir() else []
     targets_dir = base_dir / TARGETS_DIR_NAME
     if targets_dir.is_dir():
         for other_name in list_targets(targets_dir):
@@ -697,6 +702,10 @@ def check_output_dir(base_dir: Path, config: TargetConfig) -> None:
             other_source = tomllib.loads((targets_dir / f"{other_name}.toml").read_text(encoding="utf-8")).get("plugin", {}).get("source", "./")
             if other_source != "./":
                 others[f"the output of target {other_name!r}"] = resolve_output_dir(root, str(other_source)).resolve()
+                continue
+            # A root target writes each of these at the repository root and prunes none of them.
+            for name in root_output_names:
+                others[f"the output of target {other_name!r}, which writes {name}/ at the repository root"] = root / name
     for label, other in others.items():
         if output_dir.is_relative_to(other) or other.is_relative_to(output_dir):
             msg = (

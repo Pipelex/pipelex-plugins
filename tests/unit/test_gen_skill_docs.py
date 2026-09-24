@@ -378,6 +378,24 @@ class TestGenerate:
             check_freshness(tree, "prod")
         assert sorted(path for path in tree.rglob("*")) == before
 
+    @pytest.mark.parametrize(("source", "overlap"), [("hooks/", "hooks/"), ("mcp/", "mcp/"), ("hooks/extra/", "hooks/")])
+    def test_a_target_beside_a_root_target_may_not_share_its_directories(self, tmp_path: Path, source: str, overlap: str) -> None:
+        """A root target writes `skills/`, `hooks/` and `mcp/` at the repository root, and only `skills/` is one of
+        the repository's own directories. A target whose source lay in `hooks/` used to pass the check, and its
+        pruning then deleted the root target's hook files, leaving `--check` failing with no rebuild able to fix it.
+        The root target's top-level directories count as its output, derived from `templates/`."""
+        tree = _create_codex_tree(tmp_path / "repo")
+        (tree / "targets" / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "./"\n')
+        (tree / "targets" / "stray.toml").write_text(f'[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "{source}"\n')
+        generate(tree, "prod")
+        before = sorted(path for path in tree.rglob("*"))
+        refusal = f"overlaps the output of target 'prod', which writes {overlap} at the repository root"
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            generate(tree, "stray")
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            check_freshness(tree, "stray")
+        assert sorted(path for path in tree.rglob("*")) == before, "the refused build touched the root target's files"
+
     def test_no_templates_fails(self, tmp_path: Path) -> None:
         """Missing shared template files cause a clear SystemExit."""
         (tmp_path / "templates").mkdir()
