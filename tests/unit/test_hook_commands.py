@@ -116,8 +116,11 @@ class CodexHookRun:
         self.environment = {key: value for key, value in os.environ.items() if not key.startswith(CREDENTIAL_PREFIXES)}
         self.environment["PATH"] = f"{stub_bin}{os.pathsep}{self.environment.get('PATH', '')}"
 
-    def payload(self, *, tool_name: str, command: str) -> str:
-        """A PostToolUse payload with the fields Codex 0.153 sends, the session's directory as `cwd`."""
+    def payload(self, *, tool_name: str, command: str, compact: bool = False) -> str:
+        """A PostToolUse payload with the fields Codex 0.153 sends, the session's directory as `cwd`.
+
+        Codex writes compact JSON; `compact=False` spaces it, so the wrapper's reading of the tool name is tried both ways.
+        """
         return json.dumps(
             {
                 "session_id": "session-1",
@@ -131,16 +134,17 @@ class CodexHookRun:
                 "tool_input": {"command": command},
                 "tool_response": "Success. Updated the following files:\n",
                 "tool_use_id": "call-1",
-            }
+            },
+            separators=(",", ":") if compact else None,
         )
 
-    def run(self, *, tool_name: str, command: str) -> tuple[str, bool]:
+    def run(self, *, tool_name: str, command: str, compact: bool = False) -> tuple[str, bool]:
         """The hook's stdout and whether it started Node. Codex runs a hook from the session's directory."""
         if self.node_starts.exists():
             self.node_starts.unlink()
         result = subprocess.run(
             ["sh", "-c", self.command],
-            input=self.payload(tool_name=tool_name, command=command),
+            input=self.payload(tool_name=tool_name, command=command, compact=compact),
             capture_output=True,
             text=True,
             cwd=self.project,
@@ -218,23 +222,32 @@ class TestHookCommands:
         for other in ("exec_command", "shell", "mcp__pipelex__mthds_validate", "spawn_agent"):
             assert not re.search(codex.matcher, other), f"the matcher admits {other}"
 
-    def test_a_codex_patch_run_through_the_shell_is_checked(self, codex: CodexHookRun) -> None:
+    def test_a_codex_patch_run_through_the_shell_is_checked_by_absolute_path(self, codex: CodexHookRun) -> None:
         """The bundle reads the patch headers from a `Bash` call's `tool_input.command` as it does from the patch tool's."""
-        stdout, started_node = codex.run(tool_name="Bash", command=_shell_patch("broken.mthds", suffix=" && echo applied"))
+        target = codex.project / "broken.mthds"
+        stdout, started_node = codex.run(tool_name="Bash", command=_shell_patch(str(target), suffix=" && echo applied"))
         verdict = json.loads(stdout)
         assert verdict["decision"] == "block"
         assert "MTHDS lint errors" in verdict["reason"]
-        assert str(codex.project / "broken.mthds") in verdict["reason"]
+        assert str(target) in verdict["reason"]
         assert started_node
 
     def test_a_valid_method_patched_through_the_codex_shell_passes_silently(self, codex: CodexHookRun) -> None:
-        stdout, started_node = codex.run(tool_name="Bash", command=_shell_patch("valid.mthds", suffix=" && echo applied"))
+        target = codex.project / "valid.mthds"
+        stdout, started_node = codex.run(tool_name="Bash", command=_shell_patch(str(target), suffix=" && echo applied"))
         assert stdout == ""
         assert started_node
 
-    def test_the_codex_patch_tool_is_still_checked(self, codex: CodexHookRun) -> None:
-        stdout, _ = codex.run(tool_name="apply_patch", command=_patch("broken.mthds"))
-        assert json.loads(stdout)["decision"] == "block"
+    @pytest.mark.parametrize("compact", [True, False])
+    def test_the_codex_patch_tool_still_reads_a_relative_path_from_the_session_directory(self, codex: CodexHookRun, compact: bool) -> None:
+        """The patch tool applies its patch in the session's directory, so a relative path is checked there, and formatted."""
+        unformatted = codex.project / "valid.mthds"
+        stdout, _ = codex.run(tool_name="apply_patch", command=_patch("broken.mthds"), compact=compact)
+        verdict = json.loads(stdout)
+        assert verdict["decision"] == "block"
+        assert str(codex.project / "broken.mthds") in verdict["reason"]
+        codex.run(tool_name="apply_patch", command=_patch("valid.mthds"), compact=compact)
+        assert unformatted.read_text(encoding="utf-8") != VALID_METHOD, "the patch tool's relative path was not formatted in place"
 
     @pytest.mark.parametrize("command", ["ls -la", "cat broken.mthds", "grep -rl pipe --include='*.mthds' ."])
     def test_any_other_codex_shell_command_ends_in_the_pre_filter(self, codex: CodexHookRun, command: str) -> None:
@@ -243,15 +256,29 @@ class TestHookCommands:
         assert stdout == ""
         assert not started_node, f"{command!r} started Node: the wrapper's pre-filter let a command with no patch header through"
 
-    def test_a_relative_path_in_a_codex_patch_is_read_from_the_session_directory(self, codex: CodexHookRun) -> None:
-        """`cd sub; apply_patch …` writes `sub/broken.mthds`, but the bundle looks for `broken.mthds` in the session's directory.
+    @pytest.mark.parametrize("compact", [True, False])
+    @pytest.mark.parametrize("prefix", ["", "cd sub; "])
+    def test_a_relative_path_in_a_codex_shell_patch_goes_unchecked(self, codex: CodexHookRun, prefix: str, compact: bool) -> None:
+        """A shell patch may have run in a `workdir` or after a `cd` the payload does not reveal, so its relative path is not read.
 
-        No file sits there, so the edited file goes unchecked: the documented limit of a shell patch applied elsewhere.
+        `cd sub; apply_patch …` writes `sub/…`, and a same-named file in the session's directory is not the edited one: the hook
+        neither blocks on it nor formats it in place.
         """
         (codex.project / "sub" / "broken.mthds").write_text(BROKEN_METHOD, encoding="utf-8")
-        (codex.project / "broken.mthds").unlink()
-        stdout, _ = codex.run(tool_name="Bash", command=_shell_patch("broken.mthds", prefix="cd sub; "))
+        (codex.project / "sub" / "valid.mthds").write_text(BROKEN_METHOD, encoding="utf-8")
+        for name in ("broken.mthds", "valid.mthds"):
+            stdout, _ = codex.run(tool_name="Bash", command=_shell_patch(name, prefix=prefix), compact=compact)
+            assert stdout == "", f"a relative shell patch of {name} was checked against the session's directory"
+        assert (codex.project / "broken.mthds").read_text(encoding="utf-8") == BROKEN_METHOD
+        assert (codex.project / "valid.mthds").read_text(encoding="utf-8") == VALID_METHOD, "the session's same-named file was rewritten"
+
+    def test_a_shell_command_naming_the_patch_tool_does_not_pass_for_it(self, codex: CodexHookRun) -> None:
+        """The tool name is read from the payload's own field; the command's quotes are escaped, so its text cannot spoof it."""
+        command = _shell_patch("valid.mthds", prefix='echo \'"tool_name": "apply_patch"\'; ')
+        assert '"tool_name": "apply_patch"' in command
+        stdout, _ = codex.run(tool_name="Bash", command=command)
         assert stdout == ""
+        assert (codex.project / "valid.mthds").read_text(encoding="utf-8") == VALID_METHOD
 
     def test_an_absolute_path_in_a_codex_patch_is_checked_wherever_the_patch_ran(self, codex: CodexHookRun) -> None:
         target = codex.project / "sub" / "broken.mthds"
@@ -260,3 +287,10 @@ class TestHookCommands:
         verdict = json.loads(stdout)
         assert verdict["decision"] == "block"
         assert str(target) in verdict["reason"]
+
+    def test_the_directory_a_shell_patch_is_checked_from_holds_no_method(self, codex: CodexHookRun) -> None:
+        """The wrapper runs a shell patch's check from its own directory, so that no relative path can name a file there."""
+        hooks_dirs = [codex.plugin_root / "hooks", REPO_ROOT / "pipelex-codex" / "hooks"]
+        for hooks_dir in hooks_dirs:
+            assert (hooks_dir / "check-mthds-codex.sh").is_file()
+            assert not list(hooks_dir.parent.rglob("*.mthds")), f"{hooks_dir.parent} ships a .mthds file"
