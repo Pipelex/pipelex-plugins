@@ -402,8 +402,13 @@ class TestPipelexScaffoldSkill:
         assert "uv init --app --no-workspace <dir>" in initializers
         # `pdm init` runs `git init` even inside another repository's work tree (PDM 2.29.2), which would
         # plant the nested repository the pristine-commit script refuses to make.
-        assert "`pdm init --non-interactive --no-git`" in initializers
+        assert "`pdm init -p <dir> --non-interactive --no-git`" in initializers
         assert "pdm: yes, even inside another repository, and `--no-git` skips it" in initializers
+        # `pdm init` takes no directory argument: without `-p` it initializes the shell's working directory.
+        # And under any parent pyproject.toml it joins that project's workspace, writing into the user's
+        # file, with no opt-out (PDM 2.29.2), so the reference sends the user to another tool there.
+        assert "**`pdm init` takes its directory only as `-p <dir>`, and has no `--no-workspace`.**" in initializers
+        assert "when a `pyproject.toml` is there, do not run pdm" in initializers
         assert "`--no-workspace` is on every `uv init` above" in initializers
         # npm resolves the project it writes to upward exactly as uv does, and unlike uv it finds the
         # parent and silently succeeds, so every follow-on install is scoped too.
