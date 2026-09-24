@@ -180,6 +180,9 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "only on an explicit yes call again with `overwrite: true`",
     ),
     "pipelex-run": (
+        "**A dry run is this step, shown.**",
+        "Then end the turn there, even when the same request asked for the real run too",
+        "a paid run never starts on a dry-run request whose flow the user has not been shown",
         "they keep credit from being spent on a method or inputs that cannot work",
         "Never improvise a run id, a status or an output.",
         "keep polling on its hint, and never call the run stuck or failed from it.",

@@ -1,6 +1,6 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", "do a dry run first", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 allowed-tools:
   - Bash
   - Read
@@ -19,7 +19,7 @@ allowed-tools:
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle, and only that, through two entries and no third: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which stays good long after the session that started it. It does not prepare inputs (`/pipelex-inputs`), repair a method (`/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one), or bisect a failing pipeline pipe by pipe.
+This skill owns the run lifecycle, and only that, through two entries and no third: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which stays good long after the session that started it. A dry run is not a third entry: it is Start a run's step 3, shown to the user as a numbered flow. It does not prepare inputs (`/pipelex-inputs`), repair a method (`/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one), or bisect a failing pipeline pipe by pipe.
 
 ## Requirements
 
@@ -55,9 +55,11 @@ For a **bundle directory**, one `mthds_validate` call over the bundle, with the 
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass.
 
+**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run, a test run or anything "before spending credit", this call is it, and the graph it builds never reaches you. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go, because a flow shown and run past in the same breath leaves the user nothing to stop.
+
 ### 4. Say what is about to run
 
-One line before the call: the target, the pipe, where the inputs came from, and that the run spends inference credit.
+One line before the call: the target, the pipe, where the inputs came from, and that the run spends inference credit. **On a dry-run request this step comes only after the user's go**: a paid run never starts on a dry-run request whose flow the user has not been shown.
 
 > Running `summarize_pdf` (main pipe `summarize`) from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
