@@ -96,14 +96,14 @@ skill_paths = ["/absolute/path/to/pipelex-plugins/pipelex-vibe/skills"]
 
 ### The hook
 
-Wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml`, or into a trusted project's `.vibe/hooks.toml`, where an entry overrides a user-level entry of the same `name`. Vibe runs a hook's command from the project directory, so a relative path resolves against the project rather than against `hooks.toml`: set the command to the script's absolute path.
+Wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml`, or into a trusted project's `.vibe/hooks.toml`, where an entry overrides a user-level entry of the same `name`. Vibe runs a hook's command from the project directory, so a relative path resolves against the project rather than against `hooks.toml`: set the command to the script's absolute path. Vibe runs the command through a shell, so keep the path in double quotes inside the single-quoted TOML string, as below; without them, a path holding a space splits in two and the hook never starts.
 
 ```toml
 [[hooks]]
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = "/absolute/path/to/pipelex-plugins/pipelex-vibe/hooks/check-mthds-vibe.sh"
+command = '"/absolute/path/to/pipelex-plugins/pipelex-vibe/hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."

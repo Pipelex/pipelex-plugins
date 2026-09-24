@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Codex PostToolUse(apply_patch) hook: lint, format, and validate .mthds files
-# touched by an apply_patch call.
+# Codex PostToolUse(apply_patch|Bash) hook: lint, format, and validate .mthds
+# files touched by an apply_patch call, or by a patch run through the shell
+# that Codex reports as Bash (docs/hooks.md says which shell forms it does).
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
@@ -22,12 +23,15 @@
 
 set -euo pipefail
 
-# --- Read stdin (PostToolUse JSON with the apply_patch envelope) once ---
+# --- Read stdin (PostToolUse JSON with the patch in tool_input.command) once ---
 INPUT=$(cat)
 
-# Cheap pre-filter: ignore patches that touch no .mthds file before spawning
-# a Node process.
-if ! [[ "$INPUT" =~ \.mthds ]]; then
+# Cheap pre-filter, before spawning a Node process: go on only when a patch
+# header line names a .mthds file, which is all check.mjs reads. Every other
+# Bash command, one that merely mentions a .mthds file included, ends here.
+# The input is JSON, so the header's line ends at an escaped \n.
+MTHDS_PATCH_HEADER='\*\*\* (Update File|Add File|Move to):([^"\\]|\\[^n])*\.mthds'
+if ! [[ "$INPUT" =~ $MTHDS_PATCH_HEADER ]]; then
   exit 0
 fi
 

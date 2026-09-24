@@ -165,11 +165,11 @@ Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after ever
 
 ### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 
-The Codex hook command is `${PLUGIN_ROOT}/hooks/check-mthds-codex.sh` — the wrapper feeds the `apply_patch` envelope to `check.mjs --platform=codex` (several `.mthds` files per patch; outcomes merged, any block wins). Engine facts that make this work:
+The Codex hook command is `"${PLUGIN_ROOT}"/hooks/check-mthds-codex.sh`, the root in double quotes because Codex substitutes it into the text its shell runs (every harness's hook command quotes its path, so a plugin root holding a space still works; `tests/unit/test_hook_commands.py` holds them to it). Its matcher is `^(apply_patch|Bash)$`, and the wrapper feeds the `apply_patch` envelope in `tool_input.command` to `check.mjs --platform=codex` (several `.mthds` files per patch; outcomes merged, any block wins). Engine facts that make this work:
 
 - The canonical feature key is **`hooks`**, marked `Stage::Stable` and **enabled by default** (`codex_hooks` is a deprecated alias, still honored in 0.144.4; `plugin_hooks` is not an alias but an obsolete independent opt-in, removed in Codex 0.134 and formally `Stage::Removed` since 0.144).
 - Native per-source **trust model** (`[hooks.state]` trusted hashes; `--dangerously-bypass-hook-trust` for automation).
-- `PostToolUse` officially fires for `apply_patch` edits and MCP tool calls — which de-risks the `.mthds`-on-edit hook.
+- `PostToolUse` officially fires for `apply_patch` edits and MCP tool calls — which de-risks the `.mthds`-on-edit hook. A patch run through the shell is reported as `Bash`, which the matcher admits and the wrapper's pre-filter drops unless a patch header names a `.mthds` file; but one Codex intercepts (exactly `apply_patch <<'EOF'`, or `cd <dir> && ` before it) emits no `PostToolUse` at all, verified on 0.153.4, and cannot be checked. `docs/hooks.md`, "Patches run through the shell", says which forms reach the hook and how a relative path is resolved.
 - Standardized block protocol (`{"decision":"block","reason":...}` or exit 2 + stderr) maps cleanly onto the Stage 3 decision model.
 - Installed plugins run from a **cache copy** (`$CODEX_HOME/plugins/cache/...`), and `codex plugin marketplace upgrade` refreshes Git snapshots only — propagate local edits with `make codex-refresh` (an idempotent `codex plugin add`).
 

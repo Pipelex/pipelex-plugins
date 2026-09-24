@@ -2,7 +2,7 @@
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = "./hooks/check-mthds-vibe.sh"
+command = '"./hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."
