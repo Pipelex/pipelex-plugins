@@ -40,7 +40,8 @@ DEFAULT_VARS: dict[str, str | bool] = {"marketplace_name": "pipelex-plugins", "p
 FRONTMATTER_PARTIAL = "skills/shared/frontmatter.md.j2"
 
 # The skills that stop when the workshop is absent. A skill that works without it
-# — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold — stays out.
+# — pipelex-explain, pipelex-synthetic-inputs, pipelex-scaffold, and pipelex-lab,
+# whose loop alone needs it — stays out.
 MCP_SKILLS = ("pipelex-design", "pipelex-organize", "pipelex-edit", "pipelex-inputs", "pipelex-integrate", "pipelex-run", "pipelex-catalog")
 FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{% endif -%}\n'
 
@@ -2654,6 +2655,11 @@ class TestCatalogIdInEverySkill:
         """`MCP_SKILLS` asserts a skill that stops without the workshop. Explain
         gained a third tool and still explains local source without any."""
         assert "pipelex-explain" not in MCP_SKILLS
+
+    def test_the_lab_stays_out_of_the_hard_stop_roster(self) -> None:
+        """The lab frames a use case and writes keys with no workshop at all, and
+        stops before its loop, which is the only move that reads a run."""
+        assert "pipelex-lab" not in MCP_SKILLS
 
 
 class TestSkillScriptsCopy:

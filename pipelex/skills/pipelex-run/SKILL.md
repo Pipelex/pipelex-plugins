@@ -40,7 +40,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 **A dry-run request goes to step 3 first.** Validation reads no input, so this step waits for the user's go.
 
-They sit beside the bundle, or for an id in the directory `/pipelex-inputs` wrote them to: the one the user named, by default `./<method_id>/`. In this order, take the first that applies:
+They sit beside the bundle unless the caller named another directory, and for an id in the one the user named, by default `./<method_id>/`. In this order, take the first that applies:
 
 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json` where one exists: take the prepared set and replace only the keys the user named. With no prepared file, the request's values are the whole set.
 2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
