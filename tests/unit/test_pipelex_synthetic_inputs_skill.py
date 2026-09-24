@@ -117,6 +117,16 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "**Plant every fact the method must find, visibly and unambiguously.**" in text
         assert "AI-generated" in text
 
+    def test_a_set_of_photographs_of_one_subject_shares_a_reference(self) -> None:
+        """Photographs of one subject generated from words alone show a different car each time, which plants a
+        mismatch nobody asked for; the proof lab (L-260923-9d0b53) saw three of five drift. The first photograph
+        becomes the reference image of the others, through a second inline bundle with an `Image` input."""
+        text = self.reference("photograph.md")
+        assert "**Several photographs of one subject**" in text
+        assert 'inputs       = { reference = "Image", description = "Text" }' in text
+        assert 'prompt       = "Reference photo: $reference\\n\\n$description"' in text
+        assert "the photographs of one subject show the same one" in text
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_way_out_without_a_file_hands_back_no_path(self, target_name: str) -> None:
         """`/pipelex-inputs` leaves an input unfilled when the factory returns no path, so both ways the skill

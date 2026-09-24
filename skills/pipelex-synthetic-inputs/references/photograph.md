@@ -35,7 +35,26 @@ model        = "gpt-image-2"
 aspect_ratio = "landscape_4_3"
 ```
 
-One line before the call: how many photographs, the model, and that each spends inference credit. Then call `mthds_run` with `files` set to `[{ "content": "<the bundle above>", "uri": "synthetic_photograph.mthds" }]` and `inputs` set to `{ "description": "<the description>" }`. Start every photograph of the request before polling any of them: the runs are independent.
+One line before the call: how many photographs, the model, and that each spends inference credit. Then call `mthds_run` with `files` set to `[{ "content": "<the bundle above>", "uri": "synthetic_photograph.mthds" }]` and `inputs` set to `{ "description": "<the description>" }`. Start every photograph of the request before polling any of them: the runs are independent, except for the sets below.
+
+**Several photographs of one subject** — the same car from three sides, one room from two corners — drift apart when each comes from words alone: the model draws a different car every time, and the method under test then sees a mismatch nobody planted. Generate one photograph of each subject first, check it at step 4, and make the others of that subject with this bundle, passing the first one's storage reference (the `url` its run's results give for the image) as `reference`:
+
+```toml
+domain      = "synthetic_photograph"
+description = "Generate one realistic photograph of the subject of a reference photo, as a test input for another method"
+main_pipe   = "take_photograph"
+
+[pipe.take_photograph]
+type         = "PipeImgGen"
+description  = "Render the description as a realistic photograph of the subject shown in the reference photo"
+inputs       = { reference = "Image", description = "Text" }
+output       = "Image"
+prompt       = "Reference photo: $reference\n\n$description"
+model        = "gpt-image-2"
+aspect_ratio = "landscape_4_3"
+```
+
+Its description says what changes (the side, the angle, the damage) and repeats what must stay (the colour, the plate, the setting, the light). Say "no badges, logos or brand names" in it again: a reference photo pulls the model towards the real make it resembles.
 
 Follow each run with `mthds_run_status` at the hint it gives, then `mthds_run_results` once it is terminal. A failed run is reported with its `failure_message` verbatim, and that photograph is left without a path; do not retry it with a reworded description on a guess.
 
@@ -45,7 +64,7 @@ Call `mthds_download_artifacts` with the run id and `dir` set to the target's di
 
 ## 4. Verify
 
-Look at the saved picture. Where the harness can show an image to the model (Claude's `Read` tool can), check each planted fact from step 1 against what the picture shows, one by one. A fact the picture does not show, or shows wrongly, earns one more run with a sharper description that names it first; after that second attempt, keep the better picture and report the fact it misses, so the user knows the test does not cover it. Where the harness cannot show images, say that the facts were not checked by eye.
+Look at the saved picture. Where the harness can show an image to the model (Claude's `Read` tool can), check each planted fact from step 1 against what the picture shows, one by one, and that the photographs of one subject show the same one. A fact the picture does not show, or shows wrongly, earns one more run with a sharper description that names it first; after that second attempt, keep the better picture and report the fact it misses, so the user knows the test does not cover it. Where the harness cannot show images, say that the facts were not checked by eye.
 
 ## 5. Report
 

@@ -29,6 +29,8 @@ main_pipe = "main_pipe_code"          # optional but recommended — entry point
 - Pipe codes — `snake_case`.
 - Input names — `snake_case`.
 
+**A bundle split across files shares its header by domain.** Every file that declares the same `domain` is one domain at run time: the `system_prompt` written once in the root is the default of every `PipeLLM` of that domain, whichever file defines it, the root's `description` is the domain's, and a sibling file declares only `domain`. Two files giving different values keep the first loaded, with a warning, so write each once. A file with another `domain` is another domain and inherits nothing.
+
 **Ordering convention:** main pipe (controller) first, then sub-pipes in execution order. Concepts can come before or after pipes.
 
 ## 2. Concepts

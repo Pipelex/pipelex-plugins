@@ -38,7 +38,7 @@ Gather the bundle's files as the convention below says, read each, and call `mth
 
 Map the structure from the main pipe down: the subtrees, the pipes and concepts each owns, and the shared declarations. Then decide the file set by these rules, honoring any layout the user asked for (a single file, a grouping):
 
-- **The root is `main.mthds`** unless the user says otherwise, and a root inherited under another name is renamed. It holds the bundle header (`domain`, `description`, `main_pipe`, `system_prompt`), the boundary concepts and the main pipe, so reading it alone tells what the method does, what goes in and out, and the top-level steps.
+- **The root is `main.mthds`** unless the user says otherwise, and a root inherited under another name is renamed. It holds the bundle header (`domain`, `description`, `main_pipe`, `system_prompt`, which reach every file of the same `domain`, so a sibling declares only `domain`), the boundary concepts and the main pipe, so reading it alone tells what the method does, what goes in and out, and the top-level steps.
 - **One file per module**: each top-level subtree — a controller with the sub-pipes only it wires — or functional area gets its own `<snake_case_name>.mthds`, named after the controller heading it or the area it implements, holding its pipes in flow order (controller first) and the intermediate concepts introduced for it. A non-root file starts with `domain = "<same_domain>"` only.
 - **Shared declarations go up** to the root, or to a dedicated `shared.mthds` when that surface is large, never duplicated.
 - **Scale the file count to the method**: a handful of pipes belongs entirely in `main.mthds`, tens of pipes need several modules, and never one file per pipe.
