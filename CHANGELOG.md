@@ -5,6 +5,7 @@
 ### Added
 
 - **The unit tests sweep the edit hook over the MTHDS Test Corpus**: `tests/data/mthds-corpus/` is a vendored copy of the whole corpus, and `tests/unit/test_hook_corpus.py` runs the hook's offline stages over every entry, expecting a block exactly when the entry's fault is one the schema catches and a silent pass otherwise. A vendored hook whose schema refuses a form the standard allows, the way the bundle before 0.8.0 refused intent hints, now fails the unit tests, and CI installs Node so that the sweep runs there rather than skips.
+- **A release refuses a stale hook bundle**: `make check-hook-fresh`, which the release skill now runs before anything else, fails when the vendored `check.mjs` embeds an older `@pipelex/tools-wasm` than npm's latest or when a rebuild in the `pipelex-sdk-js` checkout would change it, and names the re-vendor that cures it. `make check` separately refuses, in CI too, a bundle whose provenance names an unreleased engine or no SDK commit.
 
 ## [0.8.0] - 2026-09-24
 

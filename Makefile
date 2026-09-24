@@ -14,7 +14,7 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 
 .PHONY: \
 	help env check-uv install lock li \
-	gen-skill-docs build vendor-hook check check-shared check-claude check-codex agent-check \
+	gen-skill-docs build vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
 	test agent-test test-recipes tp \
 	cleanderived cleanenv cleanall reinstall ri \
@@ -181,6 +181,10 @@ vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js and vendor it into templates
 	@cp "$(SDK_JS_DIR)/dist-hooks/check.mjs" templates/hooks/assets/check.mjs
 	@head -3 templates/hooks/assets/check.mjs | tail -1
 	@echo "• Vendored check.mjs — now run 'make build' to propagate it to the targets"
+
+# A release gate, not a CI check: it needs SDK_JS_DIR on its base and the network, and CI has neither.
+check-hook-fresh: install ## Fail when the vendored check.mjs is behind npm's tools-wasm or a rebuild in SDK_JS_DIR (release gate)
+	@$(VENV_PYTHON) scripts/check_hook_fresh.py --sdk-js-dir "$(SDK_JS_DIR)"
 
 ##########################################################################################
 ### CODEX MARKETPLACE SOURCE (local dev vs published GitHub)

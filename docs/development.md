@@ -13,11 +13,15 @@ make agent-check     # fix unused imports, format and lint, then make check
 make agent-test      # the unit tests, quiet unless one fails
 make test            # the unit tests, verbose
 make test-recipes    # execute the synthetic-inputs recipes (opt-in: runs uv and downloads packages)
+make vendor-hook     # rebuild the hook bundle in ../pipelex-sdk-js and copy it into templates/hooks/assets/
+make check-hook-fresh  # release gate: fail when the hook bundle is behind npm's engine or a rebuild in ../pipelex-sdk-js
 ```
 
 `make check-shared`, `make check-claude` and `make check-codex` run the three parts of `make check` one at a time, and `make gen-skill-docs TARGET=<name>` renders a single target.
 
 The editing loop is: edit a `.j2` file under `templates/` or a file under `targets/`, run `make build`, then run `make agent-check` and `make agent-test`. Run both before you push.
+
+The hook bundle, `templates/hooks/assets/check.mjs`, is built in `pipelex-sdk-js` rather than here, so two guards keep it honest. `make check` refuses one whose provenance line names an unreleased engine or no SDK commit, which runs anywhere, CI included. `make check-hook-fresh` fails when the bundle is behind npm's latest `@pipelex/tools-wasm` or when a rebuild in the sibling checkout would change it; it needs that checkout on `dev` and clean, and the network, which CI does not have, so it is a release gate. `docs/hooks.md` ("Re-vendoring check.mjs") has both, and the re-vendor procedure.
 
 ## Run your changes in your agent
 
