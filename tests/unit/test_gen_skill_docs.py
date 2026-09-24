@@ -1564,13 +1564,13 @@ class TestSyntheticInputsSkill:
     `/pipelex-inputs`' inline Document Generation section.
 
     The skill is executable guidance, so these tests guard the identity rules a
-    caller relies on (no AI, a fixed package allowlist, ask before installing a
+    caller relies on (no AI for what code renders, a fixed package allowlist, ask before installing a
     tool), the delegation contract, and the fact that it needs no MCP tool.
     """
 
     REPO_ROOT = Path(__file__).parents[2]
     SKILLS = REPO_ROOT / "templates" / "skills"
-    REFERENCES = ("pdf.md", "png.md", "office.md", "venv.md")
+    REFERENCES = ("pdf.md", "png.md", "office.md", "venv.md", "photograph.md")
 
     @property
     def synthetic(self) -> str:
@@ -1578,7 +1578,7 @@ class TestSyntheticInputsSkill:
 
     def test_identity_rules_are_stated(self) -> None:
         body = self.synthetic
-        assert "**No AI in the loop.**" in body
+        assert "**No AI for what code can render.**" in body
         assert "**Permissive packages only.**" in body
         for package in ("reportlab", "Pillow", "matplotlib", "numpy", "python-docx", "openpyxl"):
             assert package in body, f"missing allowlisted package: {package}"
@@ -1587,11 +1587,12 @@ class TestSyntheticInputsSkill:
         assert "Installing a *tool*" in body and "always asks first, in every mode" in body
         assert "A failure leaves nothing behind" in body
 
-    def test_refused_categories_are_named_with_the_ask(self) -> None:
+    def test_photographs_are_generated_and_handwriting_simulated(self) -> None:
         body = self.synthetic
-        assert "**Not covered, by design:** photographs and handwriting." in body
-        assert "ask the user for a real file for that input" in body
-        assert "Do not draw an approximation, and do not substitute a public image." in body
+        assert "**A photograph is generated, never drawn:**" in body
+        assert "never from a procedural scene or a public image" in body
+        assert "**Handwriting is simulated**" in body
+        assert "never draw a stand-in" in body
 
     def test_environment_ladder_has_both_rungs_and_a_graceful_stop(self) -> None:
         body = self.synthetic
@@ -1609,8 +1610,9 @@ class TestSyntheticInputsSkill:
         assert "return **no path** with the reason" in body
 
     def test_declares_no_mcp_tool(self) -> None:
-        """The file factory is MCP-free: no allowed-tools entry, and it is
-        absent from the MCP-backed skill set the STOP-posture tests cover."""
+        """The file factory is MCP-free except for a photograph, whose branch names the workshop's tools by
+        their bare names and stops gracefully without them: no allowed-tools entry, and it is absent from the
+        MCP-backed skill set the STOP-posture tests cover."""
         body = self.synthetic
         assert "mcp__" not in body
         assert "pipelex-synthetic-inputs" not in MCP_SKILLS
@@ -1642,7 +1644,7 @@ class TestSyntheticInputsSkill:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-synthetic-inputs/SKILL.md"))
         assert "# Generate synthetic input files" in body
-        assert "**No AI in the loop.**" in body
+        assert "**No AI for what code can render.**" in body
         assert "{%" not in body
         assert "{{" not in body
 
