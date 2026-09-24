@@ -145,6 +145,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**prepare again whenever a file was replaced in place.**",
         "**Offer the run, never start it**",
         "never call a run tool here",
+        "**An Office file's PDF export, made at matching, is the one exception**",
         "**every input the template asked for is filled**",
         "Never fabricate a value or abandon `inputs.json`",
     ),
@@ -181,6 +182,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-run": (
         "**A dry run is this step, shown.**",
+        "**A dry-run request goes to step 3 first.**",
         "Then end the turn there, even when the same request asked for the real run too",
         "a paid run never starts on a dry-run request whose flow the user has not been shown",
         "they keep credit from being spent on a method or inputs that cannot work",
@@ -224,10 +226,10 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-synthetic-inputs": (
         "**with the caveat of a simulated or generated file**",
-        "It never edits `inputs.json`, never uploads anything, and never starts a run",
+        "It never edits `inputs.json`, never uploads anything, and never runs the method it makes files for",
         "never from a procedural scene or a public image",
         "**No AI for what code can render.**",
-        "only once the user has been told in one line that it spends inference credit",
+        "and only on the user's go: the descriptions and what they will spend end a turn of their own",
         "never draw a stand-in",
         "**Permissive packages only.**",
         "no PyMuPDF (AGPL)",

@@ -27,12 +27,14 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 
 | Field | What to pass |
 |---|---|
-| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `docx` / `xlsx` when the method asks for those |
+| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan`; `docx` / `xlsx` when the method asks for those |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
 | `target` | `<output_dir>/inputs/<input_variable>.<ext>`; a list input's items go in a directory named after it, one index each (`<output_dir>/inputs/<input_variable>/1.<ext>`), so an item never takes another input's name |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |
 
 It writes the file, verifies it, and returns the path, with a caveat when the file is simulated handwriting or an AI-generated photograph. Repeat that caveat in the report, beside the file it concerns: the user decides from it what the run proves. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.
+
+A photograph is the one file it makes through the workshop, with `mthds_run`: that generation is not a run of the method, which the skill still only offers, and it waits for the user's own go on the descriptions the factory shows.
 
 It returns no path when it cannot make the file — no `uv`, no usable Python, a photograph the workshop could not generate, or a brief it refuses — and says why. That is not a failure of the flow; the skill's stop table says what to do with that one input.
 

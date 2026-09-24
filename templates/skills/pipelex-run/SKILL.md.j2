@@ -35,6 +35,8 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. The inputs
 
+**A dry-run request goes to step 3 first.** Validation reads no input, so this step waits for the user's go.
+
 They sit beside the bundle, or for an id in the directory `/pipelex-inputs` wrote them to: the one the user named, by default `./<method_id>/`. In this order, take the first that applies:
 
 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json` where one exists: take the prepared set and replace only the keys the user named. With no prepared file, the request's values are the whole set.
@@ -52,7 +54,7 @@ For a **bundle directory**, one `mthds_validate` call over the bundle, with the 
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass.
 
-**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run, a test run or anything "before spending credit", this call is it, and the graph it builds never reaches you. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go, because a flow shown and run past in the same breath leaves the user nothing to stop.
+**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run, a test run or anything "before spending credit", this call is it, and the graph it builds never reaches you. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent, and what the inputs still need. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go, because a flow shown and run past in the same breath leaves the user nothing to stop.
 
 ### 4. Say what is about to run
 

@@ -14,7 +14,7 @@ The description is where the test's ground truth goes in. Write it as a photogra
 - **Keep text out of the picture** unless the method reads it. Image models garble lettering; when a plate, a label or a sign must be read, give the exact characters and keep them short.
 - **Fictional subjects only**, as in step 3: no real people, no brands or logos, no real addresses.
 
-Show the description to the user in the reply before the run, with the one-line cost notice below; it is the draft they can redirect.
+Show the descriptions to the user with one line on what they will spend: how many photographs, the model, that each spends inference credit, and that a photograph missing a planted fact gets one more attempt. **Then end the turn there, even in automatic mode and even when the request asked for the photographs outright**: the descriptions are the draft the user can redirect, and a credit notice written between two tool calls can land where the user never sees it. Generate on the user's go, which covers the retries of step 4.
 
 ## 2. Generate it
 
@@ -35,7 +35,7 @@ model        = "gpt-image-2"
 aspect_ratio = "landscape_4_3"
 ```
 
-One line before the call: how many photographs, the model, and that each spends inference credit. Then call `mthds_run` with `files` set to `[{ "content": "<the bundle above>", "uri": "synthetic_photograph.mthds" }]` and `inputs` set to `{ "description": "<the description>" }`. Start every photograph of the request before polling any of them: the runs are independent, except for the sets below.
+On the user's go, call `mthds_run` with `files` set to `[{ "content": "<the bundle above>", "uri": "synthetic_photograph.mthds" }]` and `inputs` set to `{ "description": "<the description>" }`. Start every photograph of the request before polling any of them: the runs are independent, except for the sets below.
 
 **Several photographs of one subject** — the same car from three sides, one room from two corners — drift apart when each comes from words alone: the model draws a different car every time, and the method under test then sees a mismatch nobody planted. Generate one photograph of each subject first, check it at step 4, and make the others of that subject with this bundle, passing the first one's storage reference (the `url` its run's results give for the image) as `reference`:
 
