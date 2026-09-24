@@ -65,6 +65,7 @@ EXPECTED_RECIPES = {
     ("png.md", "Chart (matplotlib)"),
     ("png.md", "Diagram (Pillow)"),
     ("png.md", "Scanned document (Pillow)"),
+    ("png.md", "Handwritten marks (Pillow)"),
     ("png.md", "App screenshot (Pillow)"),
 }
 

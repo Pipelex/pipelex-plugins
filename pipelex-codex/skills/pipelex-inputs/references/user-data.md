@@ -11,9 +11,9 @@ Collect every file the user has provided: explicit paths, folders, and files men
 | Extension | Detected type | Maps to |
 |---|---|---|
 | `.pdf` | PDF document | `native.Document` |
-| `.docx`, `.doc` | Word document | `native.Document` |
-| `.xlsx`, `.xls` | spreadsheet | `native.Document` |
-| `.pptx`, `.ppt` | presentation | `native.Document` |
+| `.docx`, `.doc` | Word document | `native.Document`, exported to PDF first (below) |
+| `.xlsx`, `.xls` | spreadsheet | `native.Document`, exported to PDF first (below) |
+| `.pptx`, `.ppt` | presentation | `native.Document`, exported to PDF first (below) |
 | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.svg`, `.tiff`, `.tif`, `.bmp` | image | `native.Image` |
 | `.txt` | plain text | `native.Text`, the file's content read in |
 | `.md` | Markdown text | `native.Text`, the file's content read in |
@@ -21,6 +21,8 @@ Collect every file the user has provided: explicit paths, folders, and files men
 | `.csv` | CSV data | `native.Text` read as text, or `native.JSON` parsed into objects |
 | `.html`, `.htm` | HTML | `native.Html` |
 | `http://…`, `https://…` | web page URL | `native.Document` |
+
+**An Office file goes in as the PDF exported from it.** Extraction reads a PDF, an image or a web page, and nothing else, so a Word, Excel or PowerPoint file under a `Document` input fails the run at its first step. Where `soffice` is on PATH, convert each file on its own into a fresh temporary directory (`soffice --headless --convert-to pdf --outdir "$(mktemp -d)" <file>`), never into `inputs/`: LibreOffice names the PDF after the source file and replaces a file of that name without asking, so two sources sharing a stem, or a copy already in `inputs/`, would be overwritten. Say so, and from then on treat that PDF as the file selected for the input: Copy names it after its input like any other, and step 5 of the skill sends it as it is. Without `soffice`, ask the user to export it to PDF, and leave that input unfilled until they do. Never rename an Office file to `.pdf`.
 
 **A folder**: list its files — non-recursively by default, recursively if the user asks — keep the supported types, group them by detected type, and match them to list inputs (`Image[]`, `Document[]`, …). A folder `./invoices/` holding five PDFs, for a method expecting `documents: Document[]`, maps all five to that one input.
 

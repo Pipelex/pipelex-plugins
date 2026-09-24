@@ -23,18 +23,20 @@ A list input (`Type[]` or `Type[N]`) arrives wrapped in a list: generate several
 
 ## A file input
 
-When an input needs an actual file — `native.Image`, `native.Document`, a Word or Excel file — the skill does not make it. The `pipelex-synthetic-inputs` skill renders PDFs and PNGs from code, no AI involved, and installs the Python packages it needs on its own. Hand it one request per file:
+When an input needs an actual file — `native.Image`, `native.Document`, a Word or Excel file — the skill does not make it. The `pipelex-synthetic-inputs` skill renders PDFs, PNGs and Office files from code and installs the Python packages it needs on its own; a photograph it generates through the workshop, which spends a little credit. Hand it one request per file:
 
 | Field | What to pass |
 |---|---|
-| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `docx` / `xlsx` when the method asks for those |
+| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan`; `docx` / `xlsx` when the method asks for those |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
 | `target` | `<output_dir>/inputs/<input_variable>.<ext>`; a list input's items go in a directory named after it, one index each (`<output_dir>/inputs/<input_variable>/1.<ext>`), so an item never takes another input's name |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |
 
-It writes the file, verifies it, and returns the path. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.
+It writes the file, verifies it, and returns the path, with a caveat when the file is simulated handwriting or an AI-generated photograph. Repeat that caveat in the report, beside the file it concerns: the user decides from it what the run proves. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.
 
-It returns no path when it cannot make the file — no `uv`, no usable Python, or a brief it refuses, such as a photograph or handwriting — and says why. That is not a failure of the flow; the skill's stop table says what to do with that one input.
+A photograph is the one file it makes through the workshop, with `mthds_run`: that generation is not a run of the method, which the skill still only offers, and it waits for the user's own go on the descriptions the factory shows.
+
+It returns no path when it cannot make the file — no `uv`, no usable Python, a photograph the workshop could not generate, or a brief it refuses — and says why. That is not a failure of the flow; the skill's stop table says what to do with that one input.
 
 ## Then
 
@@ -58,4 +60,4 @@ A sales-chart reader expects `chart: Image` and `analysis_prompt: Text`.
 
 5. `chart` is a local path, so step 5 uploads it and writes the run-ready form to `inputs.prepared.json`, leaving `inputs.json` as saved, before the run is offered.
 
-Had the method wanted a photograph of a street scene, the factory would have come back with no path and an ask for a real file, since code cannot render a photograph honestly. `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.
+Had the method wanted a photograph of a street scene, the factory would have generated one through the workshop, with the details the method must find written into its description, and reported its run id and cost beside the path. Had the workshop been unreachable, it would have come back with no path: `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.

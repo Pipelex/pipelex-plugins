@@ -39,7 +39,7 @@ Your prompt here with @block_var and $inline_var
 
 Use directly without defining: `Text`, `Image`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `Html`, `SearchResult`, `Anything`, `Dynamic`
 
-> **Note**: `Document` is the native concept for any document (PDF, Word, etc.). `Image` is for any image format (JPEG, PNG, etc.). File formats like "PDF" or "JPEG" are not concepts.
+> **Note**: `Document` is the native concept for a document file or a web page URL. `Image` is for any image format (JPEG, PNG, etc.). File formats like "PDF" or "JPEG" are not concepts. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them.
 
 Each native concept has a content class with specific attributes (e.g., `Image` has `url`, `public_url`, `filename`, `caption`; `Page` has `text_and_images` and `page_view`). See [Native Content Types Reference](native-content-types.md) for the full attribute reference — useful when writing `$var.field` in prompts or `from = "input.field"` in construct blocks.
 

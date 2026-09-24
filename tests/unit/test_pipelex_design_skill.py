@@ -113,6 +113,14 @@ class TestPipelexDesignSkill:
         scaffold = self.reference("re-entry.md").split("## 3. ", 1)[1].split("\n## ", 1)[0]
         assert "only after reading the stepwise reference the skill points at for this branch" in scaffold
 
+    def test_the_authoring_reference_says_extraction_reads_no_office_format(self) -> None:
+        """A Word file passes validation and preparation and then fails the run at the extraction; the proof lab
+        (L-260923-9d0b53) designed a method over Word transcripts because the reference said `Document` covers Word."""
+        text = self.reference("writing-mthds.md")
+        assert "**It reads a PDF, an image or a web page, and nothing else.**" in text
+        assert "Any document (PDF, Word" not in text
+        assert "a Word or PowerPoint file, the run fails when it reaches the render" not in text
+
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one
         ships as literal braces; and each opens by naming the condition that sends the model to it."""
