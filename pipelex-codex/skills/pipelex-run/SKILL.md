@@ -67,9 +67,9 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 `mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error, long after `created_at`, may be slow or may be a workflow task that failed out of sight, and nothing the status carries tells the two apart: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
-### 7. Results, and the files
+### 7. Results, and the saved run
 
-`mthds_run_results`, then report the main output. When it references stored files — an image, a PDF or a document as a `pipelex-storage://` URI — their links expire within the hour, so call `mthds_download_artifacts` with the run id and `dir: "runs/<run_id>"`, **relative to the workshop's own working directory**, never an absolute path such as `<bundle_dir>/runs/<run_id>/`. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
+`mthds_run_results`, then report the main output and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
 
 When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
@@ -83,7 +83,7 @@ A run id alone, with no method and no inputs: nothing is validated or prepared.
 
 - **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's two readings hold here as well: `degraded` is only last-known, and a long `RUNNING` may be slow or stuck, which the status cannot tell apart.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
-- **"download the files from run X"** → `mthds_download_artifacts`, as step 7 says; it works days after the run.
+- **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says; it works days after the run. Saving a run twice adds copies.
 
 An unknown run id is reported in the tool's own words: runs are scoped to the key's organization, so another organization's run reads exactly like a miss.
 
@@ -92,8 +92,8 @@ An unknown run id is reported in the tool's own words: runs are scoped to the ke
 | Condition | Do this |
 |---|---|
 | `mthds_run`: `input_domain` at `method_id`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
-| `mthds_download_artifacts` absent | report the stored references as they came back and say the files were not downloaded; the run still completed |
-| `mthds_download_artifacts` refuses the `dir` | call again with no `dir`, and the workshop saves where it defaults to. A refused `dir` is not a failed download |
+| `mthds_download_artifacts` absent | say nothing was saved to disk and report the stored references as they came back; the run still completed |
+| `mthds_download_artifacts` refuses a `dir` the user named | call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
 
 ## References
 

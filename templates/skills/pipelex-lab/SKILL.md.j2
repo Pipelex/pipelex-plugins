@@ -65,7 +65,7 @@ Read [key.md](references/key.md) before writing a key.
 Read [log.md](references/log.md) before the first entry: it holds the entry format, the regression rule, how a round is scored and the scorecard. The go opens a series in the log, with its budget. Then, round after round, until a stop:
 
 1. **Run every case once** through `/pipelex-run`'s Start a run, naming `cases/<case>/` as the directory of its inputs. The go is the consent that skill needs.
-2. **Read each whole output** with `mthds_run_results`, by its run id, and look at any file a key line is about once `/pipelex-run` has downloaded it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
+2. **Read each whole output** from the `main_stuff.json` that `/pipelex-run` saved for the run, or with `mthds_run_results`, by its run id, when nothing was saved, and look at any file a key line is about beside it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
 3. **Score every Must and Must not line** as pass, fail or partial, quoting the field and the value you relied on. A reading an Also acceptable line allows passes the line it names; planted facts serve the diagnosis and are not scored.
 4. **Log each run** as log.md says: its id, its case, its cost, its duration, its score and the regressions.
 5. **Diagnose**, the inputs first, as the guard above says, then the method: which pipe produced the wrong value, and why.

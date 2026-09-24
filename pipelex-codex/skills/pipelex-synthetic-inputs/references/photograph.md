@@ -62,7 +62,7 @@ Follow each run with `mthds_run_status` at the hint it gives, then `mthds_run_re
 
 ## 3. Save it
 
-Call `mthds_download_artifacts` with the run id and `dir` set to the target's directory, relative to the directory the workshop was started in. It never overwrites and reports the path it wrote, which may carry the image's own extension (`.png`, `.jpg`, `.webp`). Move that file onto `target`, keeping the extension the download reported: a `native.Image` input accepts any of them, and the target's name follows the file, never the reverse. An existing file at `target` is still the user's: confirm before replacing it.
+Call `mthds_download_artifacts` with the run id alone, and no `dir`: it saves the run into `runs/<run_id>/`, relative to the directory the workshop was started in, writing the run's output as `main_stuff.json` beside the image, and a record of the run has no place among the inputs. It never overwrites and reports the path of the image it wrote, which may carry the image's own extension (`.png`, `.jpg`, `.webp`). Move that image onto `target`, keeping the extension the download reported: a `native.Image` input accepts any of them, and the target's name follows the file, never the reverse. Leave `main_stuff.json` where it is. An existing file at `target` is still the user's: confirm before replacing it.
 
 ## 4. Verify
 
