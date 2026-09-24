@@ -48,7 +48,7 @@ Read [key.md](references/key.md) before writing a key.
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
 2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it reports into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another.
 3. **Keys.** One `key.md` per case, in the format key.md gives.
-4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. With no estimate yet, say that the first round sets one.
+4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.
 
 ## 3. Run the loop
@@ -57,7 +57,7 @@ Read [log.md](references/log.md) before the first entry: it holds the entry form
 
 1. **Run every case once** through `/pipelex-run`'s Start a run, naming `cases/<case>/` as the directory of its inputs. The go is the consent that skill needs.
 2. **Read each whole output** with `mthds_run_results`, by its run id, and look at any file a key line is about once `/pipelex-run` has downloaded it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
-3. **Score every key line** as pass, fail or partial, quoting the field and the value you relied on. A reading the key lists as also acceptable passes.
+3. **Score every Must and Must not line** as pass, fail or partial, quoting the field and the value you relied on. A reading an Also acceptable line allows passes the line it names; planted facts serve the diagnosis and are not scored.
 4. **Log each run** as log.md says: its id, its case, its cost, its duration, its score and the regressions.
 5. **Diagnose**, the inputs first, as the guard above says, then the method: which pipe produced the wrong value, and why.
 6. **Make one fix**: the change that addresses the most failing lines without touching the contract, through `/pipelex-edit` when it keeps the method's structure and through `/pipelex-design` when it changes it. Log it as the next round's "Changed" line before that round runs.
@@ -65,7 +65,7 @@ Read [log.md](references/log.md) before the first entry: it holds the entry form
 **The loop stops, and ends the turn on the scorecard**, when:
 
 1. every case meets its pass bar;
-2. **the next round would take the series' total past the budget**, a round's estimate being the cost of the last round: never start a run the budget does not cover;
+2. **the next run would take the series' total past the budget**, its estimate being the highest cost its case has had in the series, or before that its share of the round's estimate: never start a run the budget does not cover;
 3. a failing line traces to the inputs, because the inputs and the keys were part of the go, and changing either one changes the experiment;
 4. there is no fix in sight, or the only one would change a key, the inputs, or what the main pipe takes or produces;
 5. **a round passes fewer key lines than the best round so far, or two rounds in a row pass no more than it**: name the fix it followed, and leave keeping or undoing that fix to the user;

@@ -261,7 +261,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "the user's go on them is the only go the loop gets",
         "**A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**",
         "**The loop stops, and ends the turn on the scorecard**",
-        "**the next round would take the series' total past the budget**",
+        "**the next run would take the series' total past the budget**",
         "never start a run the budget does not cover",
         "**a round passes fewer key lines than the best round so far, or two rounds in a row pass no more than it**",
         "leave keeping or undoing that fix to the user",

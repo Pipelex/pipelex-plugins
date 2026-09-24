@@ -8,10 +8,10 @@ Each go opens a series, which runs until a stop:
 
 ```
 # Series 2 · 2026-09-24 · budget $5.00
-Cases: clean-invoice, problem-invoice. Estimate: $0.40 a round, from series 1's last round. Start: commit abc1234.
+Cases: clean-invoice, problem-invoice. Estimate: $0.40 a round, from series 1. Start: commit abc1234.
 ```
 
-`Start` is `git rev-parse --short HEAD` when the project is a git repository, so that `git diff <start>` shows every fix the series made. Leave it out when the project is not a repository.
+The estimate of a round is the brief's rough cost of one run times the cases in the first series, and after that the sum of each case's highest cost in the last series. `Start` is `git rev-parse --short HEAD` when the project is a git repository, so that `git diff <start>` shows every fix the series made. Leave it out when the project is not a repository.
 
 ## A round and its runs
 
@@ -25,9 +25,10 @@ Failed: M3 (the memo puts the relocation clause below the medium items). Partial
 ```
 
 - **Changed** says in one line what the fix changed and through which skill. In the first round of a series it says what changed since the last series, or "baseline" in the first series.
-- **The cost** is `usage.cost_usd` from `mthds_run_results`. When it is `null`, write "cost unknown" and count the round's estimate in its place, so that the budget is never checked against a zero nobody measured.
+- **A run's estimate** is the highest cost its case has had in the series, or, before the case has run in it, the round's estimate divided by the cases.
+- **The cost** is `usage.cost_usd` from `mthds_run_results`. When it is `null`, or `usage` is absent because the run failed or did not finish, write "cost unknown" and count the run's estimate in its place, so that the budget is never checked against a zero nobody measured. When `usage.cost_partial` is true, the cost is a lower bound: write "at least $…" and count the larger of it and the run's estimate.
 - **The duration** runs from the status's `created_at` to its `finished_at`.
-- **The score** is the lines passed out of the key's lines. Partial and unscored lines count as not passed, toward the pass bar and toward the round's score alike.
+- **The score** is the Must and Must not lines passed, out of the case's Must and Must not lines. A reading an Also acceptable line allows passes the line it names, and planted facts are not scored. Partial and unscored lines count as not passed, toward the round's score and toward the pass bar, except a line the pass bar allows to be partial, which meets the bar when it is partial.
 - **A cut output** adds a line: "Output cut at the size cap: M4 and M6 unscored."
 - **A failed run** is logged with the status and the first line of its `failure_message`, as `FAILED · …`, and scores nothing.
 - **An unfinished run** is logged as `UNFINISHED · still RUNNING after …`, with its run id, so that `/pipelex-run` can follow it later.
@@ -35,7 +36,7 @@ Failed: M3 (the memo puts the relocation clause below the medium items). Partial
 ## Regressions and the best round
 
 - **A regression** is a line of a case that passed in an earlier run of that case and does not pass now. Name the run where it last passed. Compare only with runs made since the case's key last changed.
-- **A round's score** is the number of key lines passed across all its cases. The best round is the one with the highest score in the series. The loop's fifth stop compares each new round with it.
+- **A round's score** is the number of Must and Must not lines passed across all its cases. The best round is the one with the highest score in the series. The loop's fifth stop compares each new round with it.
 
 ## A key changes
 
