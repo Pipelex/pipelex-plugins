@@ -53,7 +53,7 @@ One line before the call: the target, the pipe, where the inputs came from, and 
 
 **When a `files` target holds a `PipeFunc`, the line says its Python does not travel**: a `files` submission carries `.mthds` only, linked or not, so a function the hosted plane has not already registered cannot resolve, and what carries it is a method saved through `/pipelex-catalog` and run here by its id alone.
 
-The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.**
+The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A case of `/pipelex-lab` is the one exception: its runs wait for the user's go on the keys that `/pipelex-lab` shows, even when the request itself asked for them.
 
 ### 5. `mthds_run`, and the run id first
 
