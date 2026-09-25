@@ -42,6 +42,7 @@ lab/<method>/
 ## Guards
 
 - **A key is written and shown before the first run of its case, and never adjusted to fit an output.** It changes only when the user says so, and the reason goes in the log.
+- **The turn that writes the keys ends on them, with no run.** The user reads every key before any credit is spent, even when the request already asked for the runs and named a budget: that request came before any key existed, so it cannot approve one. The runs start in a later turn, on the user's go.
 - **Every run is logged**, failed and unfinished ones included: each one spent credit, whatever the app or the workshop kept of it.
 - **A failing line is checked against the case's inputs before the method is touched**: open the file and confirm that it shows the fact the key expects.
 
@@ -61,7 +62,7 @@ Read [key.md](references/key.md) before writing a key.
 2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **Ask it to stop at run-ready, with no run offer**: the case has no key yet, and a yes to that offer would run it. **A case of the user's own files stays out of version control**: in a git repository, `git check-ignore -q` `lab/<method>/cases/<case>/` itself, never a file in it, before anything is copied into it. For a path not ignored, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
-5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs.
+5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**, as the guard above says: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs. A request that already asked for the runs, or already named a budget, is not that go: the budget it named is the one proposed.
 
 ## 3. Run the loop
 

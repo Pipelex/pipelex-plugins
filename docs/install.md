@@ -58,9 +58,9 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
 ```
 
-Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The hook and the Pipelex tools need Node.js on your `PATH`.
+Restart Codex, run `/plugins` to install `pipelex`, then start Codex once more and trust the plugin hook when it asks. Requires Codex 0.141 or later. The hook and the Pipelex tools need Node.js on your `PATH`.
 
-**The hook.** The `hooks` feature is stable and on by default from Codex 0.141, so there is nothing to enable. Codex asks you to trust the plugin hook on first run and keeps the trusted hashes under `[hooks.state]`. The hook lints and formats locally and validates on the Pipelex API when `PIPELEX_API_KEY` is set; a network-sandboxed session skips the validation. See [the validation hook](hooks.md).
+**The hook.** The `hooks` feature is stable and on by default from Codex 0.141, so there is nothing to enable. The hook does not run in the session where `/plugins` installs the plugin, although the skills and the Pipelex tools work there at once: Codex asks you to trust it when the next session starts, keeps the trusted hashes under `[hooks.state]`, and runs it on every edit from then on. So start Codex once more after the install and trust the hook before your first method. The hook lints and formats locally and validates on the Pipelex API when `PIPELEX_API_KEY` is set; a network-sandboxed session skips the validation. See [the validation hook](hooks.md).
 
 **The Pipelex tools.** Codex starts them on its own. They reach the model as `mcp__pipelex__mthds_validate`, `mcp__pipelex__mthds_inputs_template` and so on, and `codex mcp list` shows the `pipelex` entry. Codex starts an MCP server with a minimal environment and does not pass your shell's through, so the plugin forwards `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` by name: export them in the shell you start Codex from, as for the hook.
 
