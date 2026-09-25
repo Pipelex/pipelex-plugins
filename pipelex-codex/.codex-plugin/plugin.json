@@ -22,7 +22,7 @@
   },
   "name": "pipelex",
   "description": "Build and run AI methods from your agent with Pipelex: skills that write them in MTHDS, a hook that checks every edit, and the Pipelex tools.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "mcpServers": {
     "pipelex": {
       "command": "npx",
