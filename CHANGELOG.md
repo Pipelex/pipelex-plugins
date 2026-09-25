@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex-lab` stops at the keys even when the request already asked for the runs**: a Codex session asked to "write down the right answer for each invoice, run the method on them, score each result … six runs at most" wrote the keys, logged "the user's explicit request authorizes this series" and spent three runs before the user had seen a key, reading `pipelex-run`'s "the user asking for the run is the consent" as the go. A new guard says that the turn which writes the keys ends on them with no run, even when the request named the runs and a budget, since it came before any key existed; the go step points to it, and `pipelex-run` names a lab's case as the one exception to its consent rule.
+- **The install page says when Codex trusts the plugin's hook**: in the session where `/plugins` installs the plugin, Codex neither asks for the hook's trust nor runs the hook, while the skills and the Pipelex tools already work, so a method written there is never linted or formatted; Codex asks at the next start. `docs/install.md` and `docs/hooks.md` said to trust the hook "on first run"; the install steps now start Codex once more after `/plugins` and trust the hook when it asks, before the first method.
+
 ## [0.9.1] - 2026-09-25
 
 ### Changed
