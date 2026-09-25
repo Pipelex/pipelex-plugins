@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in pipelex-sdk-js.
-// Provenance: @pipelex/sdk 0.23.0 (63e9ba5) + @pipelex/tools-wasm 0.3.0 (npm)
+// Provenance: @pipelex/sdk 0.25.1 (ed9f2fb) + @pipelex/tools-wasm 0.3.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -549,8 +549,1228 @@ ${Q.stack}` : C;
 });
 
 // src/hooks/claude-mthds-check.ts
-import { existsSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { resolve as resolvePath2 } from "node:path";
+
+// src/hooks/check-core.ts
+import { isAbsolute as isAbsolutePath, resolve as resolvePath } from "node:path";
+
+// src/hooks/patch-envelope.ts
+var SECTION_HEADER = /^\*\*\* (Add File|Update File|Delete File):\s*(.*?)\s*$/;
+var MOVE_HEADER = /^\*\*\* Move to:\s*(.*?)\s*$/;
+var ENVELOPE_BOUNDARY = /^\*\*\* (Begin|End) Patch\b/;
+var MTHDS_PATH = /.\.mthds$/;
+var SECTION_KINDS = {
+  "Add File": "add",
+  "Update File": "update",
+  "Delete File": "delete"
+};
+function readPatchSections(text) {
+  const sections = [];
+  let current = null;
+  let envelope = 0;
+  let lineStart = 0;
+  while (lineStart <= text.length) {
+    const newline = text.indexOf("\n", lineStart);
+    const lineEnd = newline === -1 ? text.length : newline;
+    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
+    const header = SECTION_HEADER.exec(line);
+    const boundary = ENVELOPE_BOUNDARY.exec(line);
+    if (header) {
+      current = null;
+      if (header[2]) {
+        current = {
+          kind: SECTION_KINDS[header[1]],
+          path: header[2],
+          moveTo: null,
+          offset: lineStart,
+          envelope,
+          addedLines: []
+        };
+        sections.push(current);
+      }
+    } else if (boundary) {
+      current = null;
+      envelope++;
+    } else if (current) {
+      const move = MOVE_HEADER.exec(line);
+      if (move) {
+        if (current.kind === "update" && current.moveTo === null && move[1]) {
+          current.moveTo = move[1];
+        }
+      } else if (line.startsWith("+")) {
+        current.addedLines.push(line.slice(1));
+      }
+    }
+    if (newline === -1) {
+      break;
+    }
+    lineStart = newline + 1;
+  }
+  return sections;
+}
+function patchTargets(sections, keyOf = (path) => path) {
+  const envelopes = /* @__PURE__ */ new Map();
+  for (const section of sections) {
+    envelopes.set(section.envelope, [...envelopes.get(section.envelope) ?? [], section]);
+  }
+  const files = /* @__PURE__ */ new Map();
+  const removed = /* @__PURE__ */ new Set();
+  for (const envelope of envelopes.values()) {
+    const surviving = /* @__PURE__ */ new Map();
+    for (const section of envelope) {
+      const key = keyOf(section.path, section);
+      if (section.kind === "delete" || section.moveTo !== null) {
+        surviving.delete(key);
+        removed.add(key);
+      }
+      if (section.moveTo !== null) {
+        surviving.set(keyOf(section.moveTo, section), { path: section.moveTo, section });
+      } else if (section.kind !== "delete") {
+        surviving.set(key, { path: section.path, section });
+      }
+    }
+    for (const [key, { path, section }] of surviving) {
+      const file = files.get(key);
+      if (file) {
+        file.sections.push(section);
+      } else {
+        files.set(key, { key, path, sections: [section], removedByPatch: false });
+      }
+    }
+  }
+  return Array.from(files.values()).filter((file) => MTHDS_PATH.test(file.path)).map((file) => ({ ...file, removedByPatch: removed.has(file.key) }));
+}
+
+// src/hooks/shell-script.ts
+import { basename, isAbsolute, resolve } from "node:path";
+function readShellScript(script, sessionDir) {
+  let extents;
+  let quoted;
+  try {
+    const parser = new ScriptParser(script);
+    const walk = new DirectoryWalk(WALK_BUDGET_FLOOR + WALK_BUDGET_PER_CHARACTER * script.length);
+    walk.list(parser.parse(), sessionDir);
+    extents = walk.extents;
+    quoted = parser.quoted;
+  } catch {
+    return "unparsed";
+  }
+  return {
+    directoryAt(offset) {
+      const holder = innermost(extents, offset);
+      if (!holder) {
+        return { kind: "outside" };
+      }
+      if (!holder.read) {
+        return { kind: "unread" };
+      }
+      return holder.directory === null ? { kind: "unknown" } : { kind: "directory", path: holder.directory };
+    },
+    quotingAt(offset) {
+      return innermost(quoted, offset)?.quoting ?? "verbatim";
+    }
+  };
+}
+function innermost(spans, offset) {
+  let holder = null;
+  for (const span of spans) {
+    if (span.start <= offset && offset < span.end) {
+      if (!holder || span.end - span.start < holder.end - holder.start) {
+        holder = span;
+      }
+    }
+  }
+  return holder;
+}
+function linesAsRead(lines, quoting) {
+  const read = [];
+  for (const line of lines) {
+    const asRead = lineAsRead(line, quoting);
+    if (asRead === LOST) {
+      return [];
+    }
+    if (asRead !== null) {
+      read.push(asRead);
+    }
+  }
+  return read;
+}
+var LOST = Symbol("lost");
+var EXPANSION_START = /[\w{(@*#?$!-]/;
+var UNQUOTED_BREAK = /[\s;&|<>()*?[\]{}$]/;
+function lineAsRead(line, quoting) {
+  if (quoting === "verbatim") {
+    return line;
+  }
+  const initial = quoting === "single-quoted" ? "single" : quoting === "double-quoted" ? "double" : "heredoc";
+  let state = initial;
+  let read = "";
+  let known = true;
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (state === "single") {
+      if (char === "'") {
+        state = "unquoted";
+      } else {
+        read += char;
+      }
+    } else if (char === "\\") {
+      if (next === void 0) {
+        return LOST;
+      }
+      const escapable = state === "double" ? '$`"\\' : state === "heredoc" ? "$`\\" : next;
+      if (escapable.includes(next)) {
+        read += next;
+        index++;
+      } else {
+        read += char;
+      }
+    } else if (char === "`" || char === "$" && next !== void 0 && EXPANSION_START.test(next)) {
+      known = false;
+    } else if (state === "heredoc") {
+      read += char;
+    } else if (state === "double") {
+      if (char === '"') {
+        state = "unquoted";
+      } else {
+        read += char;
+      }
+    } else if (char === "'") {
+      state = "single";
+    } else if (char === '"') {
+      state = "double";
+    } else if (UNQUOTED_BREAK.test(char)) {
+      return LOST;
+    } else {
+      read += char;
+    }
+  }
+  if (state !== initial) {
+    return LOST;
+  }
+  return known ? read : null;
+}
+var Unparsed = class extends Error {
+};
+var COMMAND_PREFIXES = /* @__PURE__ */ new Set(["!", "time"]);
+var CLOSING_WORDS = /* @__PURE__ */ new Set(["then", "elif", "else", "fi", "do", "done", "esac", "}"]);
+var WORD_BREAKS = /* @__PURE__ */ new Set([" ", "	", "\n", ";", "&", "|", "<", ">", "(", ")"]);
+var REDIRECTION_OPERATORS = ["<<<", "<<-", "<<", "<&", "<>", "<", ">>", ">&", ">|", ">"];
+var ASSIGNMENT_PREFIX = /^[A-Za-z_][A-Za-z0-9_]*\+?=/;
+var ScriptParser = class {
+  constructor(src) {
+    this.src = src;
+  }
+  /** The quoted strings and heredoc bodies read so far. */
+  quoted = [];
+  pos = 0;
+  pending = [];
+  parse() {
+    return this.parseList([]);
+  }
+  /**
+   * Commands up to one of `terminators`, which is left unread: a reserved
+   * word where a command would start, `)`, or `;;` for a case branch, which
+   * `;&` and `;;&` end too. With no terminator, the list runs to the end.
+   */
+  parseList(terminators) {
+    const items = [];
+    for (; ; ) {
+      this.skipLinebreaks();
+      if (this.atEnd()) {
+        if (terminators.length > 0) {
+          throw new Unparsed();
+        }
+        break;
+      }
+      if (this.atTerminator(terminators)) {
+        break;
+      }
+      const item = this.parseAndOr();
+      items.push(item);
+      this.skipBlanks();
+      if (this.startsWith("&") && !this.startsWith("&&")) {
+        item.background = true;
+        this.pos++;
+      } else if (this.startsWith(";;") || this.startsWith(";&")) {
+        if (!terminators.includes(";;")) {
+          throw new Unparsed();
+        }
+      } else if (this.startsWith(";")) {
+        this.pos++;
+      } else if (!this.atEnd() && !["\n", "#"].includes(this.src[this.pos]) && !this.atTerminator(terminators)) {
+        throw new Unparsed();
+      }
+    }
+    return { items };
+  }
+  atTerminator(terminators) {
+    return terminators.some((terminator) => {
+      if (terminator === ")") {
+        return this.startsWith(")");
+      }
+      if (terminator === ";;") {
+        return this.startsWith(";;") || this.startsWith(";&");
+      }
+      return this.atReservedWord(terminator);
+    });
+  }
+  parseAndOr() {
+    const item = { pipelines: [this.parsePipeline()], operators: [], background: false };
+    for (; ; ) {
+      this.skipBlanks();
+      const operator = this.startsWith("&&") ? "&&" : this.startsWith("||") ? "||" : null;
+      if (operator === null) {
+        return item;
+      }
+      this.pos += 2;
+      this.skipLinebreaks();
+      item.operators.push(operator);
+      item.pipelines.push(this.parsePipeline());
+    }
+  }
+  parsePipeline() {
+    this.skipBlanks();
+    const negated = this.atReservedWord("!");
+    if (negated) {
+      this.pos++;
+    }
+    const commands = [this.parseCommand()];
+    for (; ; ) {
+      this.skipBlanks();
+      if (!this.startsWith("|") || this.startsWith("||")) {
+        break;
+      }
+      this.pos += this.startsWith("|&") ? 2 : 1;
+      this.skipLinebreaks();
+      commands.push(this.parseCommand());
+    }
+    return { commands, negated };
+  }
+  parseCommand() {
+    this.skipBlanks();
+    if (this.startsWith("((")) {
+      const command = this.emptyCommand();
+      this.pos += 2;
+      this.skipArithmetic();
+      command.end = this.pos;
+      return command;
+    }
+    if (this.startsWith("(")) {
+      this.pos++;
+      const body = this.parseList([")"]);
+      this.pos++;
+      return { kind: "subshell", body, tail: this.parseTail() };
+    }
+    if (this.atReservedWord("{")) {
+      this.pos++;
+      const body = this.parseList(["}"]);
+      this.pos++;
+      return { kind: "group", body, tail: this.parseTail() };
+    }
+    if (!this.atWordStart() || this.atRedirection()) {
+      const command = this.parseSimple(null);
+      if (command.kind === "simple" && command.end === command.start) {
+        throw new Unparsed();
+      }
+      return command;
+    }
+    const first = this.readWord();
+    const reserved = first.quoted || first.expands ? null : first.value;
+    if (reserved !== null && COMMAND_PREFIXES.has(reserved)) {
+      if (reserved === "time") {
+        this.skipBlanks();
+        if (/^-p(?![^\s;&|<>()])/.test(this.src.slice(this.pos, this.pos + 3))) {
+          this.pos += 2;
+        }
+      }
+      return this.parseCommand();
+    }
+    if (reserved !== null && CLOSING_WORDS.has(reserved)) {
+      throw new Unparsed();
+    }
+    switch (reserved) {
+      case "if":
+        return this.parseIf();
+      case "while":
+      case "until":
+        return this.parseWhile(reserved === "until");
+      case "for":
+      case "select":
+        return this.parseFor();
+      case "case":
+        return this.parseCase();
+      case "[[":
+        return this.parseConditional(first);
+      case "function":
+        this.skipBlanks();
+        if (!this.atWordStart()) {
+          throw new Unparsed();
+        }
+        this.readWord();
+        return this.parseFunctionBody();
+    }
+    return this.parseSimple(first);
+  }
+  parseIf() {
+    const clauses = [];
+    for (; ; ) {
+      const condition = this.parseList(["then"]);
+      this.readReserved("then");
+      clauses.push({ condition, body: this.parseList(["elif", "else", "fi"]) });
+      if (this.atReservedWord("elif")) {
+        this.readReserved("elif");
+        continue;
+      }
+      let otherwise = null;
+      if (this.atReservedWord("else")) {
+        this.readReserved("else");
+        otherwise = this.parseList(["fi"]);
+      }
+      this.readReserved("fi");
+      return { kind: "if", clauses, otherwise, tail: this.parseTail() };
+    }
+  }
+  parseWhile(until) {
+    const condition = this.parseList(["do"]);
+    this.readReserved("do");
+    const body = this.parseList(["done"]);
+    this.readReserved("done");
+    return { kind: "loop", head: null, condition, until, body, tail: this.parseTail() };
+  }
+  /** `for NAME [in WORDS]; do … done`, `for (( … )); do … done`, and `select` alike. */
+  parseFor() {
+    this.skipBlanks();
+    const head = this.emptyCommand();
+    if (this.startsWith("((")) {
+      this.pos += 2;
+      this.skipArithmetic();
+      head.end = this.pos;
+    } else {
+      if (!this.atWordStart()) {
+        throw new Unparsed();
+      }
+      const name = this.readWord();
+      head.start = name.start;
+      head.end = name.end;
+      this.skipLinebreaks();
+      if (this.atReservedWord("in")) {
+        this.pos += 2;
+        for (; ; ) {
+          this.skipBlanks();
+          if (!this.atWordStart()) {
+            break;
+          }
+          addWord(head, this.readWord());
+        }
+      }
+    }
+    this.skipBlanks();
+    if (this.startsWith(";") && !this.startsWith(";;")) {
+      this.pos++;
+    }
+    this.skipLinebreaks();
+    this.readReserved("do");
+    const body = this.parseList(["done"]);
+    this.readReserved("done");
+    return { kind: "loop", head, condition: null, until: false, body, tail: this.parseTail() };
+  }
+  parseCase() {
+    this.skipBlanks();
+    if (!this.atWordStart()) {
+      throw new Unparsed();
+    }
+    const subject = this.emptyCommand();
+    addWord(subject, this.readWord());
+    this.skipLinebreaks();
+    this.readReserved("in");
+    const branches = [];
+    for (; ; ) {
+      this.skipLinebreaks();
+      if (this.atReservedWord("esac")) {
+        this.readReserved("esac");
+        return { kind: "case", subject, branches, tail: this.parseTail() };
+      }
+      const patterns = this.emptyCommand();
+      if (this.startsWith("(")) {
+        this.pos++;
+      }
+      for (; ; ) {
+        this.skipBlanks();
+        if (!this.atWordStart()) {
+          throw new Unparsed();
+        }
+        addWord(patterns, this.readWord());
+        this.skipBlanks();
+        if (this.startsWith(")")) {
+          this.pos++;
+          break;
+        }
+        if (!this.startsWith("|")) {
+          throw new Unparsed();
+        }
+        this.pos++;
+      }
+      const body = this.parseList([";;", "esac"]);
+      const terminator = [";;&", ";;", ";&"].find((candidate) => this.startsWith(candidate));
+      this.pos += terminator?.length ?? 0;
+      branches.push({ patterns, body, fallsThrough: terminator === ";;&" || terminator === ";&" });
+    }
+  }
+  /** The words and redirections of a simple command, `first` already read. */
+  parseSimple(first) {
+    const command = this.emptyCommand();
+    if (first) {
+      command.start = first.start;
+      addWord(command, first);
+    }
+    for (; ; ) {
+      this.skipBlanks();
+      if (this.atEnd()) {
+        break;
+      }
+      const char = this.src[this.pos];
+      if (char === "#") {
+        this.skipComment();
+        break;
+      }
+      if (this.startsWith("<(") || this.startsWith(">(")) {
+        const start = this.pos;
+        this.pos += 2;
+        const substitution = this.parseList([")"]);
+        this.pos++;
+        addWord(command, {
+          ...bareWord(start, this.pos),
+          expands: true,
+          substitutions: [substitution]
+        });
+        continue;
+      }
+      if (this.atRedirection()) {
+        this.readRedirection(command);
+        continue;
+      }
+      if (char === "(") {
+        if (command.words.length === 1 && /^\(\s*\)/.test(this.src.slice(this.pos, this.pos + 64))) {
+          return this.parseFunctionBody();
+        }
+        throw new Unparsed();
+      }
+      if (WORD_BREAKS.has(char)) {
+        break;
+      }
+      addWord(command, this.readWord());
+    }
+    return command;
+  }
+  /**
+   * A `[[ … ]]` conditional, `[[` already read, as one command. Inside it,
+   * parentheses, `<`, `>`, `&&`, `||` and `|` belong to the expression (a
+   * regex after `=~` among them), and a newline does not end it.
+   */
+  parseConditional(first) {
+    const command = this.emptyCommand();
+    command.start = first.start;
+    addWord(command, first);
+    for (; ; ) {
+      this.skipLinebreaks();
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      if (this.atReservedWord("]]")) {
+        addWord(command, this.readWord());
+        break;
+      }
+      const char = this.src[this.pos];
+      if (char === ";") {
+        throw new Unparsed();
+      }
+      if (WORD_BREAKS.has(char)) {
+        this.pos++;
+        addWord(command, bareWord(this.pos - 1, this.pos));
+      } else {
+        addWord(command, this.readWord());
+      }
+    }
+    for (; ; ) {
+      this.skipBlanks();
+      if (!this.atRedirection()) {
+        return command;
+      }
+      this.readRedirection(command);
+    }
+  }
+  /** The redirections after a compound command's closing word, and nothing else. */
+  parseTail() {
+    const tail = this.emptyCommand();
+    for (; ; ) {
+      this.skipBlanks();
+      if (this.startsWith("<(") || this.startsWith(">(") || !this.atRedirection()) {
+        return tail;
+      }
+      this.readRedirection(tail);
+    }
+  }
+  /** The body of a function whose name was read, with its optional `()`. */
+  parseFunctionBody() {
+    this.skipBlanks();
+    const parentheses = /^\(\s*\)/.exec(this.src.slice(this.pos, this.pos + 64));
+    if (parentheses) {
+      this.pos += parentheses[0].length;
+    }
+    this.skipLinebreaks();
+    return { kind: "function", body: this.parseCommand() };
+  }
+  emptyCommand() {
+    return {
+      kind: "simple",
+      words: [],
+      start: this.pos,
+      end: this.pos,
+      heredocs: [],
+      substitutions: []
+    };
+  }
+  readReserved(word) {
+    if (!this.atReservedWord(word)) {
+      throw new Unparsed();
+    }
+    this.pos += word.length;
+  }
+  atRedirection() {
+    return /^(?:\d*[<>]|&>)/.test(this.src.slice(this.pos, this.pos + 24));
+  }
+  readRedirection(command) {
+    while (/\d/.test(this.src[this.pos] ?? "")) {
+      this.pos++;
+    }
+    let operator;
+    if (this.startsWith("&>")) {
+      operator = this.startsWith("&>>") ? "&>>" : "&>";
+    } else {
+      operator = REDIRECTION_OPERATORS.find((candidate) => this.startsWith(candidate));
+    }
+    this.pos += operator.length;
+    this.skipBlanks();
+    const heredoc = operator === "<<" || operator === "<<-";
+    if (!heredoc && (this.startsWith("<(") || this.startsWith(">("))) {
+      this.pos += 2;
+      command.substitutions.push(this.parseList([")"]));
+      this.pos++;
+      command.end = this.pos;
+      return;
+    }
+    if (!this.atWordStart()) {
+      throw new Unparsed();
+    }
+    const target = this.readWord();
+    command.end = target.end;
+    command.substitutions.push(...target.substitutions);
+    if (heredoc) {
+      this.pending.push({
+        delimiter: target.value,
+        stripTabs: operator === "<<-",
+        quoted: target.quoted,
+        owner: command
+      });
+    }
+  }
+  /** Past a newline, the bodies of the heredocs opened on the line it ends. */
+  consumeNewline() {
+    this.pos++;
+    for (const heredoc of this.pending.splice(0)) {
+      const bodyStart = this.pos;
+      let bodyEnd = this.src.length;
+      while (this.pos < this.src.length) {
+        const newline = this.src.indexOf("\n", this.pos);
+        const lineEnd = newline === -1 ? this.src.length : newline;
+        const next = newline === -1 ? this.src.length : newline + 1;
+        let line = this.src.slice(this.pos, lineEnd);
+        if (heredoc.stripTabs) {
+          line = line.replace(/^\t+/, "");
+        }
+        if (line === heredoc.delimiter) {
+          bodyEnd = this.pos;
+          this.pos = next;
+          break;
+        }
+        this.pos = next;
+      }
+      heredoc.owner.heredocs.push([bodyStart, bodyEnd]);
+      this.quoted.push({
+        start: bodyStart,
+        end: bodyEnd,
+        quoting: heredoc.quoted ? "verbatim" : "heredoc"
+      });
+    }
+  }
+  readWord() {
+    const word = bareWord(this.pos, this.pos);
+    while (!this.atEnd()) {
+      const char = this.src[this.pos];
+      if (WORD_BREAKS.has(char)) {
+        if (char === "(" && /^[A-Za-z_][A-Za-z0-9_]*\+?=$/.test(this.src.slice(word.start, this.pos))) {
+          this.skipArrayValue();
+          word.expands = true;
+          continue;
+        }
+        break;
+      }
+      if (char === "\\") {
+        const escaped = this.src[this.pos + 1];
+        this.pos = Math.min(this.pos + 2, this.src.length);
+        if (escaped !== "\n") {
+          word.quoted = true;
+          word.value += escaped ?? "";
+        }
+      } else if (char === "'") {
+        const close = this.src.indexOf("'", this.pos + 1);
+        if (close === -1) {
+          throw new Unparsed();
+        }
+        word.value += this.src.slice(this.pos + 1, close);
+        word.quoted = true;
+        this.quoted.push({ start: this.pos, end: close + 1, quoting: "single-quoted" });
+        this.pos = close + 1;
+      } else if (char === '"') {
+        this.readDoubleQuoted(word);
+      } else if (char === "$") {
+        this.readDollar(word, false);
+      } else if (char === "`") {
+        this.skipBackticks();
+        word.expands = true;
+      } else {
+        if ("*?[{}".includes(char)) {
+          word.pattern = true;
+        }
+        if ((char === "~" || char === "=") && this.pos === word.start) {
+          word.expandsHome = true;
+        }
+        word.value += char;
+        this.pos++;
+      }
+    }
+    word.end = this.pos;
+    word.assignment = ASSIGNMENT_PREFIX.test(this.src.slice(word.start, word.end));
+    return word;
+  }
+  readDoubleQuoted(word) {
+    word.quoted = true;
+    const start = this.pos;
+    this.pos++;
+    for (; ; ) {
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      const char = this.src[this.pos];
+      if (char === '"') {
+        this.pos++;
+        this.quoted.push({ start, end: this.pos, quoting: "double-quoted" });
+        return;
+      }
+      if (char === "\\") {
+        const escaped = this.src[this.pos + 1];
+        if (escaped === "\n") {
+          this.pos += 2;
+        } else if (escaped !== void 0 && '$`"\\'.includes(escaped)) {
+          word.value += escaped;
+          this.pos += 2;
+        } else {
+          word.value += char;
+          this.pos++;
+        }
+      } else if (char === "$") {
+        this.readDollar(word, true);
+      } else if (char === "`") {
+        this.skipBackticks();
+        word.expands = true;
+      } else {
+        word.value += char;
+        this.pos++;
+      }
+    }
+  }
+  /** A `$` construct: `$'…'`, `$"…"`, `$(( … ))`, `$( … )`, `${ … }`, or a parameter. */
+  readDollar(word, inDoubleQuotes) {
+    const next = this.src[this.pos + 1];
+    word.expands = true;
+    if (next === "'" && !inDoubleQuotes) {
+      this.pos += 2;
+      for (; ; ) {
+        if (this.atEnd()) {
+          throw new Unparsed();
+        }
+        const char = this.src[this.pos];
+        this.pos += char === "\\" ? 2 : 1;
+        if (char === "'") {
+          break;
+        }
+        word.value += char;
+      }
+      word.quoted = true;
+    } else if (next === '"' && !inDoubleQuotes) {
+      this.pos++;
+      this.readDoubleQuoted(word);
+    } else if (next === "(" && this.src[this.pos + 2] === "(") {
+      this.pos += 3;
+      this.skipArithmetic();
+    } else if (next === "(") {
+      this.pos += 2;
+      word.substitutions.push(this.parseList([")"]));
+      this.pos++;
+    } else if (next === "{") {
+      this.pos += 2;
+      this.skipParameterExpansion(word);
+    } else {
+      word.value += "$";
+      this.pos++;
+    }
+  }
+  /** Past the closing `}` of a `${ … }`, collecting the substitutions inside it. */
+  skipParameterExpansion(word) {
+    for (; ; ) {
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      const char = this.src[this.pos];
+      if (char === "}") {
+        this.pos++;
+        return;
+      }
+      if (char === "\\") {
+        this.pos += 2;
+      } else if (char === "'") {
+        const close = this.src.indexOf("'", this.pos + 1);
+        if (close === -1) {
+          throw new Unparsed();
+        }
+        this.pos = close + 1;
+      } else if (char === '"') {
+        const inner = bareWord(this.pos, this.pos);
+        this.readDoubleQuoted(inner);
+        word.substitutions.push(...inner.substitutions);
+      } else if (char === "$") {
+        const inner = bareWord(this.pos, this.pos);
+        this.readDollar(inner, true);
+        word.substitutions.push(...inner.substitutions);
+      } else if (char === "`") {
+        this.skipBackticks();
+      } else {
+        this.pos++;
+      }
+    }
+  }
+  /** Past the `))` closing an arithmetic expansion or command whose `((` was read. */
+  skipArithmetic() {
+    let depth = 2;
+    while (depth > 0) {
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      const char = this.src[this.pos];
+      if (char === "\\") {
+        this.pos++;
+      } else if (char === "(") {
+        depth++;
+      } else if (char === ")") {
+        depth--;
+      }
+      this.pos++;
+    }
+  }
+  /** Past the `)` closing an array assignment's value list. */
+  skipArrayValue() {
+    this.pos++;
+    for (; ; ) {
+      this.skipLinebreaks();
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      if (this.src[this.pos] === ")") {
+        this.pos++;
+        return;
+      }
+      if (!this.atWordStart()) {
+        throw new Unparsed();
+      }
+      this.readWord();
+    }
+  }
+  /**
+   * Past a backtick substitution. Its commands run in a subshell, so a `cd`
+   * inside cannot move the script, and it is not read; a heredoc inside it
+   * would need that reading, so the script is unparsed.
+   */
+  skipBackticks() {
+    const start = this.pos + 1;
+    this.pos++;
+    for (; ; ) {
+      if (this.atEnd()) {
+        throw new Unparsed();
+      }
+      const char = this.src[this.pos];
+      if (char === "`") {
+        break;
+      }
+      this.pos += char === "\\" ? 2 : 1;
+    }
+    const body = this.src.slice(start, this.pos);
+    this.pos++;
+    if (/(?<!<)<<(?!<)/.test(body)) {
+      throw new Unparsed();
+    }
+  }
+  skipBlanks() {
+    for (; ; ) {
+      const char = this.src[this.pos];
+      if (char === " " || char === "	") {
+        this.pos++;
+      } else if (char === "\\" && this.src[this.pos + 1] === "\n") {
+        this.pos += 2;
+      } else {
+        return;
+      }
+    }
+  }
+  skipComment() {
+    const newline = this.src.indexOf("\n", this.pos);
+    this.pos = newline === -1 ? this.src.length : newline;
+  }
+  /** Blanks, comments and newlines, reading heredoc bodies at each newline. */
+  skipLinebreaks() {
+    for (; ; ) {
+      this.skipBlanks();
+      const char = this.src[this.pos];
+      if (char === "#") {
+        this.skipComment();
+      } else if (char === "\n") {
+        this.consumeNewline();
+      } else {
+        return;
+      }
+    }
+  }
+  atWordStart() {
+    const char = this.src[this.pos];
+    return char !== void 0 && char !== "#" && !WORD_BREAKS.has(char);
+  }
+  /** A reserved word (`{`, `fi`, `done`, …) standing alone at the current position. */
+  atReservedWord(reserved) {
+    if (!this.startsWith(reserved)) {
+      return false;
+    }
+    const after = this.src[this.pos + reserved.length];
+    return after === void 0 || WORD_BREAKS.has(after);
+  }
+  startsWith(text) {
+    return this.src.startsWith(text, this.pos);
+  }
+  atEnd() {
+    return this.pos >= this.src.length;
+  }
+};
+function bareWord(start, end) {
+  return {
+    value: "",
+    start,
+    end,
+    quoted: false,
+    expands: false,
+    pattern: false,
+    expandsHome: false,
+    assignment: false,
+    substitutions: []
+  };
+}
+function isReservedWord(word, reserved) {
+  return !word.quoted && !word.expands && reserved.has(word.value);
+}
+function addWord(command, word) {
+  command.words.push(word);
+  command.substitutions.push(...word.substitutions);
+  command.end = word.end;
+}
+var UnknownDirectory = class {
+};
+var UNKNOWN_EFFECT_COMMANDS = /* @__PURE__ */ new Set(["pushd", "popd", "eval", "source", "."]);
+var PATH_MAX = 4096;
+var PATCH_COMMANDS = /* @__PURE__ */ new Set(["apply_patch", "applypatch"]);
+var WALK_BUDGET_FLOOR = 1e5;
+var WALK_BUDGET_PER_CHARACTER = 16;
+var DirectoryWalk = class {
+  constructor(budget) {
+    this.budget = budget;
+  }
+  extents = [];
+  /** The directory of the patch command reading the text being walked, if one does. */
+  reader;
+  steps = 0;
+  list(list, directory) {
+    return this.run(list, directory).after;
+  }
+  /** A list, with the status its last and-or list exits with. */
+  run(list, directory) {
+    let outcome = { after: directory, status: "success", moved: false };
+    for (const item of list.items) {
+      const next = this.andOr(item, outcome.after);
+      outcome = item.background ? { ...outcome, status: "success", moved: false } : next;
+    }
+    return outcome;
+  }
+  andOr(item, directory) {
+    let outcome = this.pipeline(item.pipelines[0], directory);
+    item.operators.forEach((operator, index) => {
+      const on = operator === "&&" ? "success" : "failure";
+      const next = this.pipeline(item.pipelines[index + 1], branchStart(outcome, on));
+      if (outcome.status === on) {
+        outcome = { ...next, moved: outcome.moved || next.moved };
+      } else if (next.moved) {
+        outcome = { ...outcome, after: new UnknownDirectory() };
+      }
+    });
+    return outcome;
+  }
+  /**
+   * Every member of a pipeline starts in the directory the pipeline starts
+   * in. All but the last run in subshells; zsh runs the last in the current
+   * shell and bash does not, so a directory change there is unknown after it.
+   * When a member is a patch command, the other members feed it.
+   */
+  pipeline(pipeline, directory) {
+    const after = this.members(pipeline.commands, directory);
+    return {
+      after,
+      status: pipeline.negated ? "failure" : "success",
+      moved: after !== directory
+    };
+  }
+  members(commands, directory) {
+    if (commands.length === 1) {
+      return this.command(commands[0], directory);
+    }
+    const reader = this.reader;
+    if (commands.some((command) => command.kind === "simple" && isPatchCommand(command.words))) {
+      this.reader = directory;
+    }
+    let last = directory;
+    for (const command of commands) {
+      last = this.command(command, directory);
+    }
+    this.reader = reader;
+    return last === directory ? directory : new UnknownDirectory();
+  }
+  command(command, directory) {
+    switch (command.kind) {
+      case "simple":
+        return this.simple(command, directory);
+      case "subshell":
+        this.text(command.tail, directory, false);
+        this.list(command.body, directory);
+        return directory;
+      case "group":
+        this.text(command.tail, directory, false);
+        return this.list(command.body, directory);
+      case "if":
+        return this.ifCommand(command, directory);
+      case "case":
+        return this.caseCommand(command, directory);
+      case "loop":
+        return this.loop(command, directory);
+      case "function":
+        this.command(command.body, new UnknownDirectory());
+        return new UnknownDirectory();
+    }
+  }
+  /** Each condition runs after the ones before it failed; one body, or none, runs. */
+  ifCommand(command, directory) {
+    this.text(command.tail, directory, false);
+    return this.clauses(command.clauses, command.otherwise, directory);
+  }
+  /**
+   * The first clause, and the rest (the `elif` clauses after it and the `else`
+   * body), which runs when the first clause's condition fails, as in `if C;
+   * then BODY; else REST; fi`. When the condition does not move the shell,
+   * both paths start where it ends. When it does, the one it takes off the
+   * followed path starts from an unknown directory and, as after `||`, keeps
+   * the directory the other reached unless it moves the shell itself.
+   */
+  clauses(clauses, otherwise, directory) {
+    const [clause, ...rest] = clauses;
+    if (!clause) {
+      return otherwise ? this.list(otherwise, directory) : directory;
+    }
+    const checked = this.run(clause.condition, directory);
+    const body = (start2) => this.list(clause.body, start2);
+    const remainder = (start2) => this.clauses(rest, otherwise, start2);
+    if (!checked.moved) {
+      return common([body(checked.after), remainder(checked.after)]);
+    }
+    const followed = checked.status === "success" ? body : remainder;
+    const other = checked.status === "success" ? remainder : body;
+    const end = followed(checked.after);
+    const start = new UnknownDirectory();
+    return other(start) === start ? end : new UnknownDirectory();
+  }
+  /** One branch runs, or none; a branch fallen into may start where the one before ended. */
+  caseCommand(command, directory) {
+    this.text(command.tail, directory, false);
+    this.text(command.subject, directory, false);
+    const ends = [directory];
+    let fallenFrom = null;
+    for (const branch of command.branches) {
+      this.text(branch.patterns, directory, false);
+      const start = fallenFrom === null ? directory : common([directory, fallenFrom]);
+      const end = this.list(branch.body, start);
+      ends.push(end);
+      fallenFrom = branch.fallsThrough ? end : null;
+    }
+    return common(ends);
+  }
+  /**
+   * A loop runs its body any number of times. When a pass ends where it
+   * started, every pass does. Otherwise the passes after the first start
+   * elsewhere, so the loop is walked again from an unknown directory, whose
+   * placements then stand for every pass.
+   */
+  loop(command, directory) {
+    this.text(command.tail, directory, false);
+    if (command.head) {
+      this.text(command.head, directory, false);
+    }
+    const mark = this.extents.length;
+    const first = this.pass(command, directory);
+    if (first.next === directory) {
+      return first.exit;
+    }
+    if (directory instanceof UnknownDirectory) {
+      return new UnknownDirectory();
+    }
+    this.extents.length = mark;
+    const later = this.pass(command, new UnknownDirectory());
+    return common([first.exit, later.exit]);
+  }
+  /**
+   * One pass of a loop from `start`: where the next pass starts, and where
+   * the loop ends if it ends instead, once a `for` loop's words run out, or
+   * on the status of its condition that ends it: failure for `while`,
+   * success for `until`.
+   */
+  pass(command, start) {
+    if (!command.condition) {
+      return { next: this.list(command.body, start), exit: start };
+    }
+    const checked = this.run(command.condition, start);
+    const [runs, ends] = command.until ? ["failure", "success"] : ["success", "failure"];
+    return {
+      next: this.list(command.body, branchStart(checked, runs)),
+      exit: branchStart(checked, ends)
+    };
+  }
+  simple(command, directory) {
+    this.text(command, directory, isPatchCommand(command.words));
+    const effect = directoryEffect(command.words);
+    switch (effect.kind) {
+      case "none":
+        return directory;
+      case "unknown":
+        return new UnknownDirectory();
+      case "cd": {
+        let moved;
+        if (isAbsolute(effect.operand)) {
+          moved = resolve(effect.operand);
+        } else if (typeof directory === "string") {
+          moved = resolve(directory, effect.operand);
+        } else {
+          return new UnknownDirectory();
+        }
+        return moved.length > PATH_MAX ? new UnknownDirectory() : moved;
+      }
+    }
+  }
+  /**
+   * Place a command's words and heredoc bodies, after walking the
+   * substitutions in them, which run first and in the same directory. A patch
+   * command reads its own text and what its substitutions print; any other
+   * command's text is read by the patch command it feeds, if there is one.
+   */
+  text(command, directory, patchCommand) {
+    if (++this.steps > this.budget) {
+      throw new Unparsed();
+    }
+    const reader = this.reader;
+    if (patchCommand) {
+      this.reader = directory;
+    }
+    for (const substitution of command.substitutions) {
+      this.list(substitution, directory);
+    }
+    const read = this.reader !== void 0;
+    const placed = typeof this.reader === "string" ? this.reader : null;
+    this.reader = reader;
+    if (command.end > command.start) {
+      this.extents.push({ start: command.start, end: command.end, read, directory: placed });
+    }
+    for (const [start, end] of command.heredocs) {
+      this.extents.push({ start, end, read, directory: placed });
+    }
+  }
+};
+function branchStart(outcome, on) {
+  return outcome.status === on || !outcome.moved ? outcome.after : new UnknownDirectory();
+}
+function common(ends) {
+  return ends.every((end) => end === ends[0]) ? ends[0] : new UnknownDirectory();
+}
+function commandIndex(words) {
+  let index = 0;
+  while (words[index]?.assignment) {
+    index++;
+  }
+  while (words[index] && isReservedWord(words[index], /* @__PURE__ */ new Set(["builtin", "command"])) && !words[index + 1]?.value.startsWith("-")) {
+    index++;
+  }
+  return index;
+}
+function isPatchCommand(words) {
+  const name = words[commandIndex(words)];
+  return name !== void 0 && !name.expands && PATCH_COMMANDS.has(basename(name.value));
+}
+function directoryEffect(words) {
+  const index = commandIndex(words);
+  const name = words[index];
+  if (!name || name.expands) {
+    return { kind: "none" };
+  }
+  if (name.value === "cd") {
+    return cdEffect(words.slice(index + 1));
+  }
+  if (UNKNOWN_EFFECT_COMMANDS.has(name.value)) {
+    return { kind: "unknown" };
+  }
+  return { kind: "none" };
+}
+function cdEffect(args) {
+  let index = 0;
+  while (args[index] && !args[index].expands && ["-L", "-P"].includes(args[index].value)) {
+    index++;
+  }
+  let endOfOptions = false;
+  if (args[index] && !args[index].expands && args[index].value === "--") {
+    endOfOptions = true;
+    index++;
+  }
+  const operands = args.slice(index);
+  if (operands.length !== 1) {
+    return { kind: "unknown" };
+  }
+  const operand = operands[0];
+  if (operand.expands || operand.pattern || operand.expandsHome || operand.value === "" || operand.value.startsWith("-") && !endOfOptions || /^\+\d+$/.test(operand.value)) {
+    return { kind: "unknown" };
+  }
+  return { kind: "cd", operand: operand.value };
+}
 
 // src/hooks/check-core.ts
 function parseJsonOrNull(stdinJson) {
@@ -568,19 +1788,101 @@ function extractMthdsFilePath(stdinJson) {
   }
   return filePath;
 }
-function extractCodexMthdsFiles(stdinJson) {
+var UNPLACED_KEY = "\0";
+function extractCodexMthdsTargets(stdinJson, processCwd) {
   const parsed = parseJsonOrNull(stdinJson);
+  const fromShell = parsed?.tool_name === "Bash";
   const command = parsed?.tool_input?.command;
   if (typeof command !== "string") {
-    return [];
+    return { fromShell, targets: [], unplaced: [] };
   }
-  const headerRe = /^\*\*\* (?:Update File|Add File|Move to):\s*(.+\.mthds)\s*$/gm;
-  const seen = /* @__PURE__ */ new Set();
-  let match;
-  while ((match = headerRe.exec(command)) !== null) {
-    seen.add(match[1].trim());
+  const sessionDir = typeof parsed?.cwd === "string" && isAbsolutePath(parsed.cwd) ? parsed.cwd : processCwd;
+  let sections = readPatchSections(command);
+  let directoryOf = () => sessionDir;
+  let readByPatch = () => true;
+  let addedLinesOf = (section) => section.addedLines;
+  if (fromShell) {
+    const reading = readShellScript(command, sessionDir);
+    if (reading === "unparsed") {
+      directoryOf = () => null;
+      readByPatch = () => false;
+    } else {
+      const placements = new Map(
+        sections.map((section) => [section, reading.directoryAt(section.offset)])
+      );
+      sections = sections.filter((section) => placements.get(section).kind !== "outside");
+      directoryOf = (section) => {
+        const placement = placements.get(section);
+        return placement.kind === "directory" ? placement.path : null;
+      };
+      readByPatch = (section) => placements.get(section).kind !== "unread";
+      addedLinesOf = (section) => linesAsRead(section.addedLines, reading.quotingAt(section.offset));
+    }
   }
-  return Array.from(seen);
+  const keyOf = (path, section) => {
+    if (isAbsolutePath(path)) {
+      return resolvePath(path);
+    }
+    const directory = directoryOf(section);
+    return directory === null ? UNPLACED_KEY + path : resolvePath(directory, path);
+  };
+  const targets = [];
+  const unplaced = [];
+  for (const file of patchTargets(sections, keyOf)) {
+    if (!file.key.startsWith(UNPLACED_KEY)) {
+      targets.push({
+        path: file.key,
+        writtenAs: file.path,
+        addedLines: file.sections.map(addedLinesOf),
+        removedByPatch: file.removedByPatch,
+        confirm: !fromShell ? null : !isAbsolutePath(file.path) || !file.sections.some(readByPatch) ? "carried" : "unrefuted"
+      });
+    } else if (!unplaced.includes(file.path)) {
+      unplaced.push(file.path);
+    }
+  }
+  return { fromShell, targets, unplaced };
+}
+function selectCodexTargets(extracted, readFile) {
+  const targets = [];
+  const unchecked = [...extracted.unplaced];
+  for (const target of extracted.targets) {
+    const content = readFile(target.path);
+    const confirmed = content !== null && (target.confirm === null || target.addedLines.some(
+      (addedLines) => carriesAddedLines(content, addedLines) || target.confirm === "unrefuted" && comparedLines(addedLines).length === 0
+    ));
+    if (confirmed) {
+      targets.push(target.path);
+    } else if (target.confirm === "carried" && !isAbsolutePath(target.writtenAs) && (content !== null || !target.removedByPatch) && !unchecked.includes(target.writtenAs)) {
+      unchecked.push(target.writtenAs);
+    }
+  }
+  return { targets, unchecked };
+}
+function carriesAddedLines(content, addedLines) {
+  const wanted = comparedLines(addedLines);
+  if (wanted.length === 0) {
+    return false;
+  }
+  let next = 0;
+  for (const line of content.split("\n")) {
+    if (line.trimEnd() === wanted[next]) {
+      next++;
+      if (next === wanted.length) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+function comparedLines(addedLines) {
+  return addedLines.map((line) => line.trimEnd()).filter((line) => line !== "");
+}
+function uncheckedShellPatchNote(paths) {
+  const named = paths.map((path) => `\`${path}\``);
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
+  const context = named.length === 1 ? `The .mthds hook did not check ${list}: it could not confirm which file this shell command patched. Name the file by its absolute path, or edit it with the apply_patch tool, and the hook will check it.` : `The .mthds hook did not check ${list}: it could not confirm which files this shell command patched. Name the files by their absolute paths, or edit them with the apply_patch tool, and the hook will check them.`;
+  return { kind: "context", context: truncate(context) };
 }
 function extractVibeMthdsFilePath(stdinJson) {
   const parsed = parseJsonOrNull(stdinJson);
@@ -708,7 +2010,7 @@ function encodeOutcome(outcome, platform = "claude") {
 
 // src/hooks/bundle-gather.ts
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve as resolve2 } from "node:path";
 var EXCLUDED_DIRS = /* @__PURE__ */ new Set([
   "venv",
   "env",
@@ -736,7 +2038,7 @@ function walkMthdsFiles(dir, collected) {
   }
 }
 function gatherBundle(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
-  const editedAbs = resolve(editedFilePath);
+  const editedAbs = resolve2(editedFilePath);
   const parentDir = dirname(editedAbs);
   const paths = [];
   try {
@@ -744,7 +2046,7 @@ function gatherBundle(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
   } catch {
     return { ok: false, reason: "unreadable" };
   }
-  const ordered = [editedAbs, ...paths.filter((path) => resolve(path) !== editedAbs)];
+  const ordered = [editedAbs, ...paths.filter((path) => resolve2(path) !== editedAbs)];
   if (ordered.length > caps.maxFiles) {
     return { ok: false, reason: "overflow" };
   }
@@ -883,10 +2185,12 @@ var UploadAuthenticationError = class extends InputPreparationError {
 };
 var UploadTransportError = class extends InputPreparationError {
   status;
+  code;
   constructor(message, options) {
     super(message, options);
     this.name = "UploadTransportError";
     this.status = options?.status;
+    this.code = options?.code;
   }
 };
 var ArtifactOperationError = class extends PipelineRequestError {
@@ -1036,10 +2340,25 @@ var ApiResponseError = class extends PipelineRequestError {
   }
 };
 
+// src/timers.ts
+var MAX_TIMER_DELAY_MS = 2147483647;
+function isTimerDelay(value) {
+  return Number.isFinite(value) && value > 0 && value <= MAX_TIMER_DELAY_MS;
+}
+
 // src/runs.ts
 var DEFAULT_POLL_INTERVAL_MS = 2e3;
 var DEFAULT_WAIT_TIMEOUT_MS = 12e5;
+function assertWaitOptions(options = {}) {
+  const { intervalMs, timeoutMs } = options;
+  if (Number.isNaN(intervalMs) || Number.isNaN(timeoutMs)) {
+    throw new RangeError(
+      `"intervalMs" and "timeoutMs" must be numbers, got ${String(intervalMs)} and ${String(timeoutMs)}.`
+    );
+  }
+}
 async function pollUntilResult(fetchOnce, runId, options = {}) {
+  assertWaitOptions(options);
   const intervalMs = options.intervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
   const startedAt = Date.now();
@@ -1081,15 +2400,18 @@ function sleep(ms, signal) {
     throwIfAborted(signal);
     return Promise.resolve();
   }
-  return new Promise((resolve2, reject) => {
+  return new Promise((resolve3, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
       reject(abortError(signal));
     };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve2();
-    }, ms);
+    const timer = setTimeout(
+      () => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve3();
+      },
+      Math.min(ms, MAX_TIMER_DELAY_MS)
+    );
     if (signal) {
       if (signal.aborted) {
         clearTimeout(timer);
@@ -1132,7 +2454,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.23.0";
+var SDK_VERSION = "0.25.1";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -1267,7 +2589,7 @@ var EXTENSION_MIME = {
 function isNodeRuntime() {
   return typeof process !== "undefined" && process.versions != null && process.versions.node != null;
 }
-function basename(path) {
+function basename2(path) {
   const parts = path.split(/[\\/]/);
   return parts[parts.length - 1] || path;
 }
@@ -1309,7 +2631,7 @@ function bytesToBase64(bytes) {
 async function toAssetBytes(asset, options) {
   if (typeof asset === "string") {
     const bytes2 = await readLocalPath(asset);
-    const filename2 = options.filename ?? basename(asset);
+    const filename2 = options.filename ?? basename2(asset);
     return { bytes: bytes2, filename: filename2, contentType: options.contentType ?? guessContentType(filename2) };
   }
   if (asset instanceof Uint8Array) {
@@ -1364,19 +2686,25 @@ function mapUploadError(error, filename) {
       default:
         return new UploadTransportError(
           `Upload of "${filename}" failed (${error.status}): ${error.serverMessage ?? error.statusText}.`,
-          { cause: error, status: error.status }
+          {
+            cause: error,
+            status: error.status,
+            code: error.status >= 500 ? "server_error" : "unexpected"
+          }
         );
     }
   }
   if (error instanceof ApiUnreachableError) {
     return new UploadTransportError(
       `Upload of "${filename}" could not reach the Pipelex API (${error.code ?? "unreachable"}).`,
-      { cause: error }
+      // The client's own request timeout surfaces as an unreachable host with this code.
+      { cause: error, code: error.code === "ABORT_TIMEOUT" ? "timeout" : "unreachable" }
     );
   }
   const detail = error instanceof Error ? error.message : String(error);
   return new UploadTransportError(`Upload of "${filename}" failed unexpectedly: ${detail}.`, {
-    cause: error
+    cause: error,
+    code: "unexpected"
   });
 }
 
@@ -1762,7 +3090,11 @@ function fetchBounds(options) {
   const maxBytes = options.maxBytes ?? DEFAULT_ARTIFACT_MAX_BYTES;
   const timeoutMs = options.timeoutMs ?? DEFAULT_ARTIFACT_TIMEOUT_MS;
   requirePositive("maxBytes", maxBytes);
-  requirePositive("timeoutMs", timeoutMs);
+  if (!isTimerDelay(timeoutMs)) {
+    throw new ArtifactOperationError(
+      `"timeoutMs" must be a positive number no larger than ${MAX_TIMER_DELAY_MS}, got ${String(timeoutMs)}.`
+    );
+  }
   return { maxBytes, timeoutMs, allowHttp: options.allowHttp ?? false, signal: options.signal };
 }
 function requirePositive(name, value) {
@@ -2534,6 +3866,11 @@ var PipelexApiClient = class {
     const hasBody = options.body !== void 0;
     const headers = this.requestHeaders(hasBody);
     const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    if (!isTimerDelay(timeoutMs)) {
+      throw new RangeError(
+        `"timeoutMs" must be a positive number no larger than ${MAX_TIMER_DELAY_MS}, got ${String(timeoutMs)}.`
+      );
+    }
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(new DOMException("Request timed out.", "TimeoutError")),
@@ -2557,7 +3894,9 @@ var PipelexApiClient = class {
       body = await response.text();
     } catch (err) {
       if (userSignal?.aborted) throw userSignal.reason;
-      const code = extractNetworkErrorCode(err);
+      const code = extractNetworkErrorCode(
+        controller.signal.aborted ? controller.signal.reason : err
+      );
       throw new ApiUnreachableError(
         `Could not reach Pipelex API at ${this.baseUrl} (${code ?? "network error"})`,
         this.baseUrl,
@@ -3169,7 +4508,8 @@ var PipelexApiClient = class {
    * long, so it gets its own generous timeout (5 min) rather than the 30s the static
    * routes use, and it is the ONLY extension route that takes transport options at all
    * (the policy note on `requestExtension` says why the static ones do not). Override it
-   * per call with `options.timeoutMs`; a caller that stops caring mid-sweep can cancel
+   * per call with `options.timeoutMs`, a positive number no larger than 2147483647 (else a
+   * `RangeError`); a caller that stops caring mid-sweep can cancel
    * via `options.signal` instead of waiting it out.
    */
   async buildRunner(request, options = {}) {
@@ -3289,6 +4629,7 @@ var PipelexApiClient = class {
    *   has no gateway cap off-platform and returns the native `pipe_output`.
    */
   async startAndWaitForResult(options, pollOptions) {
+    assertWaitOptions(pollOptions);
     if (await this.supportsRunLifecycle()) {
       let ack;
       try {
@@ -3511,18 +4852,6 @@ var PipelexApiClient = class {
    */
   async rotatePipelexApiKey(id) {
     return this.requestProduct("POST", `pipelex-api-keys/${encodeURIComponent(id)}/rotate`);
-  }
-  /**
-   * Provision the gateway (LLM inference) API key — `POST /v1/gateway-api-key`.
-   * The JSON body is ALWAYS sent (even with `promo_code: null`) — the server
-   * 422s an empty body.
-   */
-  async createGatewayApiKey(input) {
-    return this.requestProduct("POST", "gateway-api-key", input);
-  }
-  /** The gateway key status (`null` until provisioned) — `GET /v1/gateway-api-key`. */
-  async getGatewayApiKey() {
-    return this.requestProduct("GET", "gateway-api-key");
   }
   /** Submit the onboarding questionnaire — `POST /v1/onboarding/submit`. */
   async submitOnboarding(input) {
@@ -3941,6 +5270,13 @@ function parsePlatform(argv) {
   }
   return "claude";
 }
+function readFileOrNull(filePath) {
+  try {
+    return readFileSync2(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
 function resolveTargets(platform, stdinJson) {
   let candidates;
   switch (platform) {
@@ -3949,17 +5285,15 @@ function resolveTargets(platform, stdinJson) {
       candidates = filePath ? [filePath] : [];
       break;
     }
-    case "codex": {
-      candidates = extractCodexMthdsFiles(stdinJson).map((raw) => resolvePath(process.cwd(), raw));
-      break;
-    }
+    case "codex":
+      return selectCodexTargets(extractCodexMthdsTargets(stdinJson, process.cwd()), readFileOrNull);
     case "vibe": {
       const extracted = extractVibeMthdsFilePath(stdinJson);
-      candidates = extracted ? [resolvePath(extracted.cwd ?? process.cwd(), extracted.filePath)] : [];
+      candidates = extracted ? [resolvePath2(extracted.cwd ?? process.cwd(), extracted.filePath)] : [];
       break;
     }
   }
-  return candidates.filter((filePath) => existsSync(filePath));
+  return { targets: candidates, unchecked: [] };
 }
 async function loadEngine() {
   const engine = await Promise.resolve().then(() => __toESM(require_dist(), 1));
@@ -4021,10 +5355,8 @@ function warn(message) {
 `);
 }
 async function checkOneFile(engine, filePath) {
-  let content;
-  try {
-    content = readFileSync2(filePath, "utf-8");
-  } catch {
+  const content = readFileOrNull(filePath);
+  if (content === null) {
     return { kind: "pass" };
   }
   const lintStage = {
@@ -4048,19 +5380,18 @@ async function checkOneFile(engine, filePath) {
 }
 async function main() {
   const platform = parsePlatform(process.argv.slice(2));
-  const filePaths = resolveTargets(platform, await readStdin());
-  if (filePaths.length === 0) {
-    return;
-  }
-  let engine;
-  try {
-    engine = await loadEngine();
-  } catch {
-    return;
-  }
+  const { targets, unchecked } = resolveTargets(platform, await readStdin());
   const outcomes = [];
-  for (const filePath of filePaths) {
-    outcomes.push(await checkOneFile(engine, filePath));
+  if (targets.length > 0) {
+    const engine = await loadEngine().catch(() => null);
+    if (engine) {
+      for (const target of targets) {
+        outcomes.push(await checkOneFile(engine, target));
+      }
+    }
+  }
+  if (unchecked.length > 0) {
+    outcomes.push(uncheckedShellPatchNote(unchecked));
   }
   emit(mergeOutcomes(outcomes), platform);
 }

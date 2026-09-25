@@ -52,14 +52,14 @@ Check the requested change against the scope split at the top. Structural or con
 
 ### Step 3: Baseline verdict
 
-Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change: surface the `validation_errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
 
 ### Step 4: Apply the edits
 
-Before editing a construct you have not touched recently, read [the MTHDS reference](../shared/mthds-reference.md). A rename is done only when **no stale reference remains**: grep the whole bundle for the old code.
+Before editing a construct you have not touched recently, read [the MTHDS reference](../shared/writing-mthds.md). A rename is done only when **no stale reference remains**: grep the whole bundle for the old code.
 
 - **Rename a pipe**: the `[pipe.<code>]` table header, every step or branch reference in controllers, and `main_pipe` in the root if it names this pipe.
 - **Rename a concept**: the declaration, every `inputs`/`output` mention, `refines` references, `concept` fields inside structures, and field-reads in prompts (a `$var.field` stays keyed to the *variable*, but construct `from` paths and concept-typed fields name the concept).
@@ -93,5 +93,5 @@ State what changed (files and constructs), give the verdict line from the summar
 
 ## References
 
-- [MTHDS reference](../shared/mthds-reference.md): before editing a construct you have not touched recently.
+- [MTHDS reference](../shared/writing-mthds.md): before editing a construct you have not touched recently.
 - [Native content types](../shared/native-content-types.md): editing a prompt or construct path that field-reads a native concept (`Image.url`, `Page.text_and_images`, …).

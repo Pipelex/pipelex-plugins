@@ -68,9 +68,9 @@ class TestPipelexEditSkill:
     def test_the_authoring_reference_is_pointed_at_where_edits_are_made(self, target_name: str) -> None:
         """Box B puts a pointer at its condition, never only in the closing index."""
         body = self.render(target_name)
-        pointer = "Before editing a construct you have not touched recently, read [the MTHDS reference](../shared/mthds-reference.md)."
+        pointer = "Before editing a construct you have not touched recently, read [the MTHDS reference](../shared/writing-mthds.md)."
         assert pointer in self.section(body, "### Step 4: Apply the edits")
-        assert "[MTHDS reference](../shared/mthds-reference.md): before editing a construct you have not touched recently." in body
+        assert "[MTHDS reference](../shared/writing-mthds.md): before editing a construct you have not touched recently." in body
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_it_ships_no_reference_of_its_own(self, target_name: str) -> None:

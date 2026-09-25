@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "Pipelex",
     "shortDescription": "Build and run AI methods from Codex with Pipelex.",
-    "longDescription": "Build and run AI methods from Codex with Pipelex. Skills design a method in MTHDS, prepare its inputs, run it, save it to your Pipelex account and wire it into your code, and a hook checks every .mthds edit. Export PIPELEX_API_KEY with a key from your console at app.pipelex.com; there is nothing else to install.",
+    "longDescription": "Build and run AI methods from Codex with Pipelex. Skills design a method in MTHDS, prepare its inputs, run it, save it to your Pipelex account and wire it into your code, and a hook checks every .mthds edit. The hook and the Pipelex tools run on Node.js, which must be on your PATH. Export PIPELEX_API_KEY with a key from your console at app.pipelex.com; there is nothing else to install.",
     "developerName": "Pipelex",
     "category": "Developer Tools",
     "websiteURL": "https://pipelex.com",
@@ -22,7 +22,7 @@
   },
   "name": "pipelex",
   "description": "Build and run AI methods from your agent with Pipelex: skills that write them in MTHDS, a hook that checks every edit, and the Pipelex tools.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "mcpServers": {
     "pipelex": {
       "command": "npx",

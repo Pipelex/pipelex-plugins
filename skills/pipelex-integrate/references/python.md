@@ -71,7 +71,7 @@ from pipelex_sdk.runs import RunResults
 
 from <package>.generated.summarize_pdf.models import DocumentSummary
 
-PIPE_CODE = "summarize_pdf"
+PIPE_CODE = "summarize.summarize_pdf"
 BUNDLE_DIR = Path(__file__).resolve().parent.parent / "methods" / "summarize_pdf"
 
 
@@ -119,6 +119,8 @@ def summarize_pdf_sync(*, document: dict[str, Any], context: str | None = None) 
     """The blocking wrapper for a synchronous caller."""
     return asyncio.run(summarize_pdf(document=document, context=context))
 ```
+
+**`PIPE_CODE` is the verdict's `main_pipe.pipe_ref`, verbatim**: the value the sidecar's `pipe` record holds, with the whole of its domain, even a dotted one (`legal.contracts.summarize`). The run resolves it as an exact `domain.pipe_code`. Stripped to the bare code, it still runs until two domains of the bundle declare that code, and from then on every run fails as ambiguous, which neither the type checker nor the gate can see.
 
 **A list output is narrowed through its envelope.** The template above is right for an output whose `multiplicity` is `single`. A `variable` or `fixed` output arrives as the envelope `{"items": [...]}` — the runtime's `ListContent` serialised — and not as a top-level list, so `Model.model_validate(results.main_stuff)` rejects it and a run that succeeded fails in the narrowing. Validate the `items` as a list of the model, so `output` is `list[T]`:
 

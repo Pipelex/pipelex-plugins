@@ -15,9 +15,10 @@
 #     <plane>   production when the base URL `.env` resolves to is https://api.pipelex.com, or
 #               when it names none; other for any other URL
 #   refused: <reason>   no key was written, and <reason> is one of usage, no-directory,
-#                       not-a-repository (<dir> is not the root of a repository of its own),
-#                       not-ignored, write-failed (a file in <dir> could not be written, or
-#                       `.env` could not be closed to other users before the key reached it)
+#                       not-a-repository (<dir> is not where the pristine commit leaves it: it
+#                       has not run), not-ignored, write-failed (a file in <dir> could not be
+#                       written, or `.env` could not be closed to other users before the key
+#                       reached it)
 # The exit code is presentation: 0 unless refused.
 #
 # Why every value moves through this shell and never through the model: a value typed into a
@@ -37,10 +38,40 @@ refuse() {
 }
 
 [ $# -eq 1 ] || refuse usage
-dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd) || refuse no-directory
-# The pristine commit made <dir> the root of a repository of its own. Inside the user's repository
-# instead, `.gitignore` and `.env` would be judged and written by their rules, in their worktree.
-prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) && [ -z "$prefix" ] || refuse not-a-repository
+# <dir> where it physically is, as the pristine commit reads it.
+dir=$(CDPATH= cd -- "$1" 2> /dev/null && pwd -P) || refuse no-directory
+
+# Whether the repository whose work tree holds <dir>'s parent ignores <dir>, the directory: then a
+# repository there is as invisible to it as plain files would be. It is asked from the parent,
+# naming <dir> with no trailing slash: git reads a path as a directory when one stands there, and
+# a slash, which asking from inside as `.` adds, makes `*` and `<name>/*` match an empty last name,
+# so a directory a later pattern re-includes (`!*/`) would read as ignored. The `./` keeps a
+# leading `:` from reading as pathspec magic, which `--literal-pathspecs` cannot, since
+# check-ignore refuses it. Any answer but a plain yes reads as not ignored, because mistaking a
+# tracked directory for an ignored one plants a repository in the user's tracked tree, and git
+# reads a directory holding a tracked path as not ignored whatever the patterns say.
+ignored_around() {
+  parent=${dir%/*}
+  git -C "${parent:-/}" check-ignore -q -- "./${dir##*/}"
+}
+
+# The pristine commit left <dir> the root of a repository of its own, a repository planted inside
+# another's work tree, which it reports as `nested:`, or a directory inside another repository's
+# work tree that does not ignore it, with no repository of its own (`inside:` or `unversioned:`).
+# A root is judged by its own rules, which for a nested one are <dir>'s .gitignore files, read by
+# the enclosing repository too once the user removes <dir>/.git; a directory with no repository of
+# its own by its own rules as well (see project_git). A <dir> outside every work tree, or one its
+# enclosing repository ignores, is where the pristine commit makes a repository, so it has not run:
+# git could judge no ignore rule there that a repository of the project's reads, and nothing is
+# written.
+prefix=$(git -C "$dir" rev-parse --show-prefix 2> /dev/null) || refuse not-a-repository
+own_rules=
+no_index=
+if [ -n "$prefix" ]; then
+  ! ignored_around || refuse not-a-repository
+  own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)
+  no_index=--no-index
+fi
 example="$dir/.env.example"
 env="$dir/.env"
 
@@ -66,27 +97,48 @@ else
   add_missing_lines "$example"
 fi
 
-# An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
-# hidden example is never reviewed, committed or carried by a clone.
-if git -C "$dir" check-ignore -q -- .env.example; then
-  printf '\n!.env.example\n' >> "$dir/.gitignore" || refuse write-failed
-fi
+# git over <dir> as its ignore rules are judged. With no repository of its own, <dir> is judged by
+# its own rules, whether the enclosing repository shows its files or not: a line in <dir>'s own
+# .gitignore binds that repository too, since a deeper .gitignore decides over those above it, and
+# binds a repository the user makes there later, which reads no other, while a rule of the
+# enclosing repository's, which may ignore every file of the project, binds that repository alone.
+# So the enclosing git directory takes <dir> as its work tree, which reads only the .gitignore
+# files inside <dir>, and `$no_index` keeps its index, whose paths are not <dir>'s, out of
+# `check-ignore`.
+project_git() {
+  if [ -n "$own_rules" ]; then
+    git -C "$dir" --git-dir="$own_rules" --work-tree="$dir" "$@"
+  else
+    git -C "$dir" "$@"
+  fi
+}
 
 # Ignored by a .gitignore the project carries. This machine's global excludes file and the
-# repository's info/exclude never travel with a clone, so a teammate's `git add` would take a
-# `.env` that only this machine ignores.
+# repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
+# only this machine ignores.
 ignored_by_the_project() {
-  git -C "$dir" -c core.excludesFile=/dev/null check-ignore -q -- "$1" || return 1
-  source=$(git -C "$dir" -c core.excludesFile=/dev/null check-ignore -v -- "$1")
+  project_git -c core.excludesFile=/dev/null check-ignore $no_index -q -- "$1" || return 1
+  source=$(project_git -c core.excludesFile=/dev/null check-ignore $no_index -v -- "$1")
   case ${source%%:*} in .gitignore | */.gitignore) return 0 ;; esac
   return 1
 }
+
+# An initializer's `.env*` rule, which create-next-app writes, hides the example as well, and a
+# hidden example is never reviewed, committed or carried by a clone. With no repository of its own,
+# a rule in an enclosing repository's .gitignore files is that repository's policy for its whole
+# tree, which the project's .gitignore adds to and never lifts, and project_git does not read it.
+if project_git check-ignore $no_index -q -- .env.example; then
+  printf '\n!.env.example\n' >> "$dir/.gitignore" || refuse write-failed
+fi
 
 # `.env` is ignored before a key can reach it, and nothing is written when it cannot be.
 if ! ignored_by_the_project .env; then
   printf '\n.env\n' >> "$dir/.gitignore" || refuse write-failed
   ignored_by_the_project .env || refuse not-ignored
 fi
+# Read with no index, the project's rules cannot see a `<dir>/.env` the enclosing repository tracks,
+# which no rule ignores: that repository answers for its own index.
+[ -z "$own_rules" ] || git -C "$dir" check-ignore -q -- .env || refuse not-ignored
 
 # An existing `.env` is never overwritten: it may hold a key the user filled. A new one is
 # readable by its owner alone, since it is about to hold a key.

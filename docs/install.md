@@ -14,6 +14,8 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 | ChatGPT | The Pipelex MCP | Apps directory, or [by its address](#the-pipelex-mcp-for-chatbots) |
 | Claude chat, on the web, on mobile and in the desktop app | The Pipelex MCP | **Add custom connector**, [by its address](#the-pipelex-mcp-for-chatbots) |
 
+In every agent, the plugin needs Node.js on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The Pipelex MCP needs nothing on your machine.
+
 Cursor takes no plugin. Registering the Pipelex tools there by hand is described in the [`pipelex-mcp` developer reference](https://github.com/Pipelex/pipelex-mcp#local-workshop-install--register).
 
 ### One app, one Pipelex product
@@ -45,7 +47,7 @@ export PIPELEX_API_KEY=plx_sk_...     # the plugin configuration dialog is prefe
 
 **Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the plugin configuration dialog is the only way the key gets there. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
 
-**What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, with the same key. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
+**What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, through `npx` and with the same key, so they need Node.js on your `PATH` too. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
 
 ## Codex
 
@@ -54,7 +56,7 @@ codex plugin marketplace add Pipelex/pipelex-plugins
 export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
 ```
 
-Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later.
+Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on first run. Requires Codex 0.141 or later. The hook and the Pipelex tools need Node.js on your `PATH`.
 
 **The hook.** The `hooks` feature is stable and on by default from Codex 0.141, so there is nothing to enable. Codex asks you to trust the plugin hook on first run and keeps the trusted hashes under `[hooks.state]`. The hook lints and formats locally and validates on the Pipelex API when `PIPELEX_API_KEY` is set; a network-sandboxed session skips the validation. See [the validation hook](hooks.md).
 
@@ -76,7 +78,7 @@ The same override works for one invocation: `codex -c 'mcp_servers.pipelex.comma
 
 ## Mistral Vibe
 
-Mistral Vibe has no plugin marketplace, so it loads the plugin from a clone of this repository. Requires Mistral Vibe 2.21.0 or later, whose stable hooks API runs `post_tool` hooks with no opt-in flag.
+Mistral Vibe has no plugin marketplace, so it loads the plugin from a clone of this repository. Requires Mistral Vibe 2.21.0 or later, whose stable hooks API runs `post_tool` hooks with no opt-in flag. The hook and the Pipelex tools need Node.js on your `PATH`.
 
 ```bash
 git clone https://github.com/Pipelex/pipelex-plugins.git
@@ -94,14 +96,14 @@ skill_paths = ["/absolute/path/to/pipelex-plugins/pipelex-vibe/skills"]
 
 ### The hook
 
-Wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml`, or into a trusted project's `.vibe/hooks.toml`, where an entry overrides a user-level entry of the same `name`. Vibe runs a hook's command from the project directory, so a relative path resolves against the project rather than against `hooks.toml`: set the command to the script's absolute path.
+Wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml`, or into a trusted project's `.vibe/hooks.toml`, where an entry overrides a user-level entry of the same `name`. Vibe runs a hook's command from the project directory, so a relative path resolves against the project rather than against `hooks.toml`: set the command to the script's absolute path. Vibe runs the command through a shell, so keep the path in double quotes inside the single-quoted TOML string, as below; without them, a path holding a space splits in two and the hook never starts.
 
 ```toml
 [[hooks]]
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = "/absolute/path/to/pipelex-plugins/pipelex-vibe/hooks/check-mthds-vibe.sh"
+command = '"/absolute/path/to/pipelex-plugins/pipelex-vibe/hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."

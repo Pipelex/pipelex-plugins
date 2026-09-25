@@ -2,8 +2,11 @@
 """Generate skill docs, shared files, and hooks from Jinja2 templates.
 
 Renders all .j2 templates under templates/ and writes the corresponding
-output files (skills/, hooks/). Templates (.j2) are the source of truth;
-output files are build artifacts checked into git.
+output files (skills/, hooks/, mcp/). Templates (.j2) are the source of truth;
+output files are build artifacts checked into git. The build owns each
+target's output directory, so it also removes from it whatever no template or
+source produces any more, and `--check` compares the directory's whole file
+set, not only the files it renders.
 
 Supports multiple build targets (prod, codex, mistral-vibe) defined in
 targets/*.toml. Each target can override template variables, filter skills,
@@ -24,10 +27,12 @@ Usage:
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tomllib
 from collections.abc import Callable, Mapping
@@ -54,6 +59,29 @@ TARGETS_DIR_NAME = "targets"
 DEFAULTS_FILE = "defaults.toml"
 TEMPLATES_DIR_NAME = "templates"
 
+# The repository's own directories, relative to its root: the build's sources, the files it writes
+# outside any target (`.agents/`), and everything else that is nobody's output. The build prunes
+# each target's output directory down to what it produces, so a target whose `source` held one of
+# these, or sat inside one, would have its files deleted as output nothing produces:
+# `check_output_dir` refuses such a target instead.
+REPOSITORY_OWN_PATHS = (
+    ".agents",
+    ".claude",
+    ".claude-plugin",
+    ".codex-plugin",
+    ".git",
+    ".github",
+    ".venv",
+    "docs",
+    "packaging",
+    "scripts",
+    "skills",
+    TARGETS_DIR_NAME,
+    TEMPLATES_DIR_NAME,
+    "tests",
+    "wip",
+)
+
 # Codex discovers plugin marketplaces at `.agents/plugins/marketplace.json`
 # (preferred) or `.claude-plugin/marketplace.json` (fallback). We ship a
 # Codex-discoverable copy of `packaging/codex-marketplace.json` at the repo
@@ -69,16 +97,18 @@ CODEX_DISCOVERY_MARKETPLACE_DST = Path(".agents/plugins/marketplace.json")
 STATIC_ASSET_DIRS = ("references", "scripts")
 
 # Shared reference files, rendered standalone per target: the MTHDS language
-# references that ground the skills, and the files a skill reads when one of its
-# stops fires or one of its branches is taken, such as `credentials.md` and
-# `catalog-id.md`. Paths are relative to the templates/ directory.
+# reference (`writing-mthds.md`, the one every skill that reads or writes a bundle
+# points at) and the native content types that ground the skills, and the files a
+# skill reads when one of its stops fires or one of its branches is taken, such as
+# `credentials.md` and `catalog-id.md`. Paths are relative to the templates/
+# directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
 # shared blocks — are deliberately NOT listed here: they are {% include %}-d by
 # skill templates, so they must exist as files but should not be rendered
 # standalone (that would only ship a fragment).
 SHARED_TEMPLATES = [
-    "skills/shared/mthds-reference.md.j2",
+    "skills/shared/writing-mthds.md.j2",
     "skills/shared/native-content-types.md.j2",
     "skills/shared/credentials.md.j2",
     "skills/shared/catalog-id.md.j2",
@@ -97,20 +127,29 @@ HOOK_TEMPLATES = [
 ]
 
 # Hook templates by platform:
-# - Claude: hooks/hooks.json + the check-mthds.sh wrapper.
+# - Claude: hooks/hooks.json + the check-mthds.sh wrapper, and the
+#   launch-pipelex-mcp.sh launcher the manifest's MCP entry spawns.
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper, plus
-#   mcp/vibe-mcp.toml, the workshop launcher as a [[mcp_servers]] config
-#   fragment: Vibe has no plugin manifest to declare the server in, so the user
-#   copies the fragment into ~/.vibe/config.toml, as with vibe-hooks.toml.
+# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
     Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
-    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2", "mcp/vibe-mcp.toml.j2"],
+    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
+}
+
+# MCP templates by platform: the workshop launcher's declaration where a
+# platform has no plugin manifest to carry it. Mistral Vibe gets
+# mcp/vibe-mcp.toml, a [[mcp_servers]] config fragment the user copies into
+# ~/.vibe/config.toml, as with vibe-hooks.toml. The Claude and Codex manifests
+# declare the server themselves (make_plugin_json).
+MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
+    Platform.CLAUDE: [],
+    Platform.CODEX: [],
+    Platform.MISTRAL_VIBE: ["mcp/vibe-mcp.toml.j2"],
 }
 
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
@@ -136,6 +175,11 @@ EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vib
 # (mcp__plugin_pipelex_pipelex__mthds_validate) and mcp__<server>__<tool> on
 # Codex (mcp__pipelex__mthds_validate).
 MCP_SERVER_NAME = "pipelex"
+
+# What the Claude manifest's MCP entry spawns when the target declares plugin
+# user configuration: the launcher that promotes the user's options to their
+# PIPELEX_* names (make_plugin_json, and scripts/check.py's credential check).
+CLAUDE_MCP_LAUNCHER_COMMAND = "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"
 
 
 @dataclass
@@ -168,10 +212,23 @@ class TargetConfig:
 
 @dataclass
 class BuildResult:
-    """Result of rendering templates for a target."""
+    """Result of rendering templates for a target.
+
+    `files` holds what the build writes, rendered or copied from a static hook asset, with its
+    content; `copied` names the per-skill `references/` and `scripts/` files `setup_static_assets`
+    copies whole; `pruned` names what a build (never a dry run) removed from the output directory
+    because nothing produces it any more.
+    """
 
     files: dict[Path, str] = field(default_factory=lambda: {})
     plugin_json: dict[str, object] | None = None
+    copied: set[Path] = field(default_factory=lambda: set[Path]())
+    pruned: list[Path] = field(default_factory=lambda: list[Path]())
+
+    @property
+    def produced(self) -> set[Path]:
+        """Every file the build puts in the target's output directory."""
+        return set(self.files) | self.copied
 
 
 def _coerce_var(value: object) -> TemplateVarValue:
@@ -200,6 +257,38 @@ def load_defaults(targets_dir: Path) -> dict[str, TemplateVarValue]:
     return defaults
 
 
+def merge_template_vars(defaults: Mapping[str, TemplateVarValue], overrides: Mapping[str, object]) -> dict[str, TemplateVarValue]:
+    """Lay a target's `[vars]` over the defaults: a table merges key by key, recursively; any other value replaces.
+
+    So a target that sets only `[vars.mcp_server] command` and `args`, the dev override, keeps the
+    defaults' `env_vars` and `user_config`, and with them the credential wiring the manifests and the
+    hook wrappers are rendered from. Replacing the table whole dropped them with every check green.
+    A target can give a key the defaults define another value, but cannot remove it. The defaults are
+    copied, never shared: no target's variables alias another's.
+    """
+    merged: dict[str, TemplateVarValue] = copy.deepcopy(dict(defaults))
+    for key, value in overrides.items():
+        override = _coerce_var(value)
+        base = merged.get(key)
+        if isinstance(base, dict) and isinstance(override, dict):
+            merged[key] = _merge_tables(base, override)
+        else:
+            merged[key] = override
+    return merged
+
+
+def _merge_tables(base: dict[str, object], override: dict[str, object]) -> dict[str, object]:
+    """One level of `merge_template_vars`: `override`'s keys laid over `base`'s, tables merged in turn."""
+    merged = dict(base)
+    for key, value in override.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_tables(cast("dict[str, object]", existing), cast("dict[str, object]", value))
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
 def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, TemplateVarValue] | None = None) -> TargetConfig:
     """Load a target config, merging defaults with target-specific overrides.
 
@@ -223,11 +312,8 @@ def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, 
         msg = f"{target_path.name}: [plugin].name is required"
         raise SystemExit(msg)
 
-    # Merge template vars: defaults → target overrides → derived values
-    template_vars = dict(defaults)
-    if "vars" in raw:
-        for key, value in raw["vars"].items():
-            template_vars[key] = _coerce_var(value)
+    # Merge template vars: defaults → target overrides (tables merged key by key) → derived values
+    template_vars = merge_template_vars(defaults, raw.get("vars", {}))
     template_vars["plugin_name"] = plugin["name"]
 
     include_skills: list[str] | None = None
@@ -346,12 +432,21 @@ def render_templates(
             raise SystemExit(msg)
         hook_j2_paths.append(path)
 
+    # Collect MCP templates (platform-specific — must all exist)
+    mcp_j2_paths: list[Path] = []
+    for name in MCP_TEMPLATES_BY_PLATFORM.get(platform, []):
+        path = templates_dir / name
+        if not path.is_file():
+            msg = f"Declared MCP template not found: {name}"
+            raise SystemExit(msg)
+        mcp_j2_paths.append(path)
+
     # Collect skill templates (templates/skills/*/SKILL.md.j2)
     j2_paths = sorted(templates_dir.glob("skills/*/SKILL.md.j2"))
     if include_skills is not None:
         j2_paths = [path for path in j2_paths if path.parent.name in include_skills]
 
-    all_j2_paths = j2_paths + shared_j2_paths + hook_j2_paths
+    all_j2_paths = j2_paths + shared_j2_paths + hook_j2_paths + mcp_j2_paths
 
     # No templates at all (no skills found and no shared/hook templates)
     if not all_j2_paths:
@@ -443,11 +538,13 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     #   never values.
     # Dev override: point command/args at a local checkout (e.g.
     # command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) in
-    # targets/defaults.toml + `make build` on Claude; a same-named
+    # targets/defaults.toml, or in a target's own [vars.mcp_server], which
+    # merges into the defaults' table and so keeps env_vars and user_config
+    # (merge_template_vars), + `make build` on Claude; a same-named
     # [mcp_servers.pipelex] entry in ~/.codex/config.toml outranks the plugin
     # tier on Codex. Vibe gets no manifest entry because it has no manifest:
     # its target renders the same launcher as the mcp/vibe-mcp.toml config
-    # fragment instead (see HOOK_TEMPLATES_BY_PLATFORM). Skipped when the
+    # fragment instead (see MCP_TEMPLATES_BY_PLATFORM). Skipped when the
     # target defines no mcp_server block.
     mcp_server = config.template_vars.get("mcp_server")
     if isinstance(mcp_server, dict):
@@ -469,7 +566,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
                     base["mcpServers"] = {
                         MCP_SERVER_NAME: {
                             "type": "stdio",
-                            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
+                            "command": CLAUDE_MCP_LAUNCHER_COMMAND,
                             "args": [],
                             "env": option_env,
                         }
@@ -531,16 +628,11 @@ def setup_static_assets(
     `copy2`, which keeps a script's executable bit — a skill runs its scripts
     by path, so a copy that lost the bit would fail on every target.
     """
-    if include_skills is not None:
-        skill_names = include_skills
-    else:
-        skill_names = sorted(path.parent.name for path in templates_dir.glob("skills/*/SKILL.md.j2"))
-
     output_skills_dir = output_dir / "skills"
     output_skills_dir.mkdir(parents=True, exist_ok=True)
 
     skills_dir = base_dir / "skills"
-    for skill_name in skill_names:
+    for skill_name in _built_skill_names(templates_dir, include_skills):
         skill_output = output_skills_dir / skill_name
         skill_output.mkdir(parents=True, exist_ok=True)
         for asset_dir in STATIC_ASSET_DIRS:
@@ -553,6 +645,145 @@ def setup_static_assets(
                 # build leaves stale assets shipping in every target and `--check`
                 # reports an ORPHAN no rebuild can clear.
                 _remove(asset_dst)
+
+
+def _built_skill_names(templates_dir: Path, include_skills: list[str] | None) -> list[str]:
+    """The skills a target builds: its `[skills] include` list, or every skill with a template."""
+    if include_skills is not None:
+        return include_skills
+    return sorted(path.parent.name for path in templates_dir.glob("skills/*/SKILL.md.j2"))
+
+
+def static_asset_outputs(
+    base_dir: Path,
+    output_dir: Path,
+    templates_dir: Path,
+    include_skills: list[str] | None,
+) -> set[Path]:
+    """Every file `setup_static_assets` copies into a target, at its place in the output directory."""
+    outputs: set[Path] = set()
+    for skill_name in _built_skill_names(templates_dir, include_skills):
+        for asset_dir in STATIC_ASSET_DIRS:
+            asset_src = base_dir / "skills" / skill_name / asset_dir
+            if not asset_src.is_dir():
+                continue
+            asset_dst = output_dir / "skills" / skill_name / asset_dir
+            outputs.update(asset_dst / path.relative_to(asset_src) for path in asset_src.rglob("*") if path.is_file())
+    return outputs
+
+
+def check_output_dir(base_dir: Path, config: TargetConfig) -> None:
+    """Refuse a target whose output directory the build could not prune without deleting what it does not own.
+
+    The build removes every file of a target's output directory that it does not produce, so that
+    directory must hold nothing else: it must sit inside the repository, and neither hold nor sit
+    inside one of the repository's own directories (`REPOSITORY_OWN_PATHS`) or another target's
+    output directory. A target written to the repository root is the one exception, and the build
+    prunes nothing there; its output is instead every top-level directory its templates render
+    into, one per directory directly under `templates/` (`skills/`, `hooks/`, `mcp/`), so another
+    target may neither hold nor sit inside one of those, or its pruning would delete the root
+    target's files.
+    """
+    if config.is_root:
+        return
+    root = base_dir.resolve()
+    output_dir = resolve_output_dir(base_dir, config.source).resolve()
+    if not output_dir.is_relative_to(root) or output_dir == root:
+        msg = f"{config.name}: [plugin].source {config.source!r} is not a directory inside the repository, so the build cannot own it"
+        raise SystemExit(msg)
+    others: dict[str, Path] = {f"the repository's {name}/": root / name for name in REPOSITORY_OWN_PATHS}
+    templates_dir = base_dir / TEMPLATES_DIR_NAME
+    root_output_names = sorted(path.name for path in templates_dir.iterdir() if path.is_dir()) if templates_dir.is_dir() else []
+    targets_dir = base_dir / TARGETS_DIR_NAME
+    if targets_dir.is_dir():
+        for other_name in list_targets(targets_dir):
+            if other_name == config.name:
+                continue
+            other_source = tomllib.loads((targets_dir / f"{other_name}.toml").read_text(encoding="utf-8")).get("plugin", {}).get("source", "./")
+            if other_source != "./":
+                others[f"the output of target {other_name!r}"] = resolve_output_dir(root, str(other_source)).resolve()
+                continue
+            # A root target writes each of these at the repository root and prunes none of them.
+            for name in root_output_names:
+                others[f"the output of target {other_name!r}, which writes {name}/ at the repository root"] = root / name
+    for label, other in others.items():
+        if output_dir.is_relative_to(other) or other.is_relative_to(output_dir):
+            msg = (
+                f"{config.name}: [plugin].source {config.source!r} overlaps {label}; the build prunes a target's output "
+                "directory down to what it produces, so the two must not share a directory"
+            )
+            raise SystemExit(msg)
+
+
+def orphaned_outputs(base_dir: Path, output_dir: Path, produced: set[Path]) -> list[Path]:
+    """Every file under a target's output directory that the build does not produce, sorted.
+
+    A symlink counts as a file and is never followed, unless the build writes through it. A file git
+    ignores is left out: it never ships, so it is neither the build's to delete nor the check's to
+    report — a `.DS_Store` that Finder leaves behind is the usual one.
+    """
+    if not output_dir.is_dir():
+        return []
+    produced_dirs = {parent for path in produced for parent in path.parents}
+    candidates: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(output_dir):
+        current = Path(dirpath)
+        candidates.extend(current / name for name in filenames if current / name not in produced)
+        # os.walk lists a symlink to a directory among the directories and never descends it.
+        candidates.extend(current / name for name in dirnames if (current / name).is_symlink() and current / name not in produced_dirs)
+    ignored = _git_ignored(base_dir, candidates)
+    return sorted(path for path in candidates if path not in ignored)
+
+
+def _git_ignored(base_dir: Path, paths: list[Path]) -> set[Path]:
+    """The paths among `paths` that git ignores in the work tree holding `base_dir`.
+
+    None outside a work tree or without git, where every file is the build's like any other. Asked
+    only about files the build would otherwise report or remove, so a clean target costs no call.
+    """
+    git = shutil.which("git")
+    by_rel: dict[str, Path] = {}
+    for path in paths:
+        if path.is_relative_to(base_dir):
+            by_rel[path.relative_to(base_dir).as_posix()] = path
+    if git is None or not by_rel:
+        return set()
+    completed = subprocess.run(
+        [git, "-C", str(base_dir), "check-ignore", "-z", "--stdin"],
+        input="".join(f"{rel}\0" for rel in by_rel),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # 0: some paths are ignored; 1: none is; anything else, 128 outside a work tree among them, says nothing.
+    if completed.returncode not in {0, 1}:
+        return set()
+    return {by_rel[item] for item in completed.stdout.split("\0") if item in by_rel}
+
+
+def prune_orphans(base_dir: Path, output_dir: Path, produced: set[Path]) -> list[Path]:
+    """Remove every orphaned output of a target (see `orphaned_outputs`) and return what went.
+
+    A `.j2` file is left where it is: a template is a source, never an output, and one that
+    leaked into a target may be somebody's work written in the wrong place, so `--check` names
+    it for its author to move. A directory goes only when removing an orphan left it empty; a
+    symlink is unlinked, never followed. The caller has checked the directory is one the build
+    owns (`check_output_dir`).
+    """
+    removed = [path for path in orphaned_outputs(base_dir, output_dir, produced) if not _is_template(path)]
+    for path in removed:
+        path.unlink()
+    for path in removed:
+        parent = path.parent
+        while parent != output_dir and parent.is_relative_to(output_dir) and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+    return removed
+
+
+def _is_template(path: Path) -> bool:
+    """Whether a file is a Jinja template, which belongs under templates/ and never in a target."""
+    return path.suffix == ".j2"
 
 
 def static_asset_mismatches(
@@ -570,14 +801,12 @@ def static_asset_mismatches(
     a plugin whose recipes differ from the ones the test suite ran. A script is
     compared by its executable bit as well as its bytes: the skill runs it by
     path, so a copy that lost the bit is as broken as one that lost a line.
+
+    A copy with no source is not this function's to report: it is an orphan like
+    any other file of the output directory, and `orphaned_outputs` names it.
     """
     if output_dir == base_dir:
         return []  # root target: source and destination are the same tree
-
-    if include_skills is not None:
-        skill_names = include_skills
-    else:
-        skill_names = sorted(path.parent.name for path in templates_dir.glob("skills/*/SKILL.md.j2"))
 
     def label(path: Path) -> str:
         """Repo-relative when it can be, absolute otherwise — a caller may point
@@ -588,7 +817,7 @@ def static_asset_mismatches(
             return str(path)
 
     problems: list[str] = []
-    for skill_name in skill_names:
+    for skill_name in _built_skill_names(templates_dir, include_skills):
         for asset_dir in STATIC_ASSET_DIRS:
             problems.extend(_asset_dir_mismatches(base_dir, output_dir, skill_name, asset_dir, label))
     return problems
@@ -601,13 +830,11 @@ def _asset_dir_mismatches(
     asset_dir: str,
     label: Callable[[Path], str],
 ) -> list[str]:
-    """The freshness findings for one skill's copy of one static asset directory."""
+    """The freshness findings for one skill's copy of one static asset directory: missing, stale or mode-changed copies."""
     asset_src = base_dir / "skills" / skill_name / asset_dir
     asset_dst = output_dir / "skills" / skill_name / asset_dir
     problems: list[str] = []
     if not asset_src.is_dir():
-        if asset_dst.is_dir():
-            problems.append(f"  ORPHAN: {label(asset_dst)} (no source in skills/{skill_name}/{asset_dir})")
         return problems
 
     expected: set[Path] = {path.relative_to(asset_src) for path in asset_src.rglob("*") if path.is_file()}
@@ -617,8 +844,6 @@ def _asset_dir_mismatches(
 
     for rel in sorted(expected - actual):
         problems.append(f"  MISSING: {label(asset_dst / rel)}")
-    for rel in sorted(actual - expected):
-        problems.append(f"  ORPHAN: {label(asset_dst / rel)} (no matching source file)")
     for rel in sorted(expected & actual):
         # An unreadable file is a finding, not a traceback: check_freshness runs
         # under `make check`, where an OSError escaping here kills the whole gate.
@@ -643,6 +868,12 @@ def _is_executable(path: Path) -> bool:
 def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False) -> BuildResult:
     """Build a single target: render templates, set up output directory.
 
+    The build owns a target's output directory: after it, the directory holds what
+    the build produces and nothing else, so a file no template or source produces
+    any more — a retired template's output, a manifest left by a platform change, a
+    stray file — is removed (`prune_orphans`), except a template that leaked there
+    and a file git ignores. A target written to the repository root is never pruned.
+
     Args:
         base_dir: Repository root.
         config: Target configuration.
@@ -652,6 +883,7 @@ def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False)
     templates_dir = base_dir / TEMPLATES_DIR_NAME
     output_dir = resolve_output_dir(base_dir, config.source)
     is_root = config.is_root
+    check_output_dir(base_dir, config)
 
     result = BuildResult()
 
@@ -668,6 +900,7 @@ def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False)
         if not dry_run:
             output_dir.mkdir(parents=True, exist_ok=True)
             setup_static_assets(base_dir, output_dir, templates_dir, config.include_skills)
+        result.copied = static_asset_outputs(base_dir, output_dir, templates_dir, config.include_skills)
 
         for src_path, content in rendered.items():
             # Map base_dir-relative output to target output dir
@@ -689,15 +922,12 @@ def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False)
                 plugin_dir.mkdir(parents=True, exist_ok=True)
             plugin_json_path = plugin_dir / "plugin.json"
             result.files[plugin_json_path] = json.dumps(plugin_json, indent=2) + "\n"
-        elif not dry_run:
-            # Keep rebuilds idempotent if a target changed platform or stale
-            # manifest dirs were left by an older generator.
-            for manifest_dirname in (".claude-plugin", ".codex-plugin"):
-                stale_dir = output_dir / manifest_dirname
-                if stale_dir.is_dir():
-                    shutil.rmtree(stale_dir)
-                elif stale_dir.is_symlink() or stale_dir.is_file():
-                    stale_dir.unlink()
+
+        # Everything else in the output directory goes, the other platform's
+        # manifest after a platform change included, so that `--check` never
+        # reports an ORPHAN a rebuild cannot clear.
+        if not dry_run:
+            result.pruned = prune_orphans(base_dir, output_dir, result.produced)
 
     return result
 
@@ -748,6 +978,8 @@ def generate(base_dir: Path, target_name: str = "prod") -> int:
                 output_path.chmod(0o755)
             rel = output_path.relative_to(base_dir)
             print(f"  [{name}] Generated {rel}")
+        for pruned_path in result.pruned:
+            print(f"  [{name}] Removed {pruned_path.relative_to(base_dir)} (no template or source produces it any more)")
 
         file_count = len(result.files)
         total_files += file_count
@@ -800,30 +1032,23 @@ def check_freshness(base_dir: Path, target_name: str = "prod") -> int:
             elif output_path.name in EXECUTABLE_OUTPUTS and not os.access(output_path, os.X_OK):
                 all_stale.append(f"  NOT EXECUTABLE: {rel}")
 
-        # Detect orphaned SKILL.md files with no corresponding template
+        # The whole file set: whatever the output directory holds that the build does not produce.
+        # Each line names the cure that clears it, since `make build` removes an orphan but never
+        # a template, and prunes nothing at the repository root.
         output_dir = resolve_output_dir(base_dir, config.source)
-        output_skills_dir = output_dir / "skills"
-        rendered_skill_parents = {path.parent for path in result.files if path.name == "SKILL.md"}
-        if output_skills_dir.is_dir():
-            for skill_md in sorted(output_skills_dir.glob("*/SKILL.md")):
-                if skill_md.parent not in rendered_skill_parents:
-                    rel = skill_md.relative_to(base_dir)
-                    all_stale.append(f"  ORPHAN: {rel} (no corresponding .j2 template)")
+        if config.is_root:
+            all_stale.extend(_root_target_leftovers(base_dir, result))
+        else:
+            for orphan in orphaned_outputs(base_dir, output_dir, result.produced):
+                rel = orphan.relative_to(base_dir)
+                if _is_template(orphan):
+                    all_stale.append(f"  LEAKED TEMPLATE: {rel} (a template belongs under templates/: move it there, or delete it)")
+                else:
+                    all_stale.append(f"  ORPHAN: {rel} (no template or source file produces it: `make build` removes it)")
 
-        # Copied static assets (per-skill references/ and scripts/) are not rendered, so they
-        # need their own comparison — see static_asset_mismatches.
+        # Copied static assets (per-skill references/ and scripts/) are not rendered, so their bytes
+        # and executable bits need their own comparison — see static_asset_mismatches.
         all_stale.extend(static_asset_mismatches(base_dir, output_dir, base_dir / TEMPLATES_DIR_NAME, config.include_skills))
-
-        # Detect leaked .j2 files in output directories (should only be in templates/)
-        if output_skills_dir.is_dir():
-            for j2_file in sorted(output_skills_dir.rglob("*.j2")):
-                rel = j2_file.relative_to(base_dir)
-                all_stale.append(f"  LEAKED TEMPLATE: {rel} (should be in templates/)")
-        output_hooks_dir = output_dir / "hooks"
-        if output_hooks_dir.is_dir():
-            for j2_file in sorted(output_hooks_dir.rglob("*.j2")):
-                rel = j2_file.relative_to(base_dir)
-                all_stale.append(f"  LEAKED TEMPLATE: {rel} (should be in templates/)")
 
     # Cross-target check: when a Codex packaging source exists, its
     # `.agents/plugins/marketplace.json` discovery copy must match byte-for-byte.
@@ -838,12 +1063,32 @@ def check_freshness(base_dir: Path, target_name: str = "prod") -> int:
     if all_stale:
         for msg in all_stale:
             print(msg)
-        print("FAIL: Generated files are out of date. Run `make build` to regenerate.")
+        print("FAIL: Generated files are out of date. Run `make build` to regenerate them, and apply any other cure a line above names.")
         return 1
 
     target_label = target_name if target_name != "all" else ", ".join(target_names)
     print(f"  All generated files are fresh (targets: {target_label}).")
     return 0
+
+
+def _root_target_leftovers(base_dir: Path, result: BuildResult) -> list[str]:
+    """What a target written to the repository root no longer produces, with the cure that works there.
+
+    The root holds every source of the repository beside the build's output, so the build prunes
+    nothing there and cannot compare the whole file set: only a skill whose template is gone, and
+    a template outside `templates/`, are recognisable as leftovers, and each is the author's to delete.
+    """
+    findings: list[str] = []
+    rendered_skill_parents = {path.parent for path in result.files if path.name == "SKILL.md"}
+    for skill_md in sorted((base_dir / "skills").glob("*/SKILL.md")):
+        if skill_md.parent not in rendered_skill_parents:
+            rel = skill_md.relative_to(base_dir)
+            findings.append(f"  ORPHAN: {rel} (no template produces it: delete it, since the build prunes nothing at the repository root)")
+    for dirname in ("skills", "hooks", "mcp"):
+        for j2_file in sorted((base_dir / dirname).rglob("*.j2")):
+            rel = j2_file.relative_to(base_dir)
+            findings.append(f"  LEAKED TEMPLATE: {rel} (a template belongs under templates/: move it there, or delete it)")
+    return findings
 
 
 def main() -> int:

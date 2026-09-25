@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -92,12 +95,75 @@ class TestPipelexRunSkill:
         assert "RUNNING" not in self.reference("failed-run.md")
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_pipe_other_than_the_main_one_runs_by_its_qualified_ref(self, target_name: str) -> None:
+        """`mthds_run` takes `pipe_code` as a qualified `domain.pipe_code`, the value the template and prepare
+        calls take as `pipe_ref`, and the runtime refuses a bare code two domains of the bundle declare. So
+        the pipe step 1 settles is qualified by its own file's domain, and step 5 passes that same ref; the
+        skill once said to pass "a pipe's code", which a model reads as the bare one."""
+        body = self.render(target_name)
+        assert "**carry its `pipe_ref` through every call**, the code qualified by its own file's domain." in self.the_step(body, 1)
+        assert "for another pipe, pass step 1's `pipe_ref` as `pipe_code`." in self.the_step(body, 5)
+        assert "a pipe's code" not in body
+        assert "Running the main pipe `summarize.summarize_pdf` from" in self.the_step(body, 4)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_stop_table_holds_only_what_a_tool_reports(self, target_name: str) -> None:
         """Each other condition is stated once, at its step: a row restating a step is a second copy that drifts."""
         table = self.render(target_name).split("## Stops", 1)[1].split("\n## ", 1)[0]
         rows = [line for line in table.splitlines() if line.startswith("| `mthds_")]
         assert rows, f"{target_name}: the stop table has no rows"
         assert len(rows) == len([line for line in table.splitlines() if line.startswith("| ") and not line.startswith("| Condition")])
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_saved_run_is_kept_out_of_version_control_before_it_is_saved(self, target_name: str) -> None:
+        """Step 7 saves every completed run into `runs/<run_id>/` under the workshop's working
+        directory, usually a project root in a repository, and `main_stuff.json` holds the facts
+        the run extracted from the user's files. So in a git repository the save waits for
+        `runs/<run_id>/` to be ignored, the entry anchored so that a source directory named
+        `runs` elsewhere is left alone, and a path git still does not report ignored is not
+        written until the user says so. The anchor is the workshop's own directory, which a
+        `.gitignore` higher up must name, and a folder the user named with `dir` is theirs and
+        takes no check. Follow a run's save goes through step 7, so it is held to the same guard
+        days later."""
+        body = self.render(target_name)
+        guard = self.the_line(body, "**A saved run stays out of version control**")
+        assert guard in self.the_step(body, 7), f"{target_name}: the ignore guard is not at the step that saves"
+        step = self.the_step(body, 7)
+        assert step.index(guard) < step.index("`mthds_download_artifacts` with the run id alone"), (
+            f"{target_name}: the ignore check reads after the save it guards"
+        )
+        assert guard.startswith("**A saved run stays out of version control**: in a git repository, ")
+        assert "`git check-ignore -q` `runs/<run_id>/` before saving, not for a `dir` the user named." in guard
+        assert (
+            "add the workshop's `runs/`, anchored (`/runs/`, or `/app/runs/` for a workshop in `app/`), "
+            "to the nearest `.gitignore`, relative to that file's directory, say so, and check again"
+        ) in guard
+        assert guard.endswith("**git never ignores a tracked path, so one still not ignored is not written until the user says so.**")
+        follow = body.split("## Follow a run", 1)[1].split("\n## ", 1)[0]
+        assert "`mthds_download_artifacts`, as step 7 says" in follow, f"{target_name}: a later save no longer goes through step 7's guard"
+
+    @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
+    def test_the_entry_is_anchored_at_the_workshop_s_directory(self, tmp_path: Path) -> None:
+        """A workshop in `app/` under a repository whose nearest `.gitignore` is the root's: `/runs/` there names a
+        `runs/` beside the root and leaves the saved run unignored, so every save would wait on the user, while
+        `/app/runs/` ignores it and still leaves a package named `runs` elsewhere alone."""
+
+        def ignored(path: str) -> bool:
+            # This machine's excludes file is left out, so that a developer's own rules cannot change the reading.
+            command = ["git", "-c", f"core.excludesFile={os.devnull}", "-C", str(tmp_path), "check-ignore", "-q", path]
+            return subprocess.run(command, check=False).returncode == 0
+
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        (tmp_path / "app").mkdir()
+        root_gitignore = tmp_path / ".gitignore"
+        root_gitignore.write_text("/runs/\n", encoding="utf-8")
+        assert not ignored("app/runs/run-1/")
+        root_gitignore.write_text("/app/runs/\n", encoding="utf-8")
+        assert ignored("app/runs/run-1/")
+        assert not ignored("app/src/runs/")
+        root_gitignore.write_text("", encoding="utf-8")
+        (tmp_path / "app" / ".gitignore").write_text("/runs/\n", encoding="utf-8")
+        assert ignored("app/runs/run-1/")
 
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one

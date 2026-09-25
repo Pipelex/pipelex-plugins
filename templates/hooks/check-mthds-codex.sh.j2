@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Codex PostToolUse(apply_patch) hook: lint, format, and validate .mthds files
-# touched by an apply_patch call.
+# Codex PostToolUse(apply_patch|Bash) hook: lint, format, and validate .mthds
+# files touched by an apply_patch call, or by a patch run through the shell
+# that Codex reports as Bash (docs/hooks.md says which shell forms it does,
+# and how the bundle finds the file such a patch wrote).
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
@@ -22,12 +24,21 @@
 
 set -euo pipefail
 
-# --- Read stdin (PostToolUse JSON with the apply_patch envelope) once ---
+# --- Read stdin (PostToolUse JSON with the patch in tool_input.command) once ---
 INPUT=$(cat)
 
-# Cheap pre-filter: ignore patches that touch no .mthds file before spawning
-# a Node process.
-if ! [[ "$INPUT" =~ \.mthds ]]; then
+# Cheap pre-filter, before spawning a Node process: go on only when a patch
+# header line names a .mthds file, which is all check.mjs reads, and the
+# input names the patch program. Every other Bash command, one that merely
+# mentions a .mthds file included, ends here, and so does one that only
+# writes patch text somewhere (a heredoc to a file, a commit message): it
+# applied no patch, and the bundle would otherwise send a note asking the
+# model to act on a file nobody touched. The patch tool's call names the
+# program in its tool_name; the dash admits Codex's --codex-run-as-apply-patch.
+# The input is JSON, so the header's line ends at an escaped \n.
+MTHDS_PATCH_HEADER='\*\*\* (Update File|Add File|Move to):([^"\\]|\\[^n])*\.mthds'
+PATCH_PROGRAM='apply[-_]?patch'
+if ! [[ "$INPUT" =~ $MTHDS_PATCH_HEADER && "$INPUT" =~ $PATCH_PROGRAM ]]; then
   exit 0
 fi
 

@@ -43,7 +43,7 @@ A `PipeSignature` is **pending only when no concrete pipe of the same code exist
 
 ### 3. The verdict, when the workshop is there
 
-One `mthds_validate` call over the same files. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The call adds two things and nothing else: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
+One `mthds_validate` call over the same files. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. The call adds two things and nothing else: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
 
 Without the tool, explain from the source and **say the verdict was not checked**. Your own reading of the source is not a guess: the pipe types, the concepts and step 2's backlog are yours to state, saying whose reading it is. But do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer, and do not guess at validity. **On a target that is not on disk there is no such fallback.**
 
@@ -57,8 +57,8 @@ Say first whether it is **complete** or a **scaffold with a backlog**, from step
 
 | Pipe | How to read it |
 |---|---|
-| `PipeSequence` | follow `steps` in order |
-| `PipeBatch` | name `batch_over` and `batch_as`, then explain the inner pipe once |
+| `PipeSequence` | follow `steps` in order; a step with `batch_over` and `batch_as` runs its pipe once per item |
+| `PipeBatch` | name `input_list_name` and `input_item_name`, then explain the `branch_pipe_code` pipe once |
 | `PipeParallel` | list the branches and say what is combined at the end |
 | `PipeCondition` | map each condition to the pipe it routes to |
 
@@ -95,5 +95,5 @@ Output: final_output
 ## References
 
 - [not-on-disk.md](references/not-on-disk.md): a catalog id or a published address, before the first call on it.
-- [MTHDS reference](../shared/mthds-reference.md): a concept definition or a syntax question.
+- [MTHDS reference](../shared/writing-mthds.md): a concept definition or a syntax question.
 - [Native content types](../shared/native-content-types.md): what data flows through a pipe, such as the attributes a `Page` or an `Image` carries.

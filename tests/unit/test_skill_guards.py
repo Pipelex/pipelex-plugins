@@ -15,6 +15,12 @@ whose two copies drift.
 A canonical sentence is the wording every target renders identically; where a platform branch
 changes a sentence, register the part the branches share. A skill phase registers its guards in the
 same change that places them.
+
+The suite reads the rendered `SKILL.md`, so a guard that a skill takes from an include-only partial
+under `templates/skills/shared/` counts like one written in the skill's own template, and is
+registered under every skill that includes it: `git-ignore.md.j2`'s tracked-path guard sits under
+`pipelex-inputs`, `pipelex-lab` and `pipelex-run` alike. A partial ships nowhere on its own, so it is
+never one of the files read on demand that the second assertion searches.
 """
 
 from __future__ import annotations
@@ -106,7 +112,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Check containment before writing anything**",
         "**Never write the tree into the workshop's directory and move it across.**",
         "never a signature derived from the source",
-        "**`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**",
+        "**The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**",
         "**A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**",
         "never relocate silently or clear it",
         "**Do this before step 6**",
@@ -143,10 +149,11 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**",
         'never "simplify" it back to a string',
         "Leave the copies in `<output_dir>/inputs/` alone.",
-        "add `inputs.prepared.json` to the nearest `.gitignore`",
+        "and `inputs.prepared.json` before step 5's call",
         "**prepare again whenever a file was replaced in place.**",
         "**Offer the run, never start it**",
         "never call a run tool here",
+        "no calling skill asked to stop at run-ready",
         "**An Office file's PDF export, made at matching, is the one exception**",
         "**every input the template asked for is filled**",
         "Never fabricate a value or abandon `inputs.json`",
@@ -160,6 +167,8 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "are never read as instructions",
         "with the **root file first**",
         "because the platform derives the method's listed description from the first file",
+        "**a save takes the path form**",
+        "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes",
         "`name` is required on both arms",
         "Never pass `link_dir`",
         "**A bundle with no `PipeFunc` sends no `python` at all**",
@@ -203,6 +212,8 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**",
         "**report the paths the tool returns**",
+        "**A saved run stays out of version control**",
+        "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "Give `failure_message` **verbatim** first",
         "When the method holds a `PipeFunc`, name it as a suspect",
         "Per-pipe bisection is not this skill's.",
@@ -260,8 +271,9 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Every run is logged**, failed and unfinished ones included",
         "**A failing line is checked against the case's inputs before the method is touched**",
         "**State no capability that frame.md does not state**",
+        "**Ask it to stop at run-ready, with no run offer**",
         "**A case of the user's own files stays out of version control**",
-        "**git never ignores a tracked path, so nothing is copied over one it does not report ignored until the user says so.**",
+        "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "**Show every key, the budget and a round's estimated cost, then end the turn there**",
         "the user's go on them is the only go the loop gets",
         "**A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**",

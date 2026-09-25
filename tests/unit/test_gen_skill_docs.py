@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 from typing import ClassVar, cast
@@ -16,6 +17,7 @@ from scripts.gen_skill_docs import (
     CODEX_DISCOVERY_MARKETPLACE_DST,
     CODEX_DISCOVERY_MARKETPLACE_SRC,
     HOOK_TEMPLATES_BY_PLATFORM,
+    MCP_TEMPLATES_BY_PLATFORM,
     SHARED_TEMPLATES,
     STATIC_HOOK_ASSETS_BY_PLATFORM,
     Platform,
@@ -23,13 +25,16 @@ from scripts.gen_skill_docs import (
     build_target,
     check_freshness,
     generate,
+    load_defaults,
     load_target_config,
     make_plugin_json,
+    orphaned_outputs,
     render_codex_discovery_marketplace,
     render_templates,
     resolve_output_dir,
     setup_static_assets,
     static_asset_mismatches,
+    static_asset_outputs,
 )
 
 DEFAULT_VARS: dict[str, str | bool] = {"marketplace_name": "pipelex-plugins", "plugin_name": "pipelex", "platform": "claude"}
@@ -105,7 +110,7 @@ def template_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("# MTHDS Reference {{ marketplace_name }}\n")
+    (shared / "writing-mthds.md.j2").write_text("# MTHDS Language Reference {{ marketplace_name }}\n")
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
@@ -133,7 +138,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     templates_dir = tmp_path / "templates"
     shared = templates_dir / "skills" / "shared"
     shared.mkdir(parents=True)
-    (shared / "mthds-reference.md.j2").write_text("Ref.\n")
+    (shared / "writing-mthds.md.j2").write_text("Ref.\n")
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
@@ -185,9 +190,9 @@ class TestRenderTemplates:
 
     def test_renders_shared_templates(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
-        ref_output = template_tree / "skills" / "shared" / "mthds-reference.md"
+        ref_output = template_tree / "skills" / "shared" / "writing-mthds.md"
         assert ref_output in results
-        assert "MTHDS Reference pipelex-plugins" in results[ref_output]
+        assert "MTHDS Language Reference pipelex-plugins" in results[ref_output]
 
     def test_frontmatter_not_rendered_standalone(self, template_tree: Path) -> None:
         """frontmatter.md.j2 is an include-only partial — it must never be
@@ -203,7 +208,7 @@ class TestRenderTemplates:
         _create_shared_templates(templates_dir)
         results = render_templates(templates_dir, tmp_path, DEFAULT_VARS)
         output_names = {path.name for path in results}
-        assert "mthds-reference.md" in output_names
+        assert "writing-mthds.md" in output_names
         assert "native-content-types.md" in output_names
 
     def test_preserves_frontmatter(self, template_tree: Path) -> None:
@@ -300,7 +305,7 @@ class TestRenderTemplates:
     def test_empty_skill_filter_still_renders_shared(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS, include_skills=["nonexistent-skill"])
         output_names = {path.name for path in results}
-        assert "mthds-reference.md" in output_names
+        assert "writing-mthds.md" in output_names
 
     def test_template_vars_injected(self, template_tree: Path) -> None:
         templates_dir = template_tree / "templates"
@@ -351,6 +356,46 @@ class TestGenerate:
         assert output.is_file()
         assert "allowed-tools" in output.read_text()
 
+    @pytest.mark.parametrize(
+        ("source", "refusal"),
+        [
+            ("templates/", "overlaps the repository's templates/"),
+            ("skills/pipelex-test/", "overlaps the repository's skills/"),
+            ("pipelex-codex/", "overlaps the output of target 'codex'"),
+            ("../outside/", "is not a directory inside the repository"),
+        ],
+    )
+    def test_a_target_whose_directory_the_build_cannot_own_is_refused(self, tmp_path: Path, source: str, refusal: str) -> None:
+        """The build prunes a target's directory down to what it produces, so a `source` that held the
+        repository's own files or another target's output would have them deleted; the build and the
+        check refuse it instead, and touch nothing."""
+        tree = _create_codex_tree(tmp_path / "repo")
+        (tree / "targets" / "prod.toml").write_text(f'[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "{source}"\n')
+        before = sorted(path for path in tree.rglob("*"))
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            generate(tree, "prod")
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            check_freshness(tree, "prod")
+        assert sorted(path for path in tree.rglob("*")) == before
+
+    @pytest.mark.parametrize(("source", "overlap"), [("hooks/", "hooks/"), ("mcp/", "mcp/"), ("hooks/extra/", "hooks/")])
+    def test_a_target_beside_a_root_target_may_not_share_its_directories(self, tmp_path: Path, source: str, overlap: str) -> None:
+        """A root target writes `skills/`, `hooks/` and `mcp/` at the repository root, and only `skills/` is one of
+        the repository's own directories. A target whose source lay in `hooks/` used to pass the check, and its
+        pruning then deleted the root target's hook files, leaving `--check` failing with no rebuild able to fix it.
+        The root target's top-level directories count as its output, derived from `templates/`."""
+        tree = _create_codex_tree(tmp_path / "repo")
+        (tree / "targets" / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "./"\n')
+        (tree / "targets" / "stray.toml").write_text(f'[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "{source}"\n')
+        generate(tree, "prod")
+        before = sorted(path for path in tree.rglob("*"))
+        refusal = f"overlaps the output of target 'prod', which writes {overlap} at the repository root"
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            generate(tree, "stray")
+        with pytest.raises(SystemExit, match=re.escape(refusal)):
+            check_freshness(tree, "stray")
+        assert sorted(path for path in tree.rglob("*")) == before, "the refused build touched the root target's files"
+
     def test_no_templates_fails(self, tmp_path: Path) -> None:
         """Missing shared template files cause a clear SystemExit."""
         (tmp_path / "templates").mkdir()
@@ -390,6 +435,111 @@ class TestCheckFreshness:
         assert not alt_dir.exists()
         check_freshness(template_tree, "alt")
         assert not alt_dir.exists(), "check_freshness must not create output directories"
+
+    @pytest.mark.parametrize(
+        "stray",
+        [
+            "pipelex/hooks/stray.sh",
+            "pipelex/skills/shared/stray.md",
+            "pipelex-vibe/mcp/stale.toml",
+            "pipelex-codex/.claude-plugin/plugin.json",
+        ],
+    )
+    def test_a_file_no_source_produces_is_reported_and_the_build_removes_it(
+        self, tmp_path: Path, stray: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The whole file set of every target, not only its skills.
+
+        The check used to look for an orphaned `SKILL.md` alone, so a file left under `hooks/`,
+        `mcp/` or `skills/shared/` by a renamed template shipped with the check green, and the one
+        orphan it did report came with `make build` as its cure, which removed nothing. The build
+        now owns each target's directory: it removes what no source produces, the other platform's
+        manifest after a platform change included, and the directory it leaves empty.
+        """
+        tree = _create_codex_tree(tmp_path)
+        assert generate(tree, "all") == 0
+        assert check_freshness(tree, "all") == 0
+        (tree / stray).parent.mkdir(parents=True, exist_ok=True)
+        (tree / stray).write_text("left behind\n", encoding="utf-8")
+
+        capsys.readouterr()
+        assert check_freshness(tree, "all") == 1
+        assert f"ORPHAN: {stray} (no template or source file produces it: `make build` removes it)" in capsys.readouterr().out
+
+        assert generate(tree, "all") == 0
+        assert not (tree / stray).exists(), "the build left a file no source produces"
+        if stray.startswith("pipelex-codex/.claude-plugin/"):
+            assert not (tree / "pipelex-codex" / ".claude-plugin").exists(), "the emptied manifest directory stayed in the Codex target"
+        assert check_freshness(tree, "all") == 0
+
+    def test_a_retired_skill_leaves_with_its_directory(self, template_tree: Path) -> None:
+        generate(template_tree, "prod")
+        retired = template_tree / "pipelex" / "skills" / "pipelex-retired"
+        (retired / "references").mkdir(parents=True)
+        (retired / "SKILL.md").write_text("a skill whose template was removed\n", encoding="utf-8")
+        (retired / "references" / "branch.md").write_text("its reference\n", encoding="utf-8")
+        assert check_freshness(template_tree, "prod") == 1
+
+        generate(template_tree, "prod")
+        assert not retired.exists()
+        assert (template_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md").is_file()
+        assert check_freshness(template_tree, "prod") == 0
+
+    def test_a_target_at_the_repository_root_is_never_pruned(self, template_tree: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """The root holds every source beside the output, so a leftover there is reported with the
+        cure that works, deleting it, and the build removes nothing."""
+        (template_tree / "targets" / "prod.toml").write_text('[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "./"\n')
+        generate(template_tree, "prod")
+        assert check_freshness(template_tree, "prod") == 0
+        leftover = template_tree / "skills" / "pipelex-retired" / "SKILL.md"
+        leftover.parent.mkdir(parents=True)
+        leftover.write_text("a skill whose template was removed\n", encoding="utf-8")
+
+        capsys.readouterr()
+        assert check_freshness(template_tree, "prod") == 1
+        assert "ORPHAN: skills/pipelex-retired/SKILL.md (no template produces it: delete it" in capsys.readouterr().out
+        generate(template_tree, "prod")
+        assert leftover.is_file(), "the build pruned the repository root"
+
+    def test_a_template_leaked_into_mcp_is_reported_and_never_deleted(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A `.j2` in a target is a source written in the wrong place, maybe somebody's work, so the
+        check names it wherever it is, `mcp/` included, and the build leaves it for its author to move."""
+        tree = _create_codex_tree(tmp_path)
+        generate(tree, "all")
+        leaked = tree / "pipelex-vibe" / "mcp" / "vibe-mcp.toml.j2"
+        leaked.write_text("[[mcp_servers]]\n", encoding="utf-8")
+
+        capsys.readouterr()
+        assert check_freshness(tree, "all") == 1
+        assert "LEAKED TEMPLATE: pipelex-vibe/mcp/vibe-mcp.toml.j2 (a template belongs under templates/: move it there, or delete it)" in (
+            capsys.readouterr().out
+        )
+        generate(tree, "all")
+        assert leaked.is_file(), "the build deleted a template"
+        assert check_freshness(tree, "all") == 1
+
+    def test_a_file_git_ignores_is_neither_reported_nor_removed(self, template_tree: Path) -> None:
+        """What git ignores never ships, so it is not the build's: Finder's `.DS_Store` is the usual one."""
+        git = shutil.which("git")
+        if git is None:
+            pytest.skip("no git on the PATH")
+        subprocess.run([git, "init", "-q", str(template_tree)], check=True)
+        (template_tree / ".gitignore").write_text(".DS_Store\n", encoding="utf-8")
+        generate(template_tree, "prod")
+        junk = template_tree / "pipelex" / "skills" / ".DS_Store"
+        junk.write_bytes(b"\x00\x00\x00\x01Bud1")
+        stray = template_tree / "pipelex" / "skills" / "stray.md"
+        stray.write_text("not ignored\n", encoding="utf-8")
+        assert orphaned_outputs(
+            template_tree,
+            template_tree / "pipelex",
+            build_target(template_tree, load_target_config(template_tree / "targets", "prod"), dry_run=True).produced,
+        ) == [stray]
+
+        generate(template_tree, "prod")
+        assert junk.is_file(), "the build deleted a file git ignores"
+        assert not stray.exists()
+        assert check_freshness(template_tree, "prod") == 0
 
 
 class TestCodexDiscoveryMarketplace:
@@ -491,6 +641,65 @@ class TestTargetConfig:
         assert config.platform == "mistral-vibe"
         assert config.plugin_name == "pipelex-vibe"
         assert config.include_skills is None
+
+    REPO_ROOT = Path(__file__).parents[2]
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/local/main.js"]\n'
+
+    def test_the_dev_override_keeps_the_credential_wiring(self, tmp_path: Path) -> None:
+        """The override `docs/build-targets.md` advertises sets `command` and `args` alone.
+
+        The target's table used to replace the defaults' whole, dropping `env_vars` and
+        `user_config`: the Claude manifest lost its `userConfig` and its launcher, and the hook and
+        the launcher their credential promotion, with every check green. It merges now, and the real
+        templates render the whole wiring around the local command.
+        """
+        targets = tmp_path / "targets"
+        shutil.copytree(self.REPO_ROOT / "targets", targets)
+        with (targets / "prod.toml").open("a", encoding="utf-8") as prod_toml:
+            prod_toml.write(self.DEV_OVERRIDE)
+
+        defaults_server = load_defaults(self.REPO_ROOT / "targets")["mcp_server"]
+        assert isinstance(defaults_server, dict)
+        config = load_target_config(targets, "prod")
+        assert config.template_vars["mcp_server"] == {**defaults_server, "command": "node", "args": ["../pipelex-mcp/dist/local/main.js"]}
+
+        manifest = make_plugin_json(self.REPO_ROOT, config)
+        assert manifest["userConfig"] == defaults_server["user_config"]
+        assert manifest["mcpServers"] == {
+            "pipelex": {
+                "type": "stdio",
+                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
+                "args": [],
+                "env": {"PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}", "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}"},
+            }
+        }
+        rendered = render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, config.template_vars, include_skills=[], target_name="prod")
+        launcher = rendered[self.REPO_ROOT / "hooks" / "launch-pipelex-mcp.sh"]
+        hook = rendered[self.REPO_ROOT / "hooks" / "check-mthds.sh"]
+        for key in ("API_KEY", "BASE_URL"):
+            assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
+            assert f'export PIPELEX_{key}="$CLAUDE_PLUGIN_OPTION_{key}"' in hook
+        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/dist/local/main.js"')
+
+    def test_a_nested_table_merges_an_array_replaces_and_no_target_aliases_another(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        (tree / "targets" / "prod.toml").write_text(
+            '[plugin]\nname = "pipelex"\nversion = "1.0.0"\nsource = "pipelex/"\n\n'
+            '[vars.mcp_server]\nenv_vars = ["PIPELEX_API_KEY"]\n\n[vars.mcp_server.user_config.api_key]\ntitle = "Key"\n'
+        )
+        defaults = load_defaults(tree / "targets")
+        prod = load_target_config(tree / "targets", "prod", defaults)
+        codex = load_target_config(tree / "targets", "codex", defaults)
+
+        prod_server = prod.template_vars["mcp_server"]
+        assert isinstance(prod_server, dict)
+        assert prod_server["env_vars"] == ["PIPELEX_API_KEY"], "an array replaces the default's, never extends it"
+        assert prod_server["user_config"] == {
+            "api_key": {"type": "string", "title": "Key", "description": "Key.", "sensitive": True},
+            "base_url": {"type": "string", "title": "Pipelex API base URL", "description": "URL."},
+        }
+        assert codex.template_vars["mcp_server"] == defaults["mcp_server"]
+        assert defaults["mcp_server"] == load_defaults(tree / "targets")["mcp_server"], "a target's merge wrote into the shared defaults"
 
 
 class TestPluginManifests:
@@ -613,7 +822,7 @@ class TestPluginManifests:
         codex_manifest = tree / "pipelex-vibe" / ".codex-plugin" / "plugin.json"
         assert claude_manifest not in result.files
         assert codex_manifest not in result.files
-        assert any(path.name == "mthds-reference.md" for path in result.files)
+        assert any(path.name == "writing-mthds.md" for path in result.files)
 
     def test_build_claude_target_writes_claude_plugin_dir(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
@@ -746,6 +955,8 @@ class TestSharedSkillIncludes:
         "read [the catalog-id reference](../shared/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
+        "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
+        "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -775,19 +986,24 @@ class TestSharedSkillIncludes:
         assert include in explain
         assert include in run
 
-    def test_the_authoring_reference_carries_the_same_warning(self) -> None:
-        """The reference is where a designer reads what a PipeFunc is; a warning
-        absent there is a warning the author never meets. It is a static asset
-        copied verbatim into every target and never rendered, so it cannot
-        include the partial — this test is what holds the two in step, and it
-        reads the partial rather than restating it, so that rewording the shared
-        sentence and leaving the reference behind fails here instead of shipping
-        a plugin whose skill and whose reference disagree."""
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_language_reference_carries_the_same_warning(self, target_name: str) -> None:
+        """The language reference is where a designer reads what a PipeFunc is; a
+        warning absent there is a warning the author never meets. It used to be a
+        static asset of `pipelex-design`, copied verbatim and never rendered, so it
+        held a copy of the sentence that only this test kept in step. It is now a
+        rendered shared reference, so it includes the partial like any skill, and
+        the rendered file is held to the partial's own body."""
+        reference_template = (self.REPO_TEMPLATES / "skills" / "shared" / "writing-mthds.md.j2").read_text(encoding="utf-8")
+        assert 'include "skills/shared/pipefunc-warning.md.j2"' in reference_template
         partial = (self.REPO_TEMPLATES / "skills" / "shared" / "pipefunc-warning.md.j2").read_text(encoding="utf-8")
         warning = re.sub(r"\{#.*?#\}", "", partial, flags=re.DOTALL).strip()
         assert warning, "the partial rendered to nothing — its comment wrapper moved"
-        reference = (self.REPO_TEMPLATES.parent / "skills" / "pipelex-design" / "references" / "writing-mthds.md").read_text(encoding="utf-8")
-        assert warning in reference, "reword the shared warning and the authoring reference in the same change"
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=[], target_name=config.name)
+        reference = next(content for path, content in rendered.items() if path.match("skills/shared/writing-mthds.md"))
+        assert warning in reference, f"{target_name}: the rendered language reference lost the PipeFunc warning"
 
     def test_no_skill_restates_the_sandbox_beside_a_pipefunc(self) -> None:
         """The one-source test proves a block has one source; it is blind to a
@@ -807,6 +1023,60 @@ class TestSharedSkillIncludes:
             if "PipeFunc" in line and "sandbox" in line
         ]
         assert offenders == [], f"the sandbox fact reaches a skill through the include or not at all: {offenders}"
+
+    @pytest.mark.parametrize("skill", ["pipelex-inputs", "pipelex-lab", "pipelex-run"])
+    def test_the_ignore_procedure_reaches_every_skill_that_writes_the_user_s_data(self, skill: str) -> None:
+        """Three skills write what holds the user's data into a project that is usually a
+        repository: `pipelex-inputs` the copies of the user's files, `pipelex-lab` a case of
+        them and its key, and `pipelex-run` the saved output, which carries the facts the run
+        extracted from them. Each keeps it out of version control with the same procedure,
+        and each used to word it for itself until run needed it too. The partial is the one
+        source, and each skill names only what it checks and the entry it writes."""
+        body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        assert body.count('include "skills/shared/git-ignore.md.j2"') == 1
+        assert "{% set git_ignore_paths %}" in body
+        assert "{% set git_ignore_entry %}" in body
+
+    def test_no_skill_restates_the_ignore_check(self) -> None:
+        """The one-source test is blind to a paraphrase: a fourth skill that words the check
+        for itself passes it while dropping the tracked-path guard. `git check-ignore` reaches
+        a skill template through the partial or not at all; the scaffold's scripts run it
+        themselves and are not templates."""
+        offenders = [
+            str(path.relative_to(self.REPO_TEMPLATES))
+            for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
+            if "check-ignore" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == [], f"the ignore check reaches a skill through skills/shared/git-ignore.md.j2 alone: {offenders}"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_the_submission_convention_names_the_workshop_s_path_containment(self, target_name: str) -> None:
+        """`L-260923-019e50`: the local workshop refuses a `{ path }` item that resolves
+        outside its own working directory, an absolute one included (`pipelex-mcp`,
+        `src/local/files.ts`). The include used to say "pass an absolute one" as though
+        that were enough, so a session launched below or beside the bundle met the
+        refusal with no cure. Every skill that submits a bundle now names the refusal
+        and the relaunch that cures it. All but the catalog keep the inline fallback: a
+        save is the one submission the inline form leaves unlinked."""
+        includers = sorted(
+            path.parent.name
+            for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
+            if 'include "skills/shared/validate-call.md.j2"' in path.read_text(encoding="utf-8")
+        )
+        assert "pipelex-catalog" in includers
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
+        fallback = "is the fallback, and the only form the hosted console accepts."
+        for skill in includers:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
+            assert "relaunching the harness from a directory holding the bundle cures that" in body, f"{target_name}/{skill}: the cure is unnamed"
+            assert "pass an absolute one" not in body, f"{target_name}/{skill}: an absolute path outside the workshop is refused too"
+            if skill == "pipelex-catalog":
+                assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
+            else:
+                assert fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
@@ -881,7 +1151,8 @@ class TestPipelexRunSkill:
         read as a failed save."""
         body = self.run_skill
         assert "Pass `dir` only for a folder the user named, relative to that directory." in body
-        assert "refuses a `dir` the user named | call again without it, which saves into `runs/<run_id>/`" in body
+        # The ignore check exempts a `dir` the user named, so the fallback into `runs/<run_id>/` takes it first.
+        assert ("refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`") in body
         assert "A refused `dir` is not a failed save" in body
 
     def test_user_values_are_laid_over_a_prepared_set(self) -> None:
@@ -1021,7 +1292,15 @@ class TestPipelexRunSkill:
         assert "leave `inputs.json` exactly as it is" in body
         assert "prepare never rewrites it" in body
         assert "no envelope, no hash and no sidecar" in body
-        assert "add `inputs.prepared.json` to the nearest `.gitignore`" in body
+        # The prepared file's references are scoped to one organization on one plane, and it carries every
+        # other value of `inputs.json` word for word, so it takes the shared ignore procedure, second check
+        # and tracked-path guard included, rather than a rule of step 5's own.
+        assert (
+            "{% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, "
+            "and `inputs.prepared.json` before step 5's call{% endset -%}"
+        ) in body
+        assert "`inputs.json` or `inputs.prepared.json`{% endset -%}" in body
+        assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
 
     def test_design_points_at_the_run_without_running(self) -> None:
         design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -1093,6 +1372,39 @@ class TestPipelexCatalogSkill:
         partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
         assert "except anything under a `runs/` directory" in partial
         assert "root file first" in body
+
+    def test_a_save_takes_the_path_form_and_an_unlinkable_one_waits_for_a_yes(self) -> None:
+        """The workshop writes `pipelex-method.json` only beside a `{ path }` root file
+        (`pipelex-mcp`, `src/capabilities/catalog-write.ts`, `linkDirectoryOf`), and
+        `link_dir` is bounded by the same working directory as a path is. So a method
+        created from inline files is linked to nothing, and the directory's next save
+        creates a second one, which only an admin can delete. The skill says it through
+        the include's parameter rather than a pasted variant of the convention."""
+        body = self.catalog_skill
+        assert "{% set validate_call_inline %}" in body
+        assert "**a save takes the path form**" in body
+        assert "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes" in body
+        assert "Never pass `link_dir`" in body
+        # The update arm too: an inline update leaves the link's `synced_updated_at` behind the catalog, so the
+        # directory's next save is refused at `expected_updated_at`, a conflict with this session's own save.
+        assert "a method updated that way keeps the link's old sync time" in body
+
+    def test_a_conflict_with_this_session_s_own_save_is_not_called_somebody_else_s(self) -> None:
+        """A save whose link write failed, an inline one always, leaves the link's sync time behind the
+        catalog, so the next save from the directory is refused as though somebody had saved over the
+        method. The reference recognises the case by the stored `updated_at` this session's own save
+        reported, says so, and carries the save on with that `updated_at` as the expectation; step 5
+        names the cure for the stale link, a pull into the same directory, rather than a bare save again."""
+        conflict = self.catalog_reference("conflict.md")
+        own = conflict.split("**First, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        assert "never say that somebody saved over the method" in own
+        assert "with `expected_updated_at` set to that stored `updated_at`" in own
+        assert "relaunched from a directory holding the bundle" in own
+        assert conflict.index("**First, is it this session's own save?**") < conflict.index("somebody saved over this method")
+        body = self.catalog_skill
+        assert "unless it finds this session's own save, give the user both timestamps" in body
+        assert "a pull of this method into this directory rewrites the link alone while the files still match what was saved" in body
+        assert "fix whatever blocked the write and save again" not in body
 
     def test_python_is_chosen_and_never_swept(self) -> None:
         """The workshop gates on the `.py` extension and on bundle containment and
@@ -1727,7 +2039,7 @@ class TestSyntheticInputsSkill:
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_orphan_copies_are_reported_and_the_build_clears_them(self, target_name: str, tmp_path: Path) -> None:
-        """Both ORPHAN branches, and the build's answer to them.
+        """Both kinds of orphaned copy, and the build's answer to them.
 
         A copy with no source is the one mismatch a rebuild used to be unable to
         fix, so `make check` failed pointing at `make build` — advice that did
@@ -1738,13 +2050,16 @@ class TestSyntheticInputsSkill:
         setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
         references = tmp_path / "skills" / "pipelex-synthetic-inputs" / "references"
 
+        def orphans() -> list[Path]:
+            return orphaned_outputs(self.REPO_ROOT, tmp_path, static_asset_outputs(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills))
+
         # A file in the copy with no matching source.
         (references / "invented.md").write_text("no source file produced this\n", encoding="utf-8")
-        problems = static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
-        assert any("ORPHAN" in problem and "invented.md" in problem for problem in problems)
+        assert orphans() == [references / "invented.md"]
 
         setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
         assert not (references / "invented.md").exists(), "the rebuild left an orphaned file behind"
+        assert orphans() == []
         assert static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills) == []
 
         # A whole asset directory in the copy whose source no longer exists. The skill is picked
@@ -1760,11 +2075,11 @@ class TestSyntheticInputsSkill:
         ghost = tmp_path / "skills" / bare_skill / bare_dir
         ghost.mkdir(parents=True)
         (ghost / "retired.md").write_text("an asset whose source was removed\n", encoding="utf-8")
-        problems = static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
-        assert any("ORPHAN" in problem and bare_skill in problem for problem in problems)
+        assert orphans() == [ghost / "retired.md"]
 
         setup_static_assets(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills)
         assert not ghost.exists(), "the rebuild left a whole orphaned references/ directory behind"
+        assert orphans() == []
         assert static_asset_mismatches(self.REPO_ROOT, tmp_path, templates_dir, config.include_skills) == []
 
     def test_check_freshness_fails_on_a_stale_reference_copy(self, tmp_path: Path) -> None:
@@ -1775,7 +2090,9 @@ class TestSyntheticInputsSkill:
         written to close.
         """
         tree = tmp_path / "repo"
-        shutil.copytree(self.REPO_ROOT, tree, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", "node_modules"))
+        # `.DS_Store` too: the copy has no git to say it is ignored, so one Finder left in an output
+        # directory of the checkout would be an orphan of the copy.
+        shutil.copytree(self.REPO_ROOT, tree, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", "node_modules", ".DS_Store"))
         assert check_freshness(tree, "prod") == 0, "the copied tree should start fresh"
 
         shipped = tree / "pipelex" / "skills" / "pipelex-synthetic-inputs" / "references" / "png.md"
@@ -2143,15 +2460,19 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
 
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
-        """Each platform declares its own hook template set."""
+        """Each platform declares its own hook template set, and the MCP fragment is not among them."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == [
-            "hooks/vibe-hooks.toml.j2",
-            "hooks/check-mthds-vibe.sh.j2",
-            "mcp/vibe-mcp.toml.j2",
-        ]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
+        assert MCP_TEMPLATES_BY_PLATFORM == {Platform.CLAUDE: [], Platform.CODEX: [], Platform.MISTRAL_VIBE: ["mcp/vibe-mcp.toml.j2"]}
+
+    def test_a_missing_mcp_template_is_named_for_what_it_is(self, tmp_path: Path) -> None:
+        """The Vibe fragment is the workshop launcher's declaration, not a hook, and its absence says so."""
+        tree = _create_codex_tree(tmp_path)
+        (tree / "templates" / "mcp" / "vibe-mcp.toml.j2").unlink()
+        with pytest.raises(SystemExit, match=r"^Declared MCP template not found: mcp/vibe-mcp\.toml\.j2$"):
+            render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
 
     def test_claude_renders_hook_json_and_script(self, template_tree: Path) -> None:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
@@ -2725,7 +3046,9 @@ class TestSkillScriptsCopy:
         assert any("STALE" in problem for problem in static_asset_mismatches(base, out, base / "templates", None))
 
         shutil.rmtree(base / "skills" / "demo" / "scripts")
-        assert any("ORPHAN" in problem for problem in static_asset_mismatches(base, out, base / "templates", None))
+        assert orphaned_outputs(base, out, static_asset_outputs(base, out, base / "templates", None)) == [
+            out / "skills" / "demo" / "scripts" / "probe.sh"
+        ]
         setup_static_assets(base, out, base / "templates", None)
         assert not (out / "skills" / "demo" / "scripts").exists(), "a retired scripts/ directory kept shipping"
         assert static_asset_mismatches(base, out, base / "templates", None) == []
