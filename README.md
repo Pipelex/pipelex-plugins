@@ -8,7 +8,7 @@ The Pipelex plugin for Claude Code and Codex: build and run AI methods from your
 <!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door--open_source-plugin.md — do not edit it here. -->
 ## Quick start
 
-Pipelex lets you build AI methods with your coding agent and run them anywhere — from your agent or your chatbot via MCP, as a webapp, or via API in any software.
+Pipelex lets you build AI methods with your coding agent and run them anywhere: as an MCP for chatbots, as a webapp for people, or via API for your software.
 
 **1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
