@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Codex PostToolUse(apply_patch|Bash) hook: lint, format, and validate .mthds
-# files touched by an apply_patch call, or named by absolute path in a patch
-# run through the shell that Codex reports as Bash (docs/hooks.md says which
-# shell forms it does, and why a relative path there goes unchecked).
+# files touched by an apply_patch call, or by a patch run through the shell
+# that Codex reports as Bash (docs/hooks.md says which shell forms it does,
+# and how the bundle finds the file such a patch wrote).
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
@@ -49,22 +49,6 @@ CHECK_MJS="$SCRIPT_DIR/check.mjs"
 if [[ ! -f "$CHECK_MJS" ]]; then
   echo "[mthds-codex-hook] check.mjs not found beside check-mthds-codex.sh — passing (reinstall the plugin)" >&2
   exit 0
-fi
-
-# check.mjs resolves a relative patch path against its working directory,
-# which Codex sets to the session's directory. The patch tool applies its
-# patch there, so its call keeps that directory. A patch run through the
-# shell may have run anywhere (a `workdir` the payload does not carry, a `cd`
-# in the script), so any other call runs from this script's directory, which
-# holds no .mthds file: a relative path names no file there and goes
-# unchecked, rather than checking and reformatting a same-named file in the
-# session's directory, while an absolute path is still checked. Quotes inside
-# the command are escaped in the JSON, so the command cannot spoof the name.
-# A stopgap: the bundle of L-260924-bdb054 reads the payload's cwd instead,
-# and removing this once it is vendored is L-260924-dd7bf2.
-PATCH_TOOL='"tool_name"[[:space:]]*:[[:space:]]*"apply_patch"'
-if ! [[ "$INPUT" =~ $PATCH_TOOL ]]; then
-  cd "$SCRIPT_DIR" || exit 0
 fi
 
 exec node "$CHECK_MJS" --platform=codex <<<"$INPUT"
