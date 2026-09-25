@@ -281,15 +281,18 @@ class TestPipelexScaffoldSkill:
             assert "`committed:` names it and lists the staged paths" in body
             assert "`kept:` names the commit the initializer made itself" in body
             # Ruled 2026-09-24: inside another repository's work tree, branch B makes no repository and no
-            # commit, as the method app does, and the report says the project is new files of it.
-            # An ignored `<dir>` gets the same treatment and a verdict of its own, since the report cannot
-            # call ignored files new files of the repository: its words are the initializers reference's.
-            assert "`inside:`, `ignored:` and `nested:` name the enclosing repository, where it commits nothing" in body
+            # commit, as the method app does, and the report says the project is new files of it. Ruled
+            # 2026-09-25: a `<dir>` that repository ignores gets a repository of its own, as outside every
+            # work tree. A `<dir>` whose every file it ignores, though not the directory, gets none and a
+            # verdict of its own, since the report cannot call those files new files of the repository.
+            assert "makes `<dir>` a repository when none holds it or the one around it ignores it" in body
+            assert "`inside:`, `unversioned:` and `nested:` name the enclosing repository, where it commits nothing" in body
             assert "the pristine commit and who made it, or on `inside:` that the project is new files of that repository" in body
             assert (
-                "the `ignored:`, `nested:` and env verdicts in the words "
+                "the `unversioned:`, `nested:` and env verdicts in the words "
                 "[references/initializers.md](references/initializers.md) gives each, never the URL"
             ) in body
+            assert "`ignored:`" not in body
             # The method app's report still reads the plane by a test, never an echo, and only of the file
             # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
             assert f"the plane of the `.env.local` `make create` wrote, `{PLANE_TEST}`" in body
@@ -297,18 +300,29 @@ class TestPipelexScaffoldSkill:
             assert ">> <dir>/.env" not in body
             assert "cp -n" not in body
         initializers = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
-        assert "**Inside another repository's work tree it initializes nothing and commits nothing**" in initializers
-        assert "the script does the same and prints `ignored:` instead" in initializers
+        assert "**Inside another repository's work tree that does not ignore `<dir>`, it initializes nothing and commits nothing**" in initializers
+        assert "where the repository whose work tree holds `<dir>` ignores it (an ignored `tmp/`, a dotfiles repository ignoring `*`)" in initializers
+        assert "the script does the same and prints `unversioned:` instead" in initializers
+        assert "reads no git identity from the enclosing repository's own `.git/config`" in initializers
         assert (
-            "**`ignored:`**, from the pristine-commit script: say that the enclosing repository ignores the project, so nothing versions it"
+            "**`unversioned:`**, from the pristine-commit script: say that `<root>` ignores every file of the project but not its directory"
             in initializers
         )
-        assert "making it a repository is the user's choice, which this skill does not make for them" in initializers
+        assert "How to version it is the user's choice, which this skill does not make for them" in initializers
+        assert "`ignored:`" not in initializers
         # Review round of 2026-09-25: a repository an initializer plants inside the user's work tree anyway
         # (create-astro does) reads as a root, and was committed in. The script now says `nested:`, and the
         # report offers the removal of `<dir>/.git` without performing it, since it may hold history.
         assert "**`nested:`**, from the pristine-commit script" in initializers
-        assert "Offer, never perform, the removal of `<dir>/.git`, which deletes whatever history it holds" in initializers
+        # Review round 3: the removal is offered only of a repository the initializer planted, never of one
+        # the user had before step 1, whose history is theirs.
+        assert (
+            "**When `<dir>` held no `.git` before step 1**, the initializer made it: offer, never perform, the removal of `<dir>/.git`"
+            in initializers
+        )
+        assert (
+            "**When `<dir>` held a `.git` before step 1**, that repository and its history are the user's: never offer to remove it" in initializers
+        )
         assert (
             "**An initializer not in the tables below that would run `git init` gets its no-git flag when `<dir>` lies inside another work tree**"
             in initializers
@@ -387,12 +401,13 @@ class TestPipelexScaffoldSkill:
         assert "--template" in github and "--template Pipelex/" not in github
         # `gh` refuses a directory inside another work tree and hints at the nested `git init` both branches refuse.
         assert (
-            "**A project inside another repository's work tree has neither a repository nor a pristine commit of its own**, on either branch"
-            in github
-        )
+            "**A project inside another repository's work tree that does not ignore it has neither a repository nor a pristine commit of its own**, "
+            "on either branch"
+        ) in github
         assert "the pristine-commit script's `inside:` verdict" in github
-        assert "On `ignored:`, that repository ignores the project, so its remote carries none of it" in github
+        assert "On `unversioned:`, or a `git:` line saying the project is under no version control" in github
         assert "Treat `nested:` as `inside:`" in github
+        assert "A project under a path the enclosing repository ignores has a repository and a pristine commit of its own" in github
         assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
@@ -577,7 +592,8 @@ class TestMethodAppBranch:
             assert "how the verdict says to stop it" in body
             # The warnings are relayed, the LICENSE holder first.
             assert "first that `LICENSE` still names the template's holder when it does" in body
-            assert "which is no commit when `<dir>` sits in another repository's work tree" in body
+            # The method app's `git:` line says what happened, a repository under an ignored path included.
+            assert "the template's version and the git outcome; that" in body
 
     def test_placeholders_are_substituted_as_one_shell_word(self) -> None:
         for body in _bodies():
@@ -680,10 +696,15 @@ class TestUncreatedCopyReference:
         # The origin is read, and a tracked directory refused, before any repository is made.
         assert block.index("remote get-url origin") < block.index("init -b main")
         assert "*/Pipelex/pipelex-method-apps*|*:Pipelex/pipelex-method-apps*" in block
-        # Only a copy outside every repository gets one: the family plants no repository inside another.
-        assert block.count("init -b main") == 1
+        # Only a copy outside every repository, or one the enclosing repository ignores, gets one: the family
+        # plants no repository where another repository sees it.
+        assert block.count("init -b main") == 2
         assert "outside) git -C <dir> init -b main ;;" in block
-        assert "**A copy that sits untracked inside another repository's work tree gets no repository and no commit**" in reference
+        assert 'check-ignore -q -- "./${real##*/}"; then git -C <dir> init -b main' in block
+        assert (
+            "**A copy that sits untracked inside another repository's work tree that does not ignore it gets no repository and no commit**"
+            in reference
+        )
         # The first commit is looked for only once the copy is its own repository.
         assert reference.index(OWN_REPOSITORY_MARKER) < reference.index("git -C <dir> rev-parse -q --verify HEAD")
 
@@ -788,6 +809,34 @@ class TestUncreatedCopyRecipes:
         assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(parent.resolve())
         assert self._git(parent, "log", "--format=%H") == history
         assert self._git(parent, "diff", "--cached", "--name-only") == ""
+
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.parametrize(("rule", "own_repository"), [("apps/\n", True), ("*\n!*/\n", False)], ids=["ignored", "every-file-ignored"])
+    def test_a_copy_the_enclosing_repository_ignores_gets_one_of_its_own(
+        self, tmp_path: Path, shell: list[str], rule: str, own_repository: bool
+    ) -> None:
+        """Ruled 2026-09-25: the initializer gives a copy under an ignored path a repository of its own, so a
+        later session gives one to a copy it finds there. What counts is the directory: one the enclosing
+        repository sees, though it ignores every file in it, gets none, since a repository there would show."""
+        parent = tmp_path / "monorepo"
+        parent.mkdir()
+        subprocess.run(["git", "-C", str(parent), "init", "-q", "-b", "trunk"], check=True)
+        (parent / "README.md").write_text("theirs\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(parent), "add", "README.md"], check=True)
+        _git_commit(parent, "the user's own history")
+        (parent / ".gitignore").write_text(rule, encoding="utf-8")
+        target = parent / "apps" / "receipt-review"
+        target.mkdir(parents=True)
+        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
+        result = self._own_repository(dir_literal=str(target), shell=shell, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        if own_repository:
+            assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(target.resolve())
+            assert self._git(target, "symbolic-ref", "--short", "HEAD").strip() == "main"
+        else:
+            assert result.stdout == "inside another repository's work tree: no repository and no commit of its own\n"
+            assert not (target / ".git").exists()
+        assert self._git(parent, "status", "--porcelain", "--untracked-files=all", "--", "apps") == ""
 
     @staticmethod
     def _repository_tracking_a_copy(root: Path, origin: str) -> Path:

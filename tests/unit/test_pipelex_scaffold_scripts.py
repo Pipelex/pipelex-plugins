@@ -102,17 +102,38 @@ IGNORING_REPOSITORIES = {
     "this-machine-s-exclude": (".git/info/exclude", "*\n", "new-app"),
 }
 
+# How a user's repository comes to ignore every file of that directory but not the directory itself,
+# which is then visible to it, so that a repository planted there would show.
+EVERY_FILE_IGNORED = {
+    "every-file-but-no-directory": (".gitignore", "*\n!*/\n", "new-app"),
+    "the-directory-s-files": (".gitignore", "new-app/*\n", "new-app"),
+}
+
 
 def _ignoring_repository(tmp_path: Path, how: str) -> tuple[Path, Path]:
     """A user's repository, with its ignore rule committed where a clone carries one, and the project
-    directory it ignores, not yet created."""
-    rule_file, rule, project = IGNORING_REPOSITORIES[how]
+    directory it ignores, or ignores every file of, not yet created."""
+    rule_file, rule, project = {**IGNORING_REPOSITORIES, **EVERY_FILE_IGNORED}[how]
     outer = _repository(tmp_path / "their-repo")
     (outer / rule_file).write_text(rule, encoding="utf-8")
     (outer / "README.md").write_text("theirs\n", encoding="utf-8")
     _git(outer, "add", "-f", "README.md", *([rule_file] if rule_file == ".gitignore" else []))
     _git(outer, "commit", "-q", "-m", "their commit")
     return outer, outer / project
+
+
+def _initializer_output(project: Path) -> None:
+    """What an initializer leaves: its own `.gitignore`, which keeps out neither the dependency tree
+    nor a `.env`, both of those, and a source file."""
+    (project / "node_modules" / "x").mkdir(parents=True)
+    (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
+    (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
+    (project / ".gitignore").write_text("build/\n", encoding="utf-8")
+    (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+
+
+def _has_no_commit(repository: Path) -> bool:
+    return subprocess.run(["git", "-C", str(repository), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
 
 
 def _staged_once_made_a_repository(project: Path) -> list[str]:
@@ -311,35 +332,95 @@ class TestCommitPristine:
         assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.py"]
 
     @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
-    def test_a_directory_the_user_s_repository_ignores_is_versioned_by_nothing(self, tmp_path: Path, how: str) -> None:
-        """An ignored `<dir>` gets no repository either, and its own verdict: the report cannot call the
-        project new files of a repository that ignores them. Its `.gitignore` is judged by its own rules,
-        which the enclosing rule hides, so that a repository the user makes there later keeps the
-        dependency tree and the `.env` out."""
+    def test_a_directory_the_user_s_repository_ignores_gets_a_repository_of_its_own(self, tmp_path: Path, how: str) -> None:
+        """Ruled by Louis on 2026-09-25: under a path the enclosing repository ignores, a repository is as
+        invisible to it as plain files, while without one the project has no baseline and the enclosing
+        `git clean -fdx` deletes it. So `<dir>` gets a repository on `main` and the pristine commit, as
+        outside every work tree, and the enclosing repository is left exactly as it was."""
         outer, project = _ignoring_repository(tmp_path, how)
         head_before = _git(outer, "rev-parse", "HEAD")
-        (project / "node_modules" / "x").mkdir(parents=True)
-        (project / "node_modules" / "x" / "i.js").write_text("//\n", encoding="utf-8")
-        (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
-        (project / ".gitignore").write_text("build/\n", encoding="utf-8")
-        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        _initializer_output(project)
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
         assert result.returncode == 0, result.stderr
-        assert result.stdout == f"ignored: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
-        assert not (project / ".git").exists(), "a repository was planted inside the user's"
+        lines = result.stdout.splitlines()
+        assert lines[0].startswith("committed: ") and lines[0].endswith(" Scaffold Python project")
+        assert sorted(lines[1:]) == [".gitignore", "main.py"]
+        assert _git(project, "rev-parse", "--show-toplevel") == str(project.resolve())
+        assert _git(project, "symbolic-ref", "--short", "HEAD") == "main"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\nnode_modules/\n\n.env\n"
+        assert _git(outer, "rev-parse", "HEAD") == head_before
+        assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
+        assert _git(outer, "diff", "--cached", "--name-only") == ""
+
+    @pytest.mark.parametrize("how", list(EVERY_FILE_IGNORED))
+    def test_a_directory_whose_every_file_is_ignored_is_under_no_version_control(self, tmp_path: Path, how: str) -> None:
+        """What counts is the directory. Under `*` then `!*/`, or `<name>/*`, the enclosing repository ignores
+        every file of `<dir>` but sees the directory, so a repository there would show in its status: `<dir>`
+        gets none, and the report cannot call the project new files of a repository that never shows them.
+        The project's `.gitignore` is judged by its own rules, which the enclosing `*` would otherwise stand
+        in for, so that a repository the user makes there later keeps the dependency tree and `.env` out."""
+        outer, project = _ignoring_repository(tmp_path, how)
+        head_before = _git(outer, "rev-parse", "HEAD")
+        _initializer_output(project)
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == f"unversioned: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        assert not (project / ".git").exists(), "a repository was planted where the enclosing one sees it"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\nnode_modules/\n\n.env\n"
         assert _git(outer, "rev-parse", "HEAD") == head_before
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
         assert _staged_once_made_a_repository(project) == [".gitignore", "main.py"]
 
-    def test_a_repository_planted_inside_the_user_s_is_committed_in_by_nothing(self, tmp_path: Path) -> None:
+    def test_a_directory_holding_a_tracked_path_is_never_read_as_ignored(self, tmp_path: Path) -> None:
+        """git reads a directory that holds a tracked path as not ignored whatever the patterns say, and the
+        enclosing index names it, so the project is that repository's, never unversioned."""
+        outer = _repository(tmp_path / "their-repo")
+        project = outer / "new-app"
+        project.mkdir()
+        (project / "keep.txt").write_text("theirs\n", encoding="utf-8")
+        _git(outer, "add", "new-app/keep.txt")
+        _git(outer, "commit", "-q", "-m", "their commit")
+        (outer / ".gitignore").write_text("*\n", encoding="utf-8")
+        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.stdout == f"inside: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        assert not (project / ".git").exists()
+
+    @pytest.mark.parametrize("history", [False, True], ids=["unborn", "with-a-commit"])
+    @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
+    def test_a_repository_its_enclosing_repository_ignores_is_committed_in(self, tmp_path: Path, how: str, history: bool) -> None:
+        """Review round 3: a repository root under a dotfiles home ignoring `*` was reported `nested:`, left
+        with no commit, and offered for deletion. The enclosing repository never sees it, so it is a root
+        like any other, and gets the commit; the skill asks first when the repository was the user's."""
+        outer, project = _ignoring_repository(tmp_path, how)
+        head_before = _git(outer, "rev-parse", "HEAD")
+        _repository(project)
+        if history:
+            (project / "README.md").write_text("mine\n", encoding="utf-8")
+            _git(project, "add", "README.md")
+            _git(project, "commit", "-q", "-m", "my first commit")
+        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith("committed: ")
+        assert _git(project, "log", "--format=%s").splitlines() == ["Scaffold Python project", *(["my first commit"] if history else [])]
+        assert _git(outer, "rev-parse", "HEAD") == head_before
+        assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
+
+    @pytest.mark.parametrize("rule", ["", "*\n!*/\n"], ids=["no-rule", "every-file-but-no-directory"])
+    def test_a_repository_planted_inside_the_user_s_is_committed_in_by_nothing(self, tmp_path: Path, rule: str) -> None:
         """create-astro 5.2.4 runs `git init` and a commit even inside an enclosing work tree, since it
         looks only for a `.git` of `<dir>`'s own, and a user can make one there too. `<dir>` then reads as
         a repository's root, yet a commit there would leave the enclosing repository a pointer to it that
         no clone can fetch, so the script commits in neither repository, says `nested:` with the enclosing
-        root, and leaves `<dir>/.git` for the user to remove or keep."""
+        root, and leaves `<dir>/.git` for the user to remove or keep. A directory the enclosing repository
+        sees though it ignores every file in it is such a place: the nested repository shows there."""
         outer = _repository(tmp_path / "their-repo")
         (outer / "README.md").write_text("theirs\n", encoding="utf-8")
         _git(outer, "add", "README.md")
+        if rule:
+            (outer / ".gitignore").write_text(rule, encoding="utf-8")
+            _git(outer, "add", "-f", ".gitignore")
         _git(outer, "commit", "-q", "-m", "their commit")
         head_before = _git(outer, "rev-parse", "HEAD")
         project = _repository(outer / "new-app")
@@ -351,14 +432,57 @@ class TestCommitPristine:
         assert result.returncode == 0, result.stderr
         assert result.stdout == f"nested: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
         assert (project / ".git").is_dir(), "the nested repository is the user's to remove, never the script's"
-        assert subprocess.run(["git", "-C", str(project), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert _has_no_commit(project)
         assert _git(project, "diff", "--cached", "--name-only") == ""
         assert _git(outer, "rev-parse", "HEAD") == head_before
         assert _git(outer, "diff", "--cached", "--name-only") == ""
+        assert "new-app/" in _git(outer, "status", "--porcelain").splitlines()[0]
         # The .gitignore is written, and once the user removes `<dir>/.git` the enclosing repository reads it.
         shutil.rmtree(project / ".git")
         untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
-        assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.js"]
+        assert sorted(untracked) == ([] if rule else ["new-app/.gitignore", "new-app/main.js"])
+
+    @pytest.mark.parametrize("target", ["ignored-directory", "nested-root"])
+    def test_a_symlinked_directory_is_read_where_it_physically_is(self, tmp_path: Path, target: str) -> None:
+        """The link's own parent lies in no work tree here, while every git command reads the target's: asked
+        from the link's parent, an ignored target would read as not ignored and a nested root as no nested
+        one, which commits into a repository the enclosing one tracks as a pointer."""
+        if target == "ignored-directory":
+            outer, project = _ignoring_repository(tmp_path, "an-ignored-tmp")
+            project.mkdir(parents=True)
+        else:
+            outer = _repository(tmp_path / "their-repo")
+            project = _repository(outer / "new-app")
+        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        link = tmp_path / "elsewhere" / "the-link"
+        link.parent.mkdir()
+        link.symlink_to(project, target_is_directory=True)
+        result = _run(COMMIT_PRISTINE, str(link), "Scaffold Python project", cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        if target == "ignored-directory":
+            assert result.stdout.startswith("committed: ")
+            assert _git(project, "rev-parse", "--show-toplevel") == str(project.resolve())
+        else:
+            assert result.stdout == f"nested: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+            assert _has_no_commit(project)
+        assert not (link.parent / ".git").exists()
+
+    def test_a_new_repository_reads_no_identity_from_the_enclosing_one(self, tmp_path: Path) -> None:
+        """An identity set only in the enclosing repository's own `.git/config` does not reach a repository
+        made inside it, so the commit there is refused with git's message, never made under another name."""
+        outer, project = _ignoring_repository(tmp_path, "an-ignored-tmp")
+        _git(outer, "config", "user.name", "Their Name")
+        _git(outer, "config", "user.email", "them@example.com")
+        project.mkdir(parents=True)
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        environment = _environment()
+        for name in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+            environment.pop(name)
+        environment.update({"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.useConfigOnly", "GIT_CONFIG_VALUE_0": "true"})
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path, env=environment)
+        assert result.stdout == "refused: commit-failed\n"
+        assert result.stderr.strip(), "git's own message is relayed on standard error"
+        assert _has_no_commit(project)
 
     def test_inside_another_repository_nothing_is_written_when_the_initializer_wrote_nothing(self, tmp_path: Path) -> None:
         outer = _repository(tmp_path / "their-repo")
@@ -671,9 +795,10 @@ class TestWriteEnvFile:
         assert not (outer / ".gitignore").exists()
         assert _git(outer, "diff", "--cached", "--name-only") == "staged.md"
 
-    def test_an_enclosing_repository_s_own_rule_is_the_project_s(self, tmp_path: Path) -> None:
-        """A `.gitignore` of the enclosing repository travels with every clone of it, which is where the
-        project's files live, so it counts and no second line is written."""
+    def test_an_enclosing_repository_s_rule_leaves_the_project_its_own_line(self, tmp_path: Path) -> None:
+        """A project with no repository of its own is judged by its own rules: its own line binds the
+        enclosing repository too, a deeper `.gitignore` deciding over those above it, and a repository the
+        user makes there later, which an enclosing rule does not."""
         outer = _repository(tmp_path / "their-repo")
         (outer / ".gitignore").write_text(".env\n", encoding="utf-8")
         project = outer / "app"
@@ -681,39 +806,74 @@ class TestWriteEnvFile:
         (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
         assert result.stdout == "filled base-url=file plane=production\n"
-        assert not (project / ".gitignore").exists()
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
         assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
+
+    def test_an_enclosing_repository_s_policy_on_the_example_is_never_lifted(self, tmp_path: Path) -> None:
+        """An enclosing repository's `.env*` rule is its policy for its whole tree: the project's `.gitignore`
+        adds to what it ignores and never lifts it, so the example gains no negation there."""
+        outer = _repository(tmp_path / "their-repo")
+        (outer / ".gitignore").write_text(".env*\n", encoding="utf-8")
+        project = outer / "app"
+        project.mkdir()
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
+        assert result.stdout == "empty base-url=file plane=production\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
+
+    def test_an_env_file_the_enclosing_repository_tracks_gets_no_key(self, tmp_path: Path) -> None:
+        """Read with no index, the project's own rules cannot see a `.env` the enclosing repository tracks,
+        which no rule ignores, so that repository is asked as well, and nothing reaches the file."""
+        outer = _repository(tmp_path / "their-repo")
+        project = outer / "app"
+        project.mkdir()
+        (project / ".env").write_text("PIPELEX_API_KEY=\n", encoding="utf-8")
+        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        _git(outer, "add", "app/.env", "app/.env.example")
+        _git(outer, "commit", "-q", "-m", "their commit")
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "refused: not-ignored\n"
+        assert FAKE_KEY not in (project / ".env").read_text(encoding="utf-8")
 
     @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
     def test_a_directory_the_user_s_repository_ignores_is_written_under_its_own_rules(self, tmp_path: Path, how: str) -> None:
-        """The enclosing rule hides every `.gitignore` below it, so read through it `.env` would pass for
-        ignored by a rule no repository of the project carries, or, where only this machine ignores the
-        directory, never read as ignored at all and refuse the key. The project's own rules judge it."""
+        """After the pristine commit, an ignored `<dir>` is a repository of its own, which reads only its own
+        rules: the enclosing repository's rule, which hides every `.gitignore` below it, and this machine's
+        `info/exclude` of it are neither read nor answered with a negation."""
         outer, project = _ignoring_repository(tmp_path, how)
         project.mkdir(parents=True)
-        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        (project / "package.json").write_text("{}\n", encoding="utf-8")
+        assert _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path).stdout.startswith("committed: ")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
         assert result.stdout == "filled base-url=file plane=production\n"
-        gitignore = (project / ".gitignore").read_text(encoding="utf-8")
-        assert ".env" in gitignore.splitlines()
-        # Only a rule of the project's own sees the example, so the enclosing one never earns it a negation.
-        assert ("!.env.example" in gitignore) == (how == "this-machine-s-exclude")
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\ndist/\n.env\n"
+        assert _git(project, "status", "--porcelain", "--untracked-files=all") == "?? .env.example"
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
-        assert _staged_once_made_a_repository(project) == [".env.example", ".gitignore"]
 
-    def test_a_repository_planted_inside_the_user_s_is_written_under_its_own_rules(self, tmp_path: Path) -> None:
-        """After the pristine commit's `nested:`, `<dir>` is still a repository of its own, which reads
-        only `<dir>`'s `.gitignore` files, so a line there is what keeps `.env` out while it stays one,
-        and the enclosing repository reads the same line once the user removes `<dir>/.git`."""
-        outer = _repository(tmp_path / "their-repo")
-        (outer / ".gitignore").write_text(".env\n", encoding="utf-8")
-        project = _repository(outer / "app")
-        (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+    @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
+    def test_an_ignored_directory_before_the_pristine_commit_is_refused(self, tmp_path: Path, how: str) -> None:
+        """The pristine commit makes an ignored `<dir>` a repository, so one that is not yet is step 3 run
+        before step 2, and no rule git could judge there is one a repository of the project's reads."""
+        _outer, project = _ignoring_repository(tmp_path, how)
+        project.mkdir(parents=True)
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        assert result.stdout == "refused: not-a-repository\n"
+        assert list(project.iterdir()) == []
+
+    @pytest.mark.parametrize("how", list(EVERY_FILE_IGNORED))
+    def test_a_directory_whose_every_file_is_ignored_is_written_under_its_own_rules(self, tmp_path: Path, how: str) -> None:
+        """Review round 3: the enclosing `*` read as the rule that ignores `.env`, so the project's `.gitignore`
+        never gained the line, and a repository the user made there next took the key with its first
+        `git add`; the same `*` earned the example a negation that made it show in the enclosing status."""
+        outer, project = _ignoring_repository(tmp_path, how)
+        project.mkdir(parents=True)
+        (project / "package.json").write_text("{}\n", encoding="utf-8")
+        (project / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+        assert _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path).stdout.startswith("unversioned: ")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
         assert result.stdout == "filled base-url=file plane=production\n"
-        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
-        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
-        assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\n\n.env\n"
+        assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
+        assert _staged_once_made_a_repository(project) == [".env.example", ".gitignore", "package.json"]
 
     def test_outside_a_repository_nothing_is_written(self, tmp_path: Path) -> None:
         project = tmp_path / "loose"
@@ -745,19 +905,24 @@ def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Pa
 
 
 def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
-    """The helper is copied into each script, which runs alone, so the copies are held together here."""
+    """The helpers are copied into each script, which runs alone, so the copies are held together here."""
 
-    def helpers(script: Path) -> str:
+    def block(script: Path, first_line: str, last_function: str) -> str:
         text = script.read_text(encoding="utf-8")
-        start = text.index("# git over <dir> as its ignore rules are judged.")
-        end = text.index("\n}\n", text.index("ignored_by_the_project() {"))
+        start = text.index(first_line)
+        end = text.index("\n}\n", text.index(f"\n{last_function}() {{"))
         return text[start:end]
 
-    assert helpers(COMMIT_PRISTINE) == helpers(WRITE_ENV_FILE)
-    # And each decides the same way whether the project's own rules are the ones judged.
+    for first_line, last_function in (
+        ("# Whether the repository whose work tree holds <dir>'s parent ignores <dir>", "ignored_around"),
+        ("# git over <dir> as its ignore rules are judged.", "ignored_by_the_project"),
+    ):
+        assert block(COMMIT_PRISTINE, first_line, last_function) == block(WRITE_ENV_FILE, first_line, last_function)
     for script in (COMMIT_PRISTINE, WRITE_ENV_FILE):
         text = script.read_text(encoding="utf-8")
-        assert 'git -C "$dir" check-ignore -q .' in text
+        # Both read `<dir>` where it physically is, and neither asks about it from inside, which adds the slash.
+        assert "&& pwd -P) || refuse no-directory" in text
+        assert "check-ignore -q ." not in text
         assert 'own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)\n' in text
 
 
