@@ -16,7 +16,7 @@ Three things about the returned set are worth knowing before you describe it:
 
 ## Without `mthds_get_method`
 
-When the other tools answer and `mthds_get_method` does not, read the id at contract level exactly as an address is read below, with `method_id` as the selector, and say that the source was not read rather than implying there was none to read. **Two causes present identically from here, so say both rather than picking one**: the hosted console, which reads no files and therefore serves neither catalog-write tool, and a local workshop that predates the tool, which `npx -y @pipelex/mcp@latest` refreshes. Naming only the console tells a workshop user to go looking for a host they are not on.
+When the other tools answer and `mthds_get_method` does not, read the id at contract level exactly as an address is read below, with `method_id` as the selector, and say that the source was not read rather than implying there was none to read. **The cause is a local workshop that predates the tool**, which `npx -y @pipelex/mcp@latest` refreshes; say so. The Pipelex connector's `pipelex_*` tools, when the session has them too, belong to a different server with no tool of this name, so they neither cause this nor stand in for the workshop.
 
 ## A published address: its contract
 

@@ -92,7 +92,7 @@ What this skill does for the console: probe it, report the version it serves, an
 Two things worth telling the user when the console comes up:
 
 - **A stale version in a connector's *name* means nothing.** The name is a label typed when the connector was added; the connector resolves to the live console, which serves whatever was last deployed. Probe before believing a label.
-- **Connect each host to exactly one Pipelex server.** Both deployments register identical tool names, so a host connected to both gets ambiguous routing and contradictory schemas (the workshop accepts `{ path }`, the console rejects it). A claude.ai Pipelex connector syncs into Claude Code automatically — if this plugin's workshop is running there too, disable the connector for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers`, or `disableClaudeAiConnectors: true`).
+- **A host may have both servers, and the workshop's tools are the ones an agent uses.** The console's tools are `pipelex_*` and the workshop's are `mthds_*`, so no name is registered twice, and both servers' instructions tell the model to use the `mthds_*` tools for all method work when both are present and never to mix the two, since each can be signed in to a different organization. A claude.ai Pipelex connector syncs into Claude Code automatically; that is harmless beside this plugin's workshop, and a user who wants a shorter tool list can still turn the connector off for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers`, or `disableClaudeAiConnectors: true`).
 
 ## Proving what's actually running
 

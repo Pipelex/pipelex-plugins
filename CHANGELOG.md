@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **An agent may have both the plugin and the Pipelex MCP**: the Pipelex MCP's tools are now `pipelex_*` and share no name with the plugin's `mthds_*` tools, so the install page no longer says an app takes one Pipelex product and never both, nor that Claude Code users must turn off the Pipelex MCP synced from their Claude account. It says instead that an agent with both uses the plugin's `mthds_*` tools, and keeps turning the Pipelex MCP off as an option. The skills stop describing the Pipelex MCP as a server that takes their files or lacks only `mthds_get_method`, and a skill whose tools are absent tells the user that the plugin's MCP server is the one not connected.
+
 ### Fixed
 
 - **The MTHDS language reference says to write a method with the agent's file tools**: an agent that wrote or changed a `.mthds` file through the shell, with a heredoc, `sed` or a script, never ran the hook, so the file was not linted or formatted. The reference every writing skill reads now tells the agent to write and edit with its file tools, and to read the file again before a change that matches its text, since the hook's format can reorder it.
