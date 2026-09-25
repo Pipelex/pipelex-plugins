@@ -8,6 +8,8 @@
 
 The reference for the MTHDS language, with copy-pasteable examples: read it before writing or editing a `.mthds` file, and for any syntax question while reading one.
 
+**Write and edit a `.mthds` file with your agent's file tools, never through the shell.** The plugin's hook runs after each write or edit those tools make: it lints the file, formats it in place and validates the method, and returns a failure with the line to fix. A file written or changed by a heredoc, `sed` or a script run in the shell is never checked. The format can reorder the file, so read it again before a change that matches its text.
+
 ## 1. Bundle Skeleton
 
 ```toml

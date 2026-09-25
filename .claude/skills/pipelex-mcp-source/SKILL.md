@@ -40,7 +40,9 @@ All three are stdio — the renderer emits only `command`/`args`, and the hosted
 |---|---|---|---|
 | `npm-latest` | `npx` | `["-y", "@pipelex/mcp@latest"]` | **What ships.** The committed default. |
 | `npm-pinned` | `npx` | `["-y", "@pipelex/mcp@X.Y.Z"]` | Dev only — reproduce a specific released version. |
-| `local` | `node` | `["<absolute>/pipelex-mcp/dist/local/main.js"]` | Dev only — test unreleased changes. |
+| `local` | `node` | `["<absolute>/pipelex-mcp/packages/workshop/dist/main.js"]` | Dev only — test unreleased changes. |
+
+`pipelex-mcp` is an npm workspace: the workshop is its `packages/workshop` member, and `make build-local`, run at the root of that checkout, bundles it into `packages/workshop/dist/main.js` with the shared capability core in `packages/core` inlined. **The old path, `dist/local/main.js`, predates the workspace split and is never rebuilt.** A checkout that built before the split still carries that file, and `make clean` there no longer removes it, so a switch still pointing at it spawns a stale workshop without any error.
 
 `@latest` is the shipped default on purpose: `npx` re-resolves the dist-tag per spawn, so users track releases with no plugin bump, and `docs/decisions.md` records that pinning buys no offline resilience (npx contacts the registry even for cached exact specs). Pinning here is a **testing tool**, not a release posture. If the user asks to ship a pin, say that it contradicts that recorded decision and ask them to confirm before proceeding — they may have a good reason, but it should be a deliberate reversal with a `docs/decisions.md` amendment, not a side effect of this skill.
 
@@ -48,18 +50,19 @@ All three are stdio — the renderer emits only `command`/`args`, and the hosted
 
 When the user invokes this skill without naming a target, report current state and stop. Gather in parallel:
 
-1. **Declared source** — read `[vars.mcp_server]` from `targets/defaults.toml`.
+1. **Declared source** — read `[vars.mcp_server]` from `targets/defaults.toml`. If its `args` name `dist/local/main.js`, say that this is the pre-split path, which runs a stale build, and offer to switch it to `packages/workshop/dist/main.js`.
 2. **npm `latest`** — `npm view @pipelex/mcp dist-tags --json` (and `npm view @pipelex/mcp versions --json` if they need the list of published versions to pin to).
-3. **Console live version** — the probe in "Proving what's actually running".
-4. **Local checkout** — does `../pipelex-mcp/dist/local/main.js` exist, and is it stale? `find ../pipelex-mcp/src -name '*.ts' -newer ../pipelex-mcp/dist/local/main.js` printing anything means the build lags its sources; offer `make build-local` in `../pipelex-mcp`.
-5. **Leaked dev state** — `git diff --stat targets/defaults.toml` and `git status --porcelain pipelex/ pipelex-codex/ pipelex-vibe/`. If the declared source is not `npm-latest`, lead with that: the tree is carrying a dev switch.
+3. **Console live version** — the probe in "Proving what's actually running". The console has a release track of its own, so compare it as "The hosted console" says, never with npm `latest`.
+4. **Local checkout version** — `node -p "require('../pipelex-mcp/packages/workshop/package.json').version"`. That manifest is the one npm publishes as `@pipelex/mcp`. Never read the root `package.json`, which carries no version since the workspace split, nor `packages/console/package.json`, which versions the console on a track npm never sees. A version behind npm `latest` means the checkout needs a pull. A version equal to it is the ordinary case on `dev`, since the version moves only at a release: what the checkout has that npm lacks is listed under `## [Unreleased]` in `../pipelex-mcp/packages/workshop/CHANGELOG.md`, and an empty section there means the local source tests nothing new.
+5. **Local build** — does `../pipelex-mcp/packages/workshop/dist/main.js` exist, and is it stale? The bundle inlines the capability core, and its handshake reports the version the workshop's manifest had at build time, so it lags whenever either package's sources or that manifest are newer: `find ../pipelex-mcp/packages/core/src ../pipelex-mcp/packages/workshop/src ../pipelex-mcp/packages/workshop/package.json -type f \( -name '*.ts' -o -name package.json \) ! -name '*.test.ts' ! -name '*.e2e.ts' -newer ../pipelex-mcp/packages/workshop/dist/main.js` printing anything means the build lags; offer `make build-local` at the root of `../pipelex-mcp`.
+6. **Leaked dev state** — `git diff --stat targets/defaults.toml` and `git status --porcelain pipelex/ pipelex-codex/ pipelex-vibe/`. If the declared source is not `npm-latest`, lead with that: the tree is carrying a dev switch.
 
-Present it as a short table, not prose. The useful signal is usually a *mismatch* — declared source vs what npm serves vs what the local build contains — so state plainly whether they agree, and if the user is on `npm-latest` and npm `latest` matches the console, say there is nothing to bump.
+Present it as a short table, not prose. The useful signal is usually a *mismatch* — declared source vs what npm serves vs what the local build contains — so state plainly whether they agree, and if the user is on `npm-latest` and the checkout's workshop version equals npm `latest` with nothing under `## [Unreleased]`, say there is nothing to bump.
 
 ## Switching to a dev source
 
 1. **Confirm the target** with the user if ambiguous. For a pin, validate the version exists (`npm view @pipelex/mcp versions --json`) — a typo'd pin fails at spawn time with a confusing npx error, long after this skill has finished.
-2. For `local`, verify `dist/local/main.js` exists and is not stale; run `make build-local` in `../pipelex-mcp` if it is. Use an **absolute** path — the server spawns with the *host's* working directory, not the plugin's, so a relative path resolves somewhere unintended.
+2. For `local`, verify `packages/workshop/dist/main.js` exists and is not stale (Status, step 5); run `make build-local` at the root of `../pipelex-mcp` if it is missing or stale. Use an **absolute** path — the server spawns with the *host's* working directory, not the plugin's, so a relative path resolves somewhere unintended.
 3. Edit only `command` and `args` in `targets/defaults.toml` `[vars.mcp_server]`. Leave `env_vars` and every `user_config` table alone — credential delivery is orthogonal to which build gets spawned, and the local workshop needs the same key.
 4. Run `make build`, then `make check`.
 5. Tell the user to `/reload-plugins` (Claude Code). On Codex add `make codex-refresh` — installed plugins run from a cache copy, so a rebuild alone does not reach the running harness. Vibe has no manifest: `make build` regenerates `pipelex-vibe/mcp/vibe-mcp.toml` and the launcher quoted in Vibe's skill prose, but a running Vibe keeps whatever entry the user copied into `~/.vibe/config.toml` until they replace that entry with the new one. Adding the new entry beside the old one stops Vibe from starting, because Vibe refuses two servers of the same name.
@@ -87,18 +90,18 @@ Do the switch steps above, then propagate to the docs that quote the launcher as
 
 The console at `https://pipelex-mcp-a3c6a115.alpic.live/mcp` is **read-only from this skill**. It is never baked into the plugin: the plugin's audience is builders editing local files, which only the workshop can read, and the console authenticates each caller by OAuth sign-in that the host drives through its own connector UI (bring-your-own-key was removed in `@pipelex/mcp` 0.12.0), which no shared plugin artifact can carry. `docs/decisions.md` records this; the renderer has no url shape to emit.
 
-What this skill does for the console: probe it, report the version it serves, and compare against npm `latest`. If it lags, the fix lives in `../pipelex-mcp` (`make deploy`, from a clean `main`) — say so and hand off rather than deploying from here.
+What this skill does for the console: probe it, report the version it serves, and compare it with the console's own release track, never with npm `latest`. Up to and including 0.20.0 both servers shipped together at one version; after it, the console is versioned by `packages/console/package.json`, released on `release/console-vX.Y.Z` branches and tagged `console-vX.Y.Z`, so its version and npm's `latest` move independently and a difference between them means nothing. Read what the console should be serving with `pipelex-mcp`'s own script, which knows each track's manifest and falls back to the single root manifest on a commit from before the split: `(cd ../pipelex-mcp && bash .github/scripts/track-version.sh console origin/main)`, after a `git -C ../pipelex-mcp fetch` if `origin/main` may be behind. If the console lags that version, the fix is a console release in `../pipelex-mcp`, whose merge into `main` deploys it — say so and hand off rather than deploying from here.
 
 Two things worth telling the user when the console comes up:
 
 - **A stale version in a connector's *name* means nothing.** The name is a label typed when the connector was added; the connector resolves to the live console, which serves whatever was last deployed. Probe before believing a label.
-- **Connect each host to exactly one Pipelex server.** Both deployments register identical tool names, so a host connected to both gets ambiguous routing and contradictory schemas (the workshop accepts `{ path }`, the console rejects it). A claude.ai Pipelex connector syncs into Claude Code automatically — if this plugin's workshop is running there too, disable the connector for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers`, or `disableClaudeAiConnectors: true`).
+- **A host may have both servers, and the workshop's tools are the ones an agent uses.** The console's tools are `pipelex_*` and the workshop's are `mthds_*`, so no name is registered twice, and both servers' instructions tell the model to use the `mthds_*` tools for all method work when both are present and never to mix the two, since each can be signed in to a different organization. A claude.ai Pipelex connector syncs into Claude Code automatically; that is harmless beside this plugin's workshop, and a user who wants a shorter tool list can still turn the connector off for coding sessions (`/mcp` → "Show unused connectors", per-project `deniedMcpServers`, or `disableClaudeAiConnectors: true`).
 
 ## Proving what's actually running
 
-Every deployment reports `serverInfo.version` on the MCP handshake, sourced from `package.json`. Read it rather than inferring from config — config says what *should* spawn, the handshake says what *did*.
+Every deployment reports `serverInfo.version` on the MCP handshake, sourced from its own package's `package.json`: `packages/workshop/package.json` for the workshop, whether from npm or a checkout, and `packages/console/package.json` for the console. Read it rather than inferring from config — config says what *should* spawn, the handshake says what *did*.
 
-Local workshop, npm or checkout — swap in the command being verified:
+Local workshop, npm or checkout — swap in the command being verified, `node <absolute>/pipelex-mcp/packages/workshop/dist/main.js` for a checkout:
 
 ```bash
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \

@@ -437,7 +437,7 @@ class TestCredentialWiring:
     """
 
     REPO_ROOT = Path(__file__).parents[2]
-    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/local/main.js"]\n'
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/packages/workshop/dist/main.js"]\n'
 
     def _built_tree(self, tmp_path: Path, override: str = "") -> Path:
         """The repository's targets, `override` appended to each, built from its templates into `tmp_path`."""

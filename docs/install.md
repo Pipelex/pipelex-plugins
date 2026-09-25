@@ -4,7 +4,7 @@ The README's quick start installs the Pipelex plugin in Claude Code and Codex in
 
 ## Which app takes what
 
-An agent takes the Pipelex plugin, which builds and runs methods. A chatbot takes the Pipelex MCP, which runs the methods saved in your Pipelex account. An app takes one of the two, never both.
+An agent takes the Pipelex plugin, which builds and runs methods. A chatbot takes the Pipelex MCP, which runs the methods saved in your Pipelex account. An app needs only one of the two, and an agent that has both works too.
 
 | App | Takes | How to connect |
 |---|---|---|
@@ -16,13 +16,15 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 
 In every agent, the plugin needs Node.js on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The Pipelex MCP needs nothing on your machine.
 
-Cursor takes no plugin. Registering the Pipelex tools there by hand is described in the [`pipelex-mcp` developer reference](https://github.com/Pipelex/pipelex-mcp#local-workshop-install--register).
+Cursor takes no plugin. Registering the Pipelex tools there by hand is described in [`pipelex-mcp`'s host registration page](https://github.com/Pipelex/pipelex-mcp/blob/main/docs/hosts.md#cursor).
 
-### One app, one Pipelex product
+### An agent with both
 
-The plugin's tools and the Pipelex MCP register the same tool names. An app connected to both has two tools under each name with contradictory schemas: the plugin's tools accept a `{ path }` to a file on disk, and the Pipelex MCP refuses one. Nothing guarantees which of the two the model calls.
+The plugin's tools and the Pipelex MCP's have different names: the plugin's start with `mthds_`, and the Pipelex MCP's with `pipelex_`. An app connected to both therefore sees two separate sets of tools, never two tools under one name.
 
-You can reach that state without choosing it. **Claude Code loads what you have added to your Claude account**, so the Pipelex MCP you added on claude.ai reaches your Claude Code sessions beside the plugin. Turn it off for coding sessions in one of these places:
+You can have both without choosing it. **Claude Code loads what you have added to your Claude account**, so the Pipelex MCP you added on claude.ai reaches your Claude Code sessions beside the plugin. You can leave it there. When both are present, the agent uses the plugin's `mthds_*` tools: the skills call them, they read your files on disk, and both servers' instructions tell the agent to use them for all method work and never to mix the two servers, because each can be signed in to a different organization — the plugin with your API key, the Pipelex MCP with your Pipelex sign-in.
+
+Having both is harmless, but the Pipelex MCP adds nothing a coding session needs and lengthens the agent's tool list, so you can turn it off for coding sessions in one of these places:
 
 - In Claude Code, run `/mcp` and turn off the Pipelex entry. An entry you have not signed in to is collapsed behind the **Show unused connectors** row.
 - For one project, list it under `deniedMcpServers` in `.claude/settings.json`.
@@ -68,7 +70,7 @@ Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on
 # ~/.codex/config.toml
 [mcp_servers.pipelex]
 command = "node"
-args = ["/path/to/pipelex-mcp/dist/local/main.js"]   # e.g. a local checkout
+args = ["/path/to/pipelex-mcp/packages/workshop/dist/main.js"]   # e.g. a local checkout, built by `make build-local`
 
 [mcp_servers.pipelex.env]
 PIPELEX_API_KEY = "plx_sk_..."

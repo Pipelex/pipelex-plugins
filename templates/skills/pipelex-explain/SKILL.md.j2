@@ -84,7 +84,7 @@ Output: final_output
 | the user asks for the explanation in a file | explain in the conversation, say this skill writes nothing, and name the skill that does |
 | the workshop is absent, on a local bundle | explain from the source and say the verdict was not checked |
 | the workshop is absent, on an id or an address | stop per the Requirements: there is nothing to read |
-| `mthds_get_method` is absent while the other tools answer | explain the id at contract level, say the source was not read, and name both causes [not-on-disk.md](references/not-on-disk.md) gives |
+| `mthds_get_method` is absent while the other tools answer | explain the id at contract level, say the source was not read, and name the cause [not-on-disk.md](references/not-on-disk.md) gives |
 | an id's source comes back `truncated` | name the files you could not read and say the explanation is partial. Never describe a withheld file's pipes as absent. |
 | an id is refused at `method_id` | give the tool's answer: an unknown id and an empty stored source are different answers, and an empty one is somebody's draft, not a wrong id |
 | a selector call answers a no-verdict error | report the error and its `hint` verbatim; hosted address and id resolution is not live everywhere yet |

@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "The Pipelex plugin for Claude Code and Codex: build and run AI methods from your agent.",
-    "version": "0.9.0"
+    "version": "0.9.1"
   },
   "plugins": [
     {

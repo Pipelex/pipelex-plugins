@@ -53,4 +53,4 @@ The tools reach the Pipelex API with your key, the same one the hook uses. Each 
 - **`mthds_run`** starts a run, and **`mthds_run_status`**, **`mthds_run_results`** and the tools beside them follow it to its status, its results and its files.
 - **`mthds_list_methods`**, **`mthds_save_method`** and **`mthds_get_method`** list, save and fetch the methods saved in your organization.
 
-The full reference for each tool is in the [`pipelex-mcp` README](https://github.com/Pipelex/pipelex-mcp#tools-at-a-glance).
+The full reference for each tool is in [`pipelex-mcp`'s tools reference](https://github.com/Pipelex/pipelex-mcp/blob/main/docs/tools.md).
