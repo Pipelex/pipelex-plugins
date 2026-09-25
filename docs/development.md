@@ -65,7 +65,7 @@ The Vibe setup in [the install page](install.md#mistral-vibe) already points at 
 
 ## A local build of `pipelex-mcp`
 
-`pipelex-mcp` ships the same tools in two deployments: the **local workshop** (npm `@pipelex/mcp`, over stdio), which resolves `{ path }` files straight from your working directory, and the **hosted console** at `https://mcp.pipelex.com/mcp` (streamable HTTP), for hosts that have no filesystem. Public text calls them the Pipelex tools and the Pipelex MCP. The plugin always declares the workshop: an agent edits local `.mthds` files, and sending them through a hosted server would mean copying every file into the model's context by hand. The console is never baked into the plugin; the reasoning is in [decisions.md](decisions.md), "Dual-MCP flip".
+`pipelex-mcp` ships two servers, each with its own tools, over one capability core: the **local workshop** (npm `@pipelex/mcp`, over stdio), whose `mthds_*` tools the skills call and which resolves `{ path }` files straight from your working directory, and the **hosted console** at `https://mcp.pipelex.com/mcp` (streamable HTTP), whose `pipelex_*` tools run saved methods for chatbots and take no files at all. No tool name is registered by both. Public text calls them the Pipelex tools and the Pipelex MCP. The plugin always declares the workshop: an agent edits local `.mthds` files, which only the workshop can read. The console is never baked into the plugin; the reasoning is in [decisions.md](decisions.md), "Dual-MCP flip".
 
 The plugin declares the workshop as `npx -y @pipelex/mcp@latest` in the `[vars.mcp_server]` block of `targets/defaults.toml`. To run the skills against a local checkout of [`pipelex-mcp`](https://github.com/Pipelex/pipelex-mcp):
 

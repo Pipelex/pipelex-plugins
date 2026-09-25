@@ -16,10 +16,10 @@
 
    `validate_call_inline` is what the last sentence says of the inline form,
    after the form itself. Every skill but `pipelex-catalog` leaves it to its
-   default, the fallback the hosted console needs. The catalog sets it, because
+   default, which calls it the fallback. The catalog sets it, because
    `mthds_save_method` is the workshop's alone and writes `pipelex-method.json`
    only beside a `{ path }` root file: for a save, the inline form is the one
    that leaves a new method unlinked, or an updated one's link behind the
    catalog. -#}
-{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback, and the only form the hosted console accepts.") }}
+{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback.") }}
 {#- -#}

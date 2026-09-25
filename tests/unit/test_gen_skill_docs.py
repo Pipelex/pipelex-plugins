@@ -944,7 +944,7 @@ class TestSharedSkillIncludes:
 
     # A sentence from each shared block, and the include that owns it.
     SHARED_BLOCK_OWNERS: ClassVar[dict[str, str]] = {
-        "The Pipelex MCP server isn't connected —": "skills/shared/credentials.md.j2",
+        "The Pipelex plugin's MCP server isn't connected —": "skills/shared/credentials.md.j2",
         "The server authenticates to the API with": "skills/shared/credentials.md.j2",
         "the Pipelex MCP server isn't connected: STOP": "skills/shared/mcp-requirements.md.j2",
         "Prefer the path form ": "skills/shared/validate-call.md.j2",
@@ -1057,7 +1057,9 @@ class TestSharedSkillIncludes:
         that were enough, so a session launched below or beside the bundle met the
         refusal with no cure. Every skill that submits a bundle now names the refusal
         and the relaunch that cures it. All but the catalog keep the inline fallback: a
-        save is the one submission the inline form leaves unlinked."""
+        save is the one submission the inline form leaves unlinked. The fallback no
+        longer claims to be the one form the hosted console accepts: the console's
+        tools are `pipelex_*` and take no files at all."""
         includers = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1067,12 +1069,13 @@ class TestSharedSkillIncludes:
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
-        fallback = "is the fallback, and the only form the hosted console accepts."
+        fallback = "is the fallback."
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
             assert "relaunching the harness from a directory holding the bundle cures that" in body, f"{target_name}/{skill}: the cure is unnamed"
             assert "pass an absolute one" not in body, f"{target_name}/{skill}: an absolute path outside the workshop is refused too"
+            assert "hosted console" not in body, f"{target_name}/{skill}: the console takes no files, so it has no say in how a bundle is submitted"
             if skill == "pipelex-catalog":
                 assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
             else:
@@ -2951,28 +2954,31 @@ class TestCatalogIdInEverySkill:
         assert "not a wrong id" in body
 
     def test_explain_falls_back_to_the_contract_where_the_read_tool_is_absent(self) -> None:
-        """`mthds_get_method` is the local workshop's alone — the hosted console
-        serves neither catalog-write tool — so an id there is explained at
-        contract level. A narrower explanation, never a stop: explain's whole
-        posture is that the workshop is optional."""
+        """`mthds_get_method` arrived in a later workshop release than the tools
+        beside it, so a workshop older than that release answers everything but
+        the read, and an id there is explained at contract level. A narrower
+        explanation, never a stop: explain's whole posture is that the workshop
+        is optional."""
         body = self.skill("pipelex-explain")
         assert "narrower explanation, not a stop" in body
 
-    def test_explain_names_both_causes_of_an_absent_read_tool(self) -> None:
-        """A workshop older than the release carrying `mthds_get_method`
-        presents exactly as the hosted console does — the tool is simply not in
-        the list — so naming only the console sends a workshop user looking for
-        a host they are not on. The cure is stated without a version, because
-        `floors.pipelex_mcp` is a ceiling about the main-pipe signature and
-        quoting it here would name the wrong release. The two causes are the
-        not-on-disk reference's since the size diet, and the skill's stop row
-        names both through it."""
+    def test_explain_names_the_one_cause_of_an_absent_read_tool(self) -> None:
+        """Only a workshop older than the release carrying `mthds_get_method`
+        answers the other `mthds_*` tools and not this one. The hosted console
+        used to be named as a second cause, back when it served the same tool
+        names; its tools are `pipelex_*` now, so it answers none of them, and
+        the reference says its tools are no stand-in either. The cure is stated
+        without a version, because `floors.pipelex_mcp` is a ceiling about the
+        main-pipe signature and quoting it here would name the wrong release.
+        The cause is the not-on-disk reference's since the size diet, and the
+        skill's stop row names it through it."""
         body = self.skill("pipelex-explain")
         reference = (self.REPO_ROOT / "skills" / "pipelex-explain" / "references" / "not-on-disk.md").read_text(encoding="utf-8")
         assert "a local workshop that predates the tool" in reference
         assert "npx -y @pipelex/mcp@latest" in reference
-        assert "say both rather than picking one" in reference
-        assert "name both causes [not-on-disk.md](references/not-on-disk.md) gives" in body
+        assert "hosted console" not in reference, "the console serves no `mthds_*` tool, so it is no cause of this one's absence"
+        assert "`pipelex_*` tools" in reference
+        assert "name the cause [not-on-disk.md](references/not-on-disk.md) gives" in body
 
     def test_explain_still_reads_an_invalid_catalog_id_from_its_source(self) -> None:
         """The stops table is titled for where the skill stops, so an agent

@@ -33,7 +33,7 @@ Automatic unless the user asks to be walked through it, which confirms dependenc
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: the catalog is unversioned, so a stored edit silently invalidates committed types: say so, recommend committing the source or publishing an address, and proceed only on the user's say-so.
 
