@@ -9,6 +9,7 @@
 ### Fixed
 
 - **The MTHDS language reference says to write a method with the agent's file tools**: an agent that wrote or changed a `.mthds` file through the shell, with a heredoc, `sed` or a script, never ran the hook, so the file was not linted or formatted. The reference every writing skill reads now tells the agent to write and edit with its file tools, and to read the file again before a change that matches its text, since the hook's format can reorder it.
+- **A local build of the Pipelex tools is found at its new path**: `pipelex-mcp` now builds its workshop to `packages/workshop/dist/main.js`, so an override following the install page's Codex example or the development page found no file, or, in a checkout built before that change, ran an old `dist/local/main.js` that nothing rebuilds, without any error. Both pages and the repository's `/pipelex-mcp-source` skill now name the new path and say that `make build-local` builds it. The skill also reads the checkout's version from the workshop's own `packages/workshop/package.json`, and compares the hosted console with the console's own release track rather than with npm's `latest`.
 
 ## [0.9.0] - 2026-09-25
 

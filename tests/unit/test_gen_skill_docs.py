@@ -643,7 +643,7 @@ class TestTargetConfig:
         assert config.include_skills is None
 
     REPO_ROOT = Path(__file__).parents[2]
-    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/local/main.js"]\n'
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/packages/workshop/dist/main.js"]\n'
 
     def test_the_dev_override_keeps_the_credential_wiring(self, tmp_path: Path) -> None:
         """The override `docs/build-targets.md` advertises sets `command` and `args` alone.
@@ -661,7 +661,7 @@ class TestTargetConfig:
         defaults_server = load_defaults(self.REPO_ROOT / "targets")["mcp_server"]
         assert isinstance(defaults_server, dict)
         config = load_target_config(targets, "prod")
-        assert config.template_vars["mcp_server"] == {**defaults_server, "command": "node", "args": ["../pipelex-mcp/dist/local/main.js"]}
+        assert config.template_vars["mcp_server"] == {**defaults_server, "command": "node", "args": ["../pipelex-mcp/packages/workshop/dist/main.js"]}
 
         manifest = make_plugin_json(self.REPO_ROOT, config)
         assert manifest["userConfig"] == defaults_server["user_config"]
@@ -679,7 +679,7 @@ class TestTargetConfig:
         for key in ("API_KEY", "BASE_URL"):
             assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
             assert f'export PIPELEX_{key}="$CLAUDE_PLUGIN_OPTION_{key}"' in hook
-        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/dist/local/main.js"')
+        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/packages/workshop/dist/main.js"')
 
     def test_a_nested_table_merges_an_array_replaces_and_no_target_aliases_another(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)

@@ -537,7 +537,8 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     #   `env_vars` — variable NAMES forwarded from each user's own env,
     #   never values.
     # Dev override: point command/args at a local checkout (e.g.
-    # command = "node", args = ["../pipelex-mcp/dist/local/main.js"]) in
+    # command = "node",
+    # args = ["../pipelex-mcp/packages/workshop/dist/main.js"]) in
     # targets/defaults.toml, or in a target's own [vars.mcp_server], which
     # merges into the defaults' table and so keeps env_vars and user_config
     # (merge_template_vars), + `make build` on Claude; a same-named

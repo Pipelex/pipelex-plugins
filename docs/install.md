@@ -70,7 +70,7 @@ Restart Codex, run `/plugins` to install `pipelex`, and trust the plugin hook on
 # ~/.codex/config.toml
 [mcp_servers.pipelex]
 command = "node"
-args = ["/path/to/pipelex-mcp/dist/local/main.js"]   # e.g. a local checkout
+args = ["/path/to/pipelex-mcp/packages/workshop/dist/main.js"]   # e.g. a local checkout, built by `make build-local`
 
 [mcp_servers.pipelex.env]
 PIPELEX_API_KEY = "plx_sk_..."
