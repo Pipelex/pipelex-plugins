@@ -1,6 +1,6 @@
 # pipelex-plugins
 
-The Pipelex plugin for Claude Code and Codex: build and run AI methods from your agent, with skills that write them, a hook that checks every edit, and the Pipelex tools.
+The Pipelex plugin for Claude Code and Codex: your agent builds AI methods, runs them, and puts them in your TypeScript or Python code or in a new webapp, with skills for each step, a hook that checks every edit, and the Pipelex tools.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
 
@@ -12,7 +12,7 @@ Pipelex lets you build AI methods with your coding agent and run them anywhere: 
 
 **1. Sign up at [app.pipelex.com](https://app.pipelex.com).**
 
-**2. Install the Pipelex plugin in your coding agent.** The plugin is how you build methods: it gives your agent the skills that write and run them, a hook that checks every edit, and the Pipelex tools.
+**2. Install the Pipelex plugin in your coding agent.** The plugin gives your agent the skills that build methods, run them and put them in your software, a hook that checks every edit, and the Pipelex tools.
 
 <details open><summary><b>Claude Code</b></summary>
 
@@ -62,7 +62,7 @@ You get a run id straight away, and you can ask for its status, its results or t
 
 Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it to the conversation instead and ask for a run on it; Claude has no way yet to hand the Pipelex MCP a file you attached.
 
-**The other two ways.** Turn the method into a webapp with the [method-app template](https://github.com/Pipelex/pipelex-method-apps), or use it via API in any software through `POST /v1/start` — in TypeScript with [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk), in Python with [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/), or with any HTTP client.
+**The other two ways, built by your agent too.** Ask it for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. Ask it to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). Any other software runs a method via API through `POST /v1/start`, with any HTTP client.
 
 **Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
 
@@ -73,19 +73,30 @@ This repository is the Pipelex plugin — what it holds, the other agents it ins
 
 ### Skills
 
-Your agent picks the skill your request calls for, and you can also name one yourself.
+Your agent picks the skill your request calls for, and you can also name one yourself. Together they take a method from its first draft into your software: building it, preparing its inputs, running it, and calling it from your code.
+
+#### Build a method
 
 - **`/pipelex-design`** designs a method contract-first and writes it as `.mthds` files, directly when the method is simple and step by step when it is not.
 - **`/pipelex-edit`** makes an edit that keeps a method's contract, such as a prompt, a model or a rename, and proves it with a validation before and after.
 - **`/pipelex-organize`** regroups a method's files into a layout you can browse, without changing what the method does.
 - **`/pipelex-explain`** explains a method in plain language, its contract, its flow and every pipe, and writes nothing.
+
+#### Prepare inputs
+
 - **`/pipelex-inputs`** prepares a method's inputs from your files, from synthetic data or from a template, ready to run.
 - **`/pipelex-synthetic-inputs`** makes the test files a method needs when you have none: PDFs, images, Word and Excel files rendered from code, and photographs from an image model.
+
+#### Run and save
+
 - **`/pipelex-run`** runs a method on the hosted Pipelex API, prints its run id at once, and follows a run to its status, its results and its files.
 - **`/pipelex-catalog`** saves a method to your Pipelex account, lists what is saved there, and pulls a saved method back to disk.
 - **`/pipelex-lab`** frames a use case into candidate methods, writes each test case's answer before the first run, then runs, scores, logs and fixes the method round after round within a budget you agree.
-- **`/pipelex-integrate`** wires a method into your TypeScript or Python code, with generated types and one typed call through `@pipelex/sdk` or `pipelex-sdk`.
-- **`/pipelex-scaffold`** starts a new project around a method: a web app from the method-app template, or any other project from its language's own initializer.
+
+#### Put a method in your code
+
+- **`/pipelex-integrate`** puts a method in the TypeScript or Python code you already have: it generates the method's types and writes one typed call that runs it, through the TypeScript SDK `@pipelex/sdk` or the Python SDK `pipelex-sdk`, and refreshes the types when the method changes.
+- **`/pipelex-scaffold`** starts a new project around a method when you have no code yet: a webapp from the method-app template, created in one step and left running, or any other project from its language's own initializer, which it hands to `/pipelex-integrate`.
 
 The skills share a reference for MTHDS, the language a method is written in. [Each skill in detail, and what it needs](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/skills.md).
 
