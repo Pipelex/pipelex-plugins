@@ -28,11 +28,17 @@ set -euo pipefail
 INPUT=$(cat)
 
 # Cheap pre-filter, before spawning a Node process: go on only when a patch
-# header line names a .mthds file, which is all check.mjs reads. Every other
-# Bash command, one that merely mentions a .mthds file included, ends here.
+# header line names a .mthds file, which is all check.mjs reads, and the
+# input names the patch program. Every other Bash command, one that merely
+# mentions a .mthds file included, ends here, and so does one that only
+# writes patch text somewhere (a heredoc to a file, a commit message): it
+# applied no patch, and the bundle would otherwise send a note asking the
+# model to act on a file nobody touched. The patch tool's call names the
+# program in its tool_name; the dash admits Codex's --codex-run-as-apply-patch.
 # The input is JSON, so the header's line ends at an escaped \n.
 MTHDS_PATCH_HEADER='\*\*\* (Update File|Add File|Move to):([^"\\]|\\[^n])*\.mthds'
-if ! [[ "$INPUT" =~ $MTHDS_PATCH_HEADER ]]; then
+PATCH_PROGRAM='apply[-_]?patch'
+if ! [[ "$INPUT" =~ $MTHDS_PATCH_HEADER && "$INPUT" =~ $PATCH_PROGRAM ]]; then
   exit 0
 fi
 

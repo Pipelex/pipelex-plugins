@@ -245,12 +245,25 @@ class TestHookCommands:
         codex.run(tool_name="apply_patch", command=_patch("valid.mthds"))
         assert unformatted.read_text(encoding="utf-8") != VALID_METHOD, "the patch tool's relative path was not formatted in place"
 
-    @pytest.mark.parametrize("command", ["ls -la", "cat broken.mthds", "grep -rl pipe --include='*.mthds' ."])
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "ls -la",
+            "cat broken.mthds",
+            "grep -rl pipe --include='*.mthds' .",
+            f"cat > notes.md <<'EOF'\n{_patch('broken.mthds')}\nEOF",
+            f"git commit -m '{_patch('broken.mthds')}'",
+        ],
+    )
     def test_any_other_codex_shell_command_ends_in_the_pre_filter(self, codex: CodexHookRun, command: str) -> None:
-        """A shell command that patches no .mthds file passes silently without starting Node, one naming a broken method included."""
+        """A shell command that patches no .mthds file passes silently without starting Node, one naming a broken method included.
+
+        A command that only writes patch text, running no patch program, ends there too: the bundle would read its header as an
+        unplaced patch and send a note asking the model to act on a file nobody touched.
+        """
         stdout, started_node = codex.run(tool_name="Bash", command=command)
         assert stdout == ""
-        assert not started_node, f"{command!r} started Node: the wrapper's pre-filter let a command with no patch header through"
+        assert not started_node, f"{command!r} started Node: the wrapper's pre-filter let a command that applies no patch through"
 
     @pytest.mark.parametrize(("prefix", "directory"), [("", "."), ("cd sub; ", "sub")])
     def test_a_relative_path_in_a_codex_shell_patch_is_read_where_the_script_moved(self, codex: CodexHookRun, prefix: str, directory: str) -> None:
