@@ -23,6 +23,7 @@ Per-platform input handling inside the bundle: Claude reads one file from `tool_
 | Condition | Behavior |
 |---|---|
 | Not a `.mthds` edit / unparseable stdin | silent pass (wrapper pre-filter) |
+| Claude and Vibe: a `.mthds` file written or changed through the shell (a heredoc, `sed`, a script) | no hook runs, since the matcher admits only the file tools; the MTHDS language reference tells the agent to write and edit with those tools for that reason |
 | Codex: a shell command that patches no `.mthds` file, or only writes patch text without running the patch program | silent pass (wrapper pre-filter, no Node started) |
 | Codex: a patch Codex applies itself from a shell `apply_patch` heredoc | no hook runs: Codex emits no `PostToolUse` for it |
 | Codex: a shell patch naming a `.mthds` file by a relative path the bundle cannot place or confirm | that file is not checked; a non-blocking note names it and asks for its absolute path or the patch tool |
