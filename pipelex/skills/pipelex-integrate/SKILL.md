@@ -44,7 +44,7 @@ Automatic unless the user asks to be walked through it, which confirms dependenc
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: the catalog is unversioned, so a stored edit silently invalidates committed types: say so, recommend committing the source or publishing an address, and proceed only on the user's say-so.
 
@@ -60,7 +60,7 @@ Before step 2, read your branch: a `codegen` script or Makefile target, or a `so
 
 ### 3. The signature
 
-Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**: `PIPE_CODE` strips the domain.
+Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**: `PIPE_CODE` keeps the domain.
 
 No `main_pipe` (a workshop at `@pipelex/mcp` 0.13.0 or earlier, for one) → read [references/signature-fallback.md](references/signature-fallback.md) before step 4.
 
@@ -155,4 +155,4 @@ What was generated and where, the target and why, the call site's signature, the
 - [orphans.md](references/orphans.md): orphans, no drift.
 - [gate-failures.md](references/gate-failures.md): a gate exits `2`.
 - [codegen-check.mjs](references/codegen-check.mjs), [codegen_check.py](references/codegen_check.py): step 10's gates.
-- [MTHDS reference](../shared/mthds-reference.md): the fallback's bundle reading.
+- [MTHDS reference](../shared/writing-mthds.md): the fallback's bundle reading.

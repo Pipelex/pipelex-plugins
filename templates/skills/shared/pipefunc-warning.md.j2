@@ -3,11 +3,9 @@
    word wherever a user meets a `PipeFunc`, so the warning says the same thing
    every time; `TestSharedSkillIncludes` holds the roster of skills that carry it.
 
-   The authoring reference `skills/pipelex-design/references/writing-mthds.md`
-   says it too and cannot include it: the repo-root `skills/` tree is copied
-   verbatim into each target and never rendered, so an include directive there
-   would ship to the user as literal text. That copy is instead held to this body
-   by the same test — reword one and reword the other in the same change.
+   The MTHDS language reference, `skills/shared/writing-mthds.md.j2`, includes it
+   too, in its `PipeFunc` section: it is a rendered shared reference, so it
+   carries the sentence through this include rather than a copy of its own.
 
    Strips its own trailing newline (the closing comment below) so it can be
    included mid-sentence as well as on a line of its own. -#}

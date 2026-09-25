@@ -23,7 +23,7 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 ### 1. Capture the contract
 
-Read [writing-mthds.md](references/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks, other advanced features), write the closest in-scope equivalent and call out the deviation.
+Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks, other advanced features), write the closest in-scope equivalent and call out the deviation.
 
 Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
@@ -48,7 +48,7 @@ Design the whole graph in memory, then write `main.mthds` in the bundle home, to
 
 ### 5. Validate
 
-Gather the bundle's files as the convention below says, the whole library, and call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
+Gather the bundle's files as the convention below says, the whole library, and call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts.
 
 Branch on the **structured verdict** from its Markdown summary, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `validation_errors[]` and the summary's locators, which name the offending file, then re-validate.
 
@@ -69,7 +69,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](references/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
@@ -81,7 +81,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 ## References
 
-- [writing-mthds.md](references/writing-mthds.md): before writing any `.mthds` file.
+- [writing-mthds.md](../shared/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise at step 3 or 4, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a structural change to an existing method.
 - [Native content types](../shared/native-content-types.md): a native's fields, for `$var.field` and `from`.

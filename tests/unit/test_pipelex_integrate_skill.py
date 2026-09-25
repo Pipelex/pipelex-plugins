@@ -49,8 +49,8 @@ class TestPipelexIntegrateSkill:
         "**Do this before step 6**",
         "**Check containment before writing anything**",
         "**Never write the tree into the workshop's directory and move it across.**",
-        # The run route takes the bare pipe code; the verdict and the sidecar carry the namespaced ref.
-        "**`pipe_ref` is namespaced (`summarize.summarize_pdf`), the run's `pipe_code` is not**",
+        # The run route takes the qualified ref, the same value the verdict and the sidecar carry.
+        "**The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**",
         # A bundle is one closure: the call site submits every file, not just main.mthds.
         "loading **every `.mthds` file under `bundle_dir`** at call time",
         # The containment reading is lexically wrong in both directions without resolving.
@@ -322,6 +322,33 @@ class TestPipelexIntegrateSkill:
         assert "the entry pipe's contract did not come back whole, which comes from the runner" in fallback
         # The same signature rides the text summary, so a host that drops structured content is not a dead end.
         assert "the **same fact on a second channel, not a fourth cause**" in fallback
+
+    def test_the_run_s_pipe_code_is_the_qualified_pipe_ref(self) -> None:
+        """The run routes resolve `pipe_code` as an exact `domain.pipe_code`, and search a bare code across
+        every domain of the bundle, refusing it as ambiguous when two domains declare it. So the call site
+        runs the ref the verdict and the sidecar carry, verbatim. The skill once said the opposite and its
+        templates stripped the domain, which type-checks, passes the gate and matches the sidecar, so the
+        bare form is pinned absent from every place a model reads it."""
+        body = self.integrate
+        typescript = self.reference("typescript.md")
+        python = self.reference("python.md")
+        assert 'const PIPE_CODE = "summarize.summarize_pdf";' in typescript
+        assert 'PIPE_CODE = "summarize.summarize_pdf"' in python
+        for text in (typescript, python):
+            assert "**`PIPE_CODE` is the verdict's `main_pipe.pipe_ref`, verbatim**" in text
+            assert "even a dotted one (`legal.contracts.summarize`)" in text
+        for text in (body, typescript, python, *(self.reference(name) for name in self.BRANCH_REFERENCES)):
+            assert 'PIPE_CODE = "summarize_pdf"' not in text
+            assert "strips the domain" not in text
+            assert "the run's `pipe_code` is not" not in text
+        # Without a signature the skill builds the ref itself, from the domain of the pipe's own file.
+        fallback = self.reference("signature-fallback.md")
+        assert "Its `pipe_ref` is its code qualified by the domain of the file that defines it" in fallback
+        assert "the call site's `PIPE_CODE` hold" in fallback
+        # A project integrated before the ruling holds the bare code, which no other refresh trigger fires on.
+        refresh = self.reference("refresh.md")
+        assert "**A `PIPE_CODE` that is not the `pipe` record's `pipe_ref`, verbatim, is set to it as well**" in refresh
+        assert "## The run's `pipe_code` is qualified, the same value as `pipe_ref` (2026-09-24)" in self.decisions
 
     def test_the_wire_null_helper_is_never_installed(self) -> None:
         body = self.integrate

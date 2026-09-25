@@ -13,16 +13,21 @@ from typing import Any, cast
 
 import yaml
 
-from scripts.gen_skill_docs import MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
+from scripts.gen_skill_docs import CLAUDE_MCP_LAUNCHER_COMMAND, MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 from scripts.hook_bundle import HOOK_BUNDLE_PATH, read_bundle, read_provenance, unpublished_sources
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
 STALE_REF_PATTERN = re.compile(r"references/(?:" + "|".join(re.escape(stem) for stem in _SHARED_STEMS) + r")")
-# A shared include whose variant parameter is unset or misspelled emits this marker instead of
-# rendering as the empty string: Jinja's default `Undefined` compares unequal without raising, so
-# a typo would otherwise ship a skill with a whole block silently missing.
+# What a template emits where a chain of branches on a parameter's VALUE falls off its end: the
+# `{% else %}` of a partial that selects one of several blocks. An unset or misspelled parameter
+# NAME never gets this far, since the renderer's `StrictUndefined` fails the build on it; a value
+# that is present but names no branch is what strict mode cannot see, and without the marker the
+# block would vanish from the output with the build, the freshness check and the tests all green.
 BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
+# The directories a target written to the repository root generates into. A target with its own
+# output directory is scanned whole; the root also holds every source, so only these are its output.
+ROOT_TARGET_OUTPUT_DIRS = ("skills", "hooks", "mcp", ".claude-plugin", ".codex-plugin")
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
@@ -63,11 +68,10 @@ TARGETS_DIR_NAME = "targets"
 # statement left off this list drifts silently on the next bump.
 #
 # Each entry is ANCHORED ON PROSE rather than on a number, and deliberately: a
-# bare numeric sweep would read `writing-mthds.md`'s JSON `"number"` example of
-# `3.14` as the Python ceiling and `png.md`'s matplotlib `3.11` as the Python
-# floor. A reworded reference fails this check instead of passing silently, which
-# is the right way round — re-anchor the pattern in the same change that rewords
-# the sentence.
+# bare numeric sweep would read `png.md`'s matplotlib `3.11` as the Python
+# floor. A reworded reference fails this check instead of passing silently,
+# which is the right way round — re-anchor the pattern in the same change that
+# rewords the sentence.
 VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
     (
         "skills/pipelex-integrate/references/typescript.md",
@@ -520,20 +524,37 @@ def check_skill_frontmatter(base_dir: Path) -> list[str]:
     return errors
 
 
-def check_build_error_markers(base_dir: Path) -> list[str]:
-    """Check that no generated file carries a shared include's build-error marker.
+def _generated_files(base_dir: Path, output_dir: Path) -> list[Path]:
+    """Every file of a target's output: its whole directory, or at the root the directories the build writes into."""
+    roots = [output_dir / name for name in ROOT_TARGET_OUTPUT_DIRS] if output_dir == base_dir else [output_dir]
+    files: list[Path] = []
+    for root in roots:
+        if root.is_dir():
+            files.extend(sorted(path for path in root.rglob("*") if path.is_file()))
+    return files
 
-    A shared partial that branches on a variant parameter emits `PIPELEX_BUILD_ERROR` when the
-    including template set no variant or misspelled one. Without it the branch would render as the
-    empty string, and the block would vanish from the shipped skill with the build, the freshness
-    check and the tests all green.
+
+def check_build_error_markers(base_dir: Path) -> list[str]:
+    """Check that no generated file carries a template's build-error marker.
+
+    A partial that selects one of several blocks by a parameter's value ends its chain in an
+    `{% else %}` that emits `PIPELEX_BUILD_ERROR`, so a value naming no branch fails here rather
+    than dropping the block from the output with every other gate green. Every text file of every
+    target is read, not only the skills: a shared reference, a hook script and the MCP fragment are
+    rendered from templates too, and a partial may be included by any of them.
     """
     errors: list[str] = []
     for output_dir in _collect_output_dirs(base_dir):
-        for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
-            for idx, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
+        for path in _generated_files(base_dir, output_dir):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue  # a binary file holds no rendered text
+            if BUILD_ERROR_MARKER not in text:
+                continue
+            rel = path.relative_to(base_dir)
+            for idx, line in enumerate(text.splitlines(), start=1):
                 if BUILD_ERROR_MARKER in line:
-                    rel = skill_md.relative_to(base_dir)
                     errors.append(f"{rel}:{idx}: {line.strip()}")
     return errors
 
@@ -803,13 +824,15 @@ def check_no_templates_in_output(base_dir: Path) -> list[str]:
                 rel = j2_file.relative_to(base_dir)
                 errors.append(f"LEAKED TEMPLATE: {rel} (should be in templates/)")
 
+    # At the root: the static sources under skills/, and whatever a root target renders into hooks/ and mcp/.
     _scan_dir(base_dir / "skills")
     _scan_dir(base_dir / "hooks")
+    _scan_dir(base_dir / "mcp")
+    # A target's own output directory holds nothing but output, so all of it is scanned.
     for output_dir in _collect_output_dirs(base_dir):
         if output_dir == base_dir:
             continue
-        _scan_dir(output_dir / "skills")
-        _scan_dir(output_dir / "hooks")
+        _scan_dir(output_dir)
 
     return errors
 
@@ -921,6 +944,174 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
     return errors
 
 
+def load_mcp_server_defaults(base_dir: Path) -> dict[str, Any]:
+    """Read `[vars.mcp_server]` from the target defaults: empty when they declare no workshop launcher."""
+    defaults_path = base_dir / TARGETS_DIR_NAME / DEFAULTS_FILE
+    raw = tomllib.loads(defaults_path.read_text(encoding="utf-8"))
+    mcp_server: object = raw.get("vars", {}).get("mcp_server", {})
+    return cast(dict[str, Any], mcp_server) if isinstance(mcp_server, dict) else {}
+
+
+def check_credential_wiring(base_dir: Path) -> list[str]:
+    """Check that every generated target still carries the credential wiring `targets/defaults.toml` declares.
+
+    The expectation is read from the defaults and never from a target's merged variables. A target
+    whose own `[vars]` lost `env_vars` or `user_config` renders manifests and wrappers that agree with
+    those variables, so the freshness check passes them, and only the defaults still say what went
+    missing: a table override used to replace the defaults' table whole and do exactly that.
+
+    - Claude: the manifest's `userConfig` offers every option, a sensitive one still sensitive; its
+      `pipelex` server spawns the `launch-pipelex-mcp.sh` launcher with each option substituted into
+      `PIPELEX_PLUGIN_<KEY>`; the launcher promotes each to `PIPELEX_<KEY>` only when it is non-empty,
+      and the hook wrapper promotes `CLAUDE_PLUGIN_OPTION_<KEY>` the same way.
+    - Codex: the manifest's `pipelex` server forwards every `env_vars` name into the spawn.
+    - Mistral Vibe: the fragment's `env` table names every `env_vars` name, with an empty value for
+      the user to fill in.
+
+    A file that is missing or does not parse is left to the checks that report exactly that.
+    """
+    mcp_server = load_mcp_server_defaults(base_dir)
+    if not mcp_server:
+        return []
+    raw_options: object = mcp_server.get("user_config", {})
+    options: dict[str, dict[str, Any]] = {}
+    if isinstance(raw_options, dict):
+        for key, option in cast(dict[str, object], raw_options).items():
+            if isinstance(option, dict):
+                options[key] = cast(dict[str, Any], option)
+    raw_env_vars: object = mcp_server.get("env_vars", [])
+    env_vars = [str(name) for name in cast(list[object], raw_env_vars)] if isinstance(raw_env_vars, list) else []
+
+    errors: list[str] = []
+    defaults = load_defaults_vars(base_dir)
+    for target_name, config in load_target_configs(base_dir).items():
+        source = config.get("plugin", {}).get("source", "./")
+        output_dir = base_dir if source == "./" else base_dir / str(source).rstrip("/")
+        label = f"[{target_name}] {output_dir.relative_to(base_dir).as_posix()}"
+        match _platform_for_config(config, defaults):
+            case Platform.CLAUDE:
+                errors.extend(_claude_credential_errors(label, output_dir, options))
+            case Platform.CODEX:
+                errors.extend(_codex_credential_errors(label, output_dir, env_vars))
+            case Platform.MISTRAL_VIBE:
+                errors.extend(_vibe_credential_errors(label, output_dir, env_vars))
+    return errors
+
+
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    """A JSON file's top-level object, or None when the file is missing, invalid or not an object."""
+    if not path.is_file():
+        return None
+    try:
+        data: object = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return cast(dict[str, Any], data) if isinstance(data, dict) else None
+
+
+def _mcp_server_entry(manifest: dict[str, Any]) -> dict[str, Any] | None:
+    """The manifest's `pipelex` MCP server entry, or None when it declares none."""
+    servers: object = manifest.get("mcpServers")
+    if not isinstance(servers, dict):
+        return None
+    entry: object = cast(dict[str, object], servers).get(MCP_SERVER_NAME)
+    return cast(dict[str, Any], entry) if isinstance(entry, dict) else None
+
+
+def _promotes(text: str, source: str, target: str) -> bool:
+    """Whether a shell script exports `target` from `source`, guarded so an empty `source` changes nothing."""
+    pattern = re.escape(f'if [[ -n "${{{source}:-}}" ]]; then') + r"\s+" + re.escape(f'export {target}="${source}"') + r"\s+fi\b"
+    return re.search(pattern, text) is not None
+
+
+def _claude_credential_errors(label: str, output_dir: Path, options: dict[str, dict[str, Any]]) -> list[str]:
+    """The Claude half of `check_credential_wiring`: userConfig, the launcher entry, and both promotions."""
+    if not options:
+        return []  # no user configuration declared: the manifest spawns the workshop directly
+    errors: list[str] = []
+    manifest = _read_json_object(output_dir / ".claude-plugin" / "plugin.json")
+    if manifest is not None:
+        where = f"{label}/.claude-plugin/plugin.json"
+        raw_offered: object = manifest.get("userConfig")
+        offered = cast(dict[str, object], raw_offered) if isinstance(raw_offered, dict) else {}
+        for key, option in options.items():
+            offer = offered.get(key)
+            if not isinstance(offer, dict):
+                errors.append(f"{where}: userConfig offers no `{key}` option, which [vars.mcp_server.user_config] declares")
+            elif option.get("sensitive") is True and cast(dict[str, object], offer).get("sensitive") is not True:
+                errors.append(f"{where}: userConfig `{key}` is no longer sensitive, so its value would be stored outside the keychain")
+        entry = _mcp_server_entry(manifest)
+        if entry is None:
+            errors.append(f"{where}: declares no `{MCP_SERVER_NAME}` MCP server")
+        else:
+            if entry.get("command") != CLAUDE_MCP_LAUNCHER_COMMAND:
+                errors.append(
+                    f"{where}: the `{MCP_SERVER_NAME}` server does not spawn {CLAUDE_MCP_LAUNCHER_COMMAND}, the launcher that promotes the options"
+                )
+            raw_env: object = entry.get("env")
+            env = cast(dict[str, object], raw_env) if isinstance(raw_env, dict) else {}
+            for key in options:
+                name = f"PIPELEX_PLUGIN_{key.upper()}"
+                substitution = f"${{user_config.{key}}}"
+                if env.get(name) != substitution:
+                    errors.append(f"{where}: the `{MCP_SERVER_NAME}` server's env does not set {name} to {substitution}")
+    for script, prefix in (("launch-pipelex-mcp.sh", "PIPELEX_PLUGIN_"), ("check-mthds.sh", "CLAUDE_PLUGIN_OPTION_")):
+        script_path = output_dir / "hooks" / script
+        if not script_path.is_file():
+            continue
+        text = script_path.read_text(encoding="utf-8")
+        for key in options:
+            source, target = f"{prefix}{key.upper()}", f"PIPELEX_{key.upper()}"
+            if not _promotes(text, source, target):
+                errors.append(f"{label}/hooks/{script}: does not promote {source} to {target} when it is non-empty")
+    return errors
+
+
+def _codex_credential_errors(label: str, output_dir: Path, env_vars: list[str]) -> list[str]:
+    """The Codex half of `check_credential_wiring`: the names forwarded into the workshop's spawn."""
+    manifest = _read_json_object(output_dir / ".codex-plugin" / "plugin.json")
+    if manifest is None or not env_vars:
+        return []
+    where = f"{label}/.codex-plugin/plugin.json"
+    entry = _mcp_server_entry(manifest)
+    if entry is None:
+        return [f"{where}: declares no `{MCP_SERVER_NAME}` MCP server"]
+    raw_forwarded: object = entry.get("env_vars")
+    forwarded = [str(name) for name in cast(list[object], raw_forwarded)] if isinstance(raw_forwarded, list) else []
+    missing = [name for name in env_vars if name not in forwarded]
+    if not missing:
+        return []
+    return [
+        f"{where}: the `{MCP_SERVER_NAME}` server's env_vars forwards no {', '.join(missing)}; "
+        "Codex spawns it with a whitelisted environment, so the workshop would never see it"
+    ]
+
+
+def _vibe_credential_errors(label: str, output_dir: Path, env_vars: list[str]) -> list[str]:
+    """The Mistral Vibe half of `check_credential_wiring`: the fragment's `env` table the user fills in."""
+    fragment = output_dir / "mcp" / "vibe-mcp.toml"
+    if not fragment.is_file() or not env_vars:
+        return []
+    try:
+        data = tomllib.loads(fragment.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError:
+        return []
+    servers: object = data.get("mcp_servers")
+    if not isinstance(servers, list) or not servers or not isinstance(cast(list[object], servers)[0], dict):
+        return []
+    server = cast(dict[str, object], cast(list[object], servers)[0])
+    raw_env: object = server.get("env")
+    env = cast(dict[str, object], raw_env) if isinstance(raw_env, dict) else {}
+    where = f"{label}/mcp/vibe-mcp.toml"
+    errors: list[str] = []
+    for name in env_vars:
+        if name not in env:
+            errors.append(f"{where}: the env table has no `{name}` key; Vibe forwards no shell variable, so the user has nowhere to write it")
+        elif env[name] != "":
+            errors.append(f"{where}: the env table ships a value for `{name}`; the fragment leaves it empty for the user to fill in")
+    return errors
+
+
 def _run_check(title: str, errors: list[str], failure_message: str, success_message: str) -> bool:
     """Print a formatted check result and return whether it failed."""
     print(title)
@@ -1005,10 +1196,10 @@ def run_shared_checks(base_dir: Path) -> bool:
         "  Every SKILL.md frontmatter is valid YAML with its name and description.",
     )
     failed |= _run_check(
-        "Checking for unresolved shared-include variants...",
+        "Checking every generated file for a build-error marker...",
         check_build_error_markers(base_dir),
-        "FAIL: A shared include rendered its build-error branch (the including template set no variant, or misspelled one).",
-        "  Every shared include resolved its variant.",
+        "FAIL: A template rendered its build-error branch: a parameter was given a value none of its branches names.",
+        "  No generated file carries a build-error marker.",
     )
     failed |= _run_check(
         "Checking that links resolve both ways in every target...",
@@ -1040,6 +1231,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_vibe_target_artifacts(base_dir),
         "FAIL: Mistral Vibe target artifacts are inconsistent.",
         "  Mistral Vibe target artifacts are consistent.",
+    )
+    failed |= _run_check(
+        "Checking every target's credential wiring against targets/defaults.toml...",
+        check_credential_wiring(base_dir),
+        "FAIL: A generated target lost credential wiring [vars.mcp_server] in targets/defaults.toml declares.",
+        "  Every target carries the credential wiring the defaults declare.",
     )
 
     return failed

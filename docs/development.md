@@ -4,7 +4,7 @@ How to build the plugin from its templates, check it, and run a change in your o
 
 ## The build
 
-The plugin is rendered from the Jinja2 templates in `templates/`, with the variables in `targets/`, into one checked-in output per agent: `pipelex/` for Claude Code, `pipelex-codex/` for Codex and `pipelex-vibe/` for Mistral Vibe. Never edit a generated output directly; the next build overwrites it, and `make check` fails while it differs from its source.
+The plugin is rendered from the Jinja2 templates in `templates/`, with the variables in `targets/`, into one checked-in output per agent: `pipelex/` for Claude Code, `pipelex-codex/` for Codex and `pipelex-vibe/` for Mistral Vibe. Never edit a generated output directly; the next build overwrites it, and `make check` fails while it differs from its source. Nor add a file to one: the build owns those directories and removes whatever no template or source produces, a `.j2` template and a file git ignores aside, so a file added there by hand is gone after the next build.
 
 ```bash
 make build           # render every target (prod, codex, mistral-vibe)

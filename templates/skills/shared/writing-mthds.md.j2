@@ -1,6 +1,12 @@
-# Writing `.mthds` Directly
+{#- The one MTHDS language reference. `pipelex-design` reads it before every write, and
+   `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` point at it for a
+   syntax question. It is rendered per target to `skills/shared/writing-mthds.md` and reads no
+   target variable: it is a template so that it includes the `PipeFunc` warning instead of
+   restating it. What must ship as literal Jinja — the shorthands' expansions, an
+   `expression_template` — sits inside raw blocks. -#}
+# MTHDS Language Reference
 
-A focused, copy-pasteable reference for hand-writing MTHDS code in a `main.mthds`.
+The reference for the MTHDS language, with copy-pasteable examples: read it before writing or editing a `.mthds` file, and for any syntax question while reading one.
 
 ## 1. Bundle Skeleton
 
@@ -78,8 +84,11 @@ description = "A commercial invoice"
 invoice_number = { type = "text", description = "Unique identifier", required = true }
 issue_date     = { type = "date", description = "Issue date", required = true }
 total_amount   = { type = "number", description = "Total amount due", required = true }
+vendor_name    = "The vendor's name"   # shorthand: a REQUIRED text field
 notes          = { type = "text", description = "Free-text notes" }
 ```
+
+**A bare string is a required text field.** `vendor_name = "The vendor's name"` declares exactly `{ type = "text", required = true, description = "The vendor's name" }`. The shorthand carries a description and nothing else, so an optional text field, or a field needing any other key, is written as a table.
 
 **Constraint:** `refines` and `structure` are mutually exclusive — pick one.
 
@@ -102,13 +111,13 @@ notes          = { type = "text", description = "Free-text notes" }
 |------|----------------------|
 | `"text"` | `"hello"` |
 | `"integer"` | `42` |
-| `"number"` | `3.14` |
+| `"number"` | `2.5` |
 | `"boolean"` | `true` |
 | `"date"` | (datetime literal) |
 | `"concept"` | not allowed |
 | `"list"` | not allowed |
 
-> **Not supported by this skill:** `dict` fields. Model the data as a structured concept instead.
+> **Outside the authoring subset:** `dict` is a valid field type, which takes `key_type` and `value_type`, so a bundle you read may carry one; never write one. Model the data as a structured concept instead.
 
 ### 2e. Concept References in Fields
 
@@ -133,7 +142,7 @@ priority = { type = "text", choices = ["low", "medium", "high"], description = "
 score    = { type = "number", choices = ["0", "0.5", "1"], description = "Half-point score" }
 ```
 
-When `choices` is set and `type` is omitted, type defaults to `text`. `choices` is only valid with `text`, `integer`, or `number`. Not valid with `boolean`, `date`, `concept`, or `list`.
+When `choices` is set and `type` is omitted, type defaults to `text`. `choices` is only valid with `text`, `integer`, or `number`. Not valid with `boolean`, `date`, `concept`, or `list`. The field takes only the listed values, and generated Python types it as a `Literal`.
 
 ## 3. Native Concepts (always available)
 
@@ -143,13 +152,14 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 |------|-------------|
 | `Text` | A string. |
 | `Image` | A binary image (JPEG, PNG, ...). |
-| `Document` | A document file or a web page URL. `PipeExtract` reads a PDF, an image or a web page, and nothing else: see its section before designing over Word, Excel or PowerPoint files. |
+| `Document` | A document file or a web page URL. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them. See its section before designing over Office files. |
 | `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF). |
 | `Html` | HTML content. |
 | `TextAndImages` | Mixed text + images. |
 | `Number` | A numeric value. |
 | `YesNo` | A yes/no answer (`yes_no`). |
 | `Date` | A calendar date with optional time (`date`, `time`). |
+| `Time` | A time of day with an optional UTC offset (`time`). |
 | `JSON` | A JSON value. |
 | `SearchResult` | Web search output (`answer`, `sources`). |
 | `Anything` | Any type. |
@@ -158,7 +168,9 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 
 > File formats like "PDF" or "JPEG" are NOT concepts. Use `Document` and `Image` respectively.
 
-## 4. Multiplicity
+Each native concept has a content class with its own attributes: an `Image` has `url`, `filename` and `caption`, a `Page` has `text_and_images` and `page_view`. [Native Content Types](native-content-types.md) lists them all, for writing `$var.field` in a prompt or `from = "input.field"` in a construct.
+
+## 4. Multiplicity and Presence
 
 Applies to `inputs` values and `output`:
 
@@ -167,8 +179,10 @@ Applies to `inputs` values and `output`:
 | `ConceptName` | Single item. |
 | `ConceptName[]` | Variable-length list. |
 | `ConceptName[N]` | Exactly N items. |
+| `ConceptName?` | Optional single item: it may resolve as a recorded absence. |
+| `ConceptName!` | Forced single input: the run fails if it is absent. Inputs only. |
 
-Examples: `Text`, `Text[]`, `Image[3]`, `legal.Clause[]`. Nesting is forbidden — no `Text[][]`.
+Examples: `Text`, `Text[]`, `Image[3]`, `legal.Clause[]`, `Text?`. Nesting is forbidden — no `Text[][]` — and a presence marker never combines with a count: `Text[]?` is invalid, since a list that received nothing is empty.
 
 ## 5. Pipe Skeleton
 
@@ -211,6 +225,8 @@ Summarize the following document:
 
 **Vision:** put an `Image` in `inputs` and reference it as `$image` or `@image` in the prompt.
 
+**Model references.** Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference: `@name` is an alias (`@default-text-from-pdf`), `$name` a preset, which bundles a model with its settings (`$writing-factual`), `~name` a waterfall of fallback models, and a bare string a model handle. On a `PipeLLM`, `model` may instead be an inline table of settings, whose `temperature` is required: `model = { model = "claude-4.5-sonnet", temperature = 0.2 }`. Omit `model` to use the default.
+
 ### PipeSequence — execute steps in order
 
 ```toml
@@ -226,8 +242,9 @@ steps = [
 ```
 
 **Step blueprint:**
-- `pipe` — bare pipe code (no domain prefix).
-- `result` — the working-memory name for this step's output.
+- `pipe` — the pipe reference: bare (`extract_text`) for a pipe of this domain, domain-qualified (`finance.extract_text`) for a pipe of another domain (section 8).
+- `result` — optional: the working-memory name for this step's output, which is how a later step refers to it.
+- `nb_output` or `multiple_output` — optional, never both: how many items the step's output is expected to hold (`nb_output`, an integer), or that it holds several (`multiple_output = true`).
 - `batch_over` + `batch_as` — optional inline batch (see below). Must both be present or both absent.
 
 **Inline batch step:**
@@ -255,12 +272,14 @@ input_list_name  = "documents"
 input_item_name  = "document"
 ```
 
-**Required:** `branch_pipe_code`, `input_list_name`, `input_item_name`.
+**Required:** `branch_pipe_code` (the pipe applied to each item, a pipe reference like a step's `pipe`), `input_list_name` (the input holding the list, declared with `[]`), `input_item_name` (the name each item is passed to the branch pipe under).
 
 **Constraints:**
-- `input_item_name` MUST differ from `input_list_name`.
+- `input_item_name` MUST differ from `input_list_name`: name the list in the plural and the item in the singular (`documents` and `document`; for a compound name, `report_data` and `single_report_data`).
 - `input_item_name` MUST NOT match any other key in `inputs`.
-- For non-batched inputs (passed through to the branch), use singular types (e.g. `context = "Context"`, NOT `"Context[]"`).
+- For non-batched inputs (passed through to the branch), use singular types (e.g. `context = "Context"`, NOT `"Context[]"`): the branch pipe receives one item at a time, and declares singular inputs.
+
+Items run in parallel, and the output list keeps the input order.
 
 ### PipeParallel — run branches concurrently
 
@@ -277,9 +296,9 @@ branches = [
 ]
 ```
 
-**Required:** `branches`. The declared `output` is always the combined result and MUST be `Composite` or a structured concept whose field names match the branches' `result` names. Do not use `[]` or `[N]` on `output`.
+**Required:** `branches`, each a sub-pipe written like a sequence step. The declared `output` is always the combined result and MUST be `Composite` or a structured concept whose field names match the branches' `result` names. Do not use `[]` or `[N]` on `output`. There is no `combined_output` field: the declared `output` is the combination.
 
-`add_each_output = true` is optional and only exposes branch results individually in working memory.
+Each branch runs on its own deep copy of working memory. `add_each_output = true` is optional and only exposes branch results individually in working memory.
 
 ### PipeCondition — route to a pipe based on an expression
 
@@ -289,7 +308,7 @@ type                       = "PipeCondition"
 description                = "Route based on category"
 inputs                     = { input_data = "CategorizedInput" }
 output                     = "Text"
-expression_template        = "{{ input_data.category }}"
+expression_template        = "{% raw %}{{ input_data.category }}{% endraw %}"
 default_outcome            = "process_medium"
 
 [pipe.route_by_category.outcomes]
@@ -300,7 +319,9 @@ large  = "process_large"
 
 **Required:** `expression_template` (Jinja2) or `expression` (bare value) — exactly one. Plus `outcomes` and `default_outcome`.
 
-`default_outcome` accepts a pipe code OR the special values `"fail"` (abort) or `"continue"` (pass-through, no sub-pipe).
+`default_outcome`, like each value of `outcomes`, accepts a pipe reference OR the special values `"fail"` (abort) or `"continue"` (pass-through, no sub-pipe).
+
+**`"continue"` leaves the output absent**, so a condition that can reach it, as its `default_outcome` or as an outcome, MUST declare its output optional with `?` (`output = "Text?"`). Validation rejects it otherwise.
 
 > **Always set `default_outcome`**, even when outcomes appear exhaustive (e.g. yes/no). Validation rejects pipes without one.
 
@@ -323,6 +344,34 @@ Following up on $deal.product_name:
 """
 ```
 
+**Template table form:** `template` may be a table instead of a string, carrying `template` and `category`, and optionally `templating_style` and `extra_context`. That table is where a category is set, never a field of the pipe:
+
+```toml
+[pipe.render_report]
+type        = "PipeCompose"
+description = "Render the report as Markdown"
+inputs      = { report = "Report" }
+output      = "Text"
+
+[pipe.render_report.template]
+category = "markdown"
+template = """
+# $report.title
+
+@report.body
+"""
+```
+
+| Category | Use when | Key filters |
+|----------|----------|-------------|
+| `basic` | General-purpose text; a string `template` is `basic` | `format`, `tag` |
+| `expression` | Simple expressions | *(none)* |
+| `html` | Web content (autoescaped) | `format`, `tag`, `escape_script_tag` |
+| `markdown` | Markdown output | `format`, `tag`, `escape_script_tag` |
+| `mermaid` | Mermaid diagrams | *(none)* |
+| `llm_prompt` | LLM prompt composition | `format`, `tag`, `with_images` |
+| `img_gen_prompt` | Image generation prompts | `format`, `tag`, `with_images` |
+
 **Construct mode** (assembles a structured concept field-by-field):
 
 ```toml
@@ -343,7 +392,7 @@ tags           = ["urgent"]    # literal list
 Each construct field is one of:
 - `{ from = "input.path" }` — variable reference: a whole input variable or a dotted path into it.
 - `{ template = "..." }` — Jinja2 template string with shorthands.
-- A literal value (string, number, boolean, list).
+- A literal value (string, number, boolean, list), assigned directly and never wrapped in `{ value = ... }`.
 
 **Output** in construct mode MUST be a single concept (no `[]` or `[N]`).
 
@@ -420,12 +469,15 @@ description = "Search the web for information on a topic"
 inputs      = { topic = "Text" }
 output      = "SearchResult"
 prompt      = "What is $topic?"
-# from_date       = "2026-01-01"               # optional
-# include_domains = ["reuters.com", "bbc.com"] # optional
-# max_results     = 5                          # optional
+# model           = "$standard"                # optional: "$standard" or "$deep"
+# from_date       = "2026-01-01"               # optional, YYYY-MM-DD
+# to_date         = "2026-06-30"               # optional, YYYY-MM-DD
+# include_domains = ["reuters.com", "bbc.com"] # optional: only these domains
+# exclude_domains = ["example.com"]            # optional: never these domains
+# max_results     = 5                          # optional: omitted, the provider's default
 ```
 
-**Required:** `prompt`. **Output** MUST be `SearchResult` or a concept that refines `SearchResult`.
+**Required:** `prompt`, a query template that takes `$variable` shorthands. **Output** MUST be `SearchResult` or a concept that refines `SearchResult`: an `answer` text and a `sources` list with title, URL, and snippet for each source.
 
 ### PipeImgGen — generate images
 
@@ -436,8 +488,8 @@ description  = "Generate an image from a prompt"
 inputs       = { img_prompt = "Text" }
 output       = "Image"
 prompt       = "$img_prompt"
-# model       = "$gen-image"           # optional
-# aspect_ratio = "landscape_16_9"      # optional
+# model       = "$gen-image"           # optional, e.g. "$gen-image" or "@default-premium"
+# aspect_ratio = "landscape_16_9"      # optional, model-dependent (below)
 ```
 
 **Required:** `prompt` (even if it's just a passthrough like `"$img_prompt"`). Declared `inputs` are injected into the `prompt` template.
@@ -451,7 +503,9 @@ prompt = "Apply this change to $ref: $instruction"
 
 Each referenced image is injected as an `[Image N]` token (reference image), bounded by the model's `max_prompt_images`.
 
-**Aspect ratio:** the optional `aspect_ratio` field is model-dependent — see [PipeImgGen in the MTHDS Language Reference](../../shared/mthds-reference.md#pipeimggen---generate-images) for the value list and which models support which ratios.
+**Aspect ratio values** (enum names, not ratios): `square`, `landscape_4_3`, `landscape_3_2`, `landscape_16_9`, `landscape_21_9`, `portrait_3_4`, `portrait_2_3`, `portrait_9_16`, `portrait_9_21`.
+
+Aspect-ratio support is model-dependent, and only `square` works on every model. The newest models cover the full range: `gpt-image-2` supports all of them, `nano-banana-2` nearly all. The older `gpt-image-1` and `gpt-image-1.5` accept only `square`, `landscape_3_2` and `portrait_2_3`. For a specific shape such as `landscape_16_9` or `portrait_9_16`, choose a model that supports it rather than assuming the default does.
 
 ### PipeFunc — call a registered Python function
 
@@ -468,7 +522,7 @@ Only use this when the user has a registered function. Otherwise prefer PipeComp
 
 **`function_name` is a registry key, not an import path.** It names an entry in the runtime's flat, process-wide function registry — by default the decorated function's own name, and otherwise whatever string `@pipe_func(name=…)` was given — and resolution is a lookup with no import. So nothing in a bundle says which module defines a registered function, a dotted name is just a key that happens to contain dots, and on the hosted plane the stored `.py` files are flat importable module names beside each other. Name the function, not a path to it.
 
-**`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. The function must already be registered in the runtime that executes the method: a `function_name` naming something the plane cannot import fails at run time, not at validation.
+{% include "skills/shared/pipefunc-warning.md.j2" %} The function must already be registered in the runtime that executes the method: a `function_name` naming something the plane cannot import fails at run time, not at validation.
 
 ### PipeSignature — a contract-only header (forward declaration)
 
@@ -500,7 +554,7 @@ signature_for = "PipeLLM"   # optional hint: the intended implementation type
 
 Applies to: `prompt` (PipeLLM, PipeImgGen, PipeSearch), `system_prompt` (PipeLLM), `template` (PipeCompose), and `{ template = "..." }` in construct fields.
 
-| Shorthand | Expands to | Use |
+{% raw %}| Shorthand | Expands to | Use |
 |-----------|-----------|-----|
 | `$variable` | `{{ variable\|format() }}` | Inline substitution. |
 | `@variable` | `{{ variable\|tag("variable") }}` | Block insertion (put on its own line). |
@@ -509,7 +563,7 @@ Applies to: `prompt` (PipeLLM, PipeImgGen, PipeSearch), `system_prompt` (PipeLLM
 - Dotted paths work: `$user.name`, `@doc.summary`.
 - Dollar amounts (`$100`) and version-like strings (`@2.0`) are NOT matched — must start with a letter or underscore.
 - Trailing dots are treated as punctuation: `$amount.` → `{{ amount|format() }}.`
-- Raw Jinja2 (`{{ ... }}`, `{% ... %}`) always works alongside the shorthands.
+- Raw Jinja2 (`{{ ... }}`, `{% ... %}`) always works alongside the shorthands.{% endraw %}
 
 **Validation:** every variable in a prompt MUST be a declared input (root name), and every declared input MUST be referenced in the prompt at least once.
 
@@ -517,10 +571,12 @@ Applies to: `prompt` (PipeLLM, PipeImgGen, PipeSearch), `system_prompt` (PipeLLM
 
 ## 8. Cross-Domain References
 
-| Item | Same-domain | Cross-domain |
-|------|-------------|--------------|
+| Item | Same domain | Another domain |
+|------|-------------|----------------|
 | Concept | `"Invoice"` | `"finance.Invoice"` |
-| Pipe (in `steps`, `branches`, `outcomes`, `branch_pipe_code`) | `"extract_text"` | `"finance.extract_text"` |
+| Pipe (in `steps`, `branches`, `outcomes`, `default_outcome`, `branch_pipe_code`) | `"extract_text"` | `"finance.extract_text"` |
+
+Both forms are valid wherever a concept or a pipe is referenced: a bare reference resolves within the bundle's own domain, and a domain-qualified one within the named domain. A third form, `alias->domain.code`, reaches a domain of a dependency. A pipe's definition key, `[pipe.<pipe_code>]`, is always bare.
 
 When the bundle stays in one domain (the common case), use bare names everywhere.
 
@@ -536,12 +592,16 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 - ❌ `inputs` field on a `PipeSequence` step — steps see the sequence's inputs automatically.
 - ❌ Adjectives or circumstances in concept names (`LongArticle`, `CounterArgument`).
 - ❌ Plural concept names (`Invoices` — use `Invoice` plus multiplicity).
-- ❌ Domain prefix on pipe references when staying in-domain (`finance.extract_text` → `extract_text`).
+- ❌ An optional field written as a bare string — the shorthand is always a required text field.
 - ❌ Omitting `prompt` on `PipeImgGen` because "the input is already a prompt" — `prompt = "$img_prompt"` is still required.
 - ❌ Omitting `default_outcome` on `PipeCondition` because outcomes "look exhaustive" — still required.
+- ❌ A `PipeCondition` that can reach `"continue"` with an output lacking `?`.
 - ❌ `PipeParallel` output that is not `Composite` or a structured concept matching branch `result` names.
-- ❌ Using `dict` field type — unsupported in this skill.
-- ❌ Using `PipeStructure` — not in the builder subset; use `PipeLLM` with a structured output concept instead.
+- ❌ A `combined_output` field on `PipeParallel` — there is none; the declared `output` is the combination.
+- ❌ A `category` field on a `PipeCompose` — it belongs in the `template` table.
+- ❌ Wrapping a construct literal in `{ value = ... }` — assign it directly.
+- ❌ Writing a `dict` field — outside the authoring subset.
+- ❌ Writing a `PipeStructure` — outside the authoring subset; use `PipeLLM` with a structured output concept instead.
 - ❌ `default_value` on `concept`- or `list`-typed fields — not allowed.
 - ❌ Referencing a variable in a prompt without declaring it in `inputs` — validation will fail.
 - ❌ Declaring an `input` that no prompt references — also rejected.

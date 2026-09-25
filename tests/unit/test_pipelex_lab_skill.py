@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -121,6 +124,39 @@ class TestPipelexLabSkill:
         assert "usually the one holding `main.mthds`, unless the caller names another" in render(target_name, "pipelex-inputs")
         assert "They sit beside the bundle unless the caller named another directory" in render(target_name, "pipelex-run")
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_case_is_kept_out_of_version_control_by_its_directory(self, target_name: str) -> None:
+        """The case directory will hold the key, whose facts come from the user's files, and `inputs.json`, so it is
+        the directory that is checked: a copied PDF under a `.gitignore` of `*.pdf` reads ignored, and a check of
+        the copies would add no entry and leave the key and `inputs.json` to the next `git add .`."""
+        move = the_move(render(target_name), 2)
+        assert (
+            "**A case of the user's own files stays out of version control**: in a git repository, "
+            "`git check-ignore -q` `lab/<method>/cases/<case>/` itself, never a file in it, before anything is copied into it. "
+            "For a path not ignored, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`"
+        ) in move
+        assert "the case's paths" not in move
+
+    @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
+    def test_git_reads_the_case_directory_as_the_lab_needs(self, tmp_path: Path) -> None:
+        """The two readings the lab relies on: a rule that ignores the copies does not ignore the case directory, and
+        a case directory not yet created reads ignored under a lab git already ignores, so it gains no second entry."""
+
+        def ignored(path: str) -> bool:
+            # This machine's excludes file is left out, so that a developer's own rules cannot change the reading.
+            command = ["git", "-c", f"core.excludesFile={os.devnull}", "-C", str(tmp_path), "check-ignore", "-q", path]
+            return subprocess.run(command, check=False).returncode == 0
+
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        gitignore = tmp_path / ".gitignore"
+        gitignore.write_text("*.pdf\n", encoding="utf-8")
+        assert ignored("lab/m/cases/c/inputs/lease.pdf")
+        assert not ignored("lab/m/cases/c/")
+        gitignore.write_text("*.pdf\nlab/m/cases/c/\n", encoding="utf-8")
+        assert ignored("lab/m/cases/c/")
+        gitignore.write_text("lab/\n", encoding="utf-8")
+        assert ignored("lab/m/cases/new-case/")
+
     def test_the_lab_reads_runs_and_never_starts_one(self) -> None:
         """The lab hands every run to `/pipelex-run`, which owns the credit guard and the run id, and every fix to
         `/pipelex-edit` or `/pipelex-design`. So on Claude it pre-approves the tools that read a run and none that
@@ -191,6 +227,19 @@ class TestIntegrationPoints:
         assert "`/pipelex-lab` writes answer keys and scores the runs" in hand_off
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_case_is_handed_to_inputs_with_no_run_offer(self, target_name: str) -> None:
+        """The lab hands each case to `/pipelex-inputs` at its second setup item, before the third writes the case's
+        key, and that skill ends by offering the run. A yes to the offer would run the case before its key exists,
+        which breaks the lab's first guard. So the lab asks it to stop at run-ready, and the inputs skill waives the
+        offer on a calling skill's request, the one exemption among the offer's conditions."""
+        setup = the_move(render(target_name), 2)
+        hand_off = next(line for line in setup.splitlines() if line.startswith("2. **Inputs.**"))
+        assert "**Ask it to stop at run-ready, with no run offer**" in hand_off
+        offer = render(target_name, "pipelex-inputs").split("### 6. Offer the run", 1)[1].split("\n## ", 1)[0]
+        conditions = offer.split("Offer only when:", 1)[1]
+        assert "- no calling skill asked to stop at run-ready" in conditions
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_run_of_a_case_the_lab_did_not_start_is_offered_to_it(self, target_name: str) -> None:
         """Only a run on a case's inputs is offered: a run on any other inputs has no key to be scored against, and
         the lab would have to improvise one with the output already in view."""
@@ -227,7 +276,7 @@ class TestCapabilityMap:
     lab. So each row names a pipe that the MTHDS reference documents, and the claims that carry a limit are held to
     the reference's own words, so the two cannot drift apart."""
 
-    MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "mthds-reference.md.j2"
+    MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
 
     def rows(self) -> list[list[str]]:
         frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
@@ -241,7 +290,7 @@ class TestCapabilityMap:
         assert rows, "the capability map has no rows"
         for _, pipe, _ in rows:
             name = pipe.strip("`")
-            assert f"\n### {name} - " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
+            assert f"\n### {name} — " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
 
     OFFICE_LIMIT = (
         "Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them."

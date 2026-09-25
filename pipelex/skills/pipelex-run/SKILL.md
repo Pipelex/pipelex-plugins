@@ -34,7 +34,7 @@ This skill owns the run lifecycle, and only that, through two entries and no thi
 
 The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing or disambiguating by name and description, then carrying the returned id; without that tool, ask for the id. Every call in this skill takes the form settled here, and **an address pairs with nothing**, being a complete run source: `files` or a `method_id` beside it is refused before anything runs. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
 
-The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, so the drift check and the run inspect the same contract.
+The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, the code qualified by its own file's domain.
 
 ### 2. The inputs
 
@@ -53,17 +53,17 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 ### 3. Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over the bundle, with the same file set step 5 submits. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}` — it keeps the real path as provenance in diagnostics and spares copying whole bundles into the request; the workshop resolves a path against **its own** working directory, wherever the harness launched it, so pass an absolute one. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. For an **`mt_…` id**, the same call with `method_id` in place of `files`, and for an address with `method_ref`. Step 2's template call does not stand in for it: it answers `is_valid` alone, and a scaffold is a *valid* bundle.
+For a **bundle directory**, one `mthds_validate` call over the bundle, with the same file set step 5 submits. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback, and the only form the hosted console accepts. For an **`mt_…` id**, the same call with `method_id` in place of `files`, and for an address with `method_ref`. Step 2's template call does not stand in for it: it answers `is_valid` alone, and a scaffold is a *valid* bundle.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass.
 
-**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run or anything "before spending credit", this call is it (a test run on test files is a real run), and the graph it builds never reaches you. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent, and what the inputs still need. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go, because a flow shown and run past in the same breath leaves the user nothing to stop.
+**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run or anything "before spending credit", this call is it (a test run on test files is a real run), and the graph it builds never reaches you. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent, and what the inputs still need. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
 ### 4. Say what is about to run
 
 One line before the call: the target, the pipe, where the inputs came from, and that the run spends inference credit. **On a dry-run request this step comes only after the user's go**: a paid run never starts on a dry-run request whose flow the user has not been shown.
 
-> Running `summarize_pdf` (main pipe `summarize`) from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
+> Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
 **When a `files` target holds a `PipeFunc`, the line says its Python does not travel**: a `files` submission carries `.mthds` only, linked or not, so a function the hosted plane has not already registered cannot resolve, and what carries it is a method saved through `/pipelex-catalog` and run here by its id alone.
 
@@ -71,11 +71,11 @@ The user asking for the run is the consent; there is no second confirmation. **N
 
 ### 5. `mthds_run`, and the run id first
 
-Call `mthds_run` with the same target — the whole-bundle `files` submission, `method_id` or `method_ref` — and, as `inputs`, the values step 2 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; pass a pipe's code only when step 1 targeted another.
+Call `mthds_run` with the same target — the whole-bundle `files` submission, `method_id` or `method_ref` — and, as `inputs`, the values step 2 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
 
 When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside the `files`: the files are what run, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
-The tool returns a durable `run_id` immediately and never blocks. **Report that id the moment it returns, before anything else.** It is the only handle a later session has on this run. **For an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA, the only record of what ran, which nothing later recovers.
+The tool returns a durable `run_id` immediately and never blocks. **Report that id the moment it returns, before anything else.** **For an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 
 ### 6. Follow it to terminal
 
@@ -83,23 +83,25 @@ The tool returns a durable `run_id` immediately and never blocks. **Report that 
 
 ### 7. Results, and the saved run
 
-`mthds_run_results`, then report the main output and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. The workshop writes where the harness launched it, so **report the paths the tool returns**, never paths relative to the user's project.
+**A saved run stays out of version control**: in a git repository, `git check-ignore -q` `runs/<run_id>/` before saving, not for a `dir` the user named. For a path not ignored, add the workshop's `runs/`, anchored (`/runs/`, or `/app/runs/` for a workshop in `app/`), to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
+
+`mthds_run_results`, then report the main output and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
 
 When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
 ### 8. A failed run is reported, then routed, never bisected
 
-Give `failure_message` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Nothing upstream of the run could have caught it, since validation never resolves the function. Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
+Give `failure_message` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 
 ## Follow a run
 
 A run id alone, with no method and no inputs: nothing is validated or prepared.
 
-- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's two readings hold here as well: `degraded` is only last-known, and a long `RUNNING` may be slow or stuck, which the status cannot tell apart.
+- **"how is run X going"** → `mthds_run_status`. Report the state and, while it is running, the retry hint rather than a guess at how long it will take. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
 - **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says; it works days after the run. Saving a run twice adds copies.
 
-An unknown run id is reported in the tool's own words: runs are scoped to the key's organization, so another organization's run reads exactly like a miss.
+An unknown run id is reported in the tool's own words.
 
 ## Stops
 
@@ -107,7 +109,7 @@ An unknown run id is reported in the tool's own words: runs are scoped to the ke
 |---|---|
 | `mthds_run`: `input_domain` at `method_id`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
 | `mthds_download_artifacts` absent | say nothing was saved to disk and report the stored references as they came back; the run still completed |
-| `mthds_download_artifacts` refuses a `dir` the user named | call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
+| `mthds_download_artifacts` refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
 
 ## References
 

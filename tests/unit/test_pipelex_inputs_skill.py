@@ -117,6 +117,18 @@ class TestPipelexInputsSkill:
         assert size <= SKILL_CEILING_CHARS, f"{target_name}: pipelex-inputs renders {size} characters, over the {SKILL_CEILING_CHARS} ceiling"
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_only_a_calling_skill_waives_the_run_offer(self, target_name: str) -> None:
+        """A skill that hands this one its work can ask it to stop at run-ready, as `/pipelex-lab` does for a case
+        whose key is not written yet, and then no run is offered. A user who says not to run is not that request:
+        the offer starts nothing, so it is still made. The exemption names the caller, and says so in the same
+        bullet, so that it never reads as leave to drop the offer whenever a user asks to stop short."""
+        offer = self.render(target_name).split("### 6. Offer the run", 1)[1].split("\n## ", 1)[0]
+        conditions = offer.split("Offer only when:", 1)[1]
+        exemption = self.the_line(conditions, "stop at run-ready")
+        assert exemption.startswith("- no calling skill asked to stop at run-ready"), exemption
+        assert "a user who said not to run still gets the offer: an offer is not a run" in exemption
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_platform_renders_the_skill(self, target_name: str) -> None:
         body = self.render(target_name)
         assert "# Prepare Inputs for MTHDS methods" in body

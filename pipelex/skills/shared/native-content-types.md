@@ -13,7 +13,10 @@ Each native concept maps to a content class with specific attributes. Understand
 |----------------|---------------|----------------|
 | `Text` | TextContent | `text` |
 | `Number` | NumberContent | `number` |
-| `Image` | ImageContent | `url`, `filename`, `caption`, `mime_type`, `size` |
+| `YesNo` | YesNoContent | `yes_no` |
+| `Date` | DateContent | `date`, `time` (only when the source states one) |
+| `Time` | TimeContent | `time` |
+| `Image` | ImageContent | `url`, `filename`, `caption`, `mime_type`, `width`, `height` |
 | `Document` | DocumentContent | `url`, `public_url`, `filename`, `mime_type`, `title`, `snippet` |
 | `Html` | HtmlContent | `inner_html`, `css_class` |
 | `TextAndImages` | TextAndImagesContent | `text` (TextContent), `images` (list of ImageContent), `raw_html` (str) |
@@ -22,6 +25,7 @@ Each native concept maps to a content class with specific attributes. Understand
 | `SearchResult` | SearchResultContent | `answer`, `sources` (list of DocumentContent) |
 | `Anything` | *(any content)* | depends on actual content |
 | `Dynamic` | DynamicContent | user-defined fields |
+| `Composite` | CompositeContent | one field per component, named when the composition is made (a `PipeParallel`'s branch `result` names) |
 
 ## Detailed Attribute Reference
 
@@ -45,6 +49,37 @@ Each native concept maps to a content class with specific attributes. Understand
 
 ---
 
+### YesNo — `YesNoContent`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `yes_no` | `bool` | Whether the answer is yes (`true`) or no (`false`) |
+
+**Access**: `$var.yes_no` in prompts.
+
+---
+
+### Date — `DateContent`
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `date` | `date` | yes | The calendar date, in ISO 8601 (e.g. `2026-07-07`) |
+| `time` | `time \| None` | no | The time of day, in ISO 8601 (e.g. `15:40:00`, or `15:40:00+02:00` with a UTC offset) — present only when the source states a time, never an invented midnight |
+
+**Access**: `$var.date`, and `$var.time` when the source stated one.
+
+---
+
+### Time — `TimeContent`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `time` | `time` | The time of day, in ISO 8601 (e.g. `15:40:00`, or `15:40:00+02:00` with a UTC offset) |
+
+**Access**: `$var.time` in prompts.
+
+---
+
 ### Image — `ImageContent`
 
 | Attribute | Type | Required | Description |
@@ -53,9 +88,11 @@ Each native concept maps to a content class with specific attributes. Understand
 | `filename` | `str \| None` | no | Original filename (auto-populated from URL if not set) |
 | `caption` | `str \| None` | no | Image caption or description |
 | `mime_type` | `str \| None` | no | MIME type (e.g., `image/jpeg`, `image/png`) |
-| `size` | `ImageSize \| None` | no | Pixel dimensions: `size.width` and `size.height` |
+| `width` | `int \| None` | no | Width in pixels; set together with `height`, or neither is |
+| `height` | `int \| None` | no | Height in pixels; set together with `width`, or neither is |
 | `public_url` | `str \| None` | no | Public HTTPS URL for display |
 | `source_prompt` | `str \| None` | no | The prompt used to generate this image (if AI-generated) |
+| `source_negative_prompt` | `str \| None` | no | The negative prompt used to generate this image (if AI-generated) |
 
 **Access**: `$image.filename`, `$image.caption`, `$image.url` in prompts. Use `$image` alone in PipeLLM prompts for vision (image is sent to the LLM as a visual input).
 
@@ -81,7 +118,7 @@ Each native concept maps to a content class with specific attributes. Understand
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `inner_html` | `str` | yes | The inner HTML content |
-| `css_class` | `str` | yes | CSS class for the wrapping div |
+| `css_class` | `str \| None` | no | CSS class for a wrapping div; without one, the HTML is not wrapped |
 
 **Access**: `$html.inner_html` in prompts.
 
@@ -192,6 +229,14 @@ The key insight: `batch_over = "search_result.sources"` uses dot notation to ite
 
 ---
 
+### Composite — `CompositeContent`
+
+A named composition of contents with no declared structure: its fields are chosen when the composition is made, which is how a `PipeParallel` whose `output` is `Composite` combines its branches — each branch's `result` name becomes a field holding that branch's content.
+
+**Access**: `$var.<name>` reads the component stored under that name, such as `$analysis.sentiment` for a branch whose `result` is `sentiment`.
+
+---
+
 ### ListContent (multiplicity `[]`)
 
 When a concept has `[]` multiplicity (e.g., `Page[]`, `Image[]`), the content is a `ListContent` wrapping a list of items:
@@ -252,6 +297,9 @@ page_text = { from = "page.text_and_images.text.text" }
 {
   "my_text": {"concept": "native.Text", "content": {"text": "Hello"}},
   "my_number": {"concept": "native.Number", "content": {"number": 42}},
+  "my_yes_no": {"concept": "native.YesNo", "content": {"yes_no": true}},
+  "my_date": {"concept": "native.Date", "content": {"date": "2026-07-07"}},
+  "my_time": {"concept": "native.Time", "content": {"time": "15:40:00"}},
   "my_image": {"concept": "native.Image", "content": {"url": "/path/to/img.jpg", "mime_type": "image/jpeg"}},
   "my_document": {"concept": "native.Document", "content": {"url": "/path/to/doc.pdf"}},
   "my_json": {"concept": "native.JSON", "content": {"json_obj": {"key": "value"}}},
