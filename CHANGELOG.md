@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.0] - 2026-09-25
+
+### Highlights
+
+**One MTHDS language reference**, now in agreement with the standard, serves every skill that writes, edits or explains a bundle. **Codex checks the `.mthds` file that a patch run through the shell writes**, and the hook starts from a plugin directory whose path holds a space. **The user's data stays out of git**: a saved run and a prepared inputs file are checked and ignored before they are written. **A catalog save keeps the directory linked to its method**, and **a run names its pipe by the qualified reference**.
 
 ### Added
 
@@ -9,8 +13,7 @@
 
 ### Changed
 
-- **The README's pitch leads with building and names who each way of running a method is for**: it now opens on building AI methods with your coding agent, then says they run "as an MCP for chatbots, as a webapp for people, or via API for your software".
-- **The README says the plugin also puts a method in your software**: its tagline and quick start now say that the agent builds methods, runs them and puts them in your TypeScript or Python code or a new webapp, and that `/pipelex-scaffold` creates the webapp and leaves it running while `/pipelex-integrate` generates the typed call. The skills list is grouped by what each skill is for, and every mention of the SDKs, here and in the skills page, names `@pipelex/sdk` as the TypeScript SDK and `pipelex-sdk` as the Python one.
+- **The README leads with building and says where a method goes**: its quick start opens on building AI methods with your coding agent and says they run "as an MCP for chatbots, as a webapp for people, or via API for your software", and its tagline and quick start say that the agent builds methods, runs them and puts them in your TypeScript or Python code or a new webapp, and that `/pipelex-scaffold` creates the webapp and leaves it running while `/pipelex-integrate` generates the typed call. The skills list is grouped by what each skill is for, and every mention of the SDKs, here and in the skills page, names `@pipelex/sdk` as the TypeScript SDK and `pipelex-sdk` as the Python one.
 - **One MTHDS language reference**: `pipelex-design`, `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` all read `skills/shared/writing-mthds.md`, which replaces both design's own `references/writing-mthds.md` and the shared `mthds-reference.md`, now removed. What only the removed file said is folded in: model references, the batch naming convention, the search filters, the template categories, and the aspect-ratio values with the models that support them.
 - **`pipelex-scaffold` plants no repository inside another**: a project the initializer branch creates inside another repository's work tree used to be given a repository of its own and its pristine commit; it now gets neither, as a method app already did, and the report says its files are new files of the enclosing repository, for the user to review and commit there, or, when that repository ignores every file of the project but not its directory, that nothing versions the project. A project whose directory the enclosing repository ignores, under a dotfiles home ignoring `*` or an ignored `tmp/`, gets a repository of its own and its pristine commit, as it would outside every repository, and so does a method-app copy the skill finds there without its pristine commit. The project's `.gitignore` keeps the dependency tree, the virtual environment and `.env` out, judged by the project's own rules whenever it has no repository of its own, so that neither the enclosing repository nor one made there later takes them, and the pdm recipe passes `--no-git`, since `pdm init` otherwise makes a repository even inside another. When an initializer makes the project a repository inside a work tree that does not ignore it, as create-astro does, the skill commits nothing in it either, says so, and offers the removal of that repository without performing it, and an initializer outside the skill's tables is given its no-git flag there.
 - **The quick start shows both agents' installs**: the README's Codex install now starts open beside the Claude Code one instead of folded.
