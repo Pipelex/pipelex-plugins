@@ -76,7 +76,7 @@ args = ["/path/to/pipelex-mcp/packages/workshop/dist/main.js"]   # e.g. a local 
 PIPELEX_API_KEY = "plx_sk_..."
 ```
 
-The same override works for one invocation: `codex -c 'mcp_servers.pipelex.command="node"' …`.
+An entry of your own replaces the plugin's whole, including the names it forwards, so it passes the key on only when it says so: with an `env` table as above, or with `env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]` to keep taking them from your shell. The same override works for one invocation, and needs the names just as much: `codex -c 'mcp_servers.pipelex.command="node"' -c 'mcp_servers.pipelex.args=["/path/to/pipelex-mcp/packages/workshop/dist/main.js"]' -c 'mcp_servers.pipelex.env_vars=["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]'`. In a clone of this repository, `make codex-local-mcp` builds a local checkout's workshop and starts Codex that way; see [the development page](development.md#a-local-build-of-pipelex-mcp).
 
 ## Mistral Vibe
 

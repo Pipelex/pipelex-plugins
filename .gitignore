@@ -7,3 +7,5 @@ temp/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# The plugin copy `make claude-local-mcp` renders for a local workshop.
+.local-mcp/
