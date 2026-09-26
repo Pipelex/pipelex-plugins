@@ -7,8 +7,8 @@ own build (`--mcp`, after the make target has run `make build-local` there), spa
 spawned through `npx` at the exact version npm resolves it to.
 
 - **Claude Code.** The Claude target is rendered by the build's own renderer, with `[vars.mcp_server]`
-  `command` and `args` pointed at that workshop and the rest of the table kept, into
-  `.local-mcp/pipelex/`, which git ignores, and Claude Code starts with `--plugin-dir` on it. The copy
+  `command` and `args` pointed at that workshop and the rest of the table kept, into a directory of
+  that workshop's own under `.local-mcp/`, which git ignores, and Claude Code starts with `--plugin-dir` on it. The copy
   loads as `pipelex@inline` and takes the place of an installed `pipelex@pipelex-plugins` for that
   session, so its skills are this checkout's.
 - **Codex.** Nothing is rendered. Codex starts with `-c` overrides of its `mcp_servers.pipelex` entry,
@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import fcntl
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -45,7 +48,7 @@ from scripts.gen_skill_docs import (
     write_files,
 )
 
-# Where the Claude copy is rendered, relative to the repository root. `.gitignore` lists it.
+# Where the Claude copies are rendered, one per workshop, relative to the repository root. `.gitignore` lists it.
 LOCAL_DIR_NAME = ".local-mcp"
 
 # What `make build-local` writes in a pipelex-mcp checkout, and the manifest npm publishes it from.
@@ -157,30 +160,43 @@ def published_launcher(spec: str, resolve: Callable[[str], str] = npm_resolve) -
     return Launcher(command="npx", args=["-y", f"{WORKSHOP_PACKAGE}@{version}"], label=f"{WORKSHOP_PACKAGE} {version} from npm")
 
 
+def workshop_key(launcher: Launcher) -> str:
+    """The name of the directory under `.local-mcp/` that holds the copy spawning `launcher`, one per workshop."""
+    return hashlib.sha256("\0".join([launcher.command, *launcher.args]).encode()).hexdigest()[:12]
+
+
 def render_claude_copy(base_dir: Path, launcher: Launcher) -> Path:
-    """Render the Claude target with `launcher` as its workshop into `.local-mcp/<plugin>/`, and return that directory.
+    """Render the Claude target with `launcher` as its workshop into `.local-mcp/<key>/<plugin>/`, and return that directory.
 
     The target's `[vars.mcp_server]` table gets the launcher's `command` and `args` and keeps the rest,
     `user_config` among it, by the merge every target's own table goes through, so the copy is what
-    `make build` would ship but for the workshop it spawns. It is rendered beside the previous copy
-    and swapped in, so a session still running from that copy never meets a half-written plugin.
+    `make build` would ship but for the workshop it spawns.
+
+    Each workshop has a copy of its own, because a session reads its launcher again whenever it
+    respawns the server: in one shared copy, a later start with another workshop would change the
+    workshop of every session already running. A copy is rendered into a staging directory of this
+    run's own and swapped in under a lock, so two starts at once never write into each other's files,
+    and a session running from the copy never meets a half-written plugin.
     """
     shipped = load_target_config(base_dir / TARGETS_DIR_NAME, CLAUDE_TARGET)
-    local_dir = base_dir / LOCAL_DIR_NAME
-    final = local_dir / shipped.plugin_name
-    staging = local_dir / f".{shipped.plugin_name}.staging"
-    retired = local_dir / f".{shipped.plugin_name}.retired"
-    for leftover in (staging, retired):
-        remove_path(leftover)
-
-    template_vars = merge_template_vars(shipped.template_vars, {"mcp_server": {"command": launcher.command, "args": launcher.args}})
-    config = dataclasses.replace(shipped, source=f"{staging.relative_to(base_dir).as_posix()}/", template_vars=template_vars)
-    write_files(build_target(base_dir, config).files)
-
-    if final.exists() or final.is_symlink():
-        final.rename(retired)
-    staging.rename(final)
-    remove_path(retired)
+    workshop_dir = base_dir / LOCAL_DIR_NAME / workshop_key(launcher)
+    workshop_dir.mkdir(parents=True, exist_ok=True)
+    final = workshop_dir / shipped.plugin_name
+    retired = workshop_dir / f".{shipped.plugin_name}.retired"
+    staging = Path(tempfile.mkdtemp(prefix=f".{shipped.plugin_name}.staging-", dir=workshop_dir))
+    try:
+        template_vars = merge_template_vars(shipped.template_vars, {"mcp_server": {"command": launcher.command, "args": launcher.args}})
+        config = dataclasses.replace(shipped, source=f"{staging.relative_to(base_dir).as_posix()}/", template_vars=template_vars)
+        write_files(build_target(base_dir, config).files)
+        with (workshop_dir / ".lock").open("w", encoding="utf-8") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            remove_path(retired)
+            if final.exists() or final.is_symlink():
+                final.rename(retired)
+            staging.rename(final)
+            remove_path(retired)
+    finally:
+        remove_path(staging)
     return final
 
 

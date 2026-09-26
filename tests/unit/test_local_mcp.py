@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import cast
 
@@ -31,6 +32,7 @@ from scripts.local_mcp import (
     split_passthrough,
     start,
     toml_string,
+    workshop_key,
 )
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -144,7 +146,7 @@ class TestClaudeCopy:
         """The copy cannot drift from what ships: the same files, byte for byte and mode for mode, once the launcher is swapped back."""
         launcher = checkout_launcher(checkout)
         copy = render_claude_copy(repo, launcher)
-        assert copy == repo / LOCAL_DIR_NAME / "pipelex"
+        assert copy == repo / LOCAL_DIR_NAME / workshop_key(launcher) / "pipelex"
 
         shipped_config = load_target_config(repo / "targets", "prod")
         write_files(build_target(repo, shipped_config).files)
@@ -176,15 +178,34 @@ class TestClaudeCopy:
         assert launcher.rstrip().endswith(f'exec node "{checkout.resolve() / WORKSHOP_BUNDLE}"')
         assert os.access(copy / "hooks" / "launch-pipelex-mcp.sh", os.X_OK)
 
-    def test_a_second_render_replaces_the_first_and_leaves_nothing_beside_it(self, repo: Path, checkout: Path) -> None:
+    def test_a_second_render_of_a_workshop_replaces_its_copy_and_leaves_nothing_beside_it(self, repo: Path, checkout: Path) -> None:
         copy = render_claude_copy(repo, checkout_launcher(checkout))
         (copy / "stray.txt").write_text("left by hand\n", encoding="utf-8")
 
-        again = render_claude_copy(repo, _published("latest"))
+        again = render_claude_copy(repo, checkout_launcher(checkout))
         assert again == copy
         assert not (copy / "stray.txt").exists()
-        assert (copy / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8").rstrip().endswith('exec npx "-y" "@pipelex/mcp@0.20.0"')
-        assert sorted(path.name for path in (repo / LOCAL_DIR_NAME).iterdir()) == ["pipelex"]
+        assert sorted(path.name for path in copy.parent.iterdir()) == [".lock", "pipelex"]
+
+    def test_another_workshop_gets_a_copy_of_its_own_and_leaves_the_first_as_it_was(self, repo: Path, checkout: Path) -> None:
+        """A session reads its launcher again at every respawn, so a shared copy would switch the workshop under it."""
+        first = render_claude_copy(repo, checkout_launcher(checkout))
+        before = _tree(first)
+
+        second = render_claude_copy(repo, _published("latest"))
+        assert second != first
+        assert _tree(first) == before
+        assert (second / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8").rstrip().endswith('exec npx "-y" "@pipelex/mcp@0.20.0"')
+
+    def test_renders_of_one_workshop_at_once_each_swap_in_a_whole_copy(self, repo: Path, checkout: Path) -> None:
+        """Two starts at the same moment render apart and swap in turn, so neither fails and neither leaves a partial copy."""
+        launcher = checkout_launcher(checkout)
+        whole = _tree(render_claude_copy(repo, launcher))
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            copies = [future.result() for future in [pool.submit(render_claude_copy, repo, launcher) for _ in range(4)]]
+        assert set(copies) == {repo / LOCAL_DIR_NAME / workshop_key(launcher) / "pipelex"}
+        assert _tree(copies[0]) == whole
+        assert sorted(path.name for path in copies[0].parent.iterdir()) == [".lock", "pipelex"]
 
     def test_the_render_writes_nothing_outside_the_local_directory(self, repo: Path, checkout: Path) -> None:
         before = _tree(repo, skip=LOCAL_DIR_NAME)
@@ -193,7 +214,7 @@ class TestClaudeCopy:
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="no git on the PATH")
     def test_git_ignores_the_local_directory(self) -> None:
-        probe = f"{LOCAL_DIR_NAME}/pipelex/.claude-plugin/plugin.json"
+        probe = f"{LOCAL_DIR_NAME}/0123456789ab/pipelex/.claude-plugin/plugin.json"
         completed = subprocess.run(["git", "-C", str(REPO_ROOT), "check-ignore", "-q", "--no-index", probe], check=False)
         assert completed.returncode == 0, f"{LOCAL_DIR_NAME}/ must be in .gitignore, since the copy is never committed"
 
@@ -256,9 +277,11 @@ class TestStart:
         return chdirs
 
     def test_claude_starts_on_the_copy_in_the_workdir(self, repo: Path, checkout: Path, tmp_path: Path, harness_calls: list[Path]) -> None:
+        launcher = checkout_launcher(checkout)
         with pytest.raises(Launched) as launched:
-            start(Harness.CLAUDE, checkout_launcher(checkout), tmp_path, ["-p", "hello"], repo)
-        assert launched.value.argv == ["/usr/local/bin/claude", "--plugin-dir", str(repo / LOCAL_DIR_NAME / "pipelex"), "-p", "hello"]
+            start(Harness.CLAUDE, launcher, tmp_path, ["-p", "hello"], repo)
+        copy = repo / LOCAL_DIR_NAME / workshop_key(launcher) / "pipelex"
+        assert launched.value.argv == ["/usr/local/bin/claude", "--plugin-dir", str(copy), "-p", "hello"]
         assert harness_calls == [tmp_path]
 
     def test_codex_starts_with_the_overrides_and_renders_nothing(self, repo: Path, checkout: Path, tmp_path: Path, harness_calls: list[Path]) -> None:
