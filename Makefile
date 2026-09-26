@@ -241,10 +241,14 @@ MCP_VERSION ?=
 WORKDIR ?= .
 ARGS ?=
 
-LOCAL_MCP_SOURCE = $(if $(MCP_VERSION),--mcp-version "$(MCP_VERSION)",--mcp "$(MCP)")
+# A path reaches the script as it was given, as one single-quoted shell word of the variable's
+# unexpanded value: in double quotes, make would expand a `$` in it and the shell a backtick.
+local_mcp_path = '$(subst ','\'',$(value $(1)))'
+
+LOCAL_MCP_SOURCE = $(if $(MCP_VERSION),--mcp-version "$(MCP_VERSION)",--mcp $(call local_mcp_path,MCP))
 
 claude-local-mcp: install ## Start Claude Code on this checkout's skills with another workshop (MCP=path or MCP_VERSION=x.y.z)
-	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_SOURCE) --workdir "$(WORKDIR)" -- $(ARGS)
+	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_path,WORKDIR) -- $(ARGS)
 
 codex-local-mcp: install ## Start Codex with another workshop in place of the plugin's (MCP=path or MCP_VERSION=x.y.z)
-	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_SOURCE) --workdir "$(WORKDIR)" -- $(ARGS)
+	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_path,WORKDIR) -- $(ARGS)

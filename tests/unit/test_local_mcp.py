@@ -420,24 +420,26 @@ class TestMakeTargets:
         )
 
     @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
-    @pytest.mark.parametrize("home_relative", [False, True])
-    def test_the_checkout_is_built_with_none_of_the_targets_variables(self, tmp_path: Path, home_relative: bool) -> None:
+    @pytest.mark.parametrize("spelling", ["absolute", "home-relative", "shell-special"])
+    def test_the_checkout_is_built_with_none_of_the_targets_variables(self, tmp_path: Path, spelling: str) -> None:
         """make hands a target's commands its command-line variables, which would override or fill the checkout's own.
 
         This one runs for real: the checkout's build only reports what it sees, and the script then
-        refuses the checkout for having built no workshop, so nothing starts. zsh passes `MCP=~/…` with
-        its tilde as it is, so that spelling is run too.
+        refuses the checkout for having built no workshop, naming it, so nothing starts. zsh passes
+        `MCP=~/…` with its tilde as it is, and a path may hold what make or a shell would act on, so
+        both spellings are run too.
         """
-        checkout = tmp_path / "pipelex-mcp"
-        checkout.mkdir()
+        parent = tmp_path / "a $b \"q\" 's' `true` back\\slash" if spelling == "shell-special" else tmp_path
+        checkout = parent / "pipelex-mcp"
+        checkout.mkdir(parents=True)
         (checkout / "Makefile").write_text(
             'ARGS = its-own\nbuild-local:\n\t@echo "built with ARGS=[$(ARGS)] MCP=[$(MCP)] MCP_VERSION=[$(MCP_VERSION)] WORKDIR=[$(WORKDIR)]"\n',
             encoding="utf-8",
         )
-        mcp = "~/pipelex-mcp" if home_relative else str(checkout)
-        completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={tmp_path}", home=tmp_path)
+        mcp = "~/pipelex-mcp" if spelling == "home-relative" else str(checkout)
+        completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={parent}", home=tmp_path)
         assert "built with ARGS=[its-own] MCP=[] MCP_VERSION=[] WORKDIR=[]" in completed.stdout
-        assert "does not exist after `make build-local`" in completed.stderr
+        assert f"does not exist after `make build-local` in {checkout.resolve()}:" in completed.stderr
         assert completed.returncode != 0
 
     @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
@@ -449,4 +451,4 @@ class TestMakeTargets:
     def test_a_published_version_reaches_the_script_as_a_version(self) -> None:
         completed = self._make("-n", "claude-local-mcp", "MCP_VERSION=0.20.0", "MCP=/no/checkout/here", "ARGS=--model sonnet")
         assert completed.returncode == 0, completed.stderr
-        assert 'scripts/local_mcp.py claude --mcp-version "0.20.0" --workdir "." -- --model sonnet' in completed.stdout
+        assert "scripts/local_mcp.py claude --mcp-version \"0.20.0\" --workdir '.' -- --model sonnet" in completed.stdout
