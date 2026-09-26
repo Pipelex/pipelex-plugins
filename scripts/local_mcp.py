@@ -2,7 +2,7 @@
 """Start Claude Code or Codex with a Pipelex workshop the plugin does not ship, touching no tracked file.
 
 `make claude-local-mcp` and `make codex-local-mcp` run this. The workshop is a `pipelex-mcp` checkout's
-own build (`--mcp`, after the make target has run `make build-local` there), spawned as
+own build (`--mcp`, which runs the checkout's `make build-local` first), spawned as
 `node <checkout>/packages/workshop/dist/main.js`, or a published `@pipelex/mcp` (`--mcp-version`),
 spawned through `npx` at the exact version npm resolves it to.
 
@@ -56,6 +56,10 @@ WORKSHOP_BUNDLE = Path("packages/workshop/dist/main.js")
 WORKSHOP_MANIFEST = Path("packages/workshop/package.json")
 WORKSHOP_PACKAGE = "@pipelex/mcp"
 
+# The variables a make target hands its commands beside its own: make's, then this repository's
+# local-workshop targets'. None of them reaches the checkout's build.
+MAKE_HANDOFF = frozenset({"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL", "MCP", "MCP_VERSION", "WORKDIR", "ARGS"})
+
 CLAUDE_TARGET = "prod"
 CODEX_TARGET = "codex"
 KEY_VARIABLE = "PIPELEX_API_KEY"
@@ -75,8 +79,26 @@ class Launcher:
     label: str
 
 
-def checkout_launcher(checkout: Path) -> Launcher:
-    """The workshop a `pipelex-mcp` checkout or worktree has built, by absolute path.
+def build_checkout(root: Path) -> None:
+    """Build the checkout's workshop with its own `make build-local`, given none of the make target's variables.
+
+    make hands the commands of a target the variables on its command line, through `MAKEFLAGS` and
+    the environment, and a make run from here would read them there: `ARGS` or `MCP` would then
+    override or fill the checkout's own Makefile.
+    """
+    make = shutil.which("make")
+    if make is None:
+        msg = "make is not on the PATH, and a checkout's workshop is built with its `make build-local`."
+        raise SystemExit(msg)
+    environment = {name: value for name, value in os.environ.items() if name not in MAKE_HANDOFF}
+    completed = subprocess.run([make, "--no-print-directory", "-C", str(root), "build-local"], env=environment, check=False)
+    if completed.returncode != 0:
+        msg = f"`make build-local` failed in {root}, so no workshop was started."
+        raise SystemExit(msg)
+
+
+def checkout_launcher(checkout: Path, build: Callable[[Path], None] = build_checkout) -> Launcher:
+    """The workshop of a `pipelex-mcp` checkout or worktree, built now and spawned by absolute path.
 
     Absolute, because the harness spawns the workshop from the session's working directory, which is
     neither this repository nor the checkout.
@@ -85,9 +107,10 @@ def checkout_launcher(checkout: Path) -> Launcher:
     if not root.is_dir():
         msg = f"There is no pipelex-mcp checkout at {root}: pass MCP=<path to a checkout or worktree of pipelex-mcp>."
         raise SystemExit(msg)
+    build(root)
     bundle = root / WORKSHOP_BUNDLE
     if not bundle.is_file():
-        msg = f"{bundle} does not exist: build it with `make build-local` in {root}."
+        msg = f"{bundle} does not exist after `make build-local` in {root}: MCP must name a pipelex-mcp checkout that builds the workshop package."
         raise SystemExit(msg)
     return Launcher(command="node", args=[str(bundle)], label=f"the build in {root} ({WORKSHOP_PACKAGE} {_manifest_version(root)})")
 
@@ -286,7 +309,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("harness", choices=[harness.value for harness in Harness], help="The agent to start.")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--mcp", type=Path, help="A pipelex-mcp checkout or worktree whose `make build-local` has run (the Makefile's MCP).")
+    source.add_argument("--mcp", type=Path, help="A pipelex-mcp checkout or worktree, built with its `make build-local` first (the Makefile's MCP).")
     source.add_argument("--mcp-version", help=f"A published {WORKSHOP_PACKAGE} version or dist-tag (the Makefile's MCP_VERSION).")
     parser.add_argument("--workdir", type=Path, default=Path(), help="Where the session starts, and so where the workshop resolves a { path } file.")
     return parser.parse_args(argv)

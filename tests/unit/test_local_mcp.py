@@ -18,9 +18,11 @@ from scripts import local_mcp
 from scripts.gen_skill_docs import build_target, load_target_config, write_files
 from scripts.local_mcp import (
     LOCAL_DIR_NAME,
+    MAKE_HANDOFF,
     WORKSHOP_BUNDLE,
     Harness,
     Launcher,
+    build_checkout,
     checkout_launcher,
     codex_env_vars,
     codex_overrides,
@@ -61,6 +63,11 @@ def checkout(tmp_path: Path) -> Path:
     return root
 
 
+def _built(checkout: Path) -> Launcher:
+    """The checkout's launcher, its `make build-local` taken as run: the fixture's bundle is already there."""
+    return checkout_launcher(checkout, build=lambda _root: None)
+
+
 def _published(spec: str) -> Launcher:
     return published_launcher(spec, resolve=lambda _spec: "0.20.0")
 
@@ -98,19 +105,53 @@ class TestLauncher:
     def test_a_checkout_runs_its_build_by_absolute_path(self, checkout: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """The harness spawns the workshop from the session's directory, so a relative path would name another file."""
         monkeypatch.chdir(checkout.parent)
-        launcher = checkout_launcher(Path("pipelex-mcp"))
+        launcher = _built(Path("pipelex-mcp"))
         assert launcher.command == "node"
         assert launcher.args == [str(checkout.resolve() / WORKSHOP_BUNDLE)]
         assert "@pipelex/mcp 1.2.3" in launcher.label
 
-    def test_a_checkout_without_its_build_is_refused_with_the_build_to_run(self, checkout: Path) -> None:
+    def test_a_checkout_whose_build_writes_no_workshop_is_refused(self, checkout: Path) -> None:
         (checkout / WORKSHOP_BUNDLE).unlink()
-        with pytest.raises(SystemExit, match="make build-local"):
-            checkout_launcher(checkout)
+        with pytest.raises(SystemExit, match="does not exist after `make build-local`"):
+            _built(checkout)
 
-    def test_a_missing_checkout_names_the_variable_to_set(self, tmp_path: Path) -> None:
+    def test_the_checkout_is_built_before_its_workshop_is_looked_for(self, checkout: Path) -> None:
+        (checkout / WORKSHOP_BUNDLE).unlink()
+        built: list[Path] = []
+
+        def build(root: Path) -> None:
+            built.append(root)
+            (root / WORKSHOP_BUNDLE).write_text("// built now\n", encoding="utf-8")
+
+        launcher = checkout_launcher(checkout, build=build)
+        assert built == [checkout.resolve()]
+        assert launcher.args == [str(checkout.resolve() / WORKSHOP_BUNDLE)]
+
+    def test_a_missing_checkout_names_the_variable_to_set_and_builds_nothing(self, tmp_path: Path) -> None:
+        built: list[Path] = []
         with pytest.raises(SystemExit, match="MCP="):
-            checkout_launcher(tmp_path / "nowhere")
+            checkout_launcher(tmp_path / "nowhere", build=built.append)
+        assert built == []
+
+    def test_the_build_is_given_none_of_the_make_targets_variables(
+        self, checkout: Path, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """make hands a target's commands its command-line variables, which would override or fill the checkout's Makefile."""
+        for name in MAKE_HANDOFF:
+            monkeypatch.setenv(name, "from the make target")
+        mocker.patch.object(local_mcp.shutil, "which", return_value="/usr/bin/make")
+        run = mocker.patch.object(local_mcp.subprocess, "run", return_value=subprocess.CompletedProcess(args=[], returncode=0))
+        build_checkout(checkout)
+        assert run.call_args.args[0] == ["/usr/bin/make", "--no-print-directory", "-C", str(checkout), "build-local"]
+        environment = run.call_args.kwargs["env"]
+        assert not MAKE_HANDOFF & environment.keys()
+        assert environment["PATH"] == os.environ["PATH"]
+
+    def test_a_failed_build_starts_nothing(self, checkout: Path, mocker: MockerFixture) -> None:
+        mocker.patch.object(local_mcp.shutil, "which", return_value="/usr/bin/make")
+        mocker.patch.object(local_mcp.subprocess, "run", return_value=subprocess.CompletedProcess(args=[], returncode=2))
+        with pytest.raises(SystemExit, match="`make build-local` failed"):
+            build_checkout(checkout)
 
     def test_a_published_version_is_pinned_to_the_one_npm_resolves(self) -> None:
         launcher = _published("latest")
@@ -144,7 +185,7 @@ class TestLauncher:
 class TestClaudeCopy:
     def test_the_copy_is_the_shipped_target_but_for_the_workshop(self, repo: Path, checkout: Path) -> None:
         """The copy cannot drift from what ships: the same files, byte for byte and mode for mode, once the launcher is swapped back."""
-        launcher = checkout_launcher(checkout)
+        launcher = _built(checkout)
         copy = render_claude_copy(repo, launcher)
         assert copy == repo / LOCAL_DIR_NAME / workshop_key(launcher) / "pipelex"
 
@@ -171,7 +212,7 @@ class TestClaudeCopy:
         assert Path("hooks/launch-pipelex-mcp.sh") in swapped
 
     def test_the_launcher_keeps_the_credential_promotion(self, repo: Path, checkout: Path) -> None:
-        copy = render_claude_copy(repo, checkout_launcher(checkout))
+        copy = render_claude_copy(repo, _built(checkout))
         launcher = (copy / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8")
         for key in ("API_KEY", "BASE_URL"):
             assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
@@ -179,17 +220,17 @@ class TestClaudeCopy:
         assert os.access(copy / "hooks" / "launch-pipelex-mcp.sh", os.X_OK)
 
     def test_a_second_render_of_a_workshop_replaces_its_copy_and_leaves_nothing_beside_it(self, repo: Path, checkout: Path) -> None:
-        copy = render_claude_copy(repo, checkout_launcher(checkout))
+        copy = render_claude_copy(repo, _built(checkout))
         (copy / "stray.txt").write_text("left by hand\n", encoding="utf-8")
 
-        again = render_claude_copy(repo, checkout_launcher(checkout))
+        again = render_claude_copy(repo, _built(checkout))
         assert again == copy
         assert not (copy / "stray.txt").exists()
         assert sorted(path.name for path in copy.parent.iterdir()) == [".lock", "pipelex"]
 
     def test_another_workshop_gets_a_copy_of_its_own_and_leaves_the_first_as_it_was(self, repo: Path, checkout: Path) -> None:
         """A session reads its launcher again at every respawn, so a shared copy would switch the workshop under it."""
-        first = render_claude_copy(repo, checkout_launcher(checkout))
+        first = render_claude_copy(repo, _built(checkout))
         before = _tree(first)
 
         second = render_claude_copy(repo, _published("latest"))
@@ -199,7 +240,7 @@ class TestClaudeCopy:
 
     def test_renders_of_one_workshop_at_once_each_swap_in_a_whole_copy(self, repo: Path, checkout: Path) -> None:
         """Two starts at the same moment render apart and swap in turn, so neither fails and neither leaves a partial copy."""
-        launcher = checkout_launcher(checkout)
+        launcher = _built(checkout)
         whole = _tree(render_claude_copy(repo, launcher))
         with ThreadPoolExecutor(max_workers=4) as pool:
             copies = [future.result() for future in [pool.submit(render_claude_copy, repo, launcher) for _ in range(4)]]
@@ -209,7 +250,7 @@ class TestClaudeCopy:
 
     def test_the_render_writes_nothing_outside_the_local_directory(self, repo: Path, checkout: Path) -> None:
         before = _tree(repo, skip=LOCAL_DIR_NAME)
-        render_claude_copy(repo, checkout_launcher(checkout))
+        render_claude_copy(repo, _built(checkout))
         assert _tree(repo, skip=LOCAL_DIR_NAME) == before
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="no git on the PATH")
@@ -222,7 +263,7 @@ class TestClaudeCopy:
 class TestCodexOverrides:
     def test_the_overrides_replace_the_entry_and_forward_the_key_names(self, checkout: Path) -> None:
         """A configuration-tier entry replaces the plugin's whole, so the names it forwards must be given again."""
-        launcher = checkout_launcher(checkout)
+        launcher = _built(checkout)
         overrides = codex_overrides(launcher, ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"])
         assert overrides[0::2] == ["-c", "-c", "-c"]
         parsed = {key: tomllib.loads(f"v = {value}")["v"] for key, value in (item.split("=", 1) for item in overrides[1::2])}
@@ -277,7 +318,7 @@ class TestStart:
         return chdirs
 
     def test_claude_starts_on_the_copy_in_the_workdir(self, repo: Path, checkout: Path, tmp_path: Path, harness_calls: list[Path]) -> None:
-        launcher = checkout_launcher(checkout)
+        launcher = _built(checkout)
         with pytest.raises(Launched) as launched:
             start(Harness.CLAUDE, launcher, tmp_path, ["-p", "hello"], repo)
         copy = repo / LOCAL_DIR_NAME / workshop_key(launcher) / "pipelex"
@@ -285,7 +326,7 @@ class TestStart:
         assert harness_calls == [tmp_path]
 
     def test_codex_starts_with_the_overrides_and_renders_nothing(self, repo: Path, checkout: Path, tmp_path: Path, harness_calls: list[Path]) -> None:
-        launcher = checkout_launcher(checkout)
+        launcher = _built(checkout)
         with pytest.raises(Launched) as launched:
             start(Harness.CODEX, launcher, tmp_path, ["exec", "hello"], repo)
         assert launched.value.argv == ["/usr/local/bin/codex", *codex_overrides(launcher, codex_env_vars(repo)), "exec", "hello"]
@@ -335,35 +376,45 @@ class TestCommandLine:
 
 @pytest.mark.skipif(shutil.which("make") is None, reason="no make on the PATH")
 class TestMakeTargets:
-    def _make(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+    def _make(self, *arguments: str, home: Path | None = None) -> subprocess.CompletedProcess[str]:
         """This repository's make, told its venv is installed: `install` would update uv over the network."""
+        environment = {**os.environ, "HOME": str(home)} if home is not None else None
         return subprocess.run(
             ["make", "--no-print-directory", "-C", str(REPO_ROOT), "-o", "install", *arguments],
             capture_output=True,
             text=True,
             check=False,
+            env=environment,
         )
 
     @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
-    def test_the_checkout_is_built_with_none_of_the_targets_variables(self, tmp_path: Path) -> None:
-        """make hands a sub-make its command-line variables, through MAKEFLAGS and the environment, which would override or fill the checkout's own.
+    @pytest.mark.parametrize("home_relative", [False, True])
+    def test_the_checkout_is_built_with_none_of_the_targets_variables(self, tmp_path: Path, home_relative: bool) -> None:
+        """make hands a target's commands its command-line variables, which would override or fill the checkout's own.
 
-        This one runs for real, since `make -n` prints the build line without running it: the checkout's
-        build only reports what it sees, and the script then refuses the checkout for having built no
-        workshop, so nothing starts.
+        This one runs for real: the checkout's build only reports what it sees, and the script then
+        refuses the checkout for having built no workshop, so nothing starts. zsh passes `MCP=~/…` with
+        its tilde as it is, so that spelling is run too.
         """
-        (tmp_path / "Makefile").write_text(
+        checkout = tmp_path / "pipelex-mcp"
+        checkout.mkdir()
+        (checkout / "Makefile").write_text(
             'ARGS = its-own\nbuild-local:\n\t@echo "built with ARGS=[$(ARGS)] MCP=[$(MCP)] MCP_VERSION=[$(MCP_VERSION)] WORKDIR=[$(WORKDIR)]"\n',
             encoding="utf-8",
         )
-        completed = self._make("claude-local-mcp", f"MCP={tmp_path}", "ARGS=--model sonnet", f"WORKDIR={tmp_path}")
+        mcp = "~/pipelex-mcp" if home_relative else str(checkout)
+        completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={tmp_path}", home=tmp_path)
         assert "built with ARGS=[its-own] MCP=[] MCP_VERSION=[] WORKDIR=[]" in completed.stdout
-        assert "build it with `make build-local`" in completed.stderr
+        assert "does not exist after `make build-local`" in completed.stderr
         assert completed.returncode != 0
-        assert not (REPO_ROOT / LOCAL_DIR_NAME / ".pipelex.staging").exists()
 
-    def test_a_published_version_builds_nothing(self) -> None:
+    @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
+    def test_a_missing_checkout_is_refused_with_the_variable_to_set(self, tmp_path: Path) -> None:
+        completed = self._make("claude-local-mcp", f"MCP={tmp_path / 'nowhere'}")
+        assert "pass MCP=" in completed.stderr
+        assert completed.returncode != 0
+
+    def test_a_published_version_reaches_the_script_as_a_version(self) -> None:
         completed = self._make("-n", "claude-local-mcp", "MCP_VERSION=0.20.0", "MCP=/no/checkout/here", "ARGS=--model sonnet")
         assert completed.returncode == 0, completed.stderr
-        assert "build-local" not in completed.stdout
         assert 'scripts/local_mcp.py claude --mcp-version "0.20.0" --workdir "." -- --model sonnet' in completed.stdout

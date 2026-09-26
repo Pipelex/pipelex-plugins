@@ -230,12 +230,12 @@ codex-status: ## Show which source is currently registered for the Codex pipelex
 ### LOCAL WORKSHOP (start an agent on a pipelex-mcp the plugin does not ship)
 ##########################################################################################
 
-# MCP is a pipelex-mcp checkout or worktree, whose workshop is built with its own
-# `make build-local` first; MCP_VERSION, a published @pipelex/mcp version or dist-tag,
-# replaces it and builds nothing. WORKDIR is where the session starts, which is where
-# the workshop resolves a { path } file. ARGS goes to claude or codex as it is.
-# Neither target writes a tracked file: see "A local build of pipelex-mcp" in
-# docs/development.md.
+# MCP is a pipelex-mcp checkout or worktree, whose workshop scripts/local_mcp.py builds
+# with the checkout's own `make build-local` first; MCP_VERSION, a published @pipelex/mcp
+# version or dist-tag, replaces it and builds nothing. WORKDIR is where the session
+# starts, which is where the workshop resolves a { path } file. ARGS goes to claude or
+# codex as it is. Neither target writes a tracked file: see "A local build of
+# pipelex-mcp" in docs/development.md.
 MCP ?= ../pipelex-mcp
 MCP_VERSION ?=
 WORKDIR ?= .
@@ -243,15 +243,8 @@ ARGS ?=
 
 LOCAL_MCP_SOURCE = $(if $(MCP_VERSION),--mcp-version "$(MCP_VERSION)",--mcp "$(MCP)")
 
-# The checkout's build runs with none of these variables: make hands a sub-make the ones
-# given on its command line through MAKEFLAGS and the environment, where they would
-# override or fill that Makefile's own.
-LOCAL_MCP_BUILD = $(if $(MCP_VERSION),:,unset MCP MCP_VERSION WORKDIR ARGS; MAKEFLAGS= $(MAKE) --no-print-directory -C "$(MCP)" build-local)
-
 claude-local-mcp: install ## Start Claude Code on this checkout's skills with another workshop (MCP=path or MCP_VERSION=x.y.z)
-	@$(LOCAL_MCP_BUILD)
 	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_SOURCE) --workdir "$(WORKDIR)" -- $(ARGS)
 
 codex-local-mcp: install ## Start Codex with another workshop in place of the plugin's (MCP=path or MCP_VERSION=x.y.z)
-	@$(LOCAL_MCP_BUILD)
 	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_SOURCE) --workdir "$(WORKDIR)" -- $(ARGS)
