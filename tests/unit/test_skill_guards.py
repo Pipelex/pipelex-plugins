@@ -205,6 +205,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "keep polling on its hint, and never call the run stuck or failed from it.",
         "**When an address and another target are both in hand, ask which one is meant; never pick one yourself**",
         "**carry its `pipe_ref` through every call**",
+        "choosing by name and description and asking when several fit",
         "Not current is not run-ready",
         "Do not prepare inputs here.",
         "Never run a method that did not pass.",

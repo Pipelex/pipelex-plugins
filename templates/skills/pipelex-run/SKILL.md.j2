@@ -15,7 +15,7 @@ description: Run an MTHDS method on the hosted Pipelex API, and follow a run tha
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle through two entries: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which stays good long after the session that started it; a dry run is Start a run's step 3, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle through two entries: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which outlives the session that started it; a dry run is Start a run's step 3, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
 
 ## Requirements
 
@@ -29,7 +29,7 @@ This skill owns the run lifecycle through two entries: [Start a run](#start-a-ru
 
 ### 1. The target and the pipe
 
-The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description, then carrying the returned id; without that tool, ask for it. Every call in this skill takes the form settled here, and **an address pairs with nothing**, being a complete run source: `files` or a `method_id` beside it is refused before anything runs. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
+The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. Every call in this skill takes the form settled here, and **an address pairs with nothing**, being a complete run source: `files` or a `method_id` beside it is refused before anything runs. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
 
 The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, the code qualified by its own file's domain.
 
@@ -72,7 +72,7 @@ Call `mthds_run` with the same target — the whole-bundle `files` submission, `
 
 When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside the `files`: the files are what run, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
-The tool returns a durable `run_id` immediately and never blocks. **Report that id the moment it returns, before anything else.** **For an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
+The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 
 ### 6. Follow it to terminal
 
@@ -96,7 +96,7 @@ Give `failure_message` **verbatim** first, then read [failed-run.md](references/
 
 A run id alone, with no method and no inputs: nothing is validated or prepared.
 
-- **"how is run X going"** → `mthds_run_status`. Report the state and, while it runs, the retry hint, never a guess at how long it will take. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
+- **"how is run X going"** → `mthds_run_status`. Report the state and, while it runs, the retry hint, never a guessed duration. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
 - **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says; it works days after the run. Saving a run twice adds copies.
 
