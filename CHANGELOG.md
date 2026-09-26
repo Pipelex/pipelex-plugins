@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`make claude-local-mcp` and `make codex-local-mcp`**: one command starts Claude Code or Codex with the Pipelex tools of a local `pipelex-mcp` checkout, `MCP=<path>`, which it builds first, or of a published version, `MCP_VERSION=<version>`, and changes no file git tracks. Claude Code runs this checkout's skills from a copy rendered into the ignored `.local-mcp/` directory, loaded for that session in place of the installed plugin; Codex keeps its installed skills and has its `pipelex` server entry overridden. Both take the key from `PIPELEX_API_KEY` in the shell and warn when it is unset. The repository's `/pipelex-mcp-source` skill no longer edits `targets/defaults.toml` to switch workshops: it reports which version each deployment serves and names the target to run.
+
 ### Changed
 
 - **`pipelex-explain` points at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and `pipelex-explain` now gives that page's path before its text flow, so the whole method can be opened in a browser. The skill still writes nothing of its own, and the page is the one file an explanation of a bundle on disk leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
+
+### Fixed
+
+- **The install page's Codex override keeps the key**: an entry of the same name in `~/.codex/config.toml`, or a `-c` override, replaces the plugin's entry whole, including the variable names it forwards, so the one-invocation `-c` form the page gave started the Pipelex tools without `PIPELEX_API_KEY`. The page now says an override passes the key only through its own `env` table or `env_vars`, and gives the `-c` form with `env_vars`.
 
 ## [0.9.2] - 2026-09-25
 

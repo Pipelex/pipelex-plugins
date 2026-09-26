@@ -18,4 +18,4 @@ if [[ -n "${PIPELEX_PLUGIN_{{ key | upper }}:-}" ]]; then
   export PIPELEX_{{ key | upper }}="$PIPELEX_PLUGIN_{{ key | upper }}"
 fi
 {% endfor %}
-exec {{ mcp_server.command }}{% for arg in mcp_server.args %} "{{ arg }}"{% endfor %}
+exec {{ mcp_server.command }}{% for arg in mcp_server.args %} {{ arg | shell_double_quoted }}{% endfor %}
