@@ -2209,10 +2209,12 @@ class TestPipelexExplainSkill:
 
     def test_the_skill_writes_nothing_and_says_so(self) -> None:
         """Box F, amended at ratification: the first draft wrote a `README.md` on
-        request."""
+        request. Amended 2026-09-26: the workshop's method graph page is the one
+        file an explanation of a bundle on disk leaves, and the skill says so."""
         body = self.body()
-        assert "strictly read-only" in body.lower()
-        assert "writes no file" in body
+        assert "writes nothing of its own" in body
+        assert "the one file it leaves is the workshop's method graph page" in body
+        assert "graph_page: false" not in body
 
     def test_the_description_no_longer_offers_to_document(self) -> None:
         """Box F: "document this pipeline" leaves the description, because it is
