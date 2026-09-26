@@ -210,6 +210,18 @@ class TestPipelexRunSkill:
         assert size <= SKILL_CEILING_CHARS, f"{target_name}: pipelex-run renders {size} characters, over the {SKILL_CEILING_CHARS} ceiling"
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_dry_run_gives_the_graph_page_before_the_numbered_flow(self, target_name: str) -> None:
+        """A dry run is step 3 shown, and on a bundle validated by path that call writes the method's
+        flowchart beside it, so the dry run gives the page's path and then the numbered flow. The skill used
+        to say the graph never reaches the model, which stopped being the whole truth once the page reached
+        the user (L-260926-14cb83). A real run says nothing of the page: its reply is the run."""
+        body = self.render(target_name)
+        dry_run = self.the_line(body, "**A dry run is this step, shown.**")
+        assert dry_run.index("give the page's `path` before the text flow") < dry_run.index("Show the flow as numbered text")
+        assert "never reaches you" not in body
+        assert body.count("graph_page") == 2, "the page is named in the dry run alone"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_platform_renders_the_skill(self, target_name: str) -> None:
         body = self.render(target_name)
         assert "# Run an MTHDS method" in body

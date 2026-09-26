@@ -957,6 +957,7 @@ class TestSharedSkillIncludes:
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
         "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
         "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
+        "give the page's `path` before the text flow": "skills/shared/graph-page.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -985,6 +986,19 @@ class TestSharedSkillIncludes:
         assert design.count(include) == 2, "design warns in the contract line and again at delivery"
         assert include in explain
         assert include in run
+
+    def test_the_graph_page_is_given_where_a_skill_presents_the_flow_and_nowhere_else(self) -> None:
+        """`mthds_validate` writes `method-graph.html` beside `{ path }` files, whichever skill
+        called it. Explain, design's delivery and run's dry run present a method's flow, so each
+        gives the page's path before its text flow (L-260926-d89a39, then L-260926-14cb83); every
+        other skill that validates by path leaves the page without a word, as `docs/decisions.md`
+        records. A skill that starts naming the page, or stops, changes that ruling, so the roster
+        is pinned here."""
+        include = "skills/shared/graph-page.md.j2"
+        carriers = sorted(
+            path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in path.read_text(encoding="utf-8")
+        )
+        assert carriers == ["pipelex-design", "pipelex-explain", "pipelex-run"]
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_language_reference_carries_the_same_warning(self, target_name: str) -> None:

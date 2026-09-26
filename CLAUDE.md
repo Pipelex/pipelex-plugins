@@ -55,7 +55,8 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │       ├── saved-copy-notice.md.j2    # The linked saved method does not have this change; `/pipelex-catalog` compares the two and updates it (include-only)
 │       ├── catalog-id-pointer.md.j2   # The pointer design, edit and organize place at a catalog id, with the bridge's two guards (include-only)
 │       ├── catalog-id-bridge.md.j2    # How a file-based skill reaches a catalog id: the linked directory, or the pull (include-only; included by shared/catalog-id.md alone)
-│       └── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
+│       ├── pipefunc-warning.md.j2     # PipeFunc is experimental on the hosted plane (include-only)
+│       └── graph-page.md.j2           # The method graph page's path, before the text flow: explain, design's delivery and run's dry run (include-only)
 ├── hooks/
 │   ├── hooks.json.j2                # Claude PostToolUse hook config
 │   ├── codex-hooks.json.j2          # Codex PostToolUse hook config (plugin-bundled)

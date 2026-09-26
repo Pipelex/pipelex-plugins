@@ -50,6 +50,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Never redesign on a broken baseline**",
         "**Retain the original contents until the final verdict is restored.**",
         "restore the retained baseline contents and report the failure",
+        "give the page's `path` before the text flow",
     ),
     "pipelex-explain": (
         "Accept it, and say so in one line.",
@@ -195,6 +196,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-run": (
         "**A dry run is this step, shown.**",
+        "give the page's `path` before the text flow",
         "**A dry-run request goes to step 3 first.**",
         "Then end the turn there, even when the same request asked for the real run too",
         "a paid run never starts on a dry-run request whose flow the user has not been shown",
@@ -203,6 +205,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "keep polling on its hint, and never call the run stuck or failed from it.",
         "**When an address and another target are both in hand, ask which one is meant; never pick one yourself**",
         "**carry its `pipe_ref` through every call**",
+        "choosing by name and description and asking when several fit",
         "Not current is not run-ready",
         "Do not prepare inputs here.",
         "Never run a method that did not pass.",
