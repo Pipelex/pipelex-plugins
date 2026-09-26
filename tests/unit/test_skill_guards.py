@@ -63,6 +63,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Do not pass it, not even to a temporary directory.",
         "**pending only when no concrete pipe of the same code exists anywhere in the files you read.**",
         "**When the workshop answered, its `pending_signatures` is the authority**",
+        "**Pass `graph_page: false`** wherever the tool lists that argument",
         "explain from the source and **say the verdict was not checked**",
         "do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer",
         "**On a target that is not on disk there is no such fallback.**",
@@ -161,6 +162,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-catalog": (
         "Never report a method id, a name, or a method as saved when the answer did not come from these tools.",
         "Never call it on the way to a save",
+        "Ask it with `graph_page: false` wherever the tool lists that argument",
         "**This skill writes no file itself.**",
         "Never hand-write or hand-edit a link file.",
         "**A save is never proposed as a side effect of other work**",

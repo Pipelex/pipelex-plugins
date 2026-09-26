@@ -45,7 +45,7 @@ A `PipeSignature` is **pending only when no concrete pipe of the same code exist
 
 ### 3. The verdict, when the workshop is there
 
-One `mthds_validate` call over the same files. {% include "skills/shared/validate-call.md.j2" %} The call adds two things and nothing else: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
+One `mthds_validate` call over the same files. {% include "skills/shared/validate-call.md.j2" %} **Pass `graph_page: false`** wherever the tool lists that argument: on `{path}` files the workshop otherwise writes the method's flowchart, `method-graph.html`, beside them, and this skill writes nothing. The call adds two things and nothing else: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
 
 Without the tool, explain from the source and **say the verdict was not checked**. Your own reading of the source is not a guess: the pipe types, the concepts and step 2's backlog are yours to state, saying whose reading it is. But do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer, and do not guess at validity. **On a target that is not on disk there is no such fallback.**
 
