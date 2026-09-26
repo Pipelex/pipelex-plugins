@@ -308,12 +308,13 @@ class TestCodexOverrides:
 
 
 class Launched(Exception):
-    """What the patched `os.execv` raises in place of replacing the test process."""
+    """What the patched `os.execve` raises in place of replacing the test process."""
 
-    def __init__(self, program: str, argv: list[str]) -> None:
+    def __init__(self, program: str, argv: list[str], environment: dict[str, str]) -> None:
         super().__init__(program)
         self.program = program
         self.argv = argv
+        self.environment = environment
 
 
 class TestStart:
@@ -326,10 +327,10 @@ class TestStart:
 
         mocker.patch.object(local_mcp.shutil, "which", side_effect=which)
 
-        def execv(program: str, argv: list[str]) -> None:
-            raise Launched(program, argv)
+        def execve(program: str, argv: list[str], environment: dict[str, str]) -> None:
+            raise Launched(program, argv, environment)
 
-        mocker.patch.object(local_mcp.os, "execv", side_effect=execv)
+        mocker.patch.object(local_mcp.os, "execve", side_effect=execve)
         chdirs: list[Path] = []
         mocker.patch.object(local_mcp.os, "chdir", side_effect=chdirs.append)
         return chdirs
@@ -367,6 +368,20 @@ class TestStart:
         with pytest.raises(Launched):
             start(Harness.CODEX, _published("latest"), tmp_path, [], repo)
         assert ("PIPELEX_API_KEY is not set" in capsys.readouterr().out) is warned
+
+    @pytest.mark.parametrize("harness", list(Harness))
+    def test_the_harness_gets_the_shell_environment_without_the_make_targets_variables(
+        self, repo: Path, tmp_path: Path, harness_calls: list[Path], monkeypatch: pytest.MonkeyPatch, harness: Harness
+    ) -> None:
+        """Left in, `MAKEFLAGS` and the target's variables would override the variables of every make the agent runs."""
+        for name in MAKE_HANDOFF:
+            monkeypatch.setenv(name, "from the make target")
+        monkeypatch.setenv("PIPELEX_API_KEY", "plx_sk_test")
+        with pytest.raises(Launched) as launched:
+            start(harness, _published("latest"), tmp_path, [], repo)
+        assert not MAKE_HANDOFF & launched.value.environment.keys()
+        assert launched.value.environment["PIPELEX_API_KEY"] == "plx_sk_test"
+        assert launched.value.environment["PATH"] == os.environ["PATH"]
 
     def test_a_harness_not_on_the_path_stops_before_anything_is_rendered(self, repo: Path, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch.object(local_mcp.shutil, "which", return_value=None)

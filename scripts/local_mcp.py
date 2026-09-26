@@ -57,7 +57,7 @@ WORKSHOP_MANIFEST = Path("packages/workshop/package.json")
 WORKSHOP_PACKAGE = "@pipelex/mcp"
 
 # The variables a make target hands its commands beside its own: make's, then this repository's
-# local-workshop targets'. None of them reaches the checkout's build.
+# local-workshop targets'. None of them reaches the checkout's build or the harness.
 MAKE_HANDOFF = frozenset({"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL", "MCP", "MCP_VERSION", "WORKDIR", "ARGS"})
 
 CLAUDE_TARGET = "prod"
@@ -79,19 +79,24 @@ class Launcher:
     label: str
 
 
-def build_checkout(root: Path) -> None:
-    """Build the checkout's workshop with its own `make build-local`, given none of the make target's variables.
+def without_make_handoff() -> dict[str, str]:
+    """This process's environment without what the make target that ran it handed over.
 
     make hands the commands of a target the variables on its command line, through `MAKEFLAGS` and
-    the environment, and a make run from here would read them there: `ARGS` or `MCP` would then
-    override or fill the checkout's own Makefile.
+    the environment, and every make started below reads them there as its own command line: `ARGS`
+    or `MCP` would override or fill the checkout's Makefile, and in the harness's session they
+    would reach every make the agent runs, a project's own or a nested `make claude-local-mcp`.
     """
+    return {name: value for name, value in os.environ.items() if name not in MAKE_HANDOFF}
+
+
+def build_checkout(root: Path) -> None:
+    """Build the checkout's workshop with its own `make build-local`, given none of the make target's variables."""
     make = shutil.which("make")
     if make is None:
         msg = "make is not on the PATH, and a checkout's workshop is built with its `make build-local`."
         raise SystemExit(msg)
-    environment = {name: value for name, value in os.environ.items() if name not in MAKE_HANDOFF}
-    completed = subprocess.run([make, "--no-print-directory", "-C", str(root), "build-local"], env=environment, check=False)
+    completed = subprocess.run([make, "--no-print-directory", "-C", str(root), "build-local"], env=without_make_handoff(), check=False)
     if completed.returncode != 0:
         msg = f"`make build-local` failed in {root}, so no workshop was started."
         raise SystemExit(msg)
@@ -270,7 +275,11 @@ def toml_array(values: list[str]) -> str:
 
 
 def start(harness: Harness, launcher: Launcher, workdir: Path, passthrough: list[str], base_dir: Path) -> NoReturn:
-    """Prepare `harness` to spawn `launcher` as its Pipelex workshop, say what runs, and replace this process with it."""
+    """Prepare `harness` to spawn `launcher` as its Pipelex workshop, say what runs, and replace this process with it.
+
+    The harness gets this process's environment, the shell's key among it, without the make target's
+    variables, which would otherwise reach every make the agent runs in the session.
+    """
     program = shutil.which(harness.value)
     if program is None:
         msg = f"`{harness.value}` is not on the PATH."
@@ -294,7 +303,7 @@ def start(harness: Harness, launcher: Launcher, workdir: Path, passthrough: list
     print("\n".join(lines), flush=True)
 
     os.chdir(workdir)
-    os.execv(program, command)
+    os.execve(program, command, without_make_handoff())
 
 
 def split_passthrough(argv: list[str]) -> tuple[list[str], list[str]]:
