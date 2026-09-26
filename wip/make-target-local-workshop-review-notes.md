@@ -1,6 +1,6 @@
 # Local-workshop make targets: deferred review findings
 
-Findings the `/rev` passes on `feature/Make-target-local-workshop` (item L-260926-2b15c9) deferred rather than fixed. They were raised in round 3, whose bar (`necessity`) fixes only a defect the previous pass introduced or one too severe to ship with, and none of them is either. **None of them was verified**: each rests on its reviewer's word, read against the code but not reproduced.
+Findings the `/rev` passes on `feature/Make-target-local-workshop` (item L-260926-2b15c9) deferred rather than fixed. The first four were raised in round 3, whose bar (`necessity`) fixes only a defect the previous pass introduced or one too severe to ship with, and none of them is either; Codex raised all four again in round 4. The last was raised in round 4, whose bar (`freeze`) fixes only a critical. **None of them was verified**: each rests on its reviewer's word, read against the code but not reproduced.
 
 ## The local copy's credential guidance points at the plugin configuration
 
@@ -26,3 +26,10 @@ Findings the `/rev` passes on `feature/Make-target-local-workshop` (item L-26092
 - **Reporter:** cubic (P3), `scripts/local_mcp.py`, `start`.
 - **Claim:** `shutil.which` returns a relative path when the matching `PATH` entry is relative, such as `.` or `node_modules/.bin`, and `start` then changes to `WORKDIR` before `os.execve`, so the path resolves against the wrong directory.
 - **Why deferred:** it needs a relative `PATH` entry ahead of the harness's real location. Making `program` absolute before the `chdir` fixes it.
+
+## The headless Codex recipe needs a git repository
+
+- **Reporter:** cubic (P3), `.claude/skills/pipelex-mcp-source/SKILL.md` and `docs/development.md`, the headless form.
+- **Claim:** both recommend `make codex-local-mcp MCP=<path> WORKDIR=<scratch project> ARGS='exec "…"'`, and `codex exec` refuses to run outside a git repository or a directory Codex already trusts unless it is given `--skip-git-repo-check`, so the recipe stops before the workshop starts in a fresh scratch directory.
+- **Why deferred:** it is documentation, and a scratch project that is a git repository, or one Codex already trusts, runs as written.
+- **When picked up:** add `--skip-git-repo-check` to the `exec` example in both places, or say the scratch project must be a git repository.
