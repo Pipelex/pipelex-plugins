@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- **`pipelex-explain` leaves no method graph page behind**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, which would have left a file in the bundle every time `pipelex-explain`, a skill that writes nothing, checked a method on disk. The skill now asks the tools not to write the page, and so does `pipelex-catalog` when it checks whether a bundle would save, since that check is a question and writes no file either.
+- **`pipelex-explain` points at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and `pipelex-explain` now gives that page's path before its text flow, so the whole method can be opened in a browser. The skill still writes nothing of its own, and the page is the one file an explanation of a bundle on disk leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
 
 ## [0.9.2] - 2026-09-25
 

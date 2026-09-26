@@ -1,6 +1,6 @@
 ---
 name: pipelex-explain
-description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose stored source it reads — or a published method's address, explained at the level of its contract. Strictly read-only — it explains in the conversation and writes nothing.
+description: Explain an MTHDS method in plain language — its contract, its flow, and every pipe in it. Use when the user says "what does this pipeline do?", "explain this workflow", "explain this method", "walk me through this .mthds file", "describe the flow", "how does this work?", or wants to understand an existing MTHDS method. Takes a bundle directory, a single file, a registered method's catalog id (mt_…) — whose stored source it reads — or a published method's address, explained at the level of its contract. It changes nothing in the method — the explanation stays in the conversation, and the one file it leaves is the flowchart page the workshop writes beside a bundle on disk.
 allowed-tools:
   - Read
   - Grep
@@ -12,7 +12,7 @@ allowed-tools:
 
 # Explain an MTHDS method
 
-Read a method and say what it does, in plain language. Reading costs nothing and changes nothing, so there is no confirmation to ask for. It takes:
+Read a method and say what it does, in plain language. Reading costs nothing and changes nothing in the method, so there is no confirmation to ask for. It takes:
 
 - **A bundle directory**: every `.mthds` file beneath it outside `runs/`, read as one library. A single file is the same job with one file in it.
 - **A registered method's catalog id** (`mt_…`): the user's own organization's method, so its stored source is read and explained exactly as a bundle on disk is.
@@ -27,7 +27,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 
 ## Guards
 
-- **This skill is strictly read-only.** It writes no file, saves no document and changes nothing in the bundle, not even when asked to "document" the method. The explanation stays in the conversation; a user who wants it written down is told that `/pipelex-design` and `/pipelex-edit` own the bundle, and the rest is theirs to paste.
+- **This skill writes nothing of its own.** It saves no document and changes nothing in the bundle, not even when asked to "document" the method; the one file it leaves is the workshop's method graph page (step 3). The explanation stays in the conversation; a user who wants it written down is told that `/pipelex-design` and `/pipelex-edit` own the bundle, and the rest is theirs to paste.
 
 ## Steps
 
@@ -43,7 +43,7 @@ A `PipeSignature` is **pending only when no concrete pipe of the same code exist
 
 ### 3. The verdict, when the workshop is there
 
-One `mthds_validate` call over the same files. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. **Pass `graph_page: false`** wherever the tool lists that argument: on `{path}` files the workshop otherwise writes the method's flowchart, `method-graph.html`, beside them, and this skill writes nothing. The call adds two things and nothing else: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces.
+One `mthds_validate` call over the same files. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. The call adds two things to the explanation: the **verdict line** (whether it is valid, whether it is runnable, what is still pending) and, when the verdict carries a `main_pipe`, the **main pipe's typed signature**: its namespaced ref, each declared input with its concept and whether it is required, and the concept it produces. On `{path}` files the workshop also writes the method's flowchart beside them as `method-graph.html`, rewritten on every validation, and reports it as `graph_page`.
 
 Without the tool, explain from the source and **say the verdict was not checked**. Your own reading of the source is not a guess: the pipe types, the concepts and step 2's backlog are yours to state, saying whose reading it is. But do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer, and do not guess at validity. **On a target that is not on disk there is no such fallback.**
 
@@ -52,6 +52,8 @@ Without the tool, explain from the source and **say the verdict was not checked*
 Say first whether it is **complete** or a **scaffold with a backlog**, from step 2 and the verdict when there is one. Then, in order: its **purpose**, in one sentence in the user's terms rather than the bundle's; its **inputs**, each with its concept and what it actually carries; its **output**, the concept it produces and what is in it; **the flow** (step 5); the **custom concepts** it defines, not the native ones it uses; and **the backlog**, when there is one: each unsatisfied signature, by code, with the contract it promises.
 
 ### 5. The flow: the root first, then one passage per module
+
+**When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**: it opens in a browser and draws the whole method. When the summary says the page is new, pass on its note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
 
 **The root file gives the contract and the top-level flow**, then **one passage per module file**, each named by its file; a one-file method gets one passage, the simple case and not a missing structure. Trace the flow from the main pipe, reading the controllers in their own terms:
 
@@ -79,7 +81,7 @@ Output: final_output
 
 | Condition | Do this |
 |---|---|
-| the user asks for the explanation in a file | explain in the conversation, say this skill writes nothing, and name the skill that does |
+| the user asks for the explanation in a file | explain in the conversation, say this skill writes no document, and name the skill that does |
 | the workshop is absent, on a local bundle | explain from the source and say the verdict was not checked |
 | the workshop is absent, on an id or an address | stop per the Requirements: there is nothing to read |
 | `mthds_get_method` is absent while the other tools answer | explain the id at contract level, say the source was not read, and name the cause [not-on-disk.md](references/not-on-disk.md) gives |
