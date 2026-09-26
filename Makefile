@@ -236,19 +236,19 @@ codex-status: ## Show which source is currently registered for the Codex pipelex
 # starts, which is where the workshop resolves a { path } file. ARGS goes to claude or
 # codex as it is. Neither target writes a tracked file: see "A local build of
 # pipelex-mcp" in docs/development.md.
-MCP ?= ../pipelex-mcp
-MCP_VERSION ?=
-WORKDIR ?= .
-ARGS ?=
+#
+# Each is read from make's command line alone, and never assigned here: the names are
+# generic, so a shell variable called WORKDIR or ARGS belongs to some other tool, and it
+# reaches the session as it was. Each is taken unexpanded, so make acts on no `$` in it,
+# and a path goes as one single-quoted shell word, which the shell does not act on either.
+local_mcp_given = $(if $(filter command line,$(origin $(1))),$(value $(1)),$(2))
+local_mcp_word = '$(subst ','\'',$(call local_mcp_given,$(1),$(2)))'
 
-# A path reaches the script as it was given, as one single-quoted shell word of the variable's
-# unexpanded value: in double quotes, make would expand a `$` in it and the shell a backtick.
-local_mcp_path = '$(subst ','\'',$(value $(1)))'
-
-LOCAL_MCP_SOURCE = $(if $(MCP_VERSION),--mcp-version "$(MCP_VERSION)",--mcp $(call local_mcp_path,MCP))
+LOCAL_MCP_SOURCE = $(if $(call local_mcp_given,MCP_VERSION,),--mcp-version $(call local_mcp_word,MCP_VERSION,),--mcp $(call local_mcp_word,MCP,../pipelex-mcp))
+LOCAL_MCP_OPTIONS = $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_word,WORKDIR,.) -- $(call local_mcp_given,ARGS,)
 
 claude-local-mcp: install ## Start Claude Code on this checkout's skills with another workshop (MCP=path or MCP_VERSION=x.y.z)
-	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_path,WORKDIR) -- $(ARGS)
+	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_OPTIONS)
 
 codex-local-mcp: install ## Start Codex with another workshop in place of the plugin's (MCP=path or MCP_VERSION=x.y.z)
-	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_path,WORKDIR) -- $(ARGS)
+	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_OPTIONS)

@@ -28,6 +28,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,9 +57,17 @@ WORKSHOP_BUNDLE = Path("packages/workshop/dist/main.js")
 WORKSHOP_MANIFEST = Path("packages/workshop/package.json")
 WORKSHOP_PACKAGE = "@pipelex/mcp"
 
-# The variables a make target hands its commands beside its own: make's, then this repository's
-# local-workshop targets'. None of them reaches the checkout's build or the harness.
-MAKE_HANDOFF = frozenset({"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL", "MCP", "MCP_VERSION", "WORKDIR", "ARGS"})
+# make's own variables, which carry the command line of the make that ran this script to every
+# make started below it. None of them reaches the checkout's build or the harness.
+MAKE_STATE = frozenset({"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL"})
+
+# The local-workshop targets' variables. Given on make's command line, one reaches this script's
+# environment too, and is kept from the build and the harness with make's own; exported in the
+# user's shell, it belongs to some other tool, which the Makefile never reads, and stays.
+TARGET_VARIABLES = frozenset({"MCP", "MCP_VERSION", "WORKDIR", "ARGS"})
+
+# A word of `MAKEFLAGS` that assigns a variable: `NAME=value`, a space inside a value escaped with a backslash.
+MAKEFLAGS_ASSIGNMENT = re.compile(r"(?:^|(?<!\\)\s)([A-Za-z_][A-Za-z0-9_]*)=")
 
 CLAUDE_TARGET = "prod"
 CODEX_TARGET = "codex"
@@ -79,6 +88,11 @@ class Launcher:
     label: str
 
 
+def make_command_line(makeflags: str) -> set[str]:
+    """The names of the variables `makeflags` says were assigned on make's command line."""
+    return {match.group(1) for match in MAKEFLAGS_ASSIGNMENT.finditer(makeflags)}
+
+
 def without_make_handoff() -> dict[str, str]:
     """This process's environment without what the make target that ran it handed over.
 
@@ -86,8 +100,10 @@ def without_make_handoff() -> dict[str, str]:
     the environment, and every make started below reads them there as its own command line: `ARGS`
     or `MCP` would override or fill the checkout's Makefile, and in the harness's session they
     would reach every make the agent runs, a project's own or a nested `make claude-local-mcp`.
+    A target variable `MAKEFLAGS` does not name came from the user's shell, and is kept.
     """
-    return {name: value for name, value in os.environ.items() if name not in MAKE_HANDOFF}
+    handed = MAKE_STATE | (TARGET_VARIABLES & make_command_line(os.environ.get("MAKEFLAGS", "")))
+    return {name: value for name, value in os.environ.items() if name not in handed}
 
 
 def build_checkout(root: Path) -> None:

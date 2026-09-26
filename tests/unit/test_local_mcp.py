@@ -18,7 +18,8 @@ from scripts import local_mcp
 from scripts.gen_skill_docs import build_target, load_target_config, write_files
 from scripts.local_mcp import (
     LOCAL_DIR_NAME,
-    MAKE_HANDOFF,
+    MAKE_STATE,
+    TARGET_VARIABLES,
     WORKSHOP_BUNDLE,
     Harness,
     Launcher,
@@ -27,6 +28,7 @@ from scripts.local_mcp import (
     codex_env_vars,
     codex_overrides,
     main,
+    make_command_line,
     npm_resolve,
     parse_args,
     published_launcher,
@@ -61,6 +63,16 @@ def checkout(tmp_path: Path) -> Path:
     bundle.write_text("// the workshop\n", encoding="utf-8")
     (root / "packages" / "workshop" / "package.json").write_text('{"name": "@pipelex/mcp", "version": "1.2.3"}\n', encoding="utf-8")
     return root
+
+
+def _handed_by_make(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The environment a make target's command gets when every target variable was given on make's command line."""
+    assignments = {name: f"from the make target {name}" for name in TARGET_VARIABLES}
+    for name, value in assignments.items():
+        monkeypatch.setenv(name, value)
+    makeflags = " ".join(f"{name}={value.replace(' ', chr(92) + ' ')}" for name, value in assignments.items())
+    for name in MAKE_STATE:
+        monkeypatch.setenv(name, makeflags if name == "MAKEFLAGS" else "1")
 
 
 def _built(checkout: Path) -> Launcher:
@@ -137,15 +149,36 @@ class TestLauncher:
         self, checkout: Path, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """make hands a target's commands its command-line variables, which would override or fill the checkout's Makefile."""
-        for name in MAKE_HANDOFF:
-            monkeypatch.setenv(name, "from the make target")
+        _handed_by_make(monkeypatch)
         mocker.patch.object(local_mcp.shutil, "which", return_value="/usr/bin/make")
         run = mocker.patch.object(local_mcp.subprocess, "run", return_value=subprocess.CompletedProcess(args=[], returncode=0))
         build_checkout(checkout)
         assert run.call_args.args[0] == ["/usr/bin/make", "--no-print-directory", "-C", str(checkout), "build-local"]
         environment = run.call_args.kwargs["env"]
-        assert not MAKE_HANDOFF & environment.keys()
+        assert not (MAKE_STATE | TARGET_VARIABLES) & environment.keys()
         assert environment["PATH"] == os.environ["PATH"]
+
+    def test_a_target_variable_from_the_users_shell_is_kept(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A shell's `WORKDIR` or `ARGS` belongs to some other tool: the Makefile never reads it, and it stays."""
+        monkeypatch.setenv("MAKEFLAGS", "WORKDIR=/tmp/a\\ b ARGS=-p\\ MCP=inside")
+        for name in ("WORKDIR", "ARGS", "MCP", "MCP_VERSION"):
+            monkeypatch.setenv(name, f"{name} value")
+        environment = local_mcp.without_make_handoff()
+        assert {"MCP", "MCP_VERSION"} <= environment.keys()
+        assert not {"WORKDIR", "ARGS", "MAKEFLAGS"} & environment.keys()
+
+    @pytest.mark.parametrize(
+        ("makeflags", "names"),
+        [
+            ("", set[str]()),
+            ("WORKDIR=/tmp ARGS=--from\\ cli", {"WORKDIR", "ARGS"}),
+            ("sk -- ARGS=a\\ b", {"ARGS"}),
+            ("ARGS=-p\\ WORKDIR=x", {"ARGS"}),
+            (" --jobserver-fds=3,4 -j MCP=/x", {"MCP"}),
+        ],
+    )
+    def test_makeflags_names_the_variables_given_on_makes_command_line(self, makeflags: str, names: set[str]) -> None:
+        assert make_command_line(makeflags) == names
 
     def test_a_failed_build_starts_nothing(self, checkout: Path, mocker: MockerFixture) -> None:
         mocker.patch.object(local_mcp.shutil, "which", return_value="/usr/bin/make")
@@ -374,12 +407,11 @@ class TestStart:
         self, repo: Path, tmp_path: Path, harness_calls: list[Path], monkeypatch: pytest.MonkeyPatch, harness: Harness
     ) -> None:
         """Left in, `MAKEFLAGS` and the target's variables would override the variables of every make the agent runs."""
-        for name in MAKE_HANDOFF:
-            monkeypatch.setenv(name, "from the make target")
+        _handed_by_make(monkeypatch)
         monkeypatch.setenv("PIPELEX_API_KEY", "plx_sk_test")
         with pytest.raises(Launched) as launched:
             start(harness, _published("latest"), tmp_path, [], repo)
-        assert not MAKE_HANDOFF & launched.value.environment.keys()
+        assert not (MAKE_STATE | TARGET_VARIABLES) & launched.value.environment.keys()
         assert launched.value.environment["PIPELEX_API_KEY"] == "plx_sk_test"
         assert launched.value.environment["PATH"] == os.environ["PATH"]
 
@@ -408,9 +440,9 @@ class TestCommandLine:
 
 @pytest.mark.skipif(shutil.which("make") is None, reason="no make on the PATH")
 class TestMakeTargets:
-    def _make(self, *arguments: str, home: Path | None = None) -> subprocess.CompletedProcess[str]:
+    def _make(self, *arguments: str, home: Path | None = None, environment: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         """This repository's make, told its venv is installed: `install` would update uv over the network."""
-        environment = {**os.environ, "HOME": str(home)} if home is not None else None
+        environment = {**os.environ, **(environment or {}), **({"HOME": str(home)} if home is not None else {})}
         return subprocess.run(
             ["make", "--no-print-directory", "-C", str(REPO_ROOT), "-o", "install", *arguments],
             capture_output=True,
@@ -451,4 +483,16 @@ class TestMakeTargets:
     def test_a_published_version_reaches_the_script_as_a_version(self) -> None:
         completed = self._make("-n", "claude-local-mcp", "MCP_VERSION=0.20.0", "MCP=/no/checkout/here", "ARGS=--model sonnet")
         assert completed.returncode == 0, completed.stderr
-        assert "scripts/local_mcp.py claude --mcp-version \"0.20.0\" --workdir '.' -- --model sonnet" in completed.stdout
+        assert "scripts/local_mcp.py claude --mcp-version '0.20.0' --workdir '.' -- --model sonnet" in completed.stdout
+
+    def test_the_targets_read_their_variables_from_makes_command_line_alone(self) -> None:
+        """The names are generic, so a shell's `WORKDIR` or `ARGS` belongs to some other tool."""
+        exported = {"MCP": "/from/the/shell", "MCP_VERSION": "9.9.9", "WORKDIR": "/elsewhere", "ARGS": "--from-shell"}
+        completed = self._make("-n", "codex-local-mcp", environment=exported)
+        assert completed.returncode == 0, completed.stderr
+        assert "scripts/local_mcp.py codex --mcp '../pipelex-mcp' --workdir '.' -- \n" in completed.stdout
+
+    def test_args_reaches_the_harness_unexpanded_by_make(self) -> None:
+        completed = self._make("-n", "claude-local-mcp", "MCP_VERSION=0.20.0", "ARGS=-p 'it costs $5' --model sonnet")
+        assert completed.returncode == 0, completed.stderr
+        assert "-- -p 'it costs $5' --model sonnet" in completed.stdout
