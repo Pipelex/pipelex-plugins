@@ -12,7 +12,7 @@ Every gesture between a bundle directory and the organization's method catalog: 
 - **`mthds_list_methods`**, **`mthds_save_method`** and **`mthds_get_method`** are required, with no fallback: the catalog lives behind the API key.
 - **If the catalog tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex. Never report a method id, a name, or a method as saved when the answer did not come from these tools.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
-- **`mthds_validate`** is optional, for one question: *would this save?* Never call it on the way to a save: `mthds_save_method` reads the files, validates them and saves those same bytes in one call.
+- **`mthds_validate`** is optional, for one question: *would this save?* Never call it on the way to a save: `mthds_save_method` reads the files, validates them and saves those same bytes in one call. Ask it with `graph_page: false` wherever the tool lists that argument: a question writes no file, and `{path}` files would otherwise get `method-graph.html` beside them.
 
 ## Guards
 

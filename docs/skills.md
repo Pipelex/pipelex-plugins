@@ -44,7 +44,7 @@ The skills share one reference for MTHDS, the language a method is written in: `
 
 ## The Pipelex tools
 
-The tools reach the Pipelex API with your key, the same one the hook uses. Each tool that takes a method takes the files themselves, a saved method's catalog id as `method_id`, or a published method's address as `method_ref`; a call by id needs an API key, because the catalog belongs to an organization. The tools read a file by path only inside the directory the agent was started in, an absolute path included; for a bundle outside it, start the agent from a directory that holds the bundle, or the skills send the files' contents instead.
+The tools reach the Pipelex API with your key, the same one the hook uses. Each tool that takes a method takes the files themselves, a saved method's catalog id as `method_id`, or a published method's address as `method_ref`; a call by id needs an API key, because the catalog belongs to an organization. The tools read a file by path only inside the directory the agent was started in, an absolute path included; for a bundle outside it, start the agent from a directory that holds the bundle, or the skills send the files' contents instead. A version of the tools that draws the method graph also writes the method's flowchart, `method-graph.html`, beside files it validates by path, and rewrites it on each validation; `pipelex-explain` and `pipelex-catalog`'s check of whether a bundle would save turn the page off, since neither writes files.
 
 - **`mthds_validate`** validates a method. Its verdict carries the main pipe's signature, from which `/pipelex-integrate` types a call site.
 - **`mthds_inputs_template`** returns the input template of a pipe.
