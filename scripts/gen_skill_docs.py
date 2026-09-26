@@ -347,6 +347,18 @@ def resolve_output_dir(base_dir: Path, source: str) -> Path:
     return base_dir / source.rstrip("/")
 
 
+def shell_double_quoted(value: object) -> str:
+    """`value` as one double-quoted shell word, which a shell hands on exactly as it is.
+
+    Inside double quotes a shell still acts on `$`, a backtick and `\\`, and `"` ends the word, so each
+    of the four is escaped. A word holding none of them renders as it always did.
+    """
+    text = str(value)
+    for char in ("\\", '"', "$", "`"):
+        text = text.replace(char, f"\\{char}")
+    return f'"{text}"'
+
+
 def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, TemplateVarValue]) -> str:
     """Render one template by name, turning Jinja errors into a clean SystemExit."""
     try:
@@ -411,6 +423,7 @@ def render_templates(
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
+    env.filters["shell_double_quoted"] = shell_double_quoted
 
     # Collect shared templates (must all exist — fail loudly if missing)
     shared_j2_paths: list[Path] = []

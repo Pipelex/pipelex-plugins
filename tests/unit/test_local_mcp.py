@@ -219,6 +219,23 @@ class TestClaudeCopy:
         assert launcher.rstrip().endswith(f'exec node "{checkout.resolve() / WORKSHOP_BUNDLE}"')
         assert os.access(copy / "hooks" / "launch-pipelex-mcp.sh", os.X_OK)
 
+    @pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on the PATH")
+    def test_the_launcher_hands_the_workshop_a_path_the_shell_would_act_on_as_it_is(self, repo: Path, tmp_path: Path) -> None:
+        """A checkout is any directory, so its path reaches the launcher's `exec` line with whatever it holds."""
+        odd = tmp_path / 'a $HOME `true` "quoted" back\\slash' / "pipelex-mcp"
+        (odd / WORKSHOP_BUNDLE).parent.mkdir(parents=True)
+        (odd / WORKSHOP_BUNDLE).write_text("// the workshop\n", encoding="utf-8")
+        copy = render_claude_copy(repo, _built(odd))
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "node").write_text('#!/bin/sh\nprintf "%s" "$1"\n', encoding="utf-8")
+        (bin_dir / "node").chmod(0o755)
+        environment = {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "HOME": str(tmp_path)}
+        completed = subprocess.run([str(copy / "hooks" / "launch-pipelex-mcp.sh")], capture_output=True, text=True, check=False, env=environment)
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout == str(odd.resolve() / WORKSHOP_BUNDLE)
+
     def test_a_second_render_of_a_workshop_replaces_its_copy_and_leaves_nothing_beside_it(self, repo: Path, checkout: Path) -> None:
         copy = render_claude_copy(repo, _built(checkout))
         (copy / "stray.txt").write_text("left by hand\n", encoding="utf-8")
