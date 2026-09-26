@@ -173,6 +173,16 @@ class TestPipelexDesignSkill:
         assert size <= SKILL_CEILING_CHARS, f"{target_name}: pipelex-design renders {size} characters, over the {SKILL_CEILING_CHARS} ceiling"
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_delivery_gives_the_graph_page_before_the_text_flow(self, target_name: str) -> None:
+        """The plugin's workshop has no views, so no host ever rendered the "interactive method graph"
+        step 6 used to offer first. What reaches the user is the page `mthds_validate` writes beside a
+        bundle validated by path, so delivery gives its path and then the text flow (L-260926-14cb83)."""
+        flow = self.the_line(self.render(target_name), "**Present the flow**")
+        assert "give the page's `path` before the text flow" in flow
+        assert "as concise text" in flow
+        assert "where the host rendered it" not in self.render(target_name)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_formatting_note_is_not_a_design_step(self, target_name: str) -> None:
         """The formatting-hook note is a stop by the read-before-act test — the hook's block names the syntax
         error, and the harness refuses an edit to a file changed since it was read — so design carries none of

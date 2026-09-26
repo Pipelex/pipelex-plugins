@@ -1,0 +1,16 @@
+{#- The method graph page. When every file of an `mthds_validate` call is a
+   `{ path }`, the workshop writes the method's flowchart as `method-graph.html`
+   beside them and reports it as `graph_page: { path, written, error? }`
+   (`pipelex-mcp/SPEC.md`, "The method graph page (`graph_page`)"). One
+   sentence, included where a skill presents a method's flow: explain's step 5,
+   design's delivery and run's dry run. The other skills that validate by path
+   leave the page without a word; `docs/decisions.md` says why.
+
+   "A summary" and not "the summary": the workshop's note that the page is new
+   comes with its first write, which for design is the first validation of the
+   construction loop, long before the flow is presented.
+
+   Strips its own trailing newline (the closing comment below), so it can be
+   included mid-paragraph. -#}
+**When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**: it opens in a browser and draws the whole method. When a summary called the page new, pass on its note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
+{#- -#}

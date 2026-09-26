@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **`pipelex-explain` points at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and `pipelex-explain` now gives that page's path before its text flow, so the whole method can be opened in a browser. The skill still writes nothing of its own, and the page is the one file an explanation of a bundle on disk leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
+- **`pipelex-explain`, `pipelex-design` and `pipelex-run` point at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and these skills now give that page's path before their text flow — `pipelex-explain` in every explanation of a bundle on disk, `pipelex-design` when it hands over a method, and `pipelex-run` on a dry run — so the whole method can be opened in a browser. `pipelex-explain` still writes nothing of its own, and the page is the one file it leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
 
 ### Fixed
 
