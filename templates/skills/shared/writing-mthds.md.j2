@@ -227,7 +227,7 @@ Summarize the following document:
 
 **Vision:** put an `Image` in `inputs` and reference it as `$image` or `@image` in the prompt.
 
-**Model references.** Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference: `@name` is an alias (`@default-text-from-pdf`), `$name` a preset, which bundles a model with its settings (`$writing-factual`), `~name` a waterfall of fallback models, and a bare string a model handle. On a `PipeLLM`, `model` may instead be an inline table of settings, whose `temperature` is required: `model = { model = "claude-4.5-sonnet", temperature = 0.2 }`. Omit `model` to use the default.
+**Model references.** Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference: `@name` is an alias (`@default-text-from-pdf`), `$name` a preset, which bundles a model with its settings (`$writing-factual`), `~name` a waterfall of fallback models, and a bare string a model handle. On a `PipeLLM`, `model` may instead be an inline table of settings, whose `temperature` is required: `model = { model = "<handle>", temperature = 0.2 }`. **Omit `model` unless the user names a model**: the default is one the user's account can run, while a handle or an inline table pins a model the account's gateway may refuse, and validation cannot see that, so every run fails. To ask for a kind of behaviour, such as factual writing, without pinning a model, use a preset. A setting such as a temperature needs an inline table and so a model: when the user names a setting but no model, offer a preset or ask which model, never invent a handle.
 
 ### PipeSequence — execute steps in order
 

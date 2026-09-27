@@ -42,7 +42,7 @@ Without the tool, explain from the source and **say the verdict was not checked*
 
 ### 4. Open with what the method *is*
 
-Say first whether it is **complete** or a **scaffold with a backlog**, from step 2 and the verdict when there is one. Then, in order: its **purpose**, in one sentence in the user's terms rather than the bundle's; its **inputs**, each with its concept and what it actually carries; its **output**, the concept it produces and what is in it; **the flow** (step 5); the **custom concepts** it defines, not the native ones it uses; and **the backlog**, when there is one: each unsatisfied signature, by code, with the contract it promises.
+Say first whether it is **complete** or a **scaffold with a backlog**, from step 2 and the verdict when there is one, **and, when the verdict wrote the graph page, its path in the same opening lines, never at the end**, even in an explanation written for someone else to read. Then, in order: its **purpose**, in one sentence in the user's terms rather than the bundle's; its **inputs**, each with its concept and what it actually carries; its **output**, the concept it produces and what is in it; **the flow** (step 5); the **custom concepts** it defines, not the native ones it uses; and **the backlog**, when there is one: each unsatisfied signature, by code, with the contract it promises.
 
 ### 5. The flow: the root first, then one passage per module
 
