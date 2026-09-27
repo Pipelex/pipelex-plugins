@@ -227,7 +227,33 @@ Summarize the following document:
 
 **Vision:** put an `Image` in `inputs` and reference it as `$image` or `@image` in the prompt.
 
-**Model references.** Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference: `@name` is an alias (`@default-text-from-pdf`), `$name` a preset, which bundles a model with its settings (`$writing-factual`), `~name` a waterfall of fallback models, and a bare string a model handle. On a `PipeLLM`, `model` may instead be an inline table of settings, whose `temperature` is required: `model = { model = "<handle>", temperature = 0.2 }`. **Omit `model` unless the user names a model**: the default is one the user's account can run, while a handle or an inline table pins a model the account's gateway may refuse, and validation cannot see that, so every run fails. To ask for a kind of behaviour, such as factual writing, without pinning a model, use a preset. A setting such as a temperature needs an inline table and so a model: when the user names a setting but no model, offer a preset or ask which model, never invent a handle.
+### Model references
+
+Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference of one of four kinds, told apart by its sigil:
+
+| Kind | Sigil | Example | What it names |
+|---|---|---|---|
+| Preset | `$` | `$writing-factual` | a model with the settings suited to a kind of task; the kind to prefer |
+| Alias | `@` | `@default-text-from-pdf` | a stable name the deployment points at one model |
+| Waterfall | `~` | `~<name>` | fallback models, tried in order |
+| Handle | none | `<handle>` | one model, by its own name |
+
+On a `PipeLLM`, `model` may instead be an inline table of settings, whose `temperature` is required: `model = { model = "@default-general", temperature = 0.2 }`. The table's own `model` is an alias, a waterfall or a handle, never a preset.
+
+**Omit `model` unless the user asks for a model, a setting such as a temperature, or a kind of behaviour such as factual writing**: the default is one the user's account can run, while a reference nobody asked for pins a model the account's gateway may refuse, which validation cannot see, so every run fails.
+
+**Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen` and `search` for a `PipeSearch`. It spends no credit.
+
+- **A kind of behaviour**: list the pipe's category and write the preset whose name fits it, saying which one you chose.
+- **A model or a reference the user typed**: check it, passing it as `reference` with the pipe's `category`. On `resolved`, write it. When `other_kinds` holds the same name under another sigil, whatever the resolution (`best-gpt` exists as `@best-gpt`), write that one and say so. On any answer but `resolved`, a non-empty `other_categories` says the reference serves another kind of pipe: say so rather than write it on this one. On `not_found`, offer the `suggestions` and write only what the user picks. On `unconfirmed` with neither hint, a handle the deck does not name, write it only as a pipe's `model` string, where `mthds_validate` checks it against every model the runner serves.
+- **A model and a setting**: the setting needs an inline table, whose model must answer `resolved` and must not be a preset. When the model the user named falls short, say so and offer the choice between the setting on an alias the deck lists and the model without the setting: a preset alone, a handle `unconfirmed` with neither hint as a plain `model` string, and anything else only as the bullet above allows.
+- **A setting but no model**: offer the category's presets, which carry settings for a kind of task, or put the setting in an inline table on an alias the deck lists. Never invent a handle.
+
+**Validation never looks inside an inline table**: a reference there that does not resolve fails only when a run reaches the pipe, after credit is spent, so write one only once `mthds_models` answers `resolved` for a reference that is not a preset.
+
+**The deck is what the runner can serve, not what the account may use**: a gateway can still refuse a listed model when a run starts, after the method validated. A listed model is no promise, and leaving `model` out stays the safest choice.
+
+**Without `mthds_models`**, on a workshop older than the release that brought it, nothing can be looked up: offer a preset this reference names, or ask which model, and never invent a reference.
 
 ### PipeSequence — execute steps in order
 

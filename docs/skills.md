@@ -40,7 +40,7 @@ Those three work on files, and each also takes a saved method's catalog id (`mt_
 
 `pipelex-synthetic-inputs` needs no Pipelex tool and no key for anything but a photograph. `pipelex-scaffold` needs none either: git, the method-app family's initializer and `make serve`, the language initializers and its own two scripts are all it uses, although the method-app template's `make create` calls the hosted API with your key.
 
-The skills share one reference for MTHDS, the language a method is written in: `pipelex-design` reads it before every write, and `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` read it for a syntax question. The language keeps the standard's name; Pipelex is the product that builds and runs it.
+The skills share one reference for MTHDS, the language a method is written in: `pipelex-design` reads it before every write, and `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` read it for a syntax question. It says to leave a pipe's `model` out unless you ask for a model, a setting or a kind of behaviour, and when you do, how `pipelex-design` and `pipelex-edit` look the reference up and check it with `mthds_models` rather than guess one. The language keeps the standard's name; Pipelex is the product that builds and runs it.
 
 ## The Pipelex tools
 
@@ -48,6 +48,7 @@ The tools reach the Pipelex API with your key, the same one the hook uses. Each 
 
 - **`mthds_validate`** validates a method. Its verdict carries the main pipe's signature, from which `/pipelex-integrate` types a call site.
 - **`mthds_inputs_template`** returns the input template of a pipe.
+- **`mthds_models`** lists the model deck, the presets, aliases and waterfalls a pipe's `model` field can name, by category, or checks one reference and suggests the nearest names when it does not resolve. `/pipelex-design` and `/pipelex-edit` call it before they write a model you asked for. The deck is what the runner can serve, not what your account may use, so a listed model can still be refused when a run starts.
 - **`mthds_codegen`** turns a method's concepts into typed code (`ts-zod`, `python-pydantic` or `python-structures`) and, given an `output_dir`, writes the tree to disk.
 - **`mthds_prepare_inputs`** uploads the file values of a filled template to Pipelex storage, so a run can reach them.
 - **`mthds_run`** starts a run, and **`mthds_run_status`**, **`mthds_run_results`** and the tools beside them follow it to its status, its results and its files.
