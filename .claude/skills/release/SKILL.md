@@ -15,7 +15,7 @@ description: >
 
 # Releasing pipelex-plugins
 
-The procedure is the workspace release play, [`docs/releasing.md`](../../../../docs/releasing.md) at the workspace root — `../docs/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `pipelex-plugins`, the base is `dev`, and the pull request targets `main`. The release worktree is `_pipelex-plugins--release`, made with `wt add pipelex-plugins release --branch release/vX.Y.Z`. The repo declares neither `.worktree.toml` nor `.worktreeinclude`, so `wt` resolves the base from `origin/dev` and provisions with the Makefile's `install` target — which is what creates the `.venv` that every gate below runs out of, since each Makefile check and test target depends on `install`.
+The procedure is the workspace release play, [`docs/workspace/releasing.md`](../../../../docs/workspace/releasing.md) at the workspace root — `../docs/workspace/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `pipelex-plugins`, the base is `dev`, and the pull request targets `main`. The release worktree is `_pipelex-plugins--release`, made with `wt add pipelex-plugins release --branch release/vX.Y.Z`. The repo declares neither `.worktree.toml` nor `.worktreeinclude`, so `wt` resolves the base from `origin/dev` and provisions with the Makefile's `install` target — which is what creates the `.venv` that every gate below runs out of, since each Makefile check and test target depends on `install`.
 
 ## What ships
 
