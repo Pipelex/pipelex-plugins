@@ -15,7 +15,7 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 - **`mthds_validate`** is required: it proves every edit. **Never declare an edit done on the hook's silence alone**: its semantic stage is skipped without an API key.
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
-- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template, and **`mthds_models`** only by a model change in Step 4.
+- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template. **`mthds_models`** serves a model change in Step 4, and its absence is no stop: the model references say what to do without it.
 
 ## Mode Selection
 

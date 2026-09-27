@@ -49,7 +49,12 @@ class TestModelReferences:
         by a call, and the check's three answers are each read."""
         section = model_section(target_name)
         assert "**Look a reference up before writing it**, with the `mthds_models` tool." in section
-        for case in ("- **A kind of behaviour**:", "- **A model or a reference the user typed**:", "- **A setting but no model**:"):
+        for case in (
+            "- **A kind of behaviour**:",
+            "- **A model or a reference the user typed**:",
+            "- **A model and a setting**:",
+            "- **A setting but no model**:",
+        ):
             assert case in section, f"{target_name}: the section lost the case {case!r}"
         for answer in ("`resolved`", "`not_found`", "`unconfirmed`", "`suggestions`", "`other_kinds`", "`other_categories`"):
             assert answer in section, f"{target_name}: the section does not read {answer}"
@@ -61,7 +66,24 @@ class TestModelReferences:
         `other_kinds`: read only on `not_found`, the hint would be skipped and the bare name written."""
         section = model_section(target_name)
         assert "When `other_kinds` holds the same name under another sigil, whatever the resolution" in section
-        assert "On `unconfirmed` with no other kind" in section
+        assert "On `unconfirmed` with neither hint" in section
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_another_category_is_read_on_any_unresolved_answer(self, target_name: str) -> None:
+        """`gpt-image-2` checked as `llm` comes back `unconfirmed` with `img_gen` in `other_categories`:
+        read only on `not_found`, the handle would be written on a `PipeLLM`."""
+        assert "On any answer but `resolved`, a non-empty `other_categories` says the reference serves another kind of pipe" in (
+            model_section(target_name)
+        )
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_model_and_a_setting_never_write_an_unchecked_table(self, target_name: str) -> None:
+        """A temperature lives only in an inline table, which validation never reads: an unconfirmed
+        handle there fails at run time, so the user chooses between the model and the setting."""
+        section = model_section(target_name)
+        bullet = next(line for line in section.splitlines() if line.startswith("- **A model and a setting**"))
+        assert "whose model must answer `resolved`" in bullet
+        assert "that model alone as a plain `model` string without the setting, or the setting on an alias the deck lists" in bullet
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_section_keeps_the_default_and_never_invents(self, target_name: str) -> None:
@@ -99,7 +121,7 @@ class TestModelReferences:
         bullet = next(line for line in body.splitlines() if line.startswith("- **Change a model reference**"))
         assert f"]({ANCHOR}) before writing one" in bullet
         assert "`mthds_models`" in bullet
-        assert "**`mthds_models`** only by a model change in Step 4" in body
+        assert "**`mthds_models`** serves a model change in Step 4, and its absence is no stop" in body
         assert f"]({ANCHOR}): before writing or changing a `model` field." in body.split("## References", 1)[1]
 
     @pytest.mark.parametrize("skill", ["pipelex-design", "pipelex-edit"])

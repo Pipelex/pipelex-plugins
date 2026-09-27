@@ -19,7 +19,7 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 ## Requirements
 
 - **`mthds_validate`** is required: it proves every edit. **Never declare an edit done on the hook's silence alone**: its semantic stage is skipped without an API key.
-{% set mcp_requirements_extra %}- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template, and **`mthds_models`** only by a model change in Step 4.{% endset -%}
+{% set mcp_requirements_extra %}- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template. **`mthds_models`** serves a model change in Step 4, and its absence is no stop: the model references say what to do without it.{% endset -%}
 {% include "skills/shared/mcp-requirements.md.j2" %}
 
 ## Mode Selection
