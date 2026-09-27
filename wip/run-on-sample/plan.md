@@ -35,7 +35,7 @@ The template and its reference, as design 4.5 gives them:
 
 The tests and the documentation:
 
-- [ ] `tests/unit/test_gen_skill_docs.py`: `test_user_values_are_laid_over_a_prepared_set` asserts the `inputs.json` fallback and that "With no prepared file, the request's values are the whole set" is gone; new tests pin the id's candidate directories and the ask, the envelope clause, the optional-key clause and the order (validation before the inputs); the address-reference test checks the moved sentence.
+- [ ] `tests/unit/test_gen_skill_docs.py`: `test_user_values_are_laid_over_a_prepared_set` asserts the `inputs.json` fallback and that "With no prepared file, the request's values are the whole set" is gone; new tests pin the id's candidate directories and the ask, the envelope clause, the optional-key clause and its limit to the main pipe, and the order (validation before the inputs); the address-reference test checks the moved sentence.
 - [ ] `tests/unit/test_skill_guards.py`: "When several do, ask which; never choose." joins `pipelex-run`'s guards, and "**A dry-run request goes to step 3 first.**" leaves with its sentence.
 - [ ] `docs/skills.md`, the `pipelex-run` paragraph: a sentence on the overlay and on where a run by id finds its inputs.
 - [ ] `docs/decisions.md`: why the overlay's base is the sample, why the id's candidates are peers with an ask rather than a ranking, why the directory lends only its inputs, why `/pipelex-inputs` keeps `./<method_id>/`, why an enveloped input is checked by its content, and why validation moved ahead of the inputs.
@@ -43,7 +43,7 @@ The tests and the documentation:
 
 The gates:
 
-- [ ] `make build`, `make check` (the ceiling on every target; the design measured about 12,871 characters on Claude), `make agent-test`.
+- [ ] `make build`, `make check` (the ceiling on every target; the design measured about 12,903 characters on Claude), `make agent-test`.
 - [ ] The smoke sessions of design section 6, each recorded below with its session id and verdict.
 - [ ] `/rev`, at the profile `ledger review-profile` derives.
 - [ ] The PR, titled `fix/Run-on-sample · L-260927-87d267`, with `Closes` for the epic and each of the four children.

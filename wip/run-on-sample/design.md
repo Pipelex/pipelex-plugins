@@ -5,7 +5,7 @@ item: L-260927-87d267
 
 # Design — running a method on its own sample
 
-**Written 2026-09-27**, for the epic `L-260927-87d267`, against `pipelex-plugins` at `5bb83dd` (`dev`, after #91). It answers two bugs filed from the cookbook's copy-and-change recipe, `L-260927-235a99` and `L-260927-d7c594`, verifies both, and designs their fix. Verifying them turned up two neighbours in the same paragraph of the same step that fail the same sample, `L-260927-7f577e` (filed with the other two) and `L-260927-0e6ba4` (filed by this session). Every box was ratified as written on 2026-09-27, in an interview of one question per box: all four bugs are fixed in one pull request, and steps 2 and 3 swap. [`plan.md`](plan.md) is the tracker. File and line references were accurate on the writing date; verify them before implementing.
+**Written 2026-09-27**, for the epic `L-260927-87d267`, against `pipelex-plugins` at `5bb83dd` (`dev`, after #91). It answers two bugs filed from the cookbook's copy-and-change recipe, `L-260927-235a99` and `L-260927-d7c594`, verifies both, and designs their fix. Verifying them turned up two neighbours in the same paragraph of the same step that fail the same sample, `L-260927-7f577e` (filed with the other two) and `L-260927-0e6ba4` (filed by this session). Every box was ratified as written on 2026-09-27, in an interview of one question per box: all four bugs are fixed in one pull request, and steps 2 and 3 swap. The design's review on the same day limited box E's optional-key allowance to a run on the main pipe (4.4). [`plan.md`](plan.md) is the tracker. File and line references were accurate on the writing date; verify them before implementing.
 
 ## 1. The two bugs
 
@@ -52,7 +52,9 @@ Measured by applying the proposed text of section 4 to the rendered files at `5b
 |---|---|---|---|
 | Today | 12,987 | 12,662 | 12,676 |
 | The two bugs, with both trims | 12,924 | 12,599 | 12,613 |
-| All four, with both trims and the swap | 12,871 | 12,546 | 12,560 |
+| All four, with both trims and the swap | 12,903 | 12,578 | 12,592 |
+
+The last row includes the 32 characters that the review's main-pipe limit added to the check paragraph (4.4), which render identically on every target.
 
 ## 4. The fix
 
@@ -86,6 +88,8 @@ In the check paragraph: "A value in the `{concept, content}` envelope is checked
 
 The key-set comparison accepts a key the inputs lack when the validate verdict's `main_pipe` marks it `required: false`. That verdict has to exist before the check, so validation moves ahead of the inputs, which box E decides.
 
+The allowance holds only when the run is on the main pipe. `mthds_validate` takes no pipe selector, and its `main_pipe` is always the entry pipe's signature (`pipelex-mcp/SPEC.md:149`), while step 1 lets the user name another pipe and carries its `pipe_ref` through every call. On another pipe, the verdict's `required` flags belong to the wrong signature. Read literally, they would excuse a key the named pipe requires whenever the main pipe declares one of the same name optional, and they could never excuse an optional input that only the named pipe declares. So for a named pipe, a missing key stays drift, as it is today. Lifting the limit needs `mthds_validate` to take a `pipe_ref`, which is `L-260927-0f5a2e` in `pipelex-mcp`.
+
 ### 4.5 The text, as proposed
 
 Step 2 and step 3 after the swap of box E, rendered for Claude, with changes in bold where they are not already bold in the skill. Everything not shown is unchanged.
@@ -98,13 +102,11 @@ Step 2 and step 3 after the swap of box E, rendered for Claude, with changes in 
 >
 > 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, **else over `inputs.json`: replace only the keys the user named and keep every other. With neither file**, the request's values are the whole set.
 >
-> Then call `mthds_inputs_template` once, … and check the inputs against it on both keys and value shapes: the key set, **where a key the inputs lack is fine when step 2's verdict marks it `required: false`**, and per key the JSON kind and a structured value's field names. **A value in the `{concept, content}` envelope is checked by its `content`, and** a file-ish input the template shows as a bare URL-or-path string and the prepared file holds as `{"url": "pipelex-storage://…"}` is the prepare rewrite**; neither is drift.**
+> Then call `mthds_inputs_template` once, … and check the inputs against it on both keys and value shapes: the key set, **where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`**, and per key the JSON kind and a structured value's field names. **A value in the `{concept, content}` envelope is checked by its `content`, and** a file-ish input the template shows as a bare URL-or-path string and the prepared file holds as `{"url": "pipelex-storage://…"}` is the prepare rewrite**; neither is drift.**
 
 Step 4: "One line before the call: the target, the pipe, where the inputs came from **and which keys the request replaced**, and that the run spends inference credit." Step 4's `PipeFunc` sentence: "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run by its id alone carries it."
 
 The rest of the swap is renumbering. The intro's "a dry run is Start a run's step 3, shown" becomes step 2. "the values step 2 settled on" in step 5 becomes step 3. `references/published-address.md:17`, "A verdict that fails at step 3", becomes step 2, and the same reference gains the address sentence moved out of step 1.
-
-If box A leaves the neighbours out, there is no swap: the steps keep their numbers, and only the directory sentence, rule 1, step 4's clause and the two trims change.
 
 ### 4.6 What stays as it is
 
@@ -116,6 +118,7 @@ If box A leaves the neighbours out, there is no swap: the steps keep their numbe
 
 - **`L-260923-c8f18e` (P1, open).** A hand-off to `/pipelex-inputs` with a filled `inputs.json` can land on the Template row and save placeholders over it. This fix removes one path to that hand-off (rule 1 no longer throws the sample away), and adds none: a linked directory handed to `/pipelex-inputs` is exposed exactly as a bundle directory is today. The two can land in either order.
 - **`L-260924-afcd06`.** The search runs from the model's shell, whose directory need not be the workshop's, which is the same assumption that item records for the ignore check. The words "below the working directory" say what the bridge's "from the working directory down" says, and inherit whatever that item decides.
+- **`L-260927-0f5a2e` (`pipelex-mcp`).** Once `mthds_validate` takes a `pipe_ref`, the main-pipe limit of 4.4 can go. The same item covers an older instance of this assumption, outside this fix: today's dry run gives an id's or an address's contract "from the verdict's `main_pipe`" (`SKILL.md.j2:57`), which is the entry pipe's contract even when the user named another pipe.
 - **The cookbook recipe** already describes the fixed behaviour ("The agent finds the sample in `document-qa/inputs.json`, beside the bundle that `pipelex-method.json` links to the id"), so it needs no change.
 
 ## 6. Proof
@@ -132,5 +135,5 @@ Smoke sessions hold the behaviour, and cost nothing. In a scratch directory hold
 | B | What base does the request's value land on? | **A current `inputs.prepared.json`, else `inputs.json`; the named keys replaced whole, every other kept; the usual checks on the result** (4.1). The alternative, overlaying only when the request says "sample", depends on the user's wording, and a request naming one input of a filled set means the same thing whether or not it says "sample". | Yes, as written — 2026-09-27 |
 | C | Where does a run by id look for its inputs? | **The named directory; else, among `./<method_id>/` and the linked directories, the one holding an `inputs.json`, named; ask when several do** (4.2). The alternatives rank the two kinds of directory, `./<method_id>/` first or the linked directory first, and either one silently picks one sample over another. | Yes, as written — 2026-09-27 |
 | D | Does `/pipelex-inputs` change its default directory for an id? | **No** (4.6). The run finds both, and making the linked directory the default would expose the sample to the Template overwrite of `L-260923-c8f18e`. | Yes, as written — 2026-09-27 |
-| E | *(If A takes `L-260927-7f577e`.)* Where does step 2 learn which inputs are optional? | **Swap steps 2 and 3, so validation runs before the inputs and the check reads `required` from its verdict** (4.4, 4.5). It needs no upstream change, it removes two sentences, and a dry run then stops before any input is read, simply because of the order. The alternatives are a second validate call inside step 2, which duplicates a call and a paragraph, or a `required` mark on `mthds_inputs_template`'s output, which is a change in `pipelex-mcp` that this fix would have to wait for. | Yes, as written — 2026-09-27 |
+| E | *(If A takes `L-260927-7f577e`.)* Where does step 2 learn which inputs are optional? | **Swap steps 2 and 3, so validation runs before the inputs and the check reads `required` from its verdict** (4.4, 4.5). It needs no upstream change for the main pipe (a named pipe waits on `L-260927-0f5a2e`, 4.4), it removes two sentences, and a dry run then stops before any input is read, simply because of the order. The alternatives are a second validate call inside step 2, which duplicates a call and a paragraph, or a `required` mark on `mthds_inputs_template`'s output, which is a change in `pipelex-mcp` that this fix would have to wait for. | Yes, as written — 2026-09-27 |
 | F | Where does the room under the ceiling come from? | **Step 4's `PipeFunc` rationale, and step 1's address sentence moved into `references/published-address.md`** (section 3). Neither is a guard, and both are already written where the reader who needs them will look. The alternative, moving the id's directory rule into a reference of its own, puts a paid choice behind a pointer, and a static reference cannot share the bridge's text. | Yes, as written — 2026-09-27 |
