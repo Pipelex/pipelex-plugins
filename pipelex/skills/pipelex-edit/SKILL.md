@@ -10,6 +10,7 @@ allowed-tools:
   - Glob
   - mcp__plugin_pipelex_pipelex__mthds_validate
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
+  - mcp__plugin_pipelex_pipelex__mthds_models
 ---
 
 # Edit a MTHDS bundle
@@ -24,7 +25,7 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 - **`mthds_validate`** is required: it proves every edit. **Never declare an edit done on the hook's silence alone**: its semantic stage is skipped without an API key.
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
-- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template.
+- **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template, and **`mthds_models`** only by a model change in Step 4.
 
 ## Mode Selection
 
@@ -65,7 +66,7 @@ Before editing a construct you have not touched recently, read [the MTHDS refere
 - **Rename a concept**: the declaration, every `inputs`/`output` mention, `refines` references, `concept` fields inside structures, and field-reads in prompts (a `$var.field` stays keyed to the *variable*, but construct `from` paths and concept-typed fields name the concept).
 - **Rename an input variable**: the pipe's `inputs` key and every `$var` / `@var` in its prompts. On the **main pipe** the client-facing template keys change, so Step 6 is mandatory.
 - **Update a prompt**: the prose is free, but every `$var` / `@var` it references must still exist in the pipe's `inputs`.
-- **Change a model reference**: the `model` field is optional; omit it to use defaults.
+- **Change a model reference**: read [the model references](../shared/writing-mthds.md#model-references) before writing one: they say when to leave `model` out, and how to look a reference up and check it with `mthds_models`.
 
 ### Step 5: Re-validate
 
@@ -94,4 +95,5 @@ State what changed (files and constructs), give the verdict line from the summar
 ## References
 
 - [MTHDS reference](../shared/writing-mthds.md): before editing a construct you have not touched recently.
+- [Model references](../shared/writing-mthds.md#model-references): before writing or changing a `model` field.
 - [Native content types](../shared/native-content-types.md): editing a prompt or construct path that field-reads a native concept (`Image.url`, `Page.text_and_images`, …).
