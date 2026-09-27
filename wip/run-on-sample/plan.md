@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260927-87d267
 ---
 
@@ -46,7 +46,7 @@ The gates:
 - [x] `make build`, `make check` (the ceiling on every target; the design measured about 12,986 characters on Claude, 14 under), `make agent-test`.
 - [x] The smoke sessions of design section 6, each recorded below with its session id and verdict.
 - [x] `/rev`, at the profile `ledger review-profile` derives.
-- [ ] The PR, titled `fix/Run-on-sample · L-260927-87d267`, with `Closes` for the epic and each of the four children.
+- [x] The PR, titled `fix/Run-on-sample · L-260927-87d267`, with `Closes` for the epic and each of the four children: pipelex-plugins#93.
 
 ### Smoke sessions
 
@@ -66,6 +66,7 @@ The gates:
 
 Record the rendered sizes on every target, the SHA the PR squashed into, the smoke verdicts, and anything the review deferred and where it went. The checklist ends with `/rev` above; a deferral goes to the ledger or to this directory.
 
+- **Merged** as pipelex-plugins#93, squashed into `3db8b3e` on `dev`.
 - **Rendered sizes** of `pipelex-run/SKILL.md` at `4261cda`: 12,953 characters on Claude, 12,628 on Codex, 12,642 on Vibe, against the 13,000 ceiling. Claude came out 33 under the design's estimate, because the dry run's closing clause went.
 - **The smoke verdicts** are in the table above: every scenario passed.
 - **The review** was `/rev` at the derived profile 2, round 1, on `21bc25f`: Codex's review and the official `code-review` at `low` each reported no findings, so the pass was recorded clean and the round converged. Nothing was deferred.
@@ -73,5 +74,5 @@ Record the rendered sizes on every target, the SHA the PR squashed into, the smo
 
 ## After the fix
 
-- [ ] `/ledger-land` on the merged PR closes the children and the epic, and flips both documents to `landed`.
-- [ ] The fix reaches users with the next plugin release, cut by `/release` like any other; this campaign adds nothing to it.
+- [x] `/ledger-land` on the merged PR closes the children and the epic, and flips both documents to `landed`. It closed the epic and the four children on `3db8b3e`; the flip is its own commit, since the landing leaves a code repo's `wip/` to that repo.
+- [ ] The fix reaches users with the next plugin release, cut by `/release` like any other; this campaign adds nothing to it. The release waiting for it is `L-260924-0c76bf`, pipelex-plugins v0.10.0.

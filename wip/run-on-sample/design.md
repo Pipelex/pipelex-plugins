@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260927-87d267
 ---
 
