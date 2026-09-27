@@ -45,7 +45,7 @@ The gates:
 
 - [x] `make build`, `make check` (the ceiling on every target; the design measured about 12,986 characters on Claude, 14 under), `make agent-test`.
 - [x] The smoke sessions of design section 6, each recorded below with its session id and verdict.
-- [ ] `/rev`, at the profile `ledger review-profile` derives.
+- [x] `/rev`, at the profile `ledger review-profile` derives.
 - [ ] The PR, titled `fix/Run-on-sample · L-260927-87d267`, with `Closes` for the epic and each of the four children.
 
 ### Smoke sessions
@@ -68,6 +68,7 @@ Record the rendered sizes on every target, the SHA the PR squashed into, the smo
 
 - **Rendered sizes** of `pipelex-run/SKILL.md` at `4261cda`: 12,953 characters on Claude, 12,628 on Codex, 12,642 on Vibe, against the 13,000 ceiling. Claude came out 33 under the design's estimate, because the dry run's closing clause went.
 - **The smoke verdicts** are in the table above: every scenario passed.
+- **The review** was `/rev` at the derived profile 2, round 1, on `21bc25f`: Codex's review and the official `code-review` at `low` each reported no findings, so the pass was recorded clean and the round converged. Nothing was deferred.
 - **Filed on the way.** The design's open question, whether the envelope reading widens to a scalar's content carrying optional fields, is the decision `L-260927-f04ede`, filed so it outlives this campaign; the implementation ships the ratified wording. The line before a paid run, skipped by Claude Code in both headless sessions that reached the call, is `L-260927-17ca4a`; it predates this fix, and the request is still the consent.
 
 ## After the fix
