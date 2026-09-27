@@ -211,7 +211,7 @@ class TestPipelexRunSkill:
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_dry_run_gives_the_graph_page_before_the_numbered_flow(self, target_name: str) -> None:
-        """A dry run is step 3 shown, and on a bundle validated by path that call writes the method's
+        """A dry run is step 2 shown, and on a bundle validated by path that call writes the method's
         flowchart beside it, so the dry run gives the page's path and then the numbered flow. The skill used
         to say the graph never reaches the model, which stopped being the whole truth once the page reached
         the user (L-260926-14cb83). A real run says nothing of the page: its reply is the run."""
@@ -232,4 +232,4 @@ class TestPipelexRunSkill:
             assert "cross-skill invocation" not in body
         else:
             assert "mcp__" not in body
-            assert "so open that skill's `SKILL.md` beside this one and follow it" in self.the_step(body, 2)
+            assert "so open that skill's `SKILL.md` beside this one and follow it" in self.the_step(body, 3)

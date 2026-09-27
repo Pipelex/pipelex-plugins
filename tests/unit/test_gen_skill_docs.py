@@ -1143,12 +1143,30 @@ class TestPipelexRunSkill:
         """A scaffold is a *valid* bundle and `mthds_inputs_template` answers validity
         alone, so the template call cannot stand in for validation on the by-id path:
         a stored method with pending signatures would reach the run and burn its
-        implemented pipes before stopping at the one that is not."""
+        implemented pipes before stopping at the one that is not. Validation now runs
+        before the template call, so the order says it and the sentence that did went."""
         body = self.run_skill
         assert "Prove the target before spending credit" in body
         assert "Never run a method that did not pass." in body
         assert "the same call with `method_id` in place of `files`" in body
-        assert "a scaffold is a *valid* bundle" in body
+        assert "does not stand in for it" not in body
+
+    def test_validation_comes_before_the_inputs(self) -> None:
+        """The inputs step reads which inputs are optional from the validate verdict's
+        `main_pipe`, which the inputs template does not carry, so the verdict has to exist
+        before the check (box E of `wip/run-on-sample/design.md`). A dry run is the
+        validation step and ends the turn, so it now stops before any input is read by the
+        order alone, and the detour that sent it ahead went with the sentence saying so."""
+        body = self.run_skill
+        validate = body.index("### 2. Prove the target before spending credit")
+        inputs = body.index("### 3. The inputs")
+        assert validate < body.index("**A dry run is this step, shown.**") < inputs < body.index("Then call **`mthds_inputs_template`** once")
+        assert "a dry run is Start a run's step 2, shown" in body
+        assert "the values step 3 settled on, verbatim" in body
+        assert "goes to step 3 first" not in body
+        # The dry run reads no input, so its report no longer says what the inputs still need.
+        assert "Say that no model ran and nothing was spent." in body
+        assert "what the inputs still need" not in body
 
     def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
         """Step 7 saves under `runs/`, an artifact keeps its filename extension, and
@@ -1174,10 +1192,56 @@ class TestPipelexRunSkill:
 
     def test_user_values_are_laid_over_a_prepared_set(self) -> None:
         """Restating one input of a filled set is ordinary; without the merge it drops
-        every other key and fails the template check as drift."""
+        every other key and fails the template check as drift. A sample with an `https`
+        document needs no preparation, so no prepared file exists and the base is
+        `inputs.json` (`L-260927-235a99`): "prove it on the sample with the question asked
+        in French" keeps the sample's document. The paid run's line names the replaced keys."""
         body = self.run_skill
-        assert "laid over a current `inputs.prepared.json`" in body
-        assert "replace only the keys the user named" in body
+        assert "laid over a current `inputs.prepared.json`, else over `inputs.json`" in body
+        assert "replace only the keys the user named and keep every other" in body
+        assert "With neither file, the request's values are the whole set." in body
+        assert "With no prepared file, the request's values are the whole set." not in body
+        assert "where the inputs came from and which keys the request replaced" in body
+
+    def test_a_run_by_id_finds_its_sample_where_it_is(self) -> None:
+        """The catalog never holds an `inputs.json`: a save sends `.mthds` and `.py` files
+        alone, so a saved method's sample lives only in a directory on disk, the one
+        `/pipelex-inputs` writes for an id or the one its link file names (`L-260927-d7c594`).
+        The two are peers, since ranking them picks one sample over another in silence, and
+        a run on the wrong sample is paid, so two candidates holding one is a question."""
+        body = self.run_skill
+        assert (
+            "For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory "
+            "whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which."
+        ) in body
+        assert "**When several do, ask which; never choose.**" in body
+        assert "by default `./<method_id>/`" not in body
+
+    def test_a_missing_optional_input_is_not_drift_on_the_main_pipe(self) -> None:
+        """The light template lists every declared input and marks none optional, so a sample
+        that leaves an optional input out read as drift (`L-260927-7f577e`). The validate
+        verdict's `main_pipe` says which are optional, and it is always the entry pipe's
+        signature: on a pipe the user named, its flags belong to another signature, so the
+        allowance stops at the main pipe until `mthds_validate` takes a `pipe_ref`."""
+        body = self.run_skill
+        assert (
+            "the key set, where a key the inputs lack is fine when the run is on the main pipe "
+            "and step 2's verdict marks it `required: false`, and per key"
+        ) in body
+
+    def test_an_enveloped_input_is_checked_by_its_content(self) -> None:
+        """The `{concept, content}` envelope is a first-class form the runtime reads key by
+        key, and every cookbook sample writes it, so comparing it with the light template's
+        shape read it as drift (`L-260927-0e6ba4`). Its content is compared instead, where a
+        native scalar's one-field content stands for the bare value the template shows; the
+        clause is limited to an envelope the template does not show, since a dynamic input's
+        template is the envelope itself."""
+        body = self.run_skill
+        assert (
+            "A `{concept, content}` envelope the template does not show is checked by its `content`, "
+            'where a one-field object like `{"text": …}` stands for a bare value, and a file-ish input'
+        ) in body
+        assert "is the prepare rewrite; neither is drift." in body
 
     def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
         """The example is the most-copied part of a skill: one that still overwrites
@@ -2672,14 +2736,19 @@ class TestPublishedAddressTarget:
     def test_an_address_pairs_with_no_other_selector(self) -> None:
         """`mthds_run` takes `files` + `method_id` together — the files run and the id
         is recorded as linkage — so "one selector per call" is not a rule an agent can
-        infer from the run tool it already knows. An address is the exception and says so."""
+        infer from the run tool it already knows. An address is the exception and says so,
+        in the address reference since `wip/run-on-sample/` moved the sentence there: the
+        reference is read before the first call on an address, the only time it applies,
+        and the tool refuses a second selector before anything runs."""
         body = self.run_skill
-        assert "an address pairs with nothing" in body.lower()
-        assert "complete run source" in body
-        # The stops table says what the body says: a second selector is a refusal, not a
-        # normalization the skill performs silently on the user's behalf.
-        assert "drops the extra one" not in body
-        assert "refused before anything runs" in body
+        reference = self.run_address_reference
+        assert "an address pairs with nothing" in reference.lower()
+        assert "complete run source" in reference
+        assert "an address pairs with nothing" not in body.lower(), "the sentence moved to the reference"
+        # A second selector is a refusal, not a normalization the skill performs silently
+        # on the user's behalf.
+        assert "drops the extra one" not in body + reference
+        assert "refused with an `input_domain` error before anything runs" in reference
         # And the skill does not resolve the ambiguity itself: a run is paid, so two
         # targets in hand is a question for the user, not a selector to quietly omit.
         # The stop row that restated it went in the size diet; the guard at step 1 holds it.
@@ -2691,9 +2760,10 @@ class TestPublishedAddressTarget:
         `/pipelex-edit`. A published method belongs to whoever published it, so the
         same routing would send an agent to edit source the user does not have. The
         verdict's routing is the address reference's, the run failure's is the failure
-        reference's, and step 3 points at the first where an address's verdict fails."""
+        reference's, and step 2 points at the first where an address's verdict fails."""
         body = self.run_address_reference
         assert "belongs to whoever published it" in body
+        assert "A verdict that fails at step 2 is reported" in body
         assert "is not routed to `/pipelex-design` or `/pipelex-edit`" in body
         assert "an address's verdict is reported as [its reference](references/published-address.md) says" in self.run_skill
         failure = self.run_failure_reference.split("## A published address", 1)[1]
