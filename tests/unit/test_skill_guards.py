@@ -217,6 +217,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**",
         "**report the paths the tool returns**",
+        "**with the inputs' source and the keys the request replaced**",
         "**A saved run stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "Give `failure_message` **verbatim** first",
