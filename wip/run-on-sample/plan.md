@@ -12,7 +12,7 @@ The implementation tracker for [`design.md`](design.md), whose boxes were all ra
 - **Done.** Both requested bugs were verified against `dev` at `5bb83dd`, and `L-260927-0e6ba4`, the envelope read as drift, was found and filed on the way. The epic `L-260927-87d267` was filed to carry the campaign, with all four bugs as its children and `plan:` refs to both documents. Every box was ratified as written, in an interview of one question per box: box A brought the two neighbours in, and box E swaps steps 2 and 3.
 - **The documents travel on `docs/Run-on-sample-design`**, in the worktree `_pipelex-plugins--run-on-sample` at the workspace root. Landing them takes a recorded `/rev` pass, then `/ledger-land`; the PR body says `Advances L-260927-87d267`.
 - **Next.** The implementation starts in a new session, as phase 1 says. If the design PR has not landed by then, branch from `docs/Run-on-sample-design` so the documents are there.
-- **Open questions.** None.
+- **Open questions.** One, which the design's third review round confirmed and deferred: whether the envelope clause's one-field reading should widen to a native scalar's content that carries optional fields beside the required one, such as a Date with `time` or a Document with `title` (design 4.3). The runtime accepts that content, and no sample the tools write carries it. Read as drift, it is handed to `/pipelex-inputs`, which rewrites it to the template's bare string and drops the optional field, and which can reach `L-260923-c8f18e`'s overwrite. Widening the reading to "an object holding the template's field" changes a ratified box and spends characters the ceiling has 14 of, so it is Louis's call. Until he makes it, the implementation ships the ratified wording.
 
 ## Before the fix
 
