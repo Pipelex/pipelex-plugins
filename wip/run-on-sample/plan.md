@@ -58,6 +58,8 @@ The gates:
 | A dry run by id, which must end before any input is read | Claude Code | | |
 | "Run mt_… on its sample." with `document-qa/` linked | Codex | | |
 
+**Deferred by the design's fourth review round, unverified.** Codex read the swap of box E as colliding with these scenarios: once validation runs before the inputs, the dry-run paragraph (`templates/skills/pipelex-run/SKILL.md.j2:57`) ends the turn before the inputs step, so a request worded "…show me the target and the exact inputs you would send, and do not start the run" may be taken as a dry run and never reach the inputs a pass requires. The same paragraph's "what the inputs still need" would then describe inputs nobody has read. Before the first smoke session, settle the wording either way: reword the first three scenarios so they cannot read as a dry run, or let the dry run stop after the inputs step, and bring the paragraph's closing report into line with the order chosen.
+
 ### Checkpoint 1
 
 Record the rendered sizes on every target, the SHA the PR squashed into, the smoke verdicts, and anything the review deferred and where it went. The checklist ends with `/rev` above; a deferral goes to the ledger or to this directory.
