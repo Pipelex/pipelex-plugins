@@ -65,6 +65,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**pending only when no concrete pipe of the same code exists anywhere in the files you read.**",
         "**When the workshop answered, its `pending_signatures` is the authority**",
         "explain from the source and **say the verdict was not checked**",
+        "**and, when the verdict wrote the graph page, its path in the same opening lines, never at the end**",
         "give the page's `path` before the text flow",
         "do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer",
         "**On a target that is not on disk there is no such fallback.**",
