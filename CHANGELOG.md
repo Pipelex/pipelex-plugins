@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **`pipelex-run` runs a method on its own sample**: a request that changes one input, such as "run it on the sample with the question in French", is now laid over the method's `inputs.json` when no prepared file exists, instead of replacing the whole sample, and the line before the run names the inputs it replaced. A run by catalog id finds the sample in `./<method_id>/` or in a directory whose `pipelex-method.json` links it to the id, says which it took and asks when more than one holds a sample. A sample that leaves out an optional input of the main pipe, or writes an input in the `{concept, content}` envelope, is no longer sent to `pipelex-inputs` as out of date; to learn which inputs are optional, the skill now validates the method before it reads the inputs.
+
 - **The install page's Codex override keeps the key**: an entry of the same name in `~/.codex/config.toml`, or a `-c` override, replaces the plugin's entry whole, including the variable names it forwards, so the one-invocation `-c` form the page gave started the Pipelex tools without `PIPELEX_API_KEY`. The page now says an override passes the key only through its own `env` table or `env_vars`, and gives the `-c` form with `env_vars`.
 
 ## [0.9.2] - 2026-09-25
