@@ -82,8 +82,15 @@ class TestModelReferences:
         handle there fails at run time, so the user chooses between the model and the setting."""
         section = model_section(target_name)
         bullet = next(line for line in section.splitlines() if line.startswith("- **A model and a setting**"))
-        assert "whose model must answer `resolved`" in bullet
-        assert "that model alone as a plain `model` string without the setting, or the setting on an alias the deck lists" in bullet
+        assert "whose model must answer `resolved` and must not be a preset" in bullet
+        assert "the setting on an alias the deck lists and the model without the setting" in bullet
+        assert "a handle `unconfirmed` with neither hint as a plain `model` string, and anything else only as the bullet above allows" in bullet
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_resolved_preset_never_goes_in_an_inline_table(self, target_name: str) -> None:
+        """A preset answers `resolved`, but the run-time deck refuses one inside an inline table, which
+        validation never reads: `resolved` alone would let `$writing-factual` at a temperature through."""
+        assert "answers `resolved` for a reference that is not a preset" in model_section(target_name)
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_section_keeps_the_default_and_never_invents(self, target_name: str) -> None:

@@ -240,10 +240,10 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 - **A kind of behaviour**: list the pipe's category and write the preset whose name fits it, saying which one you chose.
 - **A model or a reference the user typed**: check it, passing it as `reference` with the pipe's `category`. On `resolved`, write it. When `other_kinds` holds the same name under another sigil, whatever the resolution (`best-gpt` exists as `@best-gpt`), write that one and say so. On any answer but `resolved`, a non-empty `other_categories` says the reference serves another kind of pipe: say so rather than write it on this one. On `not_found`, offer the `suggestions` and write only what the user picks. On `unconfirmed` with neither hint, a handle the deck does not name, write it only as a pipe's `model` string, where `mthds_validate` checks it against every model the runner serves.
-- **A model and a setting**: the setting needs an inline table, whose model must answer `resolved`. When the model the user named does not, say so and offer the choice: that model alone as a plain `model` string without the setting, or the setting on an alias the deck lists.
+- **A model and a setting**: the setting needs an inline table, whose model must answer `resolved` and must not be a preset. When the model the user named falls short, say so and offer the choice between the setting on an alias the deck lists and the model without the setting: a preset alone, a handle `unconfirmed` with neither hint as a plain `model` string, and anything else only as the bullet above allows.
 - **A setting but no model**: offer the category's presets, which carry settings for a kind of task, or put the setting in an inline table on an alias the deck lists. Never invent a handle.
 
-**Validation never looks inside an inline table**: a reference there that does not resolve fails only when a run reaches the pipe, after credit is spent, so write one only once `mthds_models` answers `resolved`.
+**Validation never looks inside an inline table**: a reference there that does not resolve fails only when a run reaches the pipe, after credit is spent, so write one only once `mthds_models` answers `resolved` for a reference that is not a preset.
 
 **The deck is what the runner can serve, not what the account may use**: a gateway can still refuse a listed model when a run starts, after the method validated. A listed model is no promise, and leaving `model` out stays the safest choice.
 
