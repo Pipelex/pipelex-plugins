@@ -5,7 +5,7 @@ item: L-260927-87d267
 
 # Design — running a method on its own sample
 
-**Written 2026-09-27**, for the epic `L-260927-87d267`, against `pipelex-plugins` at `5bb83dd` (`dev`, after #91). It answers two bugs filed from the cookbook's copy-and-change recipe, `L-260927-235a99` and `L-260927-d7c594`, verifies both, and designs their fix. Verifying them turned up two neighbours in the same paragraph of the same step that fail the same sample, `L-260927-7f577e` (filed with the other two) and `L-260927-0e6ba4` (filed by this session). Every box was ratified as written on 2026-09-27, in an interview of one question per box: all four bugs are fixed in one pull request, and steps 2 and 3 swap. The design's review on the same day limited box E's optional-key allowance to a run on the main pipe (4.4). [`plan.md`](plan.md) is the tracker. File and line references were accurate on the writing date; verify them before implementing.
+**Written 2026-09-27**, for the epic `L-260927-87d267`, against `pipelex-plugins` at `5bb83dd` (`dev`, after #91). It answers two bugs filed from the cookbook's copy-and-change recipe, `L-260927-235a99` and `L-260927-d7c594`, verifies both, and designs their fix. Verifying them turned up two neighbours in the same paragraph of the same step that fail the same sample, `L-260927-7f577e` (filed with the other two) and `L-260927-0e6ba4` (filed by this session). Every box was ratified as written on 2026-09-27, in an interview of one question per box: all four bugs are fixed in one pull request, and steps 2 and 3 swap. The design's review on the same day limited box E's optional-key allowance to a run on the main pipe (4.4), and its second round reworded the envelope clause to match the template's own shapes (4.3). [`plan.md`](plan.md) is the tracker. File and line references were accurate on the writing date; verify them before implementing.
 
 ## 1. The two bugs
 
@@ -52,9 +52,9 @@ Measured by applying the proposed text of section 4 to the rendered files at `5b
 |---|---|---|---|
 | Today | 12,987 | 12,662 | 12,676 |
 | The two bugs, with both trims | 12,924 | 12,599 | 12,613 |
-| All four, with both trims and the swap | 12,903 | 12,578 | 12,592 |
+| All four, with both trims and the swap | 12,986 | 12,661 | 12,675 |
 
-The last row includes the 32 characters that the review's main-pipe limit added to the check paragraph (4.4), which render identically on every target.
+The last row includes two review amendments to the check paragraph, which render identically on every target: the 32 characters of the main-pipe limit (4.4), and the 83 characters that the second round added to make the envelope clause match the template's shapes (4.3). That leaves 14 characters under the ceiling on Claude. If the implemented wording comes out longer, the extra room comes from rationale, as above, and never from a guard.
 
 ## 4. The fix
 
@@ -82,7 +82,13 @@ The search is written as a sentence, "a directory below the working directory wh
 
 ### 4.3 An enveloped input is checked by its content (`L-260927-0e6ba4`)
 
-In the check paragraph: "A value in the `{concept, content}` envelope is checked by its `content`". The existing exemption for the prepare rewrite then applies to that content. The `concept` annotation is left to the runtime, which checks it for compatibility at start (`input_shaper.py`, `_shape_explicit`); the skill does not duplicate that check.
+In the check paragraph: "A `{concept, content}` envelope the template does not show is checked by its `content`, where a one-field object like `{"text": …}` stands for a bare value". The clause follows the three shapes the light template gives an input, which `_delighten_entry` produces (`pipelex/pipe_machinery/rendering/input_renderer.py`):
+
+- **A native scalar**, meaning Text, Number, YesNo, Date, Time, Image, Document or a concept refining one, shows as its bare value, such as `"text_value"` or a URL string, and a list shows as an array of them. The envelope's content holds the same value as a one-field object, `{"text": …}`, `{"number": …}` or `{"url": …}`, item by item in a list, and the one-field reading bridges the two. Stripping the envelope alone would leave the cookbook's `{"text": …}` an object where the template shows a string, which is drift again.
+- **A structured concept** shows as its content dict, so the envelope's content compares by its field names directly.
+- **A dynamic input** shows as the whole envelope. That covers `Anything` and the natives outside the shaper's matrix (Html, JSON, Page, TextAndImages, SearchResult and Composite), and also a scalar refinement with extra required fields. There the sample's envelope is compared as it is, which is why the clause is limited to an envelope the template does not show.
+
+The one-field reading holds only inside an envelope. In the light form the runtime refuses `{"text": …}` for a Text input (`input_shaper.py`, `_build_item_content`), so a light-form value is still held to the template's kind, and the prepare rewrite keeps its own exemption there. The `concept` annotation is left to the runtime, which checks it for compatibility at start (`input_shaper.py`, `_shape_explicit`); the skill does not duplicate that check.
 
 ### 4.4 A missing optional input is not drift (`L-260927-7f577e`)
 
@@ -102,7 +108,7 @@ Step 2 and step 3 after the swap of box E, rendered for Claude, with changes in 
 >
 > 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, **else over `inputs.json`: replace only the keys the user named and keep every other. With neither file**, the request's values are the whole set.
 >
-> Then call `mthds_inputs_template` once, … and check the inputs against it on both keys and value shapes: the key set, **where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`**, and per key the JSON kind and a structured value's field names. **A value in the `{concept, content}` envelope is checked by its `content`, and** a file-ish input the template shows as a bare URL-or-path string and the prepared file holds as `{"url": "pipelex-storage://…"}` is the prepare rewrite**; neither is drift.**
+> Then call `mthds_inputs_template` once, … and check the inputs against it on both keys and value shapes: the key set, **where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`**, and per key the JSON kind and a structured value's field names. **A `{concept, content}` envelope the template does not show is checked by its `content`, where a one-field object like `{"text": …}` stands for a bare value, and** a file-ish input the template shows as a bare URL-or-path string and the prepared file holds as `{"url": "pipelex-storage://…"}` is the prepare rewrite**; neither is drift.**
 
 Step 4: "One line before the call: the target, the pipe, where the inputs came from **and which keys the request replaced**, and that the run spends inference credit." Step 4's `PipeFunc` sentence: "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run by its id alone carries it."
 
