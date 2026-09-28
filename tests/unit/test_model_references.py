@@ -154,3 +154,48 @@ class TestModelReferences:
     def test_no_other_skill_declares_the_lookup(self, skill: str) -> None:
         """Only design and edit write a `model` field; the other readers of the language reference never call it."""
         assert "mcp__plugin_pipelex_pipelex__mthds_models" not in skill_body("prod", skill)
+
+
+def extract_section(target_name: str) -> str:
+    """The language reference's `PipeExtract` section, up to the next heading of its level or above. Its TOML
+    example holds `# ` comments, so only a `##` or `###` line ends it."""
+    reference = next(content for path, content in rendered(target_name, "pipelex-edit").items() if path.match("skills/shared/writing-mthds.md"))
+    _, rest = reference.split("\n### PipeExtract", 1)
+    return re.split(r"\n#{2,3} ", rest, maxsplit=1)[0]
+
+
+class TestWebPageModel:
+    """The omit rule, followed to the letter, dropped the one model a web page needs: the extract deck's default
+    reads PDFs and images, and on the dev API a `PipeExtract` with no `model` validated, then failed its run over
+    a web page with "Could not identify file type of given bytes". The rationale is `docs/decisions.md`, "An input
+    the default cannot read names its model, asked or not"."""
+
+    RUN_FAILURE_REFERENCE = REPO_ROOT / "skills" / "pipelex-run" / "references" / "failed-run.md"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_an_input_the_default_cannot_read_names_its_model(self, target_name: str) -> None:
+        """The carve-out sits beside the omit rule, where a design decides whether to write `model` at all."""
+        section = model_section(target_name)
+        omit = section.index("**Omit `model` unless the user asks for a model")
+        carve_out = section.index("**A pipe whose input the default model cannot read names the model that can**, whether or not the user asked")
+        assert omit < carve_out, f"{target_name}: the carve-out must follow the rule it qualifies"
+        assert 'a `PipeExtract` over a web page sets `model = "@default-extract-web-page"`' in section
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_extract_section_makes_the_web_page_model_a_rule(self, target_name: str) -> None:
+        """ "Use it if needed" left the choice to a design that the omit rule had already told to leave it out."""
+        section = extract_section(target_name)
+        assert '**A web page is read only with `model = "@default-extract-web-page"`.**' in section
+        assert "`Could not identify file type of given bytes`, after validation has passed" in section
+        assert "A URL to a PDF is a PDF, which the default reads." in section, "a PDF by URL read under the default"
+        assert "if needed" not in section
+
+    def test_a_run_that_fails_on_a_web_page_goes_to_edit(self) -> None:
+        """The failure reads like an unreadable input, but the page is sound and the method lacks its model; the
+        inputs row stays first, since a published address routes that row alone."""
+        body = self.RUN_FAILURE_REFERENCE.read_text(encoding="utf-8")
+        rows = [line for line in body.splitlines() if line.startswith("| ") and not line.startswith("| What")]
+        assert rows[0].startswith("| an input is missing, malformed or unreadable |")
+        web_page = next(row for row in rows if "`Could not identify file type of given bytes`" in row)
+        assert "a sound web page, read by a `PipeExtract` without the web-page model" in web_page
+        assert web_page.endswith('| `/pipelex-edit`, to set that pipe\'s `model = "@default-extract-web-page"` |')

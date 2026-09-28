@@ -40,7 +40,7 @@ Those three work on files, and each also takes a saved method's catalog id (`mt_
 
 `pipelex-synthetic-inputs` needs no Pipelex tool and no key for anything but a photograph. `pipelex-scaffold` needs none either: git, the method-app family's initializer and `make serve`, the language initializers and its own two scripts are all it uses, although the method-app template's `make create` calls the hosted API with your key.
 
-The skills share one reference for MTHDS, the language a method is written in: `pipelex-design` reads it before every write, and `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` read it for a syntax question. It says to leave a pipe's `model` out unless you ask for a model, a setting or a kind of behaviour, and when you do, how `pipelex-design` and `pipelex-edit` look the reference up and check it with `mthds_models` rather than guess one. The language keeps the standard's name; Pipelex is the product that builds and runs it.
+The skills share one reference for MTHDS, the language a method is written in: `pipelex-design` reads it before every write, and `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` read it for a syntax question. It says to leave a pipe's `model` out unless you ask for a model, a setting or a kind of behaviour, or the pipe reads an input the default model cannot, as an extraction over a web page does, and when you do ask, how `pipelex-design` and `pipelex-edit` look the reference up and check it with `mthds_models` rather than guess one. The language keeps the standard's name; Pipelex is the product that builds and runs it.
 
 ## The Pipelex tools
 

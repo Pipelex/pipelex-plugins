@@ -242,6 +242,8 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 **Omit `model` unless the user asks for a model, a setting such as a temperature, or a kind of behaviour such as factual writing**: the default is one the user's account can run, while a reference nobody asked for pins a model the account's gateway may refuse, which validation cannot see, so every run fails.
 
+**A pipe whose input the default model cannot read names the model that can**, whether or not the user asked: a `PipeExtract` over a web page sets `model = "@default-extract-web-page"`, as its section says. Validation cannot see this one either, since it never knows what a `Document` will hold.
+
 **Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen` and `search` for a `PipeSearch`. It spends no credit.
 
 - **A kind of behaviour**: list the pipe's category and write the preset whose name fits it, saying which one you chose.
@@ -486,7 +488,7 @@ output      = "Page[]"
 
 **With an `Image` input**, `page_views` and `page_image_captions` cannot be turned on, and `page_views_dpi` and `max_page_images` cannot be set at all: they describe a document's pages, and validation rejects them on an image.
 
-For web pages, the input is still `Document` (the URL is in the `url` field). Use `model = "@default-extract-web-page"` if needed.
+**A web page is read only with `model = "@default-extract-web-page"`.** Its input is still a `Document`, the page's URL in the `url` field, but the default extraction model reads PDFs and images: given a web page, it fails the run at this step with `Could not identify file type of given bytes`, after validation has passed. A URL to a PDF is a PDF, which the default reads.
 
 ### PipeSearch — search the web
 

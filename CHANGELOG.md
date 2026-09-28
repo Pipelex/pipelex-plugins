@@ -18,6 +18,8 @@
 
 - **A designed method no longer pins a model nobody asked for**: the MTHDS reference's inline-table example named a real model handle, which a design copied into a method; the account's gateway refused that model, and every run failed after validation had passed. The reference now says to leave `model` out unless the user asks for a model, a setting or a kind of behaviour, since the default is one the account can run, and its inline-table example names an alias rather than a handle.
 
+- **A method that reads a web page keeps the model the page needs**: the rule to leave `model` out also left out `@default-extract-web-page`, the only extraction model that reads a web page. The default one reads PDFs and images, so such a method validated, then failed its run at the extraction with "Could not identify file type of given bytes". The MTHDS reference now says that a pipe whose input the default model cannot read names the model that can, and that a `PipeExtract` over a web page sets `@default-extract-web-page`; a URL to a PDF keeps the default. `pipelex-run` sends that failure to `pipelex-edit` to set the model, rather than to `pipelex-inputs`, since the page itself is a sound input.
+
 - **The install page's Codex override keeps the key**: an entry of the same name in `~/.codex/config.toml`, or a `-c` override, replaces the plugin's entry whole, including the variable names it forwards, so the one-invocation `-c` form the page gave started the Pipelex tools without `PIPELEX_API_KEY`. The page now says an override passes the key only through its own `env` table or `env_vars`, and gives the `-c` form with `env_vars`.
 
 ## [0.9.2] - 2026-09-25
