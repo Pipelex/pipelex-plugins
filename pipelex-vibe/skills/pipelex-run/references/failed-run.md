@@ -5,6 +5,7 @@ Read this at step 8 when a run failed, after giving its `failure_message` verbat
 | What the failure says | Where it goes |
 |---|---|
 | an input is missing, malformed or unreadable | `/pipelex-inputs` |
+| `Could not identify file type of given bytes` on bytes that open like HTML, such as `<!doctype html>`: a sound web page, read by a `PipeExtract` without the web-page model | `/pipelex-edit`, to set that pipe's `model = "@default-extract-web-page"` |
 | a pipe's prompt, model or operator settings are at fault | `/pipelex-edit` |
 | the method's structure or a contract is at fault | `/pipelex-design` |
 
