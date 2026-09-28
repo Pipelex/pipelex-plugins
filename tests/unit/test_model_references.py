@@ -61,20 +61,23 @@ class TestModelReferences:
         assert "offer a preset or ask which model, never invent a handle" not in section
 
     @pytest.mark.parametrize("target_name", TARGETS)
-    def test_a_sigil_hint_is_read_whatever_the_resolution(self, target_name: str) -> None:
-        """A bare `best-gpt` checked against the dev deck came back `unconfirmed` with `@best-gpt` in
-        `other_kinds`: read only on `not_found`, the hint would be skipped and the bare name written."""
+    def test_the_check_is_read_in_one_order(self, target_name: str) -> None:
+        """An unresolved answer can carry a hint: `best-gpt` came back `unconfirmed` with `@best-gpt` in
+        `other_kinds`, `$best-gpt` would be `not_found` with the same, and `gpt-image-2` checked as `llm`
+        comes back `unconfirmed` with `img_gen` in `other_categories`. The hints come before the
+        resolution's own branch, and one order says so, since two rules on one answer contradict."""
         section = model_section(target_name)
-        assert "When `other_kinds` holds the same name under another sigil, whatever the resolution" in section
-        assert "On `unconfirmed` with neither hint" in section
-
-    @pytest.mark.parametrize("target_name", TARGETS)
-    def test_another_category_is_read_on_any_unresolved_answer(self, target_name: str) -> None:
-        """`gpt-image-2` checked as `llm` comes back `unconfirmed` with `img_gen` in `other_categories`:
-        read only on `not_found`, the handle would be written on a `PipeLLM`."""
-        assert "On any answer but `resolved`, a non-empty `other_categories` says the reference serves another kind of pipe" in (
-            model_section(target_name)
+        bullet = next(line for line in section.splitlines() if line.startswith("- **A model or a reference the user typed**"))
+        assert "act on the first of these that fits the answer" in bullet
+        steps = (
+            "On `resolved`, write it.",
+            "When `other_kinds` holds the same name under another sigil",
+            "When `other_categories` is non-empty, the reference serves another kind of pipe",
+            "On `not_found`, offer the `suggestions`",
+            "On `unconfirmed`, a handle the deck does not name, write it only as a pipe's `model` string",
         )
+        positions = [bullet.index(step) for step in steps]
+        assert positions == sorted(positions), f"{target_name}: the check's answers are out of order"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_model_and_a_setting_never_write_an_unchecked_table(self, target_name: str) -> None:
@@ -119,7 +122,15 @@ class TestModelReferences:
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_an_older_workshop_falls_back_without_a_stop(self, target_name: str) -> None:
-        assert "**Without `mthds_models`**, on a workshop older than the release that brought it" in model_section(target_name)
+        """Without the lookup, a reference the user typed is still written where validation checks it,
+        rather than traded for a preset or a question."""
+        section = model_section(target_name)
+        assert "**Without `mthds_models`**, on a workshop older than the release that brought it" in section
+        assert (
+            "Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, "
+            "and never in an inline table" in section
+        )
+        assert "When the user named no model, offer a preset this reference names, or ask which model" in section
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_edit_points_at_the_section_where_a_model_changes(self, target_name: str) -> None:
