@@ -283,7 +283,10 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Every run is logged**, failed and unfinished ones included",
         "**A failing line is checked against the case's inputs before the method is touched**",
         "**State no capability that fit.md does not state**",
-        "**A candidate is the method's part of the request: name what carries the rest, and never promise a schedule, a connector or a write-back.**",
+        (
+            "**A candidate is the method's part of the request: name what carries the rest, "
+            "and never promise a schedule, a connector or a write-back that no carrier provides.**"
+        ),
         "**Ask it to stop at run-ready, with no run offer**",
         "**A case of the user's own files stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
