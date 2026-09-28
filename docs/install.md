@@ -28,7 +28,8 @@ Having both is harmless, but the Pipelex MCP adds nothing a coding session needs
 
 - In Claude Code, run `/mcp` and turn off the Pipelex entry. An entry you have not signed in to is collapsed behind the **Show unused connectors** row.
 - For one project, list it under `deniedMcpServers` in `.claude/settings.json`.
-- For every project, set `disableClaudeAiConnectors: true` in your user settings.
+
+Avoid `disableClaudeAiConnectors: true` for this. It removes the Pipelex MCP, but also every other connector on your Claude account, such as Gmail, Google Drive and Calendar, and those are what the agent uses to fetch a method's inputs from your mail or files and to deliver its results.
 
 ## Claude Code
 

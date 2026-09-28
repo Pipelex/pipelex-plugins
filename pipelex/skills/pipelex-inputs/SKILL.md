@@ -33,6 +33,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
+- **A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**: a run fetches it without the user's sign-in, so download or export the file first.
 - **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` each copy's path before writing it, `inputs.json` when a value holds a file's text, and `inputs.prepared.json` before step 5's call. For a path not ignored, add `<output_dir>/inputs/`, `inputs.json` or `inputs.prepared.json` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 ## Process

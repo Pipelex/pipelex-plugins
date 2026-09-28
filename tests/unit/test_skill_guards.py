@@ -35,6 +35,8 @@ TARGET_OUTPUTS = ("pipelex", "pipelex-codex", "pipelex-vibe")
 GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-design": (
         "this skill never guesses at validity",
+        "read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**",
+        "**A `PipeFunc` computes; it never calls another service or holds a credential.**",
         "Do not write `.mthds` files without validation available.",
         "Never silently skip validation.",
         "**Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**",
@@ -101,6 +103,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never write or edit `pipelex-method.json`",
     ),
     "pipelex-integrate": (
+        "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
         (
             "Every `mthds_codegen` call passes `output_dir`; "
             "a refused or failed write is a refusal, never a reason to write the returned bytes yourself."
@@ -136,6 +139,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never silently improvise a template.",
         "never hand-fake a storage reference",
         "**The template is authoritative**: fill its values; never invent shapes it doesn't have.",
+        "**A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**",
         "**A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**",
         "**The user's own files stay out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
@@ -227,6 +231,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.",
     ),
     "pipelex-scaffold": (
+        "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
         "exactly two branches and carries no templates of its own",
         "never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room",
         "A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else",
@@ -277,7 +282,8 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**A key is written and shown before the first run of its case, and never adjusted to fit an output.**",
         "**Every run is logged**, failed and unfinished ones included",
         "**A failing line is checked against the case's inputs before the method is touched**",
-        "**State no capability that frame.md does not state**",
+        "**State no capability that fit.md does not state**",
+        "**A candidate is the method's part of the request: name what carries the rest, and never promise a schedule, a connector or a write-back.**",
         "**Ask it to stop at run-ready, with no run offer**",
         "**A case of the user's own files stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",

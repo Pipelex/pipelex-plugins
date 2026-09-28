@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Construction is complexity-adaptive — a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…). Construction adapts to complexity — a shallow, fully understood graph is written directly, and deep, uncertain or staged work goes stepwise.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -31,11 +31,13 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 ### 1. Capture the contract
 
+**When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
+
 Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks and the like), write the closest in-scope equivalent and call out the deviation.
 
 Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, without waiting for a reply. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: {% include "skills/shared/pipefunc-warning.md.j2" %} Discuss only genuine ambiguity, or when the user asks to collaborate.
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, without waiting for a reply. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: {% include "skills/shared/pipefunc-warning.md.j2" %} **A `PipeFunc` computes; it never calls another service or holds a credential.** Discuss only genuine ambiguity, or when the user asks to collaborate.
 
 ### 2. Resolve the bundle home before writing
 
@@ -68,7 +70,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. {% include "skills/shared/graph-page.md.j2" %}
 4. **Warn again for a `PipeFunc`**, naming its pipes: {% include "skills/shared/pipefunc-warning.md.j2" %}
-5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it if the user wants one.
+5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
 6. {% include "skills/shared/stale-types-notice.md.j2" %}
 
 {% include "skills/shared/saved-copy-notice.md.j2" %}
