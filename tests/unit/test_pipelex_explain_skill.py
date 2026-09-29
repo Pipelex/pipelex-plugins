@@ -14,7 +14,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexExplainSkillShape:
-    """The size diet (`wip/skill-size-diet/`, phase 6) rewrote the skill in the read-before-act shape: the
+    """The size diet (L-260923-a9bdfe, phase 6) rewrote the skill in the read-before-act shape: the
     targets, the requirements with the workshop optional, the read-only guard, the five steps of an explanation
     and a stop table in `SKILL.md`, and a method that is not on disk — a catalog id or a published address — in
     one reference read before the first call on one. What these pin is that shape holding: the reference pointed

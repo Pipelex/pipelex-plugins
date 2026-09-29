@@ -31,12 +31,12 @@ ROOT_TARGET_OUTPUT_DIRS = ("skills", "hooks", "mcp", ".claude-plugin", ".codex-p
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
-# The compaction ceiling (box C of `wip/skill-size-diet/design.md`). After a compaction Claude
+# The compaction ceiling (box C of the size diet's design, L-260923-a9bdfe). After a compaction Claude
 # Code re-attaches each invoked skill within 5,000 tokens, so a SKILL.md longer than that is
 # carried forward as its head alone and loses whatever its tail guarded. The ceiling is counted
 # in characters, which a check can count exactly, and derived from tokens in phase 0: 5,000
 # times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
-# target (2.77, the Claude 5 tokenizer), less a margin — `wip/skill-size-diet/facts.md`.
+# target (2.77, the Claude 5 tokenizer), less a margin — the size diet's facts (L-260923-a9bdfe).
 SKILL_CEILING_CHARS = 13_000
 
 # A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
@@ -617,7 +617,7 @@ def _link_targets(text: str) -> list[str]:
 
 
 def check_skill_links(base_dir: Path) -> list[str]:
-    """Links resolve both ways in every target (box H of `wip/skill-size-diet/design.md`).
+    """Links resolve both ways in every target (box H of the size diet's design, L-260923-a9bdfe).
 
     Forward: every relative link in a skill, a reference or a shared file names a file that
     exists in the same target, and every anchor names a heading of the file it points into.

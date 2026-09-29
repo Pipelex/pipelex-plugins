@@ -14,7 +14,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexCatalogSkillShape:
-    """The size diet (`wip/skill-size-diet/`, phase 6) rewrote the skill in the read-before-act
+    """The size diet (L-260923-a9bdfe, phase 6) rewrote the skill in the read-before-act
     shape: list and find, the save as numbered steps and the pull as numbered steps in `SKILL.md`,
     with a Guards section and one stop table; and three branches in references read on their
     condition — the Python a `PipeFunc` bundle sends, a save refused because the saved method moved,

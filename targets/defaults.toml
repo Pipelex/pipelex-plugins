@@ -17,7 +17,7 @@ harness_name = "Claude Code"
 # ${CLAUDE_SKILL_DIR} in a skill body before the model reads it; Codex and
 # Mistral Vibe substitute nothing, so they override this with a <skill-dir>
 # placeholder that `templates/skills/shared/skill-dir.md.j2` defines in one
-# sentence (wip/skill-size-diet/facts.md, sections 3 to 5).
+# sentence (the size diet's facts, L-260923-a9bdfe, sections 3 to 5).
 skill_dir = "${CLAUDE_SKILL_DIR}"
 
 # Version floors the skills state to the user. One table, so a bump is one edit
@@ -65,9 +65,9 @@ python_max = "3.14"
 # The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
 # (stdio) — definitive, not a BYOK workaround: builders authoring local files
 # are the plugin's audience, and the hosted console is a connector users add
-# in their host's own UI, never a plugin declaration (rationale: the Pipelex
-# workspace's wip/history/mcp-dual-deployment/pipelex-mcp-plugin-reconciliation.md
-# §8). The workshop authenticates
+# in their host's own UI, never a plugin declaration (rationale: docs/decisions.md,
+# "Dual-MCP flip: every baked declaration is the local workshop launcher").
+# The workshop authenticates
 # with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
 # - Claude: the `user_config` tables below become the manifest's `userConfig`
 #   (Claude prompts for them when the plugin is enabled; sensitive values go

@@ -1,4 +1,4 @@
-"""The guard registry (box H of `wip/skill-size-diet/design.md`).
+"""The guard registry (box H of the size diet's design, L-260923-a9bdfe).
 
 A guard is a sentence a model must have read before it acts: skipping it loses something that
 cannot be recovered, sends something off the machine, spends credit, or leaves a result wrong with
