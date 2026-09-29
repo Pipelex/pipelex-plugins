@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **`pipelex-synthetic-inputs`' PDF recipes are rewritten from scratch**: the canvas, multi-page, table and line-item recipes are new scripts with new sample documents, and each keeps everything it shows, along with a `PAGE_SIZE` switch for A4, in one marked content block. The table and line-item recipes check their column widths against the real 456-point text frame of a Letter page, where the old check allowed 468 points and so let a table up to 12 points too wide through; the table repeats its header row on every page and computes each verdict from the limits it prints, and the canvas recipe stops rather than draw text past the edge of the page.
+
 - **`pipelex-explain`, `pipelex-design` and `pipelex-run` point at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and these skills now give that page's path before their text flow — `pipelex-explain` in the opening lines of every explanation of a bundle on disk, `pipelex-design` when it hands over a method, and `pipelex-run` on a dry run — so the whole method can be opened in a browser. `pipelex-explain` still writes nothing of its own, and the page is the one file it leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
 
 ### Fixed
