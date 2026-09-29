@@ -17,7 +17,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexRunSkill:
-    """The size diet (`wip/skill-size-diet/`, phase 6) rewrote the skill in the read-before-act
+    """The size diet (L-260923-a9bdfe, phase 6) rewrote the skill in the read-before-act
     shape: the steps of Start a run with their guards, Follow a run, and a stop table holding only
     what a tool reports, in `SKILL.md`; and the branches in references read on their condition — a
     published address, a failed run, and a linked run refused at `method_id`. What these pin is that

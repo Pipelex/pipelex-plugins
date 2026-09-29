@@ -509,7 +509,7 @@ class TestMethodAppBranch:
     """The TypeScript branch is the method app: the family's initializer, then its serve target.
 
     Ratified on 2026-09-16 with the method-app template, and amended at the size diet's ratification on
-    2026-09-23 (box E of `wip/skill-size-diet/design.md`): a program that belongs to a template lives in
+    2026-09-23 (box E of the size diet's design, L-260923-a9bdfe): a program that belongs to a template lives in
     the template. `pipelex-method-apps` publishes `@pipelex/create-method-app`, which writes `webapp-js/`,
     makes the pristine commit and runs the copy's `make create`, and the template's `make serve`, which
     starts the dev server detached on loopback and proves the page answers. The skill runs those two

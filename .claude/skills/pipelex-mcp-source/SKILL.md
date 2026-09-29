@@ -87,7 +87,7 @@ Rare, and the only case where prose docs move. This is a real change to the plug
 
 Edit only `command` and `args` in `targets/defaults.toml` `[vars.mcp_server]`, leaving `env_vars` and every `user_config` table alone, since credential delivery is orthogonal to which build gets spawned. Run `make build`, then `make check`. Then propagate to the docs that quote the launcher as *current fact*: `docs/install.md`, `docs/development.md`, `docs/decisions.md`, `docs/build-targets.md`, `CLAUDE.md`. Grep for `@pipelex/mcp@` and `npx -y @pipelex` to find them rather than trusting this list.
 
-**Do not rewrite** `CHANGELOG.md`, `TODOS.md`, or anything under `wip/` — those are historical records of what was true at the time, and editing them destroys the record. Add a new `CHANGELOG.md` entry describing the change instead. Amend `docs/decisions.md` where the change contradicts a recorded decision, so the reasoning stays discoverable; this repo treats decisions as durable, so supersede the entry with the new rationale rather than deleting it.
+**Do not rewrite** the existing entries of `CHANGELOG.md` — they are a historical record of what was true at the time, and editing them destroys the record. Add a new `CHANGELOG.md` entry describing the change instead. Amend `docs/decisions.md` where the change contradicts a recorded decision, so the reasoning stays discoverable; this repo treats decisions as durable, so supersede the entry with the new rationale rather than deleting it.
 
 ## The hosted console
 

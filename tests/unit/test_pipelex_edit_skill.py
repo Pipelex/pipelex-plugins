@@ -13,7 +13,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexEditSkill:
-    """The size diet (`wip/skill-size-diet/`, phase 6) rewrote the skill in the read-before-act shape:
+    """The size diet (L-260923-a9bdfe, phase 6) rewrote the skill in the read-before-act shape:
     its scope split, mode table, steps 1 to 7 under their old headings, a stop table and a reference
     index, and no reference of its own, since its rename checklist is read on most runs. It made the
     moves `pipelex-organize` made in the same phase: the catalog-id bridge is read from the shared
