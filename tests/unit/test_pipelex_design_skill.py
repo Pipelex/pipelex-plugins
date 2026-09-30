@@ -14,7 +14,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexDesignSkill:
-    """The size diet (`wip/skill-size-diet/`, phase 4) rewrote the skill in the read-before-act
+    """The size diet (L-260923-a9bdfe, phase 4) rewrote the skill in the read-before-act
     shape: the contract, the bundle home, the choice of mode, direct construction, the verdicts, the
     runnable gate and delivery in `SKILL.md`, with the re-entry guards and a stop table; and the two
     branches the skill decides first in references read on their condition — stepwise construction

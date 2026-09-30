@@ -44,7 +44,7 @@ def the_move(body: str, number: int) -> str:
 class TestPipelexLabSkill:
     """`pipelex-lab` owns the loop around a method that the proof lab's driver ran by hand: frame a use case,
     write each case's answer key before its first run, agree a budget, then run, score and log every run,
-    fixing the method until the pass bar or a stop (`wip/lab-skill/design.md`, ratified 2026-09-24). It is
+    fixing the method until the pass bar or a stop (the design behind L-260924-37b97b, ratified 2026-09-24). It is
     written to the read-before-act rule from the start: the three moves with their guards and the loop's stops in
     `SKILL.md`, and the branches — framing, the key's format, the log's format — in references read at their move.
     What these pin is that shape. The guards themselves are registered in `test_skill_guards.py`."""
@@ -216,7 +216,7 @@ class TestLabTriggers:
 
 class TestIntegrationPoints:
     """The other skills point at the lab where a builder reaches it without asking for it (phase 2 of
-    `wip/lab-skill/plan.md`). Design's hand-off names it beside the test files it already offers. A run the lab did
+    the plan behind L-260924-37b97b). Design's hand-off names it beside the test files it already offers. A run the lab did
     not start is still credit spent, and "run it again" belongs to `/pipelex-run`, so that skill offers the lab a run
     of a lab case, and the lab logs it outside its rounds. The file factory lists every file's planted facts, which a
     key takes as they are. Every one of those skills sits at the size ceiling, so each point is one sentence, pinned

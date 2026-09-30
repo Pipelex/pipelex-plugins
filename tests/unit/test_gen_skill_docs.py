@@ -71,6 +71,7 @@ HOOK_TEMPLATE_BODIES = {
 # vendored check.mjs bundle (whose real content is a 4+ MB esbuild artifact).
 STATIC_ASSET_BODIES = {
     "hooks/assets/check.mjs": "// vendored hook bundle {{ not_a_template }}\n",
+    "hooks/assets/THIRD-PARTY-NOTICES.md": "# Notices for check.mjs {% not_a_template %}\n",
 }
 
 
@@ -124,7 +125,7 @@ def template_tree(tmp_path: Path) -> Path:
 
     plugin_dir = tmp_path / ".claude-plugin"
     plugin_dir.mkdir()
-    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
@@ -153,12 +154,12 @@ def _create_codex_tree(tmp_path: Path) -> Path:
 
     claude_plugin = tmp_path / ".claude-plugin"
     claude_plugin.mkdir()
-    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     codex_plugin = tmp_path / ".codex-plugin"
     codex_plugin.mkdir()
     (codex_plugin / "plugin-base.json").write_text(
-        '{"author": {"name": "test"}, "license": "Apache-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
+        '{"author": {"name": "test"}, "license": "Elastic-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
     )
 
     targets_dir = tmp_path / "targets"
@@ -934,7 +935,7 @@ class TestSkillFailureDiscipline:
 
 
 class TestSharedSkillIncludes:
-    """Box J of `wip/plugin-skills-gaps/design.md`: the blocks the MCP-backed
+    """Box J of the design behind L-260921-cfb760: the blocks the MCP-backed
     skills used to copy live in `templates/skills/shared/` and are included.
 
     The cost of the copies was concrete — the wrong Claude credential sentence
@@ -1156,7 +1157,7 @@ class TestPipelexRunSkill:
     def test_validation_comes_before_the_inputs(self) -> None:
         """The inputs step reads which inputs are optional from the validate verdict's
         `main_pipe`, which the inputs template does not carry, so the verdict has to exist
-        before the check (box E of `wip/run-on-sample/design.md`). A dry run is the
+        before the check (box E of the design behind L-260927-87d267). A dry run is the
         validation step and ends the turn, so it now stops before any input is read by the
         order alone, and the detour that sent it ahead went with the sentence saying so."""
         body = self.run_skill
@@ -1740,7 +1741,7 @@ class TestPipelexInputsSizeLimitDiscipline:
     behavioral boundary: size rejection stops, while an unreadable path may be
     corrected without changing the selected asset.
 
-    The size diet (`wip/skill-size-diet/`, phase 3) split the two halves by what a
+    The size diet (L-260923-a9bdfe, phase 3) split the two halves by what a
     model must have read before it acts. The file-fidelity rule is a guard — a
     derived file uploaded in place of the user's is silently wrong — so it stays in
     `SKILL.md`, once, at the prepare step. The failure branches announce themselves
@@ -2184,7 +2185,7 @@ class TestSyntheticInputsSkill:
 
 
 class TestPipelexExplainSkill:
-    """Boxes F and M of `wip/plugin-skills-gaps/design.md`: explain is brought on
+    """Boxes F and M of the design behind L-260921-cfb760: explain is brought on
     par with the main skills — a directory target, every pipe type named, the
     workshop optional, a remote method at contract level — and it is strictly
     read-only, which the tool list is made to match."""
@@ -2425,7 +2426,7 @@ class TestBundleHome:
 
 
 class TestEditClassifiesFirstAndTriggersStopColliding:
-    """Box L of `wip/plugin-skills-gaps/design.md`.
+    """Box L of the design behind L-260921-cfb760.
 
     Two things a description cannot say twice and a step order that decides who
     pays for a verdict: `pipelex-edit` routes a structural change to
@@ -2591,9 +2592,9 @@ class TestHookRendering:
         assert os.access(hook_script, os.X_OK)
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
-        """One vendored check.mjs bundle serves all three platforms."""
+        """One vendored check.mjs bundle serves all three platforms, and its MIT notice ships beside it on each."""
         for platform in Platform:
-            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs"]
+            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 
     def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
         """check.mjs must bypass Jinja: its body (a generated bundle) may contain
@@ -2605,9 +2606,10 @@ class TestHookRendering:
 
     def test_generate_writes_static_asset_into_target(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
-        asset = template_tree / "pipelex" / "hooks" / "check.mjs"
-        assert asset.is_file()
-        assert asset.read_text() == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+        for name, body in STATIC_ASSET_BODIES.items():
+            asset = template_tree / "pipelex" / "hooks" / Path(name).name
+            assert asset.is_file()
+            assert asset.read_text() == body
 
     def test_missing_static_asset_raises(self, template_tree: Path) -> None:
         (template_tree / "templates" / "hooks" / "assets" / "check.mjs").unlink()
@@ -2669,7 +2671,7 @@ class TestNoShippedSkillNamesAnAbsentSkill:
 class TestPublishedAddressTarget:
     """A published address is the third target form in `pipelex-inputs` and `pipelex-run`.
 
-    Box E of `wip/plugin-skills-gaps/design.md` at the workspace root, ratified
+    Box E of the design behind L-260921-cfb760, ratified
     2026-09-21. An address is passed as `method_ref` exactly as a catalog id is
     passed as `method_id`, so no step grows a special case — and what these pin
     is the handful of places where an address is genuinely not like an id: it
@@ -2739,7 +2741,7 @@ class TestPublishedAddressTarget:
         """`mthds_run` takes `files` + `method_id` together — the files run and the id
         is recorded as linkage — so "one selector per call" is not a rule an agent can
         infer from the run tool it already knows. An address is the exception and says so,
-        in the address reference since `wip/run-on-sample/` moved the sentence there: the
+        in the address reference since the run-on-sample campaign (L-260927-87d267) moved the sentence there: the
         reference is read before the first call on an address, the only time it applies,
         and the tool refuses a second selector before anything runs."""
         body = self.run_skill
@@ -2816,7 +2818,7 @@ class TestPublishedAddressTarget:
 
 
 class TestCatalogIdInEverySkill:
-    """Box H of `wip/plugin-skills-gaps/design.md`, with box A step 5, box F.4
+    """Box H of the design behind L-260921-cfb760, with box A step 5, box F.4
     and box R's notice: a catalog id is a target every skill accepts.
 
     The three file-based skills reach a saved method through a directory — the

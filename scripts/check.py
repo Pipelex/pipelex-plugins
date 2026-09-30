@@ -14,7 +14,7 @@ from typing import Any, cast
 import yaml
 
 from scripts.gen_skill_docs import CLAUDE_MCP_LAUNCHER_COMMAND, MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
-from scripts.hook_bundle import HOOK_BUNDLE_PATH, read_bundle, read_provenance, unpublished_sources
+from scripts.hook_bundle import HOOK_BUNDLE_PATH, HOOK_NOTICES_PATH, inlined_packages, read_bundle, read_provenance, unpublished_sources
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
@@ -31,12 +31,12 @@ ROOT_TARGET_OUTPUT_DIRS = ("skills", "hooks", "mcp", ".claude-plugin", ".codex-p
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 
-# The compaction ceiling (box C of `wip/skill-size-diet/design.md`). After a compaction Claude
+# The compaction ceiling (box C of the size diet's design, L-260923-a9bdfe). After a compaction Claude
 # Code re-attaches each invoked skill within 5,000 tokens, so a SKILL.md longer than that is
 # carried forward as its head alone and loses whatever its tail guarded. The ceiling is counted
 # in characters, which a check can count exactly, and derived from tokens in phase 0: 5,000
 # times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
-# target (2.77, the Claude 5 tokenizer), less a margin — `wip/skill-size-diet/facts.md`.
+# target (2.77, the Claude 5 tokenizer), less a margin — the size diet's facts (L-260923-a9bdfe).
 SKILL_CEILING_CHARS = 13_000
 
 # A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
@@ -617,7 +617,7 @@ def _link_targets(text: str) -> list[str]:
 
 
 def check_skill_links(base_dir: Path) -> list[str]:
-    """Links resolve both ways in every target (box H of `wip/skill-size-diet/design.md`).
+    """Links resolve both ways in every target (box H of the size diet's design, L-260923-a9bdfe).
 
     Forward: every relative link in a skill, a reference or a shared file names a file that
     exists in the same target, and every anchor names a heading of the file it points into.
@@ -801,6 +801,30 @@ def check_hook_provenance(base_dir: Path) -> list[str]:
         f"{rel}: {problem} — re-vendor from the main checkout of pipelex-sdk-js with PIPELEX_TOOLS_WASM_PATH unset "
         "(`make vendor-hook`), then `make build`"
         for problem in unpublished_sources(provenance)
+    ]
+
+
+def check_hook_notices(base_dir: Path) -> list[str]:
+    """Refuse a vendored hook bundle that inlines a package its notices file does not name.
+
+    The bundle is MIT code inside an ELv2 plugin, so it ships with `THIRD-PARTY-NOTICES.md` beside
+    it, and a re-vendor that brings in a new dependency brings a notice nobody has written yet. The
+    packages are read from the comments esbuild writes above each inlined module, and each has to
+    appear in the notices file in backticks. Only the template copies are read: the freshness check
+    holds every target's copies to them byte for byte.
+    """
+    bundle_path = base_dir / HOOK_BUNDLE_PATH
+    notices_path = base_dir / HOOK_NOTICES_PATH
+    if not bundle_path.is_file():
+        return []  # check_hook_provenance reports the missing bundle
+    if not notices_path.is_file():
+        return [f"{HOOK_NOTICES_PATH.as_posix()}: missing — the hook bundle ships MIT code and needs its notice beside it"]
+    notices = notices_path.read_text(encoding="utf-8")
+    return [
+        f"{HOOK_NOTICES_PATH.as_posix()}: `{package}` is inlined into {HOOK_BUNDLE_PATH.name} but not named here "
+        "— add its licence and copyright to the notices file"
+        for package in sorted(inlined_packages(read_bundle(bundle_path)))
+        if f"`{package}`" not in notices
     ]
 
 
@@ -1225,6 +1249,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_hook_provenance(base_dir),
         "FAIL: The vendored hook bundle names a source no published artifact reproduces.",
         "  The hook bundle was built from a pipelex-sdk-js commit and @pipelex/tools-wasm from npm.",
+    )
+    failed |= _run_check(
+        "Checking the hook bundle's notices name every package it inlines...",
+        check_hook_notices(base_dir),
+        "FAIL: The hook bundle inlines a package its notices file does not name.",
+        "  Every package the hook bundle inlines is named in its notices file.",
     )
     failed |= _run_check(
         "Checking Mistral Vibe target artifacts...",

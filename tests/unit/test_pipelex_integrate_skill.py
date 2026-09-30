@@ -24,7 +24,7 @@ class TestPipelexIntegrateSkill:
     touched, one directory per method, orphans are never deleted, sources are never
     mixed, a project-owned harness is kept, and the signature comes from the verdict.
 
-    The size diet (`wip/skill-size-diet/`, phase 2) moved the skill's branches into
+    The size diet (L-260923-a9bdfe, phase 2) moved the skill's branches into
     references read on their condition — refresh mode, the harness branch, the
     signature fallback, the report on orphans, the gate failures — and stated each
     rule the skill keeps once. So an assertion about a branch reads the reference that
@@ -215,7 +215,7 @@ class TestPipelexIntegrateSkill:
             assert count == 1, f"{rule!r} is stated {count} times; each rule of the skill is stated once"
 
     def test_an_untagged_address_is_accepted_and_said_to_float(self) -> None:
-        """Box E of `wip/plugin-skills-gaps/design.md`, as amended at ratification:
+        """Box E of the design behind L-260921-cfb760, as amended at ratification:
         every skill accepts an untagged address and says in one line that it
         floats. This skill used to refuse one outright for a committed
         integration, which the amendment reversed."""
@@ -1625,6 +1625,13 @@ class TestPipelexIntegrateSkill:
             assert any(mark in line for line in head), f"{script} no longer opens with its ownership line"
         assert f"without the line `{mark}` is the user's: ask first." in self.the_line(self.integrate, "never by rewriting it")
         assert f"and only when it carries step 10's line `{mark}`" in self.reference("refresh.md")
+
+    def test_the_copied_gates_are_mit_0(self) -> None:
+        """The plugin is ELv2, but the two gates land in the user's own repository, which they may publish, so each
+        says in its opening lines that it is MIT-0, the grant the README's License section makes for such code."""
+        for script in ("codegen-check.mjs", "codegen_check.py"):
+            head = (self.REFERENCES_DIR / script).read_text(encoding="utf-8").splitlines()[:2]
+            assert any(line.endswith("SPDX-License-Identifier: MIT-0") for line in head), f"{script} lost its MIT-0 line"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_each_branch_is_pointed_at_where_it_is_taken(self, target_name: str) -> None:

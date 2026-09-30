@@ -157,13 +157,16 @@ MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # rendering) from templates/hooks/assets/ to the target's hooks/ directory.
 # Today that is the vendored `check.mjs` bundle — the .mthds validation hook
 # built in pipelex-sdk-js (`npm run build:hook`, see docs/hooks.md for the
-# re-vendor procedure). It carries a provenance header and inlines a WASM
-# engine, so it must never pass through the template engine. One bundle
-# serves all three platforms behind its --platform flag.
+# re-vendor procedure) — and THIRD-PARTY-NOTICES.md, the MIT notice the bundle
+# owes wherever it is copied, since the rest of the plugin is ELv2. The bundle
+# carries a provenance header and inlines a WASM engine, so it must never pass
+# through the template engine. One bundle serves all three platforms behind
+# its --platform flag.
+HOOK_BUNDLE_ASSETS = ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
-    Platform.CLAUDE: ["hooks/assets/check.mjs"],
-    Platform.CODEX: ["hooks/assets/check.mjs"],
-    Platform.MISTRAL_VIBE: ["hooks/assets/check.mjs"],
+    Platform.CLAUDE: HOOK_BUNDLE_ASSETS,
+    Platform.CODEX: HOOK_BUNDLE_ASSETS,
+    Platform.MISTRAL_VIBE: HOOK_BUNDLE_ASSETS,
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod

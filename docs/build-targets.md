@@ -124,6 +124,7 @@ pipelex/                       (prod target)
 │   ├── hooks.json            PostToolUse wiring (Write|Edit → check-mthds.sh)
 │   ├── check-mthds.sh        .mthds validation wrapper (executable; fail-open)
 │   ├── check.mjs             the vendored validation bundle, copied verbatim from templates/hooks/assets/
+│   ├── THIRD-PARTY-NOTICES.md the bundle's MIT notice, copied verbatim beside it
 │   └── launch-pipelex-mcp.sh the workshop launcher the manifest's MCP entry spawns (executable)
 └── skills/
     ├── pipelex-explain/
@@ -142,7 +143,7 @@ The Mistral Vibe target is manifestless: it emits skills, the Vibe hook files (`
 
 ## The size of a skill
 
-Every skill is written to one rule, the **read-before-act rule** of the size diet (`wip/skill-size-diet/design.md`, box A): of each sentence, ask what happens if the model never reads it, and what would tell it.
+Every skill is written to one rule, the **read-before-act rule** of the size diet (box A of its design, `L-260923-a9bdfe` in the workspace ledger): of each sentence, ask what happens if the model never reads it, and what would tell it.
 
 - A **guard** — skipping it loses something that cannot be recovered, sends something off the machine, spends credit, or leaves a result silently wrong — stays in `SKILL.md`, once, in one sentence, at the step it governs.
 - A **branch** — the wrong thing done on a path the model could have recognised before taking it — goes to a reference under `skills/<skill>/references/`, and `SKILL.md` keeps the condition and a pointer to follow **before acting**, at the decision point and never only in a closing list. References are one level deep: a reference never sends the model to another.
@@ -153,7 +154,7 @@ A `SKILL.md` takes one shape, in this order: the frontmatter; what the skill doe
 
 These checks hold the shape:
 
-- **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (`wip/skill-size-diet/facts.md`). It fails on any skill over the ceiling on any target: it reported without failing while the size diet brought each skill under, and has failed since the diet's last phase.
+- **The ceiling.** `make check` measures every rendered `SKILL.md` against `SKILL_CEILING_CHARS` in `scripts/check.py`, **13,000 characters**: Claude Code re-attaches an invoked skill after a compaction within 5,000 tokens, and 13,000 is that at the lowest characters-per-token ratio measured under the Claude 5 tokenizer, 2.77, less a margin (the size diet's facts, `L-260923-a9bdfe` in the workspace ledger). It fails on any skill over the ceiling on any target: it reported without failing while the size diet brought each skill under, and has failed since the diet's last phase.
 - **Links, both ways.** Every relative link in a skill, a reference or a shared file must name a file in the same target — a link that climbs out of it names a file the installed plugin does not carry — and every anchor a heading of the file it points into, slugged as GitHub does, inline code keeping its text; code, fenced or inline, is an example and never a link; every shipped reference must be linked from a `SKILL.md`, every script named by its skill or one of its references (by its `/scripts/<name>` path), and every shared file by a skill or a reference.
 - **The guard registry.** `tests/unit/test_skill_guards.py` lists each skill's guards by their canonical sentence and asserts, on every target, that each appears exactly once in the rendered `SKILL.md` and in no reference or shared file. A skill phase registers its guards in the change that places them.
 - **Freshness.** A copied reference or script that differs from its source, bytes or executable bit, fails `--check`, and so does any file of a target that no source produces, a reference or a script among them ("Checks over the generated targets" below).
@@ -236,7 +237,7 @@ All targets share the same version string in lockstep — `make check` fails on 
 
 ### The skill directory
 
-A skill that copies one of its own files verbatim, or runs one of its scripts, names it by path, and the path of a skill's directory is known only at run time, differently on each harness (`wip/skill-size-diet/facts.md`, sections 2 to 5). Claude Code substitutes `${CLAUDE_SKILL_DIR}` in a skill body before the model reads it, so on Claude `skill_dir` is that token and the model reads a real path. Codex and Mistral Vibe substitute nothing, but each tells the model where a loaded `SKILL.md` lives — Codex in the `<skill>` message that injects the skill, Vibe as "Base directory for this skill" — so there `skill_dir` is the placeholder `<skill-dir>`, and the include-only partial `skill-dir.md.j2` defines it in one sentence, placed just before its first use. On Claude that partial renders nothing.
+A skill that copies one of its own files verbatim, or runs one of its scripts, names it by path, and the path of a skill's directory is known only at run time, differently on each harness (the size diet's facts, sections 2 to 5, `L-260923-a9bdfe` in the workspace ledger). Claude Code substitutes `${CLAUDE_SKILL_DIR}` in a skill body before the model reads it, so on Claude `skill_dir` is that token and the model reads a real path. Codex and Mistral Vibe substitute nothing, but each tells the model where a loaded `SKILL.md` lives — Codex in the `<skill>` message that injects the skill, Vibe as "Base directory for this skill" — so there `skill_dir` is the placeholder `<skill-dir>`, and the include-only partial `skill-dir.md.j2` defines it in one sentence, placed just before its first use. On Claude that partial renders nothing.
 
 Two rules come with it. **A verbatim copy is a `cp` from `{{ skill_dir }}/references/…`, run from the user's project**, never left to the model to read the file and write it back, which is how Vibe once copied `codegen-check.mjs`: identical by luck, and capped at the size its tools can carry. **A script is run by its absolute path, from the user's project, through its interpreter** (`sh "{{ skill_dir }}/scripts/x.sh" …`), because on Codex and Vibe the model otherwise changes into the skill's directory to run it, and a script acting on a project must run where the project is.
 
