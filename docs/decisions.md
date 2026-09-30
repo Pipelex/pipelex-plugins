@@ -736,4 +736,4 @@ The workshop-proving campaign found that a designed method pinned a model handle
 
 ## License & distribution
 
-**Elastic License 2.0** since 2026-09-30, Apache 2.0 before. The repo is public (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.
+**Elastic License 2.0** since 2026-09-30, Apache 2.0 before. Two exceptions. Code the skills copy or write into a user's project is granted under MIT-0, stated in the README's License section and as an SPDX line in the two copied gates, because it lands in the user's own repository, which they may publish, and ELv2's terms would otherwise travel with it. The vendored `check.mjs` is MIT code from other Pipelex packages and a fork of Taplo, and ships with its notice beside it. The repo is public (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.

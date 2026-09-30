@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT-0
 """codegen_check.py — the offline drift gate for Pipelex-generated Python trees.
 
 Copied verbatim into a project by /pipelex-integrate. Run it from the project root, with the project's
