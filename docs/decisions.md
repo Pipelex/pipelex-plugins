@@ -736,4 +736,4 @@ The workshop-proving campaign found that a designed method pinned a model handle
 
 ## License & distribution
 
-**Apache 2.0**; repo made public when ready (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.
+**Elastic License 2.0** since 2026-09-30, Apache 2.0 before. The repo is public (required for easy marketplace install). Versions start at **0.1.0** (plugin and marketplace). GitHub home assumed `Pipelex/pipelex-plugins` — confirm at first push.

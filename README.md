@@ -2,7 +2,7 @@
 
 The Pipelex plugin for Claude Code and Codex: your agent builds AI methods, runs them, and puts them in your TypeScript or Python code or in a new webapp, with skills for each step, a hook that checks every edit, and the Pipelex tools.
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
 
 <!-- onboarding: front-door -->
 <!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door--open_source-plugin.md — do not edit it here. -->
@@ -146,4 +146,4 @@ To run your changes in Claude Code or Codex before they are released, see [the d
 
 ## License
 
-Apache 2.0. See [LICENSE](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE).
+The Pipelex plugin is licensed under the Elastic License 2.0 (ELv2), a source-available license. You may install it, use it and adapt it for your own work, your team's or your company's. What the Elastic License 2.0 rules out is offering the plugin to others as a hosted or managed service that gives them its skills. See [LICENSE](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE) for the full terms, including notices and redistribution, and the [license page](https://docs.pipelex.com/latest/license/) for how Pipelex reads them.

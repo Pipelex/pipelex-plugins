@@ -123,7 +123,7 @@ def template_tree(tmp_path: Path) -> Path:
 
     plugin_dir = tmp_path / ".claude-plugin"
     plugin_dir.mkdir()
-    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
@@ -151,12 +151,12 @@ def _create_codex_tree(tmp_path: Path) -> Path:
 
     claude_plugin = tmp_path / ".claude-plugin"
     claude_plugin.mkdir()
-    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     codex_plugin = tmp_path / ".codex-plugin"
     codex_plugin.mkdir()
     (codex_plugin / "plugin-base.json").write_text(
-        '{"author": {"name": "test"}, "license": "Apache-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
+        '{"author": {"name": "test"}, "license": "Elastic-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
     )
 
     targets_dir = tmp_path / "targets"
