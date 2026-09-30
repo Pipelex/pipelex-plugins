@@ -1626,6 +1626,13 @@ class TestPipelexIntegrateSkill:
         assert f"without the line `{mark}` is the user's: ask first." in self.the_line(self.integrate, "never by rewriting it")
         assert f"and only when it carries step 10's line `{mark}`" in self.reference("refresh.md")
 
+    def test_the_copied_gates_are_mit_0(self) -> None:
+        """The plugin is ELv2, but the two gates land in the user's own repository, which they may publish, so each
+        says in its opening lines that it is MIT-0, the grant the README's License section makes for such code."""
+        for script in ("codegen-check.mjs", "codegen_check.py"):
+            head = (self.REFERENCES_DIR / script).read_text(encoding="utf-8").splitlines()[:2]
+            assert any(line.endswith("SPDX-License-Identifier: MIT-0") for line in head), f"{script} lost its MIT-0 line"
+
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_each_branch_is_pointed_at_where_it_is_taken(self, target_name: str) -> None:
         """Box A of the size diet: a branch moves to a reference only behind a pointer placed at the decision

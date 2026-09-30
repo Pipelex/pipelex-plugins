@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT-0
 // codegen-check.mjs — the offline drift gate for Pipelex-generated trees.
 //
 // Copied verbatim into a project by /pipelex-integrate. Run it from the project root

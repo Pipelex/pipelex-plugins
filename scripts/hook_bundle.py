@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 HOOK_BUNDLE_PATH = Path("templates") / "hooks" / "assets" / "check.mjs"
+# The MIT notice the bundle ships beside it, which names every package the bundle inlines.
+HOOK_NOTICES_PATH = Path("templates") / "hooks" / "assets" / "THIRD-PARTY-NOTICES.md"
 # The banner `scripts/build-hook.mjs` writes: a title, the do-not-edit line, then the provenance.
 BANNER_LINE_COUNT = 3
 PROVENANCE_PATTERN = re.compile(
@@ -27,6 +29,9 @@ PROVENANCE_PATTERN = re.compile(
 # The engine origin the build writes when it bundled the npm devDependency. Anything else is
 # `local checkout <sha>`, which `PIPELEX_TOOLS_WASM_PATH` produces from an unreleased engine build.
 NPM_ORIGIN = "npm"
+# esbuild's comment above each module it inlines from a dependency, `// node_modules/mthds/dist/x.js`
+# or `// node_modules/@pipelex/tools-wasm/dist/index.js`, from which the package name is read.
+INLINED_MODULE_PATTERN = re.compile(r"^// (?:\S*/)?node_modules/(?P<package>@[^/\s]+/[^/\s]+|[^@/\s][^/\s]*)/", re.MULTILINE)
 # `git rev-parse --short HEAD`, which `core.abbrev` can shorten to four characters, up to a full
 # SHA-256 object name. Outside a git checkout the build writes `unknown` instead.
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{4,64}")
@@ -95,6 +100,11 @@ def first_body_difference(vendored: str, rebuilt: str) -> int | None:
             return BANNER_LINE_COUNT + index + 1
     # One body is the other plus lines at its end.
     return BANNER_LINE_COUNT + min(len(vendored_lines), len(rebuilt_lines)) + 1
+
+
+def inlined_packages(bundle: str) -> set[str]:
+    """The npm packages whose code the bundle inlines, read from the comment esbuild writes above each of their modules."""
+    return {match.group("package") for match in INLINED_MODULE_PATTERN.finditer(bundle)}
 
 
 def read_bundle(path: Path) -> str:
