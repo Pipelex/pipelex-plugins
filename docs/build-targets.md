@@ -124,6 +124,7 @@ pipelex/                       (prod target)
 │   ├── hooks.json            PostToolUse wiring (Write|Edit → check-mthds.sh)
 │   ├── check-mthds.sh        .mthds validation wrapper (executable; fail-open)
 │   ├── check.mjs             the vendored validation bundle, copied verbatim from templates/hooks/assets/
+│   ├── THIRD-PARTY-NOTICES.md the bundle's MIT notice, copied verbatim beside it
 │   └── launch-pipelex-mcp.sh the workshop launcher the manifest's MCP entry spawns (executable)
 └── skills/
     ├── pipelex-explain/

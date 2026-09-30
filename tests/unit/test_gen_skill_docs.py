@@ -71,6 +71,7 @@ HOOK_TEMPLATE_BODIES = {
 # vendored check.mjs bundle (whose real content is a 4+ MB esbuild artifact).
 STATIC_ASSET_BODIES = {
     "hooks/assets/check.mjs": "// vendored hook bundle {{ not_a_template }}\n",
+    "hooks/assets/THIRD-PARTY-NOTICES.md": "# Notices for check.mjs {% not_a_template %}\n",
 }
 
 
@@ -2589,9 +2590,9 @@ class TestHookRendering:
         assert os.access(hook_script, os.X_OK)
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
-        """One vendored check.mjs bundle serves all three platforms."""
+        """One vendored check.mjs bundle serves all three platforms, and its MIT notice ships beside it on each."""
         for platform in Platform:
-            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs"]
+            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 
     def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
         """check.mjs must bypass Jinja: its body (a generated bundle) may contain
@@ -2603,9 +2604,10 @@ class TestHookRendering:
 
     def test_generate_writes_static_asset_into_target(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
-        asset = template_tree / "pipelex" / "hooks" / "check.mjs"
-        assert asset.is_file()
-        assert asset.read_text() == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+        for name, body in STATIC_ASSET_BODIES.items():
+            asset = template_tree / "pipelex" / "hooks" / Path(name).name
+            assert asset.is_file()
+            assert asset.read_text() == body
 
     def test_missing_static_asset_raises(self, template_tree: Path) -> None:
         (template_tree / "templates" / "hooks" / "assets" / "check.mjs").unlink()

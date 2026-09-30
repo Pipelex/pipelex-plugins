@@ -10,7 +10,7 @@
 
 ### Changed
 
-- **The plugin is licensed under the Elastic License 2.0 (Breaking)**: it moves from Apache 2.0 to the Elastic License 2.0 (ELv2), a source-available license, as the Pipelex runtime and servers did. Installing, using and adapting the plugin for your own work, your team's or your company's is unchanged; offering it to others as a hosted or managed service is what the license rules out.
+- **The plugin is licensed under the Elastic License 2.0 (Breaking)**: it moves from Apache 2.0 to the Elastic License 2.0 (ELv2), a source-available license, as the Pipelex runtime and servers did. Installing, using and adapting the plugin for your own work, your team's or your company's is unchanged; offering it to others as a hosted or managed service is what the license rules out. The validation hook, `check.mjs`, stays MIT-licensed, and its notice now ships beside it in every target as `hooks/THIRD-PARTY-NOTICES.md`; `make check` fails when the bundle inlines a package the notice does not name.
 
 - **`pipelex-explain`, `pipelex-design` and `pipelex-run` point at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and these skills now give that page's path before their text flow — `pipelex-explain` in the opening lines of every explanation of a bundle on disk, `pipelex-design` when it hands over a method, and `pipelex-run` on a dry run — so the whole method can be opened in a browser. `pipelex-explain` still writes nothing of its own, and the page is the one file it leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
 
