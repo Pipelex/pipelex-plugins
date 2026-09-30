@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in pipelex-sdk-js.
-// Provenance: @pipelex/sdk 0.25.1 (ed9f2fb) + @pipelex/tools-wasm 0.3.0 (npm)
+// Provenance: @pipelex/sdk 0.27.0 (2b1db43) + @pipelex/tools-wasm 0.3.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2259,11 +2259,13 @@ var PipelineExecuteTimeoutError = class extends PipelineRequestError {
 var RunFailedError = class extends PipelineRequestError {
   runId;
   status;
+  error;
   constructor(message, runId, status, options) {
-    super(message, options);
+    super(message, options?.cause === void 0 ? void 0 : { cause: options.cause });
     this.name = "RunFailedError";
     this.runId = runId;
     this.status = status;
+    this.error = options?.error ?? null;
   }
 };
 var MissingMainStuffError = class extends PipelineRequestError {
@@ -2311,23 +2313,80 @@ var ApiResponseError = class extends PipelineRequestError {
   responseBody;
   errorType;
   serverMessage;
+  /**
+   * The platform's native code — a closed set (`conflict`, `not_found`, `run_not_found`,
+   * `pipelex_api_key_limit_reached`, …), one-to-one with `type`. Finer than `errorDomain` and
+   * specific to the platform: a runner's problem carries `errorType` instead. `undefined` for a
+   * body that carries no `code`.
+   */
   code;
   /**
+   * RFC 9457 `type`: the stable URI naming the error class. With `errorDomain`, the field a
+   * machine consumer branches on — the same class carries the same URI on every occurrence.
+   */
+  type;
+  /** RFC 9457 `title`: the short human label of the error class. */
+  title;
+  /** RFC 9457 `instance`: the occurrence — the request path, or a request URN. */
+  instance;
+  /**
+   * The request's correlation id — the body's `request_id`, or the `X-Request-ID` response
+   * header when the body carries none. The id to hand to support: it finds the server's log
+   * lines for this request.
+   */
+  requestId;
+  /**
+   * The body's `error_domain`: who can fix the failure. `input` — the caller (a malformed
+   * bundle, a bad argument, a missing input); `config` — a configuration change (a missing
+   * secret, a model the backend does not serve); `runtime` — nobody beforehand (a provider
+   * outage during execution). Typed open, as the server owns the vocabulary; `undefined` when
+   * the server did not classify it.
+   */
+  errorDomain;
+  /**
+   * The body's `error_category`: the finer classification of an inference failure — known
+   * values `transient`, `configuration`, `content`, `capacity`, `ambiguous`, `unknown`.
+   */
+  errorCategory;
+  /**
+   * The body's `retryable`: whether retrying the same request can plausibly succeed.
+   * `undefined` means unknown, which is not the same as `false`.
+   */
+  retryable;
+  /** The body's `user_action`: what the caller should do next, when the server can say. */
+  userAction;
+  /** The body's `model`: the model an inference failure used. */
+  model;
+  /** The body's `provider`: the provider an inference failure reached. */
+  provider;
+  /** The body's `provider_metadata`: what the provider's SDK said, raw text included. */
+  providerMetadata;
+  /** The body's `migration`: a pending configuration migration that explains the failure. */
+  migration;
+  /** The platform's field-level `errors[]` — one item per offending request field. */
+  errors;
+  /**
+   * The decoded problem document whole — every member, named or not, such as a failed run's
+   * `run_status` and `error` or a member a newer server adds. `undefined` when the body was not
+   * a JSON object.
+   */
+  problemDocument;
+  /**
    * Structured per-error diagnostics on a problem body that carries a top-level
-   * `validation_errors[]` — the **build routes** (`POST /v1/build/*`), which still
-   * reject an invalid bundle with a 422.
+   * `validation_errors[]` — the 422 a **run route** (`execute`, `start`) answers when the
+   * runner refuses the method for its validation errors.
    *
-   * `POST /v1/validate` no longer routes content errors here: an invalid bundle is
-   * a produced verdict (a **200** `PipelexInvalidReport` whose `validation_errors[]`
-   * the caller reads off the returned value), not an `ApiResponseError`. This field
-   * stays for the build-route 422s and is `undefined` for any error that carries no
-   * per-error list (auth, transport, a request-shape 422). A consumer must NOT
-   * assume a given `error_type` implies a populated list — fall back to
-   * `serverMessage` when this is empty.
+   * Everywhere else an invalid bundle is a produced verdict, not an `ApiResponseError`:
+   * `POST /v1/validate` answers it with a **200** `PipelexInvalidReport`, and the build
+   * and crate routes with a **200** `CrateInvalidReport`, whose `validation_errors[]` the
+   * caller reads off the returned value. This field is `undefined` for any error that
+   * carries no per-error list (auth, transport, a request-shape 422, a build route's 422
+   * for a pipe it cannot build). A consumer must NOT assume a given `error_type` implies a
+   * populated list — fall back to `serverMessage` when this is empty.
    */
   validationErrors;
   constructor(message, apiUrl, status, statusText, responseBody, errorType, serverMessage, validationErrors, code, options) {
-    super(message, options);
+    super(message, options?.cause === void 0 ? void 0 : { cause: options.cause });
     this.name = "ApiResponseError";
     this.apiUrl = apiUrl;
     this.status = status;
@@ -2337,6 +2396,21 @@ var ApiResponseError = class extends PipelineRequestError {
     this.serverMessage = serverMessage;
     this.validationErrors = validationErrors;
     this.code = code;
+    const problem = options?.problem;
+    this.type = problem?.type;
+    this.title = problem?.title;
+    this.instance = problem?.instance;
+    this.requestId = problem?.requestId;
+    this.errorDomain = problem?.errorDomain;
+    this.errorCategory = problem?.errorCategory;
+    this.retryable = problem?.retryable;
+    this.userAction = problem?.userAction;
+    this.model = problem?.model;
+    this.provider = problem?.provider;
+    this.providerMetadata = problem?.providerMetadata;
+    this.migration = problem?.migration;
+    this.errors = problem?.errors;
+    this.problemDocument = options?.problemDocument;
   }
 };
 
@@ -2378,7 +2452,7 @@ async function pollUntilResult(fetchOnce, runId, options = {}) {
       return state.result;
     }
     if (state.state === "failed") {
-      throw new RunFailedError(state.message, runId, state.status);
+      throw new RunFailedError(state.message, runId, state.status, { error: state.error });
     }
     attempt += 1;
     options.onPoll?.({ attempt, elapsedMs });
@@ -2454,7 +2528,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.25.1";
+var SDK_VERSION = "0.27.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -2711,6 +2785,10 @@ function mapUploadError(error, filename) {
 // src/prepare-inputs.ts
 var PIPELEX_STORAGE_SCHEME = "pipelex-storage://";
 var HTTP_URL_RE = /^https?:\/\//i;
+var PIPE_SELECTION_ERROR_TYPES = /* @__PURE__ */ new Set([
+  "EntryPipeNotFoundError",
+  "EntryPipeAmbiguousError"
+]);
 function isPlainObject(value) {
   return Object.prototype.toString.call(value) === "[object Object]";
 }
@@ -2834,22 +2912,39 @@ function resolveSelector(request) {
   }
   if (given.length > 1) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: ${given.join(" and ")} were both given. Supply exactly one method selector \u2014 \`files\`, \`method_ref\` or \`method_id\`.`
+      `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 \`files\`, \`method_ref\` or \`method_id\`.`
     );
   }
   if (files !== void 0) return { files };
   if (methodRef !== void 0) return { method_ref: methodRef };
   return { method_id: methodId };
 }
-async function fetchSignature(client, selector) {
+function normalizePipeRef(raw) {
+  const pipeRef = nonEmptyString(raw);
+  if (pipeRef === void 0) return void 0;
+  if (pipeRef.includes("->")) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`pipe_ref\` "${pipeRef}" names a dependency package's pipe. Preparation covers the method's own pipes: name one as \`domain.pipe_code\`.`
+    );
+  }
+  if (!pipeRef.includes(".")) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`pipe_ref\` must be qualified (\`domain.pipe_code\`), got the bare "${pipeRef}".`
+    );
+  }
+  return pipeRef;
+}
+async function fetchSignature(client, selector, pipeRef) {
+  const request = pipeRef === void 0 ? { ...selector } : { ...selector, pipe_ref: pipeRef };
   let result;
-  if ("files" in selector) {
-    const contents = selector.files.map((file) => file.content);
-    const hasAnySource = selector.files.some((file) => file.source !== void 0);
-    const sources = hasAnySource ? selector.files.map((file, index) => file.source ?? `inline://file-${index + 1}.mthds`) : void 0;
-    result = await client.validate(contents, true, sources, void 0, ["input_form"]);
-  } else {
-    result = await client.validate(selector, true, void 0, void 0, ["input_form"]);
+  try {
+    result = await client.pipeIo(request);
+  } catch (error) {
+    if (error instanceof ApiResponseError && error.status === 422 && error.errorType !== void 0 && PIPE_SELECTION_ERROR_TYPES.has(error.errorType)) {
+      const detail = error.serverMessage ?? error.message;
+      throw new InputPreparationError(`Cannot prepare inputs: ${detail}`, { cause: error });
+    }
+    throw error;
   }
   if (!result.is_valid) {
     const first = result.validation_errors[0]?.message ?? result.message;
@@ -2859,62 +2954,22 @@ async function fetchSignature(client, selector) {
   }
   return result;
 }
-function selectPipeRef(report, inputForm, requested) {
-  const refs = Object.keys(inputForm);
-  const candidates = refs.length > 0 ? refs.join(", ") : "(none \u2014 the closure declares no pipes)";
-  if (requested !== void 0) {
-    if (!requested.includes(".")) {
-      throw new InputPreparationError(
-        `Cannot prepare inputs: \`pipe_ref\` must be qualified (\`domain.pipe_code\`), got the bare "${requested}". The method declares: ${candidates}.`
-      );
-    }
-    if (!(requested in inputForm)) {
-      throw new InputPreparationError(
-        `Cannot prepare inputs: the method declares no pipe "${requested}". It declares: ${candidates}.`
-      );
-    }
-    return requested;
+function selectedDescriptor(report) {
+  const pipeRef = nonEmptyString(report.pipe_ref);
+  const inputForm = report.input_form;
+  if (pipeRef === void 0 || !isPlainObject(inputForm) || !Object.hasOwn(inputForm, pipeRef)) {
+    const described = isPlainObject(inputForm) ? Object.keys(inputForm).join(", ") || "none" : "none";
+    throw new InputPreparationError(
+      `Cannot prepare inputs: the pipe I/O answer selected ${pipeRef === void 0 ? "no pipe" : `"${pipeRef}"`}, but its \`input_form\` does not describe it (it describes: ${described}).`
+    );
   }
-  if (report.default_pipe_ref !== void 0) {
-    const statedDefault = nonEmptyString(report.default_pipe_ref);
-    if (statedDefault === void 0) {
-      throw new InputPreparationError(
-        `Cannot prepare inputs: the server determined no entry pipe for this method, so a run that names no pipe would not resolve one (no \`main_pipe\` is declared, or the package manifest names a pipe the closure does not declare or declares in several domains). Pass \`pipe_ref\`. It declares: ${candidates}.`
-      );
-    }
-    if (!(statedDefault in inputForm)) {
-      throw new InputPreparationError(
-        `Cannot prepare inputs: the validate report names "${statedDefault}" as the default pipe, but its \`input_form\` descriptor does not describe it. Pass \`pipe_ref\`. It declares: ${candidates}.`
-      );
-    }
-    return statedDefault;
-  }
-  const blueprintDefault = readBlueprintMainPipeRef(report.bundle_blueprint);
-  if (blueprintDefault !== void 0 && blueprintDefault in inputForm) return blueprintDefault;
-  if (refs.length === 1) return refs[0];
-  throw new InputPreparationError(
-    `Cannot prepare inputs: the method declares no single default pipe, so \`pipe_ref\` is required. It declares: ${candidates}.`
-  );
-}
-function readBlueprintMainPipeRef(blueprint) {
-  if (!isPlainObject(blueprint)) return void 0;
-  const mainPipe = nonEmptyString(blueprint["main_pipe"]);
-  if (mainPipe === void 0) return void 0;
-  if (mainPipe.includes(".")) return mainPipe;
-  const domain = nonEmptyString(blueprint["domain"]);
-  return domain === void 0 ? void 0 : `${domain}.${mainPipe}`;
+  return inputForm[pipeRef];
 }
 async function prepareInputs(client, request) {
   const selector = resolveSelector(request);
-  const report = await fetchSignature(client, selector);
-  const inputForm = report.input_form;
-  if (inputForm === void 0) {
-    throw new InputPreparationError(
-      'Cannot prepare inputs: the validate report carries no `input_form` descriptor \u2014 the signature preparation reads. The descriptor rides `views: ["input_form"]` on pipelex-api >= 0.18.0; point the client at a runner that serves it.'
-    );
-  }
-  const pipeRef = selectPipeRef(report, inputForm, nonEmptyString(request.pipe_ref));
-  const descriptor = inputForm[pipeRef];
+  const pipeRef = normalizePipeRef(request.pipe_ref);
+  const report = await fetchSignature(client, selector, pipeRef);
+  const descriptor = selectedDescriptor(report);
   const declared = new Map(
     descriptor.fields.map((field) => [field.name, field])
   );
@@ -3417,7 +3472,7 @@ async function readCompletedResults(client, runId, signal) {
     );
   }
   if (state.state === "failed") {
-    throw new RunFailedError(state.message, runId, state.status);
+    throw new RunFailedError(state.message, runId, state.status, { error: state.error });
   }
   return state.result;
 }
@@ -3936,8 +3991,8 @@ var PipelexApiClient = class {
   /**
    * Issue a Pipelex-product request (`/v1/me`, `/v1/methods`, `/v1/billing/*`,
    * …) and parse its JSON body, mapping a non-2xx response to the typed
-   * `ApiResponseError` so callers branch on the structured `code` discriminant,
-   * not the HTTP status. Empty-body tolerant — DELETE / onboarding / updateRun
+   * `ApiResponseError` so callers branch on its `errorDomain` and `type`, not the
+   * HTTP status. Empty-body tolerant — DELETE / onboarding / updateRun
    * answer 2xx with no body, returned as `undefined`. Uses the management-call
    * timeout, not the blocking-execute ceiling.
    */
@@ -3953,7 +4008,10 @@ var PipelexApiClient = class {
     return res.body ? JSON.parse(res.body) : void 0;
   }
   throwApiResponseError(method, endpoint, res) {
-    const { errorType, serverMessage, validationErrors, code } = parseErrorBody(res.body);
+    const { errorType, serverMessage, validationErrors, code, problem, document } = parseErrorBody(
+      res.body
+    );
+    const requestId = problem.requestId ?? nonEmptyHeader(res.headers, REQUEST_ID_HEADER);
     throw new ApiResponseError(
       `API ${method} /${API_PREFIX}/${endpoint} failed (${res.status}): ${serverMessage ?? (res.body || res.statusText)}`,
       this.baseUrl,
@@ -3963,7 +4021,8 @@ var PipelexApiClient = class {
       errorType,
       serverMessage,
       validationErrors,
-      code
+      code,
+      { problem: { ...problem, requestId }, problemDocument: document }
     );
   }
   /**
@@ -4267,7 +4326,7 @@ var PipelexApiClient = class {
   // published package's documented fallback against a runner. The crate
   // routes (`resolve`/`codegen`) shared this gap and are now exposed everywhere;
   // these two were not included, a known non-critical item on the platform's list.
-  // Tracked in `wip/hosted-exposure-crate-and-tools-routes.md`.
+  // Tracked in L-260929-b58f26.
   /**
    * Lint one `.mthds` file against the embedded MTHDS schema — `POST /v1/lint`.
    *
@@ -4310,13 +4369,13 @@ var PipelexApiClient = class {
   }
   /**
    * POST one of the Pipelex-API extension routes — the tools (`lint`, `format`), the
-   * crate routes (`resolve`, `codegen`), and the build projections (`build/*`). Their
+   * crate routes (`resolve`, `codegen`, `pipe-io`), and the build projections (`build/*`). Their
    * non-2xx bodies are RFC 7807 problems, mapped to the typed `ApiResponseError` like
    * the product routes.
    *
    * The mapping is what makes their no-verdict arms usable: a crate-family route
    * answers `422` for a request it cannot act on (an unresolvable pipe selector on the
-   * build routes; an unknown `kind`/`target`, or a `pipe_ref` on the concept-set-wide
+   * build routes and `pipe-io`; an unknown `kind`/`target`, or a `pipe_ref` on the concept-set-wide
    * `types` kind, on `codegen`) and `501` for the reserved registry-form `method_ref`
    * (the address form is resolved server-side as of pipelex-api 0.21.0). A caller
    * branches on `ApiResponseError.status`, never on a message.
@@ -4379,7 +4438,7 @@ var PipelexApiClient = class {
     }
     return JSON.parse(res.body);
   }
-  // ── Crate extensions (Pipelex API — `/v1/resolve`, `/v1/codegen`) ─────
+  // ── Crate extensions (Pipelex API — `/v1/resolve`, `/v1/codegen`, `/v1/pipe-io`) ──
   //
   // Served by any `pipelex-api` runner AND on every hosted origin. On the hosted
   // plane a route is reachable only when the gateway's API-key allowlist and the
@@ -4391,11 +4450,16 @@ var PipelexApiClient = class {
   // Measured 2026-08-23 with a real key: api.pipelex.com (pipelex-hosted@0.10.1)
   // serves both, verdict discipline intact (200 `is_valid:false`, 501, 422);
   // api-dev.pipelex.com has since 2026-08-13. `lint`/`format` are the two still
-  // unexposed — see their section above for why that blocks nothing.
+  // unexposed — see their section above for why that blocks nothing. `pipe-io` is
+  // newer: a runner serves it from `pipelex-api` v0.33.0, and types its selection
+  // refusals `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` from v0.33.1
+  // (v0.33.0 typed them `ValidationError`), and a hosted origin
+  // serves it once the platform's proxy and the gateway list it (see
+  // `docs/crate-routes.md`).
   //
-  // Both are STATIC routes (no dry-run sweep), so like every static sibling they take
-  // no `timeoutMs`/`signal` — see the policy note on `requestExtension` before adding
-  // one here.
+  // All three are STATIC routes (no dry-run sweep), so like every static sibling they
+  // take no `timeoutMs`/`signal` — see the policy note on `requestExtension` before
+  // adding one here.
   /**
    * Resolve a closure into its normalized library crate — `POST /v1/resolve`.
    *
@@ -4444,6 +4508,41 @@ var PipelexApiClient = class {
       timeoutMs: crateRequestTimeoutMs(request)
     });
   }
+  /**
+   * Read a method's three I/O artifacts — `POST /v1/pipe-io`.
+   *
+   * Resolves the closure exactly like {@link resolve}, selects a pipe, and returns its
+   * pipe I/O contracts, input form and output form — the MTHDS standard's artifacts,
+   * typed from `mthds/protocol` — beside the resolved `pipe_ref`, the method's own
+   * `default_pipe_ref`, and the runnability facts (`pending_signatures`, `is_runnable`).
+   * It runs NO dry-run sweep, so it costs one load and one derivation where `validate`
+   * dry-runs every pipe; a caller that shows a method, prepares its inputs or generates
+   * types for it reads this, and one that needs the dry-run verdict stays on `validate`.
+   *
+   * Selection: the request's qualified `pipe_ref`, else a fetched package's manifest
+   * `main_pipe`, else the closure's single `main_pipe` declaration. `all_pipes: true`
+   * describes every pipe instead, and never refuses for want of an entry pipe.
+   * `include_files: true` echoes the resolved closure's `.mthds` files as `files`.
+   *
+   * Same 200-verdict discipline and same three-form closure selector as {@link resolve}
+   * (the request is posted verbatim, and the selector XOR is the server's to enforce).
+   * Only a no-verdict condition throws `ApiResponseError`: a malformed selector and an
+   * over-limit file are `ValidationError` `422`s; a selection the route refuses is a
+   * `422` whose `errorType` is `EntryPipeNotFoundError` (an unknown `pipe_ref`, no entry
+   * pipe) or `EntryPipeAmbiguousError` (an ambiguous code, several entry pipes), the
+   * candidates in its `serverMessage`; a registry-form `method_ref` is a `501`; a pipe
+   * whose artifacts cannot be derived is a `500`.
+   *
+   * A `method_ref` gets the fetch-sized budget, as on the other crate routes. On the
+   * hosted API the gateway caps a request at about 30 seconds whatever the client
+   * allows, so a cold `method_ref` clone can answer a `502` that a retry clears once the
+   * runner has cached the clone.
+   */
+  async pipeIo(request) {
+    return this.requestExtension("pipe-io", request, {
+      timeoutMs: crateRequestTimeoutMs(request)
+    });
+  }
   // ── Build extensions (Pipelex API layer 2 — `/v1/build/*`) ────────
   /**
    * Project a pipe's declared inputs as a fill-in template — `POST /v1/build/inputs`.
@@ -4461,14 +4560,14 @@ var PipelexApiClient = class {
    * model {@link BuildInputsRequest}; the address form is server-resolved, the
    * registry form `501`s) — exactly one of the two, like `buildOutput` /
    * `buildRunner`. There is NO by-id form: the build routes take no `method_id`
-   * (the hosted tooling selector covers `validate`/`resolve`/`codegen` only), so a
+   * (the hosted tooling selector covers `validate`/`resolve`/`codegen`/`pipe-io` only), so a
    * stored method is expanded first — `buildInputs({ files: await
    * client.getMethodClosure(methodId) })`. That expansion stays the answer here
    * because a `buildInputs` caller wants this route's template; it is not what
    * `prepareInputs` does any more.
    *
    * Nothing inside this SDK calls this route: `prepareInputs` reads its signature
-   * from the input-form descriptor on the validate report. It survives for the
+   * from the input-form descriptor `pipeIo` returns. It survives for the
    * consumers that still render a template over HTTP, and is retired with the rest
    * of `/v1/build/*` once they project it client-side.
    */
@@ -4554,7 +4653,10 @@ var PipelexApiClient = class {
    * Maps the server's poll semantics to a discriminated union:
    * - HTTP 202 → `running` (with the `Retry-After` hint)
    * - HTTP 200 → `completed` (with the result artifacts)
-   * - HTTP 409 → `failed` (terminal non-`COMPLETED`)
+   * - HTTP 409 → `failed` (terminal non-`COMPLETED`), carrying the problem's `detail` as
+   *   `message`, its `run_status` member as `status` (recovered from `detail` on a platform
+   *   that predates the member) and its `error` member, the run's stored error report, typed
+   *   as `error`
    * - HTTP 503 → `running` (Temporal degraded — retry, never fail a poller)
    *
    * Throws `RunLifecycleUnavailableError` when the lifecycle routes are absent
@@ -4575,14 +4677,7 @@ var PipelexApiClient = class {
       };
     }
     if (res.status === 409) {
-      const { serverMessage } = parseErrorBody(res.body);
-      const message = serverMessage ?? "Run finished without a result.";
-      return {
-        state: "failed",
-        pipeline_run_id: runId,
-        status: extractRunStatusFromMessage(message),
-        message
-      };
+      return runResultFailed(runId, res.body);
     }
     this.throwIfLifecycleUnavailable(res, url);
     if (res.status < 200 || res.status >= 300) {
@@ -4648,7 +4743,7 @@ var PipelexApiClient = class {
   // The hosted catalog/account routes the webapp drives. Every one rides the
   // same `{base}/v1/*` surface, `Authorization: Bearer`, org-from-JWT contract
   // as the protocol routes, and maps a non-2xx `problem+json` to a typed
-  // `ApiResponseError` (branch on `.code`, not the status).
+  // `ApiResponseError` (branch on `.errorDomain` and `.type`, not the status).
   /** The authenticated user's profile — `GET /v1/me`. */
   async getMe() {
     return this.requestProduct("GET", "me");
@@ -4732,8 +4827,8 @@ var PipelexApiClient = class {
    * This is the LOCAL expansion utility — for callers that want the files in
    * hand (to edit, to diff, to feed a route with no by-id form, the `/v1/build/*`
    * family being the last of those). The operations that accept `method_id`
-   * natively (`execute`/`start`, `validate`/`resolve`/`codegen`, and
-   * `prepareInputs`, which composes a `validate` of its own) take the id as a
+   * natively (`execute`/`start`, `validate`/`resolve`/`codegen`/`pipeIo`, and
+   * `prepareInputs`, which composes a `pipeIo` of its own) take the id as a
    * pass-through instead; nothing in this client expands an id behind your back.
    *
    * Requires an API key: the methods catalog is org-scoped to the key's org, so
@@ -4946,17 +5041,18 @@ var PipelexApiClient = class {
    * through unchanged; all failures are raised before any run is created.
    *
    * Name the method exactly one of three ways, all server-resolved through the
-   * one `validate` call this composes:
+   * one `pipeIo` call this composes:
    *
    * - `files` — the inline MTHDS closure;
    * - `method_ref` — a published method's address, fetched by the runner;
    * - `method_id` — a stored method's catalog id, resolved by the platform
    *   (hosted only; requires an API key).
    *
-   * The signature itself is the input-form descriptor on the validate report
-   * (`views: ["input_form", "output_form"]`), which states the kind of every input at every
-   * depth — so a file position is a fact of the method, never a guess from the
-   * value's shape. See `docs/input-preparation.md`.
+   * The route also selects the pipe — the caller's qualified `pipe_ref`, else the
+   * method's own entry pipe — and the signature is the input-form descriptor it
+   * answers with, which states the kind of every input at every depth, so a file
+   * position is a fact of the method, never a guess from the value's shape. It
+   * needs an API serving `POST /v1/pipe-io`. See `docs/input-preparation.md`.
    */
   async prepareInputs(request) {
     return prepareInputs(this, request);
@@ -5201,20 +5297,33 @@ var KNOWN_RUN_STATUSES = [
   "TERMINATED",
   "TIMED_OUT"
 ];
-function extractRunStatusFromMessage(message) {
-  const match = message.match(/status\s+([A-Z_]+)/);
-  const candidate = match?.[1];
-  if (candidate && KNOWN_RUN_STATUSES.includes(candidate)) {
-    return candidate;
-  }
-  return "FAILED";
+var REQUEST_ID_HEADER = "x-request-id";
+function runResultFailed(runId, body) {
+  const { serverMessage, document } = parseErrorBody(body);
+  const message = serverMessage ?? "Run finished without a result.";
+  const rawReport = document?.error;
+  return {
+    state: "failed",
+    pipeline_run_id: runId,
+    status: knownRunStatus(document?.run_status) ?? statusFromDetail(message) ?? "FAILED",
+    message,
+    error: isPlainObject2(rawReport) ? rawReport : null
+  };
+}
+function knownRunStatus(value) {
+  return typeof value === "string" && KNOWN_RUN_STATUSES.includes(value) ? value : void 0;
+}
+function statusFromDetail(detail) {
+  return knownRunStatus(/status\s+([A-Z_]+)/.exec(detail)?.[1]);
 }
 function parseErrorBody(body) {
   const empty = {
     errorType: void 0,
     serverMessage: void 0,
     validationErrors: void 0,
-    code: void 0
+    code: void 0,
+    problem: {},
+    document: void 0
   };
   if (!body) return empty;
   let parsed;
@@ -5223,7 +5332,7 @@ function parseErrorBody(body) {
   } catch {
     return empty;
   }
-  if (!parsed || typeof parsed !== "object") {
+  if (!isPlainObject2(parsed)) {
     return empty;
   }
   const root = parsed;
@@ -5241,7 +5350,40 @@ function parseErrorBody(body) {
   if (serverMessage === void 0 && typeof root.message === "string") serverMessage = root.message;
   const validationErrors = Array.isArray(root.validation_errors) ? root.validation_errors : void 0;
   const code = typeof root.code === "string" ? root.code : void 0;
-  return { errorType, serverMessage, validationErrors, code };
+  const problem = {
+    type: stringMember(root.type),
+    title: stringMember(root.title),
+    instance: stringMember(root.instance),
+    requestId: stringMember(root.request_id),
+    errorDomain: stringMember(root.error_domain),
+    errorCategory: stringMember(root.error_category),
+    retryable: typeof root.retryable === "boolean" ? root.retryable : void 0,
+    userAction: parseUserAction(root.user_action),
+    model: stringMember(root.model),
+    provider: stringMember(root.provider),
+    providerMetadata: isPlainObject2(root.provider_metadata) ? root.provider_metadata : void 0,
+    migration: isPlainObject2(root.migration) ? root.migration : void 0,
+    errors: Array.isArray(root.errors) ? root.errors.filter(isPlainObject2) : void 0
+  };
+  return { errorType, serverMessage, validationErrors, code, problem, document: root };
+}
+function isPlainObject2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function stringMember(value) {
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function parseUserAction(value) {
+  if (!isPlainObject2(value)) return void 0;
+  const { kind, detail } = value;
+  if (typeof kind !== "string" || typeof detail !== "string" || detail.length === 0) {
+    return void 0;
+  }
+  return { kind, detail };
+}
+function nonEmptyHeader(headers, name) {
+  const value = headers.get(name)?.trim();
+  return value ? value : void 0;
 }
 
 // src/hooks/validate-client.ts
