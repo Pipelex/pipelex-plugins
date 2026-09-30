@@ -18,7 +18,7 @@ allowed-tools:
 
 Leave a Python or TypeScript project calling an MTHDS method through one typed module, over generated types and an offline gate that says when they drift.
 
-**Not** a runner (`/pipelex-inputs`) or a design skill (`/pipelex-design`): it writes no tests, routes or UI, and edits no business code.
+**Not** a runner (`/pipelex-inputs`) or a design skill (`/pipelex-design`): it writes no tests, routes or UI, edits no business code, and **writes no client for another service before reading [fit.md](../shared/fit.md)**.
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 ---
 name: pipelex-lab
-description: Experiment with an MTHDS method the way a lab would — frame a use case into candidate methods, write the answer key of each test case before its first run, agree a budget, then run, score every run against its key and log it, fixing the method round after round until it meets the pass bar or a stop. Use when the user says "what could I build with Pipelex", "help me try Pipelex on our invoices", "help me pick where to start", "test this method", "set up test cases", "write an answer key", "check it against the answer key", "score this run", "is it getting better", "iterate until it passes", or wants to know whether a method is good enough. It designs, prepares inputs, runs and edits through the skills that own those steps, and keeps the brief, the keys and the log under lab/ in the project. A run spends inference credit, so the loop starts only on the user's go on a budget.
+description: Experiment with an MTHDS method the way a lab would — frame a use case into candidate methods, write the answer key of each test case before its first run, agree a budget, then run, score every run against its key and log it, fixing the method round after round until it meets the pass bar or a stop. Use when the user says "what could I build with Pipelex", "help me try Pipelex on our invoices", "help me pick where to start", "test this method", "set up test cases", "write an answer key", "check it against the answer key", "score this run", "is it getting better", "iterate until it passes", or wants to know whether a method is good enough. Also use it first when the user wants a piece of work automated, such as "automate this", "every morning, summarise", "when an email arrives", "connect Pipelex to Gmail, Drive or Notion". It keeps the brief, the keys and the log under lab/. A run spends inference credit, so the loop starts only on the user's go on a budget.
 ---
 
 # Experiment with a method
@@ -38,7 +38,7 @@ lab/<method>/
 
 ## 1. Frame the use case
 
-Read [frame.md](references/frame.md) before asking anything: it holds the questions to ask, what the platform can and cannot do, the shape of a candidate, and the brief. **State no capability that frame.md does not state**: a method designed around one the platform lacks fails at its first run, after credit is spent.
+Read [frame.md](references/frame.md) before asking anything: it holds the questions to ask, the shape of a candidate, and the brief. Read [fit.md](../shared/fit.md) with it, before any candidate: it says what a method can and cannot do, and what carries the rest. **State no capability that fit.md does not state**: a method designed around one the platform lacks fails at its first run, after credit is spent. **A candidate is the method's part of the request: name what carries the rest, and never promise a schedule, a connector or a write-back that no carrier provides.**
 
 For a use case with no method yet, propose two or three candidates, and recommend the one whose output can be checked against a key and whose inputs can be made safely. Once the user picks, write `lab/<method>/brief.md` with what "right" means for the chosen method, which seeds its keys, `<method>` being the `domain` you give `/pipelex-design` in the project language's casing. Hand the brief to `/pipelex-design`, and if the directory it makes is named otherwise, rename `lab/<method>/` to match. The setup follows once the method validates.
 
@@ -90,5 +90,6 @@ A new go opens a new series, with its own budget.
 ## References
 
 - [frame.md](references/frame.md): at the first move, before asking anything.
+- [fit.md](../shared/fit.md): at the first move, with frame.md.
 - [key.md](references/key.md): at the second move, before writing a key.
 - [log.md](references/log.md): at the third move, before the first entry, and when a stop writes the scorecard.

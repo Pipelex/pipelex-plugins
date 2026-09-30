@@ -61,6 +61,7 @@ class TestPipelexLabSkill:
         the move that needs it, with the instruction to read it before acting."""
         body = render(target_name)
         assert "Read [frame.md](references/frame.md) before asking anything" in the_move(body, 1)
+        assert "Read [fit.md](../shared/fit.md) with it, before any candidate" in the_move(body, 1)
         assert "Read [key.md](references/key.md) before writing a key." in the_move(body, 2)
         assert "Read [log.md](references/log.md) before the first entry" in the_move(body, 3)
         index = body.split("## References", 1)[1]
@@ -271,7 +272,7 @@ class TestIntegrationPoints:
 
 
 class TestCapabilityMap:
-    """The capability map in `frame.md` is what the lab tells a builder the platform can do, before a method exists,
+    """The capability map in the shared `fit.md` is what the lab tells a builder the platform can do, before a method exists,
     and a wrong claim there sends a design to its first run to fail — as a Word-transcript method did in the proof
     lab. So each row names a pipe that the MTHDS reference documents, and the claims that carry a limit are held to
     the reference's own words, so the two cannot drift apart."""
@@ -279,8 +280,8 @@ class TestCapabilityMap:
     MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
 
     def rows(self) -> list[list[str]]:
-        frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
-        table = frame.split("## What the platform can do", 1)[1].split("\n## ", 1)[0]
+        fit = (REPO_ROOT / "templates" / "skills" / "shared" / "fit.md.j2").read_text(encoding="utf-8")
+        table = fit.split("## What the platform can do", 1)[1].split("\n## ", 1)[0]
         lines = [line for line in table.splitlines() if line.startswith("| ") and not line.startswith("| In the builder")]
         return [[cell.strip() for cell in line.strip("|").split("|")] for line in lines]
 
@@ -290,7 +291,7 @@ class TestCapabilityMap:
         assert rows, "the capability map has no rows"
         for _, pipe, _ in rows:
             name = pipe.strip("`")
-            assert f"\n### {name} — " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
+            assert f"\n### {name} — " in reference, f"fit.md's {name} row names a pipe the MTHDS reference does not document"
 
     OFFICE_LIMIT = (
         "Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them."
@@ -307,7 +308,7 @@ class TestCapabilityMap:
         """The limit that failed a proof-lab run, said in the words the shared reference uses."""
         reference = " ".join(self.MTHDS_REFERENCE.read_text(encoding="utf-8").split())
         assert anchor in reference, f"the MTHDS reference no longer says {anchor!r}"
-        assert any(claim in row[2] for row in self.rows()), f"frame.md no longer says {claim!r}"
+        assert any(claim in row[2] for row in self.rows()), f"fit.md no longer says {claim!r}"
 
     def test_the_web_page_model_and_the_search_output_are_the_references(self) -> None:
         reference = self.MTHDS_REFERENCE.read_text(encoding="utf-8")

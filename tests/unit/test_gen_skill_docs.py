@@ -115,6 +115,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
+    (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -143,6 +144,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
+    (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
