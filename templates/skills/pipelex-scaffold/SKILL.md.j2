@@ -8,7 +8,7 @@ description: Start a new project that calls MTHDS methods through Pipelex, in Ty
 
 Give a user with no project one that runs their method, or one ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
 
-- **The method app**, for a web app around a method in TypeScript. The `pipelex-method-apps` family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
+- **The method app**, for a web app around a method in TypeScript. The method-app family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
 - **The ecosystem's own initializer** for every other project: Python of any shape, and TypeScript that is not a web app. You run it and never assemble a project by hand.
 
 **The starters are not scaffolded from**: a user who names `pipelex-starter-js` or `pipelex-starter-python` is told so and offered the method app or the initializer. This skill is not a template engine (no cookiecutter, no copier, no framework matrix of its own), a runner or a deployer, and it needs no MCP tool; it **writes no client for another service before reading [fit.md](../shared/fit.md)**.
@@ -97,7 +97,7 @@ Two lines close it. **The project's own instructions and skills load in a sessio
 | A toolchain piece is missing, or `refused: missing-tool` or `node-too-old` | STOP and name it, first reading [references/version-managers.md](references/version-managers.md) for `node` or `uv` |
 | The directory is not empty, or `refused: not-empty` | STOP and ask for another; never delete, move or write into it, and never offer to |
 | `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `--no-create` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
-| `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-method-apps` | STOP: that is the template, not a copy |
+| `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-sdk` | STOP: that is the template, not a copy |
 | any other `refused:`, `failed: write` or `failed: commit` | the line says what stands and names the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
 | `failed: create` | read the end of the log it named, then [references/uncreated-copy.md](references/uncreated-copy.md); never substitute a base URL the user did not declare |
 | `make serve` says `refused: not-loopback` | report no URL, and relay the cause it names |

@@ -779,7 +779,7 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
 def check_hook_provenance(base_dir: Path) -> list[str]:
     """Refuse a vendored hook bundle whose provenance no published source can reproduce.
 
-    The bundle is built in `pipelex-sdk-js` and its banner names what from, so two things are
+    The bundle is built in `pipelex-sdk`'s `js/` and its banner names what from, so two things are
     readable here with no sibling checkout and no network: an engine bundled from an unreleased
     `tools-wasm` build through `PIPELEX_TOOLS_WASM_PATH`, and an SDK built outside a git checkout,
     whose commit the banner spells `unknown`. Either ships a hook nobody can rebuild. Whether the
@@ -798,7 +798,7 @@ def check_hook_provenance(base_dir: Path) -> list[str]:
             "— re-vendor it with `make vendor-hook`, then `make build`"
         ]
     return [
-        f"{rel}: {problem} — re-vendor from the main checkout of pipelex-sdk-js with PIPELEX_TOOLS_WASM_PATH unset "
+        f"{rel}: {problem} — re-vendor from the js/ directory of the pipelex-sdk main checkout with PIPELEX_TOOLS_WASM_PATH unset "
         "(`make vendor-hook`), then `make build`"
         for problem in unpublished_sources(provenance)
     ]
@@ -1248,7 +1248,7 @@ def run_shared_checks(base_dir: Path) -> bool:
         "Checking the vendored hook bundle was built from published sources...",
         check_hook_provenance(base_dir),
         "FAIL: The vendored hook bundle names a source no published artifact reproduces.",
-        "  The hook bundle was built from a pipelex-sdk-js commit and @pipelex/tools-wasm from npm.",
+        "  The hook bundle was built from an SDK commit and @pipelex/tools-wasm from npm.",
     )
     failed |= _run_check(
         "Checking the hook bundle's notices name every package it inlines...",

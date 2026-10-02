@@ -6,7 +6,7 @@
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
-# pipelex-sdk-js — see docs/hooks.md), invoked with --platform=codex so it
+# pipelex-sdk's js/ — see docs/hooks.md), invoked with --platform=codex so it
 # parses the apply_patch envelope in tool_input.command (possibly several
 # .mthds files per call — outcomes merged, any block wins) and emits Codex's
 # block / hookSpecificOutput protocol:

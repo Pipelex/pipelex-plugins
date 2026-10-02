@@ -3,7 +3,7 @@
 #
 # Two-layer design: this thin wrapper is the fail-open guard and the
 # per-platform seam; ALL validation logic lives in the vendored check.mjs
-# bundle beside it (built in pipelex-sdk-js — see docs/hooks.md):
+# bundle beside it (built in pipelex-sdk's js/ — see docs/hooks.md):
 #   1. local lint   (@pipelex/tools-wasm — offline, no credentials) → block on errors
 #   2. local format (same engine) → write back in place when changed
 #   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)

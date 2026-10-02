@@ -825,7 +825,10 @@ class TestPipelexIntegrateSkill:
         assert "**`summarize_usage(results)` — what the run cost.**" in python
         assert "**`results.working_memory` — every named stuff of the run.**" in python
         assert "Their page is `docs/artifact-download.md`." in python
-        assert "https://github.com/Pipelex/pipelex-sdk-python/blob/main/docs/<page>.md" in python
+        assert "https://github.com/Pipelex/pipelex-sdk/blob/main/python/docs/<page>.md" in python
+        # The TypeScript twin's pages live beside it, in the `js/` directory of the same repository.
+        typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        assert "https://github.com/Pipelex/pipelex-sdk/blob/main/js/docs/<page>.md" in typescript
         assert "the report names them for a Python project exactly as it would for TypeScript, from these pages" in python
         assert "The Python SDK does not carry" not in body
 
