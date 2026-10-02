@@ -23,9 +23,9 @@ from scripts.hook_bundle import Provenance, first_body_difference, read_bundle, 
 TITLE = "// check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)\n"
 DO_NOT_EDIT = "// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.\n"
 BODY = "var __create = Object.create;\nvar __defProp = Object.defineProperty;\nexport { main };\n"
-# A throwaway git identity and no hooks or signing, whatever this machine's global config says.
 # The build lives in this directory of the pipelex-sdk repository, as `SDK_JS_DIR` defaults to `../pipelex-sdk/js`.
 SDK_JS_SUBDIRECTORY = "js"
+# A throwaway git identity and no hooks or signing, whatever this machine's global config says.
 GIT_CONFIG = ("-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null")
 
 
