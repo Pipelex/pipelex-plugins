@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
-// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in pipelex-sdk-js.
-// Provenance: @pipelex/sdk 0.27.0 (2b1db43) + @pipelex/tools-wasm 0.3.0 (npm)
+// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
+// Provenance: @pipelex/sdk 0.29.1 (c14f0ae) + @pipelex/tools-wasm 0.3.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2421,6 +2421,33 @@ function isTimerDelay(value) {
 }
 
 // src/runs.ts
+var RUN_RESULT_ARTIFACTS = [
+  "graph_spec",
+  "pipe_io_contracts",
+  "input_form",
+  "output_form",
+  "main_stuff",
+  "working_memory",
+  "tokens_usages"
+];
+function assertArtifactSelection(artifacts) {
+  if (artifacts === void 0) return;
+  if (!Array.isArray(artifacts) || artifacts.length === 0) {
+    throw new RangeError(
+      `"artifacts" must name one or more of ${RUN_RESULT_ARTIFACTS.join(", ")}; omit it to read every artifact.`
+    );
+  }
+  const known = RUN_RESULT_ARTIFACTS;
+  const unknown = artifacts.filter((name) => !known.includes(name));
+  if (unknown.length > 0) {
+    throw new RangeError(
+      `Unknown result artifact(s) ${unknown.join(", ")}; valid artifacts are: ${RUN_RESULT_ARTIFACTS.join(", ")}.`
+    );
+  }
+}
+function selectionIncludesMainStuff(artifacts) {
+  return artifacts === void 0 || artifacts.includes("main_stuff");
+}
 var DEFAULT_POLL_INTERVAL_MS = 2e3;
 var DEFAULT_WAIT_TIMEOUT_MS = 12e5;
 function assertWaitOptions(options = {}) {
@@ -2430,6 +2457,7 @@ function assertWaitOptions(options = {}) {
       `"intervalMs" and "timeoutMs" must be numbers, got ${String(intervalMs)} and ${String(timeoutMs)}.`
     );
   }
+  assertArtifactSelection(options.artifacts);
 }
 async function pollUntilResult(fetchOnce, runId, options = {}) {
   assertWaitOptions(options);
@@ -2447,7 +2475,10 @@ async function pollUntilResult(fetchOnce, runId, options = {}) {
         timeoutMs
       );
     }
-    const state = await fetchOnce(runId, { signal: options.signal });
+    const state = await fetchOnce(
+      runId,
+      options.artifacts === void 0 ? { signal: options.signal } : { signal: options.signal, artifacts: options.artifacts }
+    );
     if (state.state === "completed") {
       return state.result;
     }
@@ -2528,7 +2559,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.27.0";
+var SDK_VERSION = "0.29.1";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -2615,7 +2646,8 @@ function detectRuntime(scope = globalThis) {
   return { kind: "server" };
 }
 function renderRuntime(runtime) {
-  if (!runtime.name || !runtime.version || !isToken(runtime.version)) return void 0;
+  if (!runtime.name || !isToken(runtime.name)) return void 0;
+  if (!runtime.version || !isToken(runtime.version)) return void 0;
   const token = `${runtime.name}/${runtime.version}`;
   const platform = [runtime.os, runtime.arch].filter(
     (part) => typeof part === "string" && isToken(part)
@@ -3462,8 +3494,8 @@ function isExpired(expiresAt) {
 function isCredentialRefusal(err) {
   return err instanceof ApiResponseError && (err.status === 401 || err.status === 403);
 }
-async function readCompletedResults(client, runId, signal) {
-  const state = await client.getRunResult(runId, { signal });
+async function readCompletedResults(client, runId, scope, signal) {
+  const state = await client.getRunResult(runId, { signal, artifacts: [scope] });
   if (state.state === "running") {
     throw new RunStillRunningError(
       `Run ${runId} is still running, so it has no artifacts to download yet` + (state.retry_after_seconds != null ? ` \u2014 retry in ${state.retry_after_seconds}s.` : "."),
@@ -3500,7 +3532,7 @@ async function downloadArtifacts(client, request) {
       "downloadArtifacts takes exactly one of `run_id` (the results are re-read) or `results` (a RunResults in hand)."
     );
   }
-  const results = hasResults ? request.results : await readCompletedResults(client, request.run_id, request.signal);
+  const results = hasResults ? request.results : await readCompletedResults(client, request.run_id, scope, request.signal);
   const runId = results.pipeline_run_id;
   const walked = scope === "main_stuff" ? results.main_stuff : results["working_memory"];
   if (walked == null) {
@@ -4393,7 +4425,7 @@ var PipelexApiClient = class {
    *    other extension route rides the static core (`crate_ops.py` is explicit that
    *    `build/runner` "is the exception — it needs the dry-run sweep"). Giving one
    *    static route an override while its siblings lack one is the inconsistency.
-   * 2. The input is **bounded server-side** — `pipelex-api/api/limits.py` caps a request
+   * 2. The input is **bounded server-side** — the runner's `pipelex_api/limits.py` caps a request
    *    at 16 `.mthds` files of 1 MiB each — and none of these routes runs inference.
    * 3. On the hosted path an override would be **inert**: the gateway caps responses at
    *    ~30s (see `POLL_REQUEST_TIMEOUT_MS` above), so raising `timeoutMs` would still be
@@ -4659,11 +4691,21 @@ var PipelexApiClient = class {
    *   as `error`
    * - HTTP 503 → `running` (Temporal degraded — retry, never fail a poller)
    *
+   * `options.artifacts` narrows the read to the named artifacts, sent as one
+   * comma-separated `?artifacts=` parameter: only those are read, and an
+   * unselected artifact is absent from the result (`undefined`) while a
+   * selected one the run never wrote is `null`. Omitted, every artifact is
+   * read. An empty selection or an unknown name throws a `RangeError` before
+   * any request. `MissingMainStuffError` is thrown only for a read that asked
+   * for `main_stuff` — no selection, or one naming it.
+   *
    * Throws `RunLifecycleUnavailableError` when the lifecycle routes are absent
    * (a bare runner).
    */
   async getRunResult(runId, options = {}) {
-    const endpoint = `${RUNS}/${encodeURIComponent(runId)}/results`;
+    assertArtifactSelection(options.artifacts);
+    const base = `${RUNS}/${encodeURIComponent(runId)}/results`;
+    const endpoint = options.artifacts === void 0 ? base : `${base}?artifacts=${[...new Set(options.artifacts)].join(",")}`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
       timeoutMs: POLL_REQUEST_TIMEOUT_MS,
@@ -4684,7 +4726,7 @@ var PipelexApiClient = class {
       this.throwApiResponseError("GET", endpoint, res);
     }
     const result = JSON.parse(res.body);
-    if (result.main_stuff == null) {
+    if (selectionIncludesMainStuff(options.artifacts) && result.main_stuff == null) {
       throw new MissingMainStuffError(
         `Completed run '${runId}' returned no main stuff \u2014 a completed run always delivers a main stuff.`,
         runId
@@ -5071,6 +5113,10 @@ var PipelexApiClient = class {
    * either read `page.items` (accepting the first page) or follow the cursor.
    * `iterateRuns` does the latter for you.
    *
+   * Each item is a `RunHistoryItem` — the id, status, timestamps, pipe and,
+   * for a failed run, its error report. The run's organization, creator,
+   * method and workflow id are not on the list; `getRunDetail` returns them.
+   *
    * `createdFrom` / `createdTo` are applied server-side as index key
    * conditions, so a bounded page genuinely reads less. They are INSTANTS,
    * not days — see `ListRunsQuery`.
@@ -5099,7 +5145,7 @@ var PipelexApiClient = class {
    * **Prefer `listRuns`** for anything user-facing: this is O(history) by
    * construction and makes as many round trips as the data demands.
    *
-   * An iterator rather than a `listAllRuns(): Promise<PipelineRun[]>`, and that
+   * An iterator rather than a `listAllRuns(): Promise<RunHistoryItem[]>`, and that
    * is not stylistic. An all-at-once helper needs a page cap so a misbehaving
    * server cannot spin it forever — and a cap means it returns a TRUNCATED list
    * with no error and no flag, a method with 6,000 runs quietly yielding 5,000.

@@ -12,7 +12,7 @@
 
 ### Changed
 
-- **The validation hook is rebuilt on `@pipelex/sdk` 0.27.0**: the `check.mjs` bundle every target runs on a `.mthds` edit embedded `@pipelex/sdk` 0.25.1, and now embeds 0.27.0 with the same `@pipelex/tools-wasm` 0.3.0. The hook's own code is unchanged, so it lints, formats and validates as before, and its validate stage names the new SDK version in its `User-Agent`.
+- **The validation hook is rebuilt on `@pipelex/sdk` 0.29.1**: the `check.mjs` bundle every target runs on a `.mthds` edit embedded `@pipelex/sdk` 0.25.1, and now embeds 0.29.1 with the same `@pipelex/tools-wasm` 0.3.0, built in the `js/` directory of `Pipelex/pipelex-sdk`, which its header now names as the place to rebuild it. The hook's own code is unchanged, so it lints, formats and validates as before, and its validate stage names the new SDK version in its `User-Agent`.
 
 - **The plugin is licensed under the Elastic License 2.0 (Breaking)**: it moves from Apache 2.0 to the Elastic License 2.0 (ELv2), a source-available license, as the Pipelex runtime and servers did. Installing, using and adapting the plugin for your own work, your team's or your company's is unchanged; offering it to others as a hosted or managed service is what the license rules out. Code the skills copy or write into your own project, such as the codegen check scripts and the call-site modules `pipelex-integrate` writes, is licensed to you under MIT-0, so you can publish your project with no conditions from the plugin. The validation hook, `check.mjs`, stays MIT-licensed, and its notice now ships beside it in every target as `hooks/THIRD-PARTY-NOTICES.md`; `make check` fails when the bundle inlines a package the notice does not name.
 
