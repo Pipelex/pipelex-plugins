@@ -65,7 +65,7 @@ templates/                     # SOURCE OF TRUTH — all .j2 templates live here
 │   ├── check-mthds.sh.j2            # Claude wrapper (fail-open guard → check.mjs)
 │   ├── check-mthds-codex.sh.j2      # Codex wrapper (apply_patch envelope → check.mjs)
 │   ├── check-mthds-vibe.sh.j2       # Vibe wrapper (post_tool payload → check.mjs)
-│   └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk-js)
+│   └── assets/check.mjs             # Vendored wasm+API validation bundle (static asset, built in pipelex-sdk's js/)
 └── mcp/
     └── vibe-mcp.toml.j2             # Vibe [[mcp_servers]] fragment: the workshop launcher (Vibe has no plugin manifest)
 skills/                        # SOURCE OF TRUTH for static (non-templated) skill assets — references/ and scripts/ — copied verbatim into every target, executable bits kept
@@ -84,7 +84,7 @@ pipelex-vibe/                  # Mistral Vibe target (generated, checked in; loa
 scripts/
 ├── gen_skill_docs.py          # Template renderer (multi-target)
 ├── check.py                   # Validation / freshness / packaging checks, the hook bundle's provenance guard included
-├── check_hook_fresh.py        # Release gate: the vendored check.mjs against npm's latest engine and a rebuild in ../pipelex-sdk-js
+├── check_hook_fresh.py        # Release gate: the vendored check.mjs against npm's latest engine and a rebuild in ../pipelex-sdk/js
 ├── hook_bundle.py             # Reads the hook bundle's provenance banner and compares bundles below it
 └── local_mcp.py               # Starts Claude Code or Codex on another pipelex-mcp workshop (`make claude-local-mcp` / `codex-local-mcp`)
 tests/unit/                    # Unit tests for renderer + checks, and the hook's sweep over the corpus
@@ -112,8 +112,8 @@ make test            # Run unit tests
 make test-recipes    # Execute the shipped synthetic-inputs recipes (opt-in; runs uv, downloads packages)
 make agent-test      # Run unit tests quietly (output only on failure) — prefer this
 make gen-skill-docs  # Build default target (prod); use TARGET=codex for others
-make vendor-hook     # Rebuild check.mjs in ../pipelex-sdk-js and copy it into templates/hooks/assets/
-make check-hook-fresh  # Release gate: fail when check.mjs is behind npm's tools-wasm or a rebuild in ../pipelex-sdk-js
+make vendor-hook     # Rebuild check.mjs in ../pipelex-sdk/js and copy it into templates/hooks/assets/
+make check-hook-fresh  # Release gate: fail when check.mjs is behind npm's tools-wasm or a rebuild in ../pipelex-sdk/js
 make claude-local-mcp  # Start Claude Code on this checkout's skills with another workshop: MCP=<pipelex-mcp checkout> or MCP_VERSION=x.y.z
 make codex-local-mcp   # The same for Codex, overriding only its pipelex server entry; neither touches a tracked file
 ```
@@ -166,7 +166,7 @@ Session-only alternative that leaves global config untouched: `claude --plugin-d
 
 ## PostToolUse Hook — CLI-free wasm+API pipeline
 
-Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `post_tool` (stable hooks API, Vibe 2.21.0+). Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in `pipelex-sdk-js`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
+Claude Code and Codex run a `PostToolUse` hook against `.mthds` files after every edit; Mistral Vibe's equivalent is `post_tool` (stable hooks API, Vibe 2.21.0+). Nothing shells out to `plxt` or `mthds-agent`: each target ships a thin fail-open wrapper script that runs the shared vendored `check.mjs` bundle (built in the `js/` directory of `pipelex-sdk`) — local lint and format via the inlined `@pipelex/tools-wasm` engine (offline, format writes back in place), then the bundle verdict from `POST /v1/validate` through `@pipelex/sdk` when `PIPELEX_API_KEY` is set. Fail-open: no Node → the whole hook passes silently; no key / API unreachable → the local lint/format verdicts still apply and only the validate stage is skipped. Full details, failure-posture table, and the re-vendor procedure (`make vendor-hook`) in `docs/hooks.md`.
 
 ### Codex specifics (verified against Codex 0.144.4, incl. live sessions)
 

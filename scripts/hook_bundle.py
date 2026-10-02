@@ -1,7 +1,7 @@
 """The vendored hook bundle: what its banner says it was built from, and the code below the banner.
 
-`templates/hooks/assets/check.mjs` is built in `pipelex-sdk-js` by `npm run build:hook`, whose
-`scripts/build-hook.mjs` writes a three-line comment banner above the bundled code. The third line
+`templates/hooks/assets/check.mjs` is built in the `js/` directory of `pipelex-sdk` by `npm run build:hook`,
+whose `scripts/build-hook.mjs` writes a three-line comment banner above the bundled code. The third line
 names the sources the bundle was built from:
 
     // Provenance: @pipelex/sdk 0.23.0 (63e9ba5) + @pipelex/tools-wasm 0.3.0 (npm)
@@ -71,7 +71,7 @@ def unpublished_sources(provenance: Provenance) -> list[str]:
         )
     if COMMIT_PATTERN.fullmatch(provenance.sdk_commit) is None:
         problems.append(
-            f"the SDK commit is `{provenance.sdk_commit}`, not a commit: the bundle was built outside a git checkout of pipelex-sdk-js, "
+            f"the SDK commit is `{provenance.sdk_commit}`, not a commit: the bundle was built outside a git checkout of pipelex-sdk, "
             "so no branch holds the source it was built from"
         )
     return problems
@@ -80,7 +80,7 @@ def unpublished_sources(provenance: Provenance) -> list[str]:
 def bundle_body(bundle: str) -> str:
     """Everything below the banner: the code a rebuild of the same sources reproduces.
 
-    The banner names the SDK commit, which moves with every commit to `pipelex-sdk-js`, including
+    The banner names the SDK commit, which moves with every commit to `pipelex-sdk`, including
     the ones that leave the hook alone, so it is left out of the comparison.
     """
     return "".join(bundle.splitlines(keepends=True)[BANNER_LINE_COUNT:])

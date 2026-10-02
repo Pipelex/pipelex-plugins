@@ -1,6 +1,6 @@
 # A project that owns a codegen harness
 
-Read this at step 1, before step 2, when the project shows a codegen harness. A project made from the method app (`pipelex-method-apps`' `webapp-js/`), `pipelex-starter-js` or `pipelex-starter-python`, or one that adopted their pattern, regenerates every method in one place, checks them in one place, and keeps its own sidecar. Writing the skill's tree beside that would leave two regeneration paths, two sidecar dialects and files the workshop never emits. The language reference read at step 1 has a harness section of its own, with that language's commands.
+Read this at step 1, before step 2, when the project shows a codegen harness. A project made from the method app (`webapp-js/` under `pipelex-sdk`'s `method-apps/`), `pipelex-starter-js` or `pipelex-starter-python`, or one that adopted their pattern, regenerates every method in one place, checks them in one place, and keeps its own sidecar. Writing the skill's tree beside that would leave two regeneration paths, two sidecar dialects and files the workshop never emits. The language reference read at step 1 has a harness section of its own, with that language's commands.
 
 ## Recognising one
 

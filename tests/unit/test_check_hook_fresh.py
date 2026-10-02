@@ -21,8 +21,10 @@ from scripts.check_hook_fresh import (
 from scripts.hook_bundle import Provenance, first_body_difference, read_bundle, read_provenance
 
 TITLE = "// check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)\n"
-DO_NOT_EDIT = "// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in pipelex-sdk-js.\n"
+DO_NOT_EDIT = "// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.\n"
 BODY = "var __create = Object.create;\nvar __defProp = Object.defineProperty;\nexport { main };\n"
+# The build lives in this directory of the pipelex-sdk repository, as `SDK_JS_DIR` defaults to `../pipelex-sdk/js`.
+SDK_JS_SUBDIRECTORY = "js"
 # A throwaway git identity and no hooks or signing, whatever this machine's global config says.
 GIT_CONFIG = ("-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null")
 
@@ -51,16 +53,20 @@ def _commit(checkout: Path, name: str) -> None:
 class TestCheckHookFresh:
     @pytest.fixture
     def sibling(self, tmp_path: Path) -> Path:
-        """A pipelex-sdk-js stand-in on `dev`, clean and level with its origin, a local bare repository, so no test reaches the network."""
+        """The `js/` directory of a pipelex-sdk stand-in on `dev`, clean and level with its origin, a local bare
+        repository, so no test reaches the network. The build lives one directory below the repository's root,
+        as in the real one, so every git reading runs from a subdirectory."""
         seed = tmp_path / "seed"
-        (seed / BUILD_SCRIPT.parent).mkdir(parents=True)
-        (seed / BUILD_SCRIPT).write_text("// build\n")
+        (seed / SDK_JS_SUBDIRECTORY / BUILD_SCRIPT.parent).mkdir(parents=True)
+        (seed / SDK_JS_SUBDIRECTORY / BUILD_SCRIPT).write_text("// build\n")
+        (seed / "starter-js").mkdir()
+        (seed / "starter-js" / "package.json").write_text("{}\n")
         _git(tmp_path, "init", "--quiet", "-b", "dev", str(seed))
         _git(seed, "add", ".")
         _git(seed, "commit", "-m", "seed")
         _git(tmp_path, "clone", "--quiet", "--bare", str(seed), str(tmp_path / "origin.git"))
-        _git(tmp_path, "clone", "--quiet", str(tmp_path / "origin.git"), str(tmp_path / "pipelex-sdk-js"))
-        return tmp_path / "pipelex-sdk-js"
+        _git(tmp_path, "clone", "--quiet", str(tmp_path / "origin.git"), str(tmp_path / "pipelex-sdk"))
+        return tmp_path / "pipelex-sdk" / SDK_JS_SUBDIRECTORY
 
     def _run_gate(self, mocker: MockerFixture, tmp_path: Path, *, vendored: str, rebuilt: str, latest: str, refusals: list[str] | None = None) -> int:
         """The gate's wiring, with the sibling's state, npm and the rebuild replaced."""
@@ -110,7 +116,7 @@ class TestCheckHookFresh:
     def test_an_engine_behind_the_sdk_pin_asks_for_the_pin_first(self) -> None:
         findings = engine_findings(_provenance(_bundle(tools_wasm="0.3.0")), _provenance(_bundle(tools_wasm="0.3.0")), "0.4.0")
         assert len(findings) == 1
-        assert "pipelex-sdk-js pins 0.3.0" in findings[0]
+        assert "pipelex-sdk's js/ pins 0.3.0" in findings[0]
         assert "npm install --save-dev --save-exact @pipelex/tools-wasm@0.4.0" in findings[0]
 
     # Question 2: whether re-vendoring would change the bundle.
@@ -134,7 +140,14 @@ class TestCheckHookFresh:
     def test_a_directory_without_the_build_script_is_refused(self, tmp_path: Path) -> None:
         refusals = sibling_refusals(tmp_path)
         assert len(refusals) == 1
-        assert "is not a pipelex-sdk-js checkout" in refusals[0]
+        assert "is not the js/ directory of a pipelex-sdk checkout" in refusals[0]
+
+    def test_the_root_of_the_sdk_checkout_is_refused(self, sibling: Path) -> None:
+        """The build is in `js/`: the repository's root holds no build script, so pointing at it names the fix."""
+        refusals = sibling_refusals(sibling.parent)
+        assert len(refusals) == 1
+        assert "is not the js/ directory of a pipelex-sdk checkout" in refusals[0]
+        assert "Point SDK_JS_DIR at one." in refusals[0]
 
     def test_a_checkout_off_its_base_is_refused(self, sibling: Path) -> None:
         _git(sibling, "checkout", "--quiet", "-b", "feature/Other")
@@ -147,7 +160,15 @@ class TestCheckHookFresh:
         refusals = sibling_refusals(sibling)
         assert len(refusals) == 1
         assert "has uncommitted changes" in refusals[0]
-        assert "scratch.ts" in refusals[0]
+        assert "js/scratch.ts" in refusals[0]
+
+    def test_an_uncommitted_change_elsewhere_in_the_sdk_checkout_is_refused_too(self, sibling: Path) -> None:
+        """The whole checkout counts, not only `js/`: the gate stands for a build of `dev`, which a dirty checkout is not."""
+        (sibling.parent / "starter-js" / "package.json").write_text('{"name": "edited"}\n')
+        refusals = sibling_refusals(sibling)
+        assert len(refusals) == 1
+        assert "has uncommitted changes" in refusals[0]
+        assert "starter-js/package.json" in refusals[0]
 
     def test_a_checkout_behind_origin_is_refused_with_the_fast_forward(self, sibling: Path, tmp_path: Path) -> None:
         """A checkout behind origin would rebuild an old hook and pass a bundle `dev` has moved past."""
