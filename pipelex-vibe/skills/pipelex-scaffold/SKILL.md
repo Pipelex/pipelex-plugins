@@ -7,7 +7,7 @@ description: Start a new project that calls MTHDS methods through Pipelex, in Ty
 
 Give a user with no project one that runs their method, or one ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
 
-- **The method app**, for a web app around a method in TypeScript. The `pipelex-method-apps` family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
+- **The method app**, for a web app around a method in TypeScript. The method-app family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
 - **The ecosystem's own initializer** for every other project: Python of any shape, and TypeScript that is not a web app. You run it and never assemble a project by hand.
 
 **The starters are not scaffolded from**: a user who names `pipelex-starter-js` or `pipelex-starter-python` is told so and offered the method app or the initializer. This skill is not a template engine (no cookiecutter, no copier, no framework matrix of its own), a runner or a deployer, and it needs no MCP tool; it **writes no client for another service before reading [fit.md](../shared/fit.md)**.

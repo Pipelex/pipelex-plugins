@@ -716,7 +716,10 @@ class TestUncreatedCopyReference:
         block = _recipe(reference, OWN_REPOSITORY_MARKER)
         # The origin is read, and a tracked directory refused, before any repository is made.
         assert block.index("remote get-url origin") < block.index("init -b main")
-        assert "*[/:]Pipelex/pipelex-sdk|*[/:]Pipelex/pipelex-sdk[./]*|*[/:]Pipelex/pipelex-method-apps*)" in block
+        # Read as the initializer's `TEMPLATE_ORIGINS` reads it: in any letter case, with or without `.git` or a
+        # trailing slash, and naming the repository exactly.
+        assert "remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]'); origin=${origin%/}; origin=${origin%.git}" in block
+        assert "*[/:]pipelex/pipelex-sdk|*[/:]pipelex/pipelex-method-apps)" in block
         # Only a copy outside every repository, or one the enclosing repository ignores, gets one: the family
         # plants no repository where another repository sees it.
         assert block.count("init -b main") == 2
@@ -885,10 +888,11 @@ class TestUncreatedCopyRecipes:
             "https://github.com/Pipelex/pipelex-sdk.git",
             "https://github.com/Pipelex/pipelex-sdk",
             "git@github.com:Pipelex/pipelex-sdk.git",
+            "git@github.com:pipelex/pipelex-sdk.git/",
             "https://github.com/Pipelex/pipelex-method-apps.git",
             "git@github.com:Pipelex/pipelex-method-apps.git",
         ],
-        ids=["https", "https-without-suffix", "ssh", "https-before-the-move", "ssh-before-the-move"],
+        ids=["https", "https-without-suffix", "ssh", "ssh-lowercase-with-slash", "https-before-the-move", "ssh-before-the-move"],
     )
     def test_the_template_s_own_checkout_is_refused_and_left_alone(self, tmp_path: Path, shell: list[str], origin: str) -> None:
         family = tmp_path / "template-repository"
@@ -902,8 +906,13 @@ class TestUncreatedCopyRecipes:
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
     @pytest.mark.parametrize(
         "origin",
-        ["https://github.com/someone/pipelex-method-apps.git", "https://github.com/Pipelex/pipelex-sdk-js.git"],
-        ids=["a-fork", "a-sibling-of-the-template-s-repository"],
+        [
+            "https://github.com/someone/pipelex-method-apps.git",
+            "https://github.com/Pipelex/pipelex-sdk-js.git",
+            "https://github.com/Pipelex/pipelex-sdk.wiki.git",
+            "https://gitlab.com/Pipelex/pipelex-sdk/other.git",
+        ],
+        ids=["a-fork", "a-sibling-of-the-template-s-repository", "the-template-s-wiki", "a-repository-nested-under-its-name"],
     )
     def test_a_directory_another_repository_tracks_is_refused_whatever_its_origin(self, tmp_path: Path, shell: list[str], origin: str) -> None:
         """A fork of the family under another owner carries no Pipelex origin, and is still not a fresh copy; a

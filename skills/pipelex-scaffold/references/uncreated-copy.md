@@ -28,8 +28,9 @@ A commit it prints is the pristine one, and the report names it as found; go str
 A copy made by hand is often made without git, and any copy may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-sdk`, and of `pipelex-method-apps` in a clone made before it moved, so git places its checkout inside that repository, where it passes every other test. Read git before initializing anything. One command tells the cases apart, and initializes only a copy outside every repository or one the enclosing repository ignores:
 
 ```bash
-case "$(git -C <dir> remote get-url origin 2>/dev/null)" in
-  *[/:]Pipelex/pipelex-sdk|*[/:]Pipelex/pipelex-sdk[./]*|*[/:]Pipelex/pipelex-method-apps*)
+origin=$(git -C <dir> remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]'); origin=${origin%/}; origin=${origin%.git}
+case "$origin" in
+  *[/:]pipelex/pipelex-sdk|*[/:]pipelex/pipelex-method-apps)
     echo "this is a template's own checkout, not a copy of it" >&2; exit 1 ;;
 esac
 prefix=$(git -C <dir> rev-parse --show-prefix 2>/dev/null) || prefix=outside
