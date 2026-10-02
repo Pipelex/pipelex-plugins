@@ -1,7 +1,7 @@
 """Pin the pipelex-scaffold skill: two branches, no templates of its own, one commit, and a key that never crosses the conversation.
 
 The method app is the template family's own two commands, its initializer and `make serve`, whose programs
-and tests live in `pipelex-method-apps`. The initializer branch's two scripts are executed in
+and tests live in `pipelex-sdk`'s `method-apps/`. The initializer branch's two scripts are executed in
 `test_pipelex_scaffold_scripts.py`. What this module executes is what the skill still carries of the method
 app: the git reading and the `make create` run of `references/uncreated-copy.md`, for a copy of the template
 the initializer did not finish.
@@ -34,14 +34,17 @@ SERVE_COMMAND = "make -C '<dir>' serve"
 CREATE_MARKER = "create METHOD='<method>'"
 OWN_REPOSITORY_MARKER = "rev-parse --show-prefix"
 INITIALIZER_COPY_MARKER = "rev-parse --show-cdup"
-PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-method-apps/webapp-js "
-PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version>" -- .'
+# The pristine commit's subject, as `pipelex-sdk`'s initializer writes it (`method-apps/initializers/js/lib/git.mjs`,
+# `pristineMessage`), and as it wrote it from `pipelex-method-apps` before the move, which a copy made then keeps.
+PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-sdk/method-apps/webapp-js "
+PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE = "Start from Pipelex/pipelex-method-apps/webapp-js "
+PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>" -- .'
 TARGETS = ("prod", "codex", "mistral-vibe")
 # The method app's report reads the plane of the `.env.local` `make create` wrote with this test.
 PLANE_TEST = 'u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other'
 
-# What the family's initializer and `make serve` print, as `pipelex-method-apps` documents them
-# (`initializers/js/README.md`, `webapp-js/scripts/lib/serve.mts`). The skill keys its stop table on
+# What the family's initializer and `make serve` print, as `pipelex-sdk` documents them
+# (`method-apps/initializers/js/README.md`, `method-apps/webapp-js/scripts/lib/serve.mts`). The skill keys its stop table on
 # these words; a verdict the family adds or renames is re-read here and in the table together.
 INITIALIZER_VERDICTS_WITH_A_ROW = (
     "`refused: not-empty`",
@@ -194,10 +197,9 @@ class TestPipelexScaffoldSkill:
                 "is finished and never created again: read [references/uncreated-copy.md](references/uncreated-copy.md) before running anything in it"
                 in body
             )
-            assert (
-                "| `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-method-apps` | STOP: that is the template, not a copy |"
-                in body
-            )
+            # The row names the template's home; a clone of `pipelex-method-apps`, where it lived before, is refused
+            # by the initializer and by the reference's own `origin` reading, which both still name it.
+            assert "| `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-sdk` | STOP: that is the template, not a copy |" in body
 
     def test_only_a_lone_git_reads_as_empty_and_no_cruft_list_joins_it(self) -> None:
         """`L-260912-724b71`, ruled 2026-09-13: a directory holding nothing but `.git` is empty.
@@ -529,7 +531,17 @@ class TestMethodAppBranch:
         """The chains the family's commands replaced are gone from every file the skill ships."""
         shipped = _bodies() + [(REFERENCES_DIR / reference).read_text(encoding="utf-8") for reference in TestPipelexScaffoldSkill.REFERENCES]
         for text in shipped:
-            for gone in ("pipelex-method-apps.git", "git clone", 'cp -R "$tmp', "nohup", "port-check", "lsof -ti", "pgrep", "curl -sS"):
+            for gone in (
+                "pipelex-method-apps.git",
+                "pipelex-sdk.git",
+                "git clone",
+                'cp -R "$tmp',
+                "nohup",
+                "port-check",
+                "lsof -ti",
+                "pgrep",
+                "curl -sS",
+            ):
                 assert gone not in text, f"the skill still carries {gone!r}"
 
     def test_the_verdict_is_read_from_its_line_never_from_the_exit_code(self) -> None:
@@ -650,10 +662,19 @@ class TestUncreatedCopyReference:
         hand-made copy gets, and a copy already committed is not read as one that needs a repository."""
         reference = self.reference
         block = _recipe(reference, INITIALIZER_COPY_MARKER)
-        assert PRISTINE_SUBJECT_PREFIX in block
+        pattern = re.search(r"grep -m1 -E '([^']+)'", block)
+        assert pattern is not None, "the block reads the history with one grep -E pattern"
+        subject = re.compile(pattern.group(1))
+        # Both subjects are recognized, the one written since the template moved into `pipelex-sdk` and the
+        # one a copy made before keeps; a sibling repository's name is not.
+        for prefix in (PRISTINE_SUBJECT_PREFIX, PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE):
+            assert subject.match(f"2598d4e {prefix}0.4.0 (2598d4e)"), prefix
+        assert not subject.match("2598d4e Start from Pipelex/pipelex-sdk-js/webapp-js 0.4.0")
         assert reference.index(INITIALIZER_COPY_MARKER) < reference.index(OWN_REPOSITORY_MARKER)
-        # The commit this file makes by hand carries the subject the block recognizes.
-        assert PRISTINE_COPY_COMMIT.split('"')[1].startswith(PRISTINE_SUBJECT_PREFIX)
+        # The commit this file makes by hand carries the new subject, which the block recognizes.
+        hand_made = PRISTINE_COPY_COMMIT.split('"')[1]
+        assert hand_made.startswith(PRISTINE_SUBJECT_PREFIX)
+        assert subject.match(f"2598d4e {hand_made}")
 
     def test_a_cause_the_sandbox_imposes_is_handed_to_the_user(self) -> None:
         """Codex's `workspace-write` sandbox denies `ps`, which the template's tests and `make serve` need,
@@ -695,7 +716,10 @@ class TestUncreatedCopyReference:
         block = _recipe(reference, OWN_REPOSITORY_MARKER)
         # The origin is read, and a tracked directory refused, before any repository is made.
         assert block.index("remote get-url origin") < block.index("init -b main")
-        assert "*/Pipelex/pipelex-method-apps*|*:Pipelex/pipelex-method-apps*" in block
+        # Read as the initializer's `TEMPLATE_ORIGINS` reads it: in any letter case, with or without `.git` or a
+        # trailing slash, and naming the repository exactly.
+        assert "remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]'); origin=${origin%/}; origin=${origin%.git}" in block
+        assert "*[/:]pipelex/pipelex-sdk|*[/:]pipelex/pipelex-method-apps)" in block
         # Only a copy outside every repository, or one the enclosing repository ignores, gets one: the family
         # plants no repository where another repository sees it.
         assert block.count("init -b main") == 2
@@ -750,8 +774,13 @@ class TestUncreatedCopyRecipes:
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
     @pytest.mark.parametrize(
         "subject",
-        [f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)", f"{PRISTINE_SUBJECT_PREFIX}0.4.0"],
-        ids=["the-initializer-s", "made-by-hand"],
+        [
+            f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)",
+            f"{PRISTINE_SUBJECT_PREFIX}0.4.0",
+            f"{PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE}0.4.0 (2598d4e)",
+            f"{PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE}0.4.0",
+        ],
+        ids=["the-initializer-s", "made-by-hand", "the-initializer-s-before-the-move", "made-by-hand-before-the-move"],
     )
     def test_a_copy_already_committed_prints_its_pristine_commit(self, tmp_path: Path, shell: list[str], subject: str) -> None:
         target = tmp_path / "receipt review"
@@ -855,11 +884,18 @@ class TestUncreatedCopyRecipes:
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
     @pytest.mark.parametrize(
         "origin",
-        ["https://github.com/Pipelex/pipelex-method-apps.git", "git@github.com:Pipelex/pipelex-method-apps.git"],
-        ids=["https", "ssh"],
+        [
+            "https://github.com/Pipelex/pipelex-sdk.git",
+            "https://github.com/Pipelex/pipelex-sdk",
+            "git@github.com:Pipelex/pipelex-sdk.git",
+            "git@github.com:pipelex/pipelex-sdk.git/",
+            "https://github.com/Pipelex/pipelex-method-apps.git",
+            "git@github.com:Pipelex/pipelex-method-apps.git",
+        ],
+        ids=["https", "https-without-suffix", "ssh", "ssh-lowercase-with-slash", "https-before-the-move", "ssh-before-the-move"],
     )
     def test_the_template_s_own_checkout_is_refused_and_left_alone(self, tmp_path: Path, shell: list[str], origin: str) -> None:
-        family = tmp_path / "pipelex-method-apps"
+        family = tmp_path / "template-repository"
         copy = self._repository_tracking_a_copy(family, origin)
         result = self._own_repository(dir_literal=str(copy), shell=shell, cwd=tmp_path)
         assert result.returncode != 0
@@ -868,10 +904,21 @@ class TestUncreatedCopyRecipes:
         assert self._git(family, "status", "--porcelain") == ""
 
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    def test_a_directory_another_repository_tracks_is_refused_whatever_its_origin(self, tmp_path: Path, shell: list[str]) -> None:
-        """A fork of the family under another owner carries no Pipelex origin, and is still not a fresh copy."""
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "https://github.com/someone/pipelex-method-apps.git",
+            "https://github.com/Pipelex/pipelex-sdk-js.git",
+            "https://github.com/Pipelex/pipelex-sdk.wiki.git",
+            "https://gitlab.com/Pipelex/pipelex-sdk/other.git",
+        ],
+        ids=["a-fork", "a-sibling-of-the-template-s-repository", "the-template-s-wiki", "a-repository-nested-under-its-name"],
+    )
+    def test_a_directory_another_repository_tracks_is_refused_whatever_its_origin(self, tmp_path: Path, shell: list[str], origin: str) -> None:
+        """A fork of the family under another owner carries no Pipelex origin, and is still not a fresh copy; a
+        repository whose name only begins like the template's is not the template, and is refused the same way."""
         fork = tmp_path / "our-apps"
-        copy = self._repository_tracking_a_copy(fork, "https://github.com/someone/pipelex-method-apps.git")
+        copy = self._repository_tracking_a_copy(fork, origin)
         result = self._own_repository(dir_literal=str(copy), shell=shell, cwd=tmp_path)
         assert result.returncode != 0
         assert "already tracks this directory" in result.stderr
