@@ -156,7 +156,7 @@ MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
 # rendering) from templates/hooks/assets/ to the target's hooks/ directory.
 # Today that is the vendored `check.mjs` bundle — the .mthds validation hook
-# built in pipelex-sdk-js (`npm run build:hook`, see docs/hooks.md for the
+# built in pipelex-sdk's js/ (`npm run build:hook`, see docs/hooks.md for the
 # re-vendor procedure) — and THIRD-PARTY-NOTICES.md, the MIT notice the bundle
 # owes wherever it is copied, since the rest of the plugin is ELv2. The bundle
 # carries a provenance header and inlines a WASM engine, so it must never pass

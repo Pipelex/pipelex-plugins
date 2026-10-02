@@ -1,6 +1,6 @@
 # Notices for check.mjs
 
-`check.mjs`, the `.mthds` validation hook beside this file, is distributed under the MIT License below, not under the Elastic License 2.0 that covers the rest of this plugin. It is a bundle built in `pipelex-sdk-js`, whose hook source it carries, from these packages:
+`check.mjs`, the `.mthds` validation hook beside this file, is distributed under the MIT License below, not under the Elastic License 2.0 that covers the rest of this plugin. It is a bundle built in the `js/` directory of `pipelex-sdk`, whose hook source it carries, from these packages:
 
 - `mthds`, the MTHDS SDK;
 - `@pipelex/tools-wasm`, the MTHDS language engine compiled to WebAssembly, built on a fork of Taplo.
