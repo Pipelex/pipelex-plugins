@@ -18,6 +18,8 @@
 
 - **`pipelex-explain`, `pipelex-design` and `pipelex-run` point at the method graph page**: the Pipelex tools are about to write a method's flowchart, `method-graph.html`, beside the files a validation reads by path, and these skills now give that page's path before their text flow — `pipelex-explain` in the opening lines of every explanation of a bundle on disk, `pipelex-design` when it hands over a method, and `pipelex-run` on a dry run — so the whole method can be opened in a browser. `pipelex-explain` still writes nothing of its own, and the page is the one file it leaves. `pipelex-catalog`'s check of whether a bundle would save asks the tools not to write the page, since that check is a question and writes no file.
 
+- **`pipelex-scaffold` recognises a method-app copy from the template's new home**: the method-app template and its initializer, `@pipelex/create-method-app`, now live in `Pipelex/pipelex-sdk`, whose initializer commits a new copy as `Start from Pipelex/pipelex-sdk/method-apps/webapp-js …`. The skill finds a copy's pristine commit under that subject or under the `Pipelex/pipelex-method-apps` one a copy made before the move keeps, writes the new subject on a copy it commits itself, and stops on a checkout of either repository as the template rather than a copy.
+
 ### Fixed
 
 - **The install guide no longer suggests `disableClaudeAiConnectors` to hide the Pipelex MCP**: that setting also turns off every other connector on your Claude account, such as Gmail and Google Drive, which the agent uses to fetch a method's inputs and deliver its results. The guide now says so and points at `/mcp` and `deniedMcpServers`, which remove only the Pipelex entry.

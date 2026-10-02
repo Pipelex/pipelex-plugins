@@ -14,22 +14,22 @@ The copy stands, with its pristine commit unless the `git:` line said it sits in
 
 **A cause the harness's own sandbox imposes is the user's to lift, never yours to work around**, in either case: a denied `ps`, which the template's tests and `make serve` both need, or an npm cache the sandbox will not let npm write. Nothing in the copy fixes it. Name it, say that the user lifts the sandbox or runs the steps the failure named, then `make serve`, in a terminal of their own, and stop.
 
-**A copy the user stands in is one of these when its own repository already holds the pristine commit**, whose subject opens `Start from Pipelex/pipelex-method-apps/webapp-js`, as the one this file makes by hand does too. Read it before anything else, since the user seldom says who made the copy. This prints the commit, and prints nothing for a copy that is not its own repository's root or holds no such commit, which is [a copy with no pristine commit](#a-copy-with-no-pristine-commit), whether a hand made it or the initializer left it inside another repository's work tree:
+**A copy the user stands in is one of these when its own repository already holds the pristine commit**, whose subject opens `Start from Pipelex/pipelex-sdk/method-apps/webapp-js`, as the one this file makes by hand does too, or `Start from Pipelex/pipelex-method-apps/webapp-js` on a copy made before the template moved into `pipelex-sdk`. Read it before anything else, since the user seldom says who made the copy. This prints the commit, and prints nothing for a copy that is not its own repository's root or holds no such commit, which is [a copy with no pristine commit](#a-copy-with-no-pristine-commit), whether a hand made it or the initializer left it inside another repository's work tree:
 
 ```bash
 [ -z "$(git -C <dir> rev-parse --show-cdup 2>/dev/null || echo outside)" ] &&
-  git -C <dir> log --format='%h %s' | grep -m1 -E '^[0-9a-f]+ Start from Pipelex/pipelex-method-apps/webapp-js '
+  git -C <dir> log --format='%h %s' | grep -m1 -E '^[0-9a-f]+ Start from Pipelex/(pipelex-sdk/method-apps|pipelex-method-apps)/webapp-js '
 ```
 
 A commit it prints is the pristine one, and the report names it as found; go straight to [Run `make create`](#run-make-create), with the method the user gave.
 
 ## A copy with no pristine commit
 
-A copy made by hand is often made without git, and any copy may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-method-apps`, so git places its checkout inside the family repository, where it passes every other test. Read git before initializing anything. One command tells the cases apart, and initializes only a copy outside every repository or one the enclosing repository ignores:
+A copy made by hand is often made without git, and any copy may sit inside another repository. That repository may be the user's, or the template's own: the method app is a directory of `pipelex-sdk`, and of `pipelex-method-apps` in a clone made before it moved, so git places its checkout inside that repository, where it passes every other test. Read git before initializing anything. One command tells the cases apart, and initializes only a copy outside every repository or one the enclosing repository ignores:
 
 ```bash
 case "$(git -C <dir> remote get-url origin 2>/dev/null)" in
-  */Pipelex/pipelex-method-apps*|*:Pipelex/pipelex-method-apps*)
+  *[/:]Pipelex/pipelex-sdk|*[/:]Pipelex/pipelex-sdk[./]*|*[/:]Pipelex/pipelex-method-apps*)
     echo "this is a template's own checkout, not a copy of it" >&2; exit 1 ;;
 esac
 prefix=$(git -C <dir> rev-parse --show-prefix 2>/dev/null) || prefix=outside
@@ -48,7 +48,7 @@ The `origin` it reads belongs to whichever repository holds the directory, and i
 When the copy is its own repository's root and that repository has no commit yet (`git -C <dir> rev-parse -q --verify HEAD` prints nothing), make the pristine commit before `make create`, because the gesture's changes are reviewable only against it. The directory is the user's, so this commit confirms in every mode: show `git -C <dir> status --short` and say what it will land on. `<version>` is the copy's `package.json` version, the family's:
 
 ```bash
-git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-method-apps/webapp-js <version>" -- .
+git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>" -- .
 ```
 
 The pathspec is on both commands, because `git -C` sets git's working directory and scopes nothing, and a commit without one commits the whole index. It is the one commit the skill makes on this path. A copy with no `make create` target is not this template any more: stop, say so, and never assemble the app by hand.
