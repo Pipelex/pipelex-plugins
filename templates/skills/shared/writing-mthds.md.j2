@@ -229,7 +229,7 @@ Summarize the following document:
 
 ### Model references
 
-Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference of one of four kinds, told apart by its sigil:
+Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeJudge`) takes a reference of one of four kinds, told apart by its sigil:
 
 | Kind | Sigil | Example | What it names |
 |---|---|---|---|
@@ -255,7 +255,7 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 **The deck is what the runner can serve, not what the account may use**: a gateway can still refuse a listed model when a run starts, after the method validated. A listed model is no promise, and leaving `model` out stays the safest choice.
 
-**Without `mthds_models`**, on a workshop older than the release that brought it, nothing can be looked up. Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, and never in an inline table, which nothing would check: a setting asked with it is left out, and you say so. When the user named no model, offer a preset this reference names, or ask which model, and never invent a reference.
+**Without `mthds_models`**, on a workshop older than the release that brought it, nothing can be looked up. The same holds for one pipe when the tool refuses its category, on a workshop older than that category. Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, and never in an inline table, which nothing would check: a setting asked with it is left out, and you say so. When the user named no model, offer a preset this reference names, or ask which model, and never invent a reference.
 
 ### PipeSequence — execute steps in order
 
