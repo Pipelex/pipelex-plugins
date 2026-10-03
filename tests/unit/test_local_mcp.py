@@ -21,6 +21,7 @@ from scripts.local_mcp import (
     MAKE_STATE,
     TARGET_VARIABLES,
     WORKSHOP_BUNDLE,
+    WORKSHOP_MANIFEST,
     Harness,
     Launcher,
     build_checkout,
@@ -61,7 +62,7 @@ def checkout(tmp_path: Path) -> Path:
     bundle = root / WORKSHOP_BUNDLE
     bundle.parent.mkdir(parents=True)
     bundle.write_text("// the workshop\n", encoding="utf-8")
-    (root / "packages" / "workshop" / "package.json").write_text('{"name": "@pipelex/mcp", "version": "1.2.3"}\n', encoding="utf-8")
+    (root / WORKSHOP_MANIFEST).write_text('{"name": "@pipelex/mcp", "version": "1.2.3"}\n', encoding="utf-8")
     return root
 
 
@@ -471,7 +472,7 @@ class TestMakeTargets:
         mcp = "~/pipelex-mcp" if spelling == "home-relative" else str(checkout)
         completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={parent}", home=tmp_path)
         assert "built with ARGS=[its-own] MCP=[] MCP_VERSION=[] WORKDIR=[]" in completed.stdout
-        assert f"does not exist after `make build-local` in {checkout.resolve()}:" in completed.stderr
+        assert f"does not exist after `make build-local` in {checkout.resolve()}." in completed.stderr
         assert completed.returncode != 0
 
     @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
