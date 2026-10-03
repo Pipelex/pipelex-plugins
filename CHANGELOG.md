@@ -36,6 +36,8 @@
 
 - **The install page's Codex override keeps the key**: an entry of the same name in `~/.codex/config.toml`, or a `-c` override, replaces the plugin's entry whole, including the variable names it forwards, so the one-invocation `-c` form the page gave started the Pipelex tools without `PIPELEX_API_KEY`. The page now says an override passes the key only through its own `env` table or `env_vars`, and gives the `-c` form with `env_vars`.
 
+- **A local build of the Pipelex tools is found at its new path**: `pipelex-mcp` is now one package and builds its workshop to `dist/main.js` at the root of a checkout, so the install page's Codex override and the development page's Vibe entry named `packages/workshop/dist/main.js`, which a checkout built in the old layout still holds and nothing rebuilds, and so ran an old workshop without any error. Both pages now name the new path. The repository's `/pipelex-mcp-source` skill reads the workshop's version from the root `package.json`, and reads the version the hosted console should serve from the `pipelex-mcp-console` repository, where the console now lives.
+
 ## [0.9.2] - 2026-09-25
 
 ### Fixed

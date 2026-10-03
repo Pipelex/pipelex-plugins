@@ -3,7 +3,7 @@
 
 `make claude-local-mcp` and `make codex-local-mcp` run this. The workshop is a `pipelex-mcp` checkout's
 own build (`--mcp`, which runs the checkout's `make build-local` first), spawned as
-`node <checkout>/packages/workshop/dist/main.js`, or a published `@pipelex/mcp` (`--mcp-version`),
+`node <checkout>/dist/main.js`, or a published `@pipelex/mcp` (`--mcp-version`),
 spawned through `npx` at the exact version npm resolves it to.
 
 - **Claude Code.** The Claude target is rendered by the build's own renderer, with `[vars.mcp_server]`
@@ -53,8 +53,8 @@ from scripts.gen_skill_docs import (
 LOCAL_DIR_NAME = ".local-mcp"
 
 # What `make build-local` writes in a pipelex-mcp checkout, and the manifest npm publishes it from.
-WORKSHOP_BUNDLE = Path("packages/workshop/dist/main.js")
-WORKSHOP_MANIFEST = Path("packages/workshop/package.json")
+WORKSHOP_BUNDLE = Path("dist/main.js")
+WORKSHOP_MANIFEST = Path("package.json")
 WORKSHOP_PACKAGE = "@pipelex/mcp"
 
 # make's own variables, which carry the command line of the make that ran this script to every
@@ -131,7 +131,11 @@ def checkout_launcher(checkout: Path, build: Callable[[Path], None] = build_chec
     build(root)
     bundle = root / WORKSHOP_BUNDLE
     if not bundle.is_file():
-        msg = f"{bundle} does not exist after `make build-local` in {root}: MCP must name a pipelex-mcp checkout that builds the workshop package."
+        msg = (
+            f"{bundle} does not exist after `make build-local` in {root}. MCP must name a checkout of pipelex-mcp recent enough to build "
+            "its workshop there: one from before the workshop moved to the repository root builds it under packages/workshop/, "
+            "so pull it or rebase its branch."
+        )
         raise SystemExit(msg)
     return Launcher(command="node", args=[str(bundle)], label=f"the build in {root} ({WORKSHOP_PACKAGE} {_manifest_version(root)})")
 
