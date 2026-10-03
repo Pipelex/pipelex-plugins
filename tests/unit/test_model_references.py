@@ -61,6 +61,23 @@ class TestModelReferences:
         assert "offer a preset or ask which model, never invent a handle" not in section
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_every_protocol_category_names_its_pipe(self, target_name: str) -> None:
+        """The lookup reads the deck by the MTHDS protocol's categories, each the settings family of the pipes
+        that name its models, and every one of those pipes is listed among the pipes that take a `model`."""
+        section = model_section(target_name)
+        lookup = next(line for line in section.splitlines() if line.startswith("**Look a reference up before writing it**"))
+        model_field = next(line for line in section.splitlines() if line.startswith("Every pipe with a `model` field"))
+        for category, pipe in (
+            ("llm", "PipeLLM"),
+            ("extract", "PipeExtract"),
+            ("img_gen", "PipeImgGen"),
+            ("search", "PipeSearch"),
+            ("judgment", "PipeJudge"),
+        ):
+            assert f"`{category}` for a `{pipe}`" in lookup, f"{target_name}: the lookup does not name `{category}` for a `{pipe}`"
+            assert f"`{pipe}`" in model_field, f"{target_name}: `{pipe}` is missing from the pipes that take a `model`"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_check_is_read_in_one_order(self, target_name: str) -> None:
         """An unresolved answer can carry a hint: `best-gpt` came back `unconfirmed` with `@best-gpt` in
         `other_kinds`, `$best-gpt` would be `not_found` with the same, and `gpt-image-2` checked as `llm`
@@ -126,6 +143,7 @@ class TestModelReferences:
         rather than traded for a preset or a question."""
         section = model_section(target_name)
         assert "**Without `mthds_models`**, on a workshop older than the release that brought it" in section
+        assert "The same holds for one pipe when the tool refuses its category, on a workshop older than that category." in section
         assert (
             "Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, "
             "and never in an inline table" in section

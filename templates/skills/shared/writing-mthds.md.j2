@@ -229,7 +229,7 @@ Summarize the following document:
 
 ### Model references
 
-Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`) takes a reference of one of four kinds, told apart by its sigil:
+Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeJudge`) takes a reference of one of four kinds, told apart by its sigil:
 
 | Kind | Sigil | Example | What it names |
 |---|---|---|---|
@@ -244,7 +244,7 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 **A pipe whose input the default model cannot read names the model that can**, whether or not the user asked: a `PipeExtract` over a web page sets `model = "@default-extract-web-page"`, as its section says. Validation cannot see this one either, since it never knows what a `Document` will hold.
 
-**Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen` and `search` for a `PipeSearch`. It spends no credit.
+**Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen`, `search` for a `PipeSearch` and `judgment` for a `PipeJudge`. It spends no credit.
 
 - **A kind of behaviour**: list the pipe's category and write the preset whose name fits it, saying which one you chose.
 - **A model or a reference the user typed**: check it, passing it as `reference` with the pipe's `category`, and act on the first of these that fits the answer. On `resolved`, write it. When `other_kinds` holds the same name under another sigil (`best-gpt` exists as `@best-gpt`), write that one and say so. When `other_categories` is non-empty, the reference serves another kind of pipe: say so rather than write it on this one. On `not_found`, offer the `suggestions` and write only what the user picks. On `unconfirmed`, a handle the deck does not name, write it only as a pipe's `model` string, where `mthds_validate` checks it against every model the runner serves.
@@ -255,7 +255,7 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 **The deck is what the runner can serve, not what the account may use**: a gateway can still refuse a listed model when a run starts, after the method validated. A listed model is no promise, and leaving `model` out stays the safest choice.
 
-**Without `mthds_models`**, on a workshop older than the release that brought it, nothing can be looked up. Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, and never in an inline table, which nothing would check: a setting asked with it is left out, and you say so. When the user named no model, offer a preset this reference names, or ask which model, and never invent a reference.
+**Without `mthds_models`**, on a workshop older than the release that brought it, nothing can be looked up. The same holds for one pipe when the tool refuses its category, on a workshop older than that category. Write a model or a reference the user typed only as a pipe's `model` string, where `mthds_validate` checks it, and never in an inline table, which nothing would check: a setting asked with it is left out, and you say so. When the user named no model, offer a preset this reference names, or ask which model, and never invent a reference.
 
 ### PipeSequence — execute steps in order
 
