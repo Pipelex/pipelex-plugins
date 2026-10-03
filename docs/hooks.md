@@ -64,7 +64,7 @@ make check-hook-fresh  # the release gate: npm's latest engine, and a rebuild ch
 
 - **`make check` refuses a bundle that inlines a package its notices file does not name.** esbuild writes a comment naming each module it inlines from a dependency, `// node_modules/mthds/dist/…`, and `scripts/check.py` reads the package names from those comments and fails when one of them is not in backticks in `THIRD-PARTY-NOTICES.md`. A re-vendor that brings in a new dependency therefore fails until that dependency's licence and copyright are added to the notice.
 
-The second question relies on the build being deterministic: two consecutive builds of one `pipelex-sdk-js` commit were measured byte-identical when the gate was written. If that ever stops holding, the gate reports a stale bundle that a re-vendor does not cure, and the build is what to look at.
+The second question relies on the build being deterministic: two consecutive builds of one commit were measured byte-identical when the gate was written, in the `pipelex-sdk-js` repository the hook was built in then, and again after the hook's source moved into `pipelex-sdk`. If that ever stops holding, the gate reports a stale bundle that a re-vendor does not cure, and the build is what to look at.
 
 ## Per-platform wiring
 
