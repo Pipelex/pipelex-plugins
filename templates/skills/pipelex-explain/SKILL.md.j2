@@ -61,7 +61,7 @@ Say first whether it is **complete** or a **scaffold with a backlog**, from step
 
 | Pipe | How to read it |
 |---|---|
-| `PipeSequence` | follow `steps` in order; a step with `batch_over` and `batch_as` runs its pipe once per item |
+| `PipeSequence` | follow `steps` in order; a step with `batch_over` and `batch_as` runs its pipe once per item, a dotted `batch_over` over the list at that path; a step with `from` runs no pipe and hands the value at that path, a field or the whole value renamed, to later steps under its `result` |
 | `PipeBatch` | name `input_list_name` and `input_item_name`, then explain the `branch_pipe_code` pipe once |
 | `PipeParallel` | list the branches and say what is combined at the end |
 | `PipeCondition` | map each condition to the pipe it routes to |

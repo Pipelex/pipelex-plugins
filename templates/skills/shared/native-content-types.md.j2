@@ -4,8 +4,11 @@ Each native concept maps to a content class with specific attributes. Understand
 
 - Writing `$var.field` references in prompts or PipeCompose templates
 - Building `construct` blocks with `from = "input.field"`
+- Writing a binding step's path in a PipeSequence (`{ from = "page.page_view", result = "page_view" }`) or a dotted `batch_over`, whose result takes the concept of the attribute it reaches
 - Interpreting pipeline outputs (e.g., what comes out of PipeExtract)
 - Preparing input JSON for running a method
+
+A path never goes into an input name: an input is a plain name holding one whole value, and `"page.page_view" = "Image"` is refused as `invalid_input_name`. A pipe reads an attribute through the whole value it declares (`$page.page_view`), or receives the attribute under a plain name from a binding step in its sequence.
 
 ## Content Type Summary
 
@@ -26,6 +29,8 @@ Each native concept maps to a content class with specific attributes. Understand
 | `Anything` | *(any content)* | depends on actual content |
 | `Dynamic` | DynamicContent | user-defined fields |
 | `Composite` | CompositeContent | one field per component, named when the composition is made (a `PipeParallel`'s branch `result` names) |
+
+**In a binding step's path**, a native whose value is its one attribute, `Text` (`text`), `Number` (`number`), `Time` (`time`) or `JSON` (`json_obj`), is a leaf: bind it whole, `from = "note"`, since `from = "note.text"` is refused as `binding_path_unresolved`, even though `$note.text` works in a prompt. A native with several attributes is walked through them, and the binding copies everything the path reaches: `page.page_view` binds an `Image`, its `caption` included, and `page.page_view.caption` a `Text`. `Dynamic`, `Anything` and `Composite` declare no attributes, so a path cannot go into them.
 
 ## Detailed Attribute Reference
 
@@ -225,7 +230,7 @@ steps = [
 ]
 ```
 
-The key insight: `batch_over = "search_result.sources"` uses dot notation to iterate over the `sources` list inside the SearchResult. Each source is a `DocumentContent` with a `url` field, so it can be passed directly to PipeExtract as a web page URL. Batching does not propagate automatically — each step that should iterate needs its own `batch_over`.
+The key insight: `batch_over = "search_result.sources"` is a dotted `batch_over`, which runs as a binding step of `search_result.sources`, the `Document[]` inside the SearchResult, followed by the batch over that list. Each source is a `DocumentContent` with a `url` field, so it can be passed directly to PipeExtract as a web page URL. A dotted `batch_over` belongs on a PipeSequence step: a PipeParallel branch takes a plain one, so a parallel that needs the sources gets them from a binding step before it. Batching does not propagate automatically — each step that should iterate needs its own `batch_over`.
 
 ---
 
@@ -281,6 +286,39 @@ Analyze this document:
 @pages
 """
 ```
+
+### Handing a pipe one attribute: a binding step
+
+A pipe that needs only the image of each page declares `page_view = "Image"`, never `"page.page_view"`, and the sequence binds the attribute for it:
+
+```toml
+[pipe.describe_page_views]
+type        = "PipeSequence"
+description = "Extract a PDF's pages with their views, then describe each view"
+inputs      = { document = "Document" }
+output      = "Text[]"
+steps = [
+    { pipe = "extract_pages_with_views", result = "pages" },
+    { from = "pages.page_view", result = "page_views" },
+    { pipe = "describe_view", batch_over = "page_views", batch_as = "page_view", result = "descriptions" },
+]
+
+[pipe.extract_pages_with_views]
+type        = "PipeExtract"
+description = "Extract the pages of a PDF, with an image of each page"
+inputs      = { document = "Document" }
+output      = "Page[]"
+page_views  = true
+
+[pipe.describe_view]
+type        = "PipeLLM"
+description = "Describe how one page looks"
+inputs      = { page_view = "Image" }
+output      = "Text"
+prompt      = "Describe the layout of this page in two sentences: $page_view"
+```
+
+`pages.page_view` crosses the `Page[]` list, so it binds an `Image[]`, one image per page that has a view. The last two steps can also be one, `{ pipe = "describe_view", batch_over = "pages.page_view", batch_as = "page_view", result = "descriptions" }`, whose dotted `batch_over` binds the list and batches over it.
 
 ### Accessing nested fields in PipeCompose
 
