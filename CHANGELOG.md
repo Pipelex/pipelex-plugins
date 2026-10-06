@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The hook's corpus sweep runs over the MTHDS Test Corpus of pipelex v0.76.0**: the vendored MTHDS Test Corpus the hook sweep runs over gains, from pipelex v0.76.0, the `markdown` filter of an HTML template, a sequence whose steps read one input first as `Markdown` and then as `Text`, and the refusals of a sequence step reading as one item what the step before it stored as a list and of a step calling a package that cannot be resolved. The hook passes each of them with nothing said, since none is a fault its schema catches, and the corpus vocabulary now declares the unresolved package dependency as a fault the runtime catches.
+
 ## [0.10.0] - 2026-10-06
 
 ### Added
