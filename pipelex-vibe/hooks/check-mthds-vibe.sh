@@ -4,7 +4,7 @@
 #
 # Two-layer design: this thin wrapper is the fail-open guard; ALL validation
 # logic lives in the vendored check.mjs bundle beside it (built in
-# pipelex-sdk-js — see docs/hooks.md), invoked with --platform=vibe so it
+# pipelex-sdk's js/ — see docs/hooks.md), invoked with --platform=vibe so it
 # reads the post_tool payload (tool_status gate, cwd-resolved path)
 # and speaks Vibe's deny / hook_specific_output.additional_context dialect:
 #   1. local lint   (@pipelex/tools-wasm — offline, no credentials) → deny on errors

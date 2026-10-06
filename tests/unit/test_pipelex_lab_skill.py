@@ -44,7 +44,7 @@ def the_move(body: str, number: int) -> str:
 class TestPipelexLabSkill:
     """`pipelex-lab` owns the loop around a method that the proof lab's driver ran by hand: frame a use case,
     write each case's answer key before its first run, agree a budget, then run, score and log every run,
-    fixing the method until the pass bar or a stop (`wip/lab-skill/design.md`, ratified 2026-09-24). It is
+    fixing the method until the pass bar or a stop (the design behind L-260924-37b97b, ratified 2026-09-24). It is
     written to the read-before-act rule from the start: the three moves with their guards and the loop's stops in
     `SKILL.md`, and the branches — framing, the key's format, the log's format — in references read at their move.
     What these pin is that shape. The guards themselves are registered in `test_skill_guards.py`."""
@@ -61,6 +61,7 @@ class TestPipelexLabSkill:
         the move that needs it, with the instruction to read it before acting."""
         body = render(target_name)
         assert "Read [frame.md](references/frame.md) before asking anything" in the_move(body, 1)
+        assert "Read [fit.md](../shared/fit.md) with it, before any candidate" in the_move(body, 1)
         assert "Read [key.md](references/key.md) before writing a key." in the_move(body, 2)
         assert "Read [log.md](references/log.md) before the first entry" in the_move(body, 3)
         index = body.split("## References", 1)[1]
@@ -215,7 +216,7 @@ class TestLabTriggers:
 
 class TestIntegrationPoints:
     """The other skills point at the lab where a builder reaches it without asking for it (phase 2 of
-    `wip/lab-skill/plan.md`). Design's hand-off names it beside the test files it already offers. A run the lab did
+    the plan behind L-260924-37b97b). Design's hand-off names it beside the test files it already offers. A run the lab did
     not start is still credit spent, and "run it again" belongs to `/pipelex-run`, so that skill offers the lab a run
     of a lab case, and the lab logs it outside its rounds. The file factory lists every file's planted facts, which a
     key takes as they are. Every one of those skills sits at the size ceiling, so each point is one sentence, pinned
@@ -271,7 +272,7 @@ class TestIntegrationPoints:
 
 
 class TestCapabilityMap:
-    """The capability map in `frame.md` is what the lab tells a builder the platform can do, before a method exists,
+    """The capability map in the shared `fit.md` is what the lab tells a builder the platform can do, before a method exists,
     and a wrong claim there sends a design to its first run to fail — as a Word-transcript method did in the proof
     lab. So each row names a pipe that the MTHDS reference documents, and the claims that carry a limit are held to
     the reference's own words, so the two cannot drift apart."""
@@ -279,8 +280,8 @@ class TestCapabilityMap:
     MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
 
     def rows(self) -> list[list[str]]:
-        frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
-        table = frame.split("## What the platform can do", 1)[1].split("\n## ", 1)[0]
+        fit = (REPO_ROOT / "templates" / "skills" / "shared" / "fit.md.j2").read_text(encoding="utf-8")
+        table = fit.split("## What the platform can do", 1)[1].split("\n## ", 1)[0]
         lines = [line for line in table.splitlines() if line.startswith("| ") and not line.startswith("| In the builder")]
         return [[cell.strip() for cell in line.strip("|").split("|")] for line in lines]
 
@@ -290,7 +291,7 @@ class TestCapabilityMap:
         assert rows, "the capability map has no rows"
         for _, pipe, _ in rows:
             name = pipe.strip("`")
-            assert f"\n### {name} — " in reference, f"frame.md's {name} row names a pipe the MTHDS reference does not document"
+            assert f"\n### {name} — " in reference, f"fit.md's {name} row names a pipe the MTHDS reference does not document"
 
     OFFICE_LIMIT = (
         "Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them."
@@ -307,7 +308,7 @@ class TestCapabilityMap:
         """The limit that failed a proof-lab run, said in the words the shared reference uses."""
         reference = " ".join(self.MTHDS_REFERENCE.read_text(encoding="utf-8").split())
         assert anchor in reference, f"the MTHDS reference no longer says {anchor!r}"
-        assert any(claim in row[2] for row in self.rows()), f"frame.md no longer says {claim!r}"
+        assert any(claim in row[2] for row in self.rows()), f"fit.md no longer says {claim!r}"
 
     def test_the_web_page_model_and_the_search_output_are_the_references(self) -> None:
         reference = self.MTHDS_REFERENCE.read_text(encoding="utf-8")

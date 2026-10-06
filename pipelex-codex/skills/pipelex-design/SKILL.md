@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Construction is complexity-adaptive — a fully understood shallow graph is written directly as a coherent runnable bundle, while deep, uncertain, staged, or resumable work goes through validated signature-driven stepwise refinement. Re-enters existing methods with the same adaptive choice.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "reshape this concept", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…). Construction adapts to complexity — a shallow, fully understood graph is written directly, and deep, uncertain or staged work goes stepwise.
 ---
 
 # Design a MTHDS bundle top-down at the right depth
@@ -23,11 +23,13 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 ### 1. Capture the contract
 
-Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks, other advanced features), write the closest in-scope equivalent and call out the deviation.
+**When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
+
+Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks and the like), write the closest in-scope equivalent and call out the deviation.
 
 Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
-**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, so the user can interject without blocking progress. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Discuss only genuine ambiguity, or when the user asks to collaborate.
+**Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, without waiting for a reply. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. **A `PipeFunc` computes; it never calls another service or holds a credential.** Discuss only genuine ambiguity, or when the user asks to collaborate.
 
 ### 2. Resolve the bundle home before writing
 
@@ -48,7 +50,7 @@ Design the whole graph in memory, then write `main.mthds` in the bundle home, to
 
 ### 5. Validate
 
-Gather the bundle's files as the convention below says, the whole library, and call `mthds_validate` with `files` for every file. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback.
+Call `mthds_validate` with `files` for every file of the whole library, gathered as the convention below says. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback.
 
 Branch on the **structured verdict** from its Markdown summary, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `validation_errors[]` and the summary's locators, which name the offending file, then re-validate.
 
@@ -58,9 +60,9 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
-3. **Present the flow**: the interactive method graph where the host rendered it, else a concise text flow.
+3. **Present the flow** as concise text. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**: it opens in a browser and draws the whole method. When a summary called the page new, pass on its note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
-5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id anything can call; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with none, `/pipelex-scaffold` creates an application around it if the user wants one.
+5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
 6. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree (`src/generated/<method>/`, `<package>/generated/<method>/`), never beside the bundle, so looking only next to the `.mthds` files finds nothing. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
 **The saved method does not have this change.** When `pipelex-method.json` sits beside the root `.mthds` file, this directory is linked to a method in the organization's catalog: name it by the link's `name` and `mt_…` id and say that what just changed here is not in the catalog, so every caller of that id goes on running whatever is saved there. **Say that and no more.** The link records no hashes, so this directory may equally be behind the catalog — a teammate may have saved since it last synced — and calling the saved copy old asserts an ordering nothing here can read. `/pipelex-catalog` is what compares the two, and what updates the saved copy. **Offer that; never do it.** A save is a deployment — a production call site included runs the new content from its next call — so it happens when the user asks for it and not as the tail of somebody else's edit. No link file beside the root means this directory is not linked and there is nothing to say. Never write or edit `pipelex-method.json`: the workshop writes it, because it is the only party that knows which API host it talks to.
@@ -75,7 +77,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 | Condition | Do this |
 |---|---|
-| `status: "error"`, class `input_domain` | the submission is malformed: fix the call |
+| `status: "error"`, class `input_domain` | fix the call |
 | `status: "error"`, class `runtime` | report it, and retry once before stopping |
 | validation fails twice on the same construct, or the client contract itself looks wrong | pause and show the user |
 

@@ -10,7 +10,7 @@ from scripts.check import check_hook_provenance
 class TestHookProvenance:
     BANNER_HEAD = (
         "// check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)\n"
-        "// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in pipelex-sdk-js.\n"
+        "// GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.\n"
     )
 
     def _bundle(self, tmp_path: Path, provenance: str) -> Path:
@@ -34,7 +34,7 @@ class TestHookProvenance:
         assert "`make vendor-hook`" in errors[0]
 
     def test_an_unknown_sdk_commit_is_refused(self, tmp_path: Path) -> None:
-        """What the build writes outside a git checkout of pipelex-sdk-js: a source no branch holds."""
+        """What the build writes outside a git checkout of pipelex-sdk: a source no branch holds."""
         base = self._bundle(tmp_path, "// Provenance: @pipelex/sdk 0.23.0 (unknown) + @pipelex/tools-wasm 0.3.0 (npm)")
         errors = check_hook_provenance(base)
         assert len(errors) == 1, errors

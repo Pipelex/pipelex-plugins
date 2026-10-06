@@ -71,6 +71,7 @@ HOOK_TEMPLATE_BODIES = {
 # vendored check.mjs bundle (whose real content is a 4+ MB esbuild artifact).
 STATIC_ASSET_BODIES = {
     "hooks/assets/check.mjs": "// vendored hook bundle {{ not_a_template }}\n",
+    "hooks/assets/THIRD-PARTY-NOTICES.md": "# Notices for check.mjs {% not_a_template %}\n",
 }
 
 
@@ -114,6 +115,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "native-content-types.md.j2").write_text("# Native Content Types\n")
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
+    (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -123,7 +125,7 @@ def template_tree(tmp_path: Path) -> Path:
 
     plugin_dir = tmp_path / ".claude-plugin"
     plugin_dir.mkdir()
-    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (plugin_dir / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     targets_dir = tmp_path / "targets"
     targets_dir.mkdir()
@@ -142,6 +144,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "native-content-types.md.j2").write_text("Types.\n")
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
+    (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -151,12 +154,12 @@ def _create_codex_tree(tmp_path: Path) -> Path:
 
     claude_plugin = tmp_path / ".claude-plugin"
     claude_plugin.mkdir()
-    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Apache-2.0"}\n')
+    (claude_plugin / "plugin-base.json").write_text('{"author": {"name": "test"}, "license": "Elastic-2.0"}\n')
 
     codex_plugin = tmp_path / ".codex-plugin"
     codex_plugin.mkdir()
     (codex_plugin / "plugin-base.json").write_text(
-        '{"author": {"name": "test"}, "license": "Apache-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
+        '{"author": {"name": "test"}, "license": "Elastic-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
     )
 
     targets_dir = tmp_path / "targets"
@@ -643,7 +646,7 @@ class TestTargetConfig:
         assert config.include_skills is None
 
     REPO_ROOT = Path(__file__).parents[2]
-    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/packages/workshop/dist/main.js"]\n'
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/main.js"]\n'
 
     def test_the_dev_override_keeps_the_credential_wiring(self, tmp_path: Path) -> None:
         """The override `docs/build-targets.md` advertises sets `command` and `args` alone.
@@ -661,7 +664,7 @@ class TestTargetConfig:
         defaults_server = load_defaults(self.REPO_ROOT / "targets")["mcp_server"]
         assert isinstance(defaults_server, dict)
         config = load_target_config(targets, "prod")
-        assert config.template_vars["mcp_server"] == {**defaults_server, "command": "node", "args": ["../pipelex-mcp/packages/workshop/dist/main.js"]}
+        assert config.template_vars["mcp_server"] == {**defaults_server, "command": "node", "args": ["../pipelex-mcp/dist/main.js"]}
 
         manifest = make_plugin_json(self.REPO_ROOT, config)
         assert manifest["userConfig"] == defaults_server["user_config"]
@@ -679,7 +682,7 @@ class TestTargetConfig:
         for key in ("API_KEY", "BASE_URL"):
             assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
             assert f'export PIPELEX_{key}="$CLAUDE_PLUGIN_OPTION_{key}"' in hook
-        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/packages/workshop/dist/main.js"')
+        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/dist/main.js"')
 
     def test_a_nested_table_merges_an_array_replaces_and_no_target_aliases_another(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
@@ -932,7 +935,7 @@ class TestSkillFailureDiscipline:
 
 
 class TestSharedSkillIncludes:
-    """Box J of `wip/plugin-skills-gaps/design.md`: the blocks the MCP-backed
+    """Box J of the design behind L-260921-cfb760: the blocks the MCP-backed
     skills used to copy live in `templates/skills/shared/` and are included.
 
     The cost of the copies was concrete — the wrong Claude credential sentence
@@ -957,6 +960,7 @@ class TestSharedSkillIncludes:
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
         "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
         "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
+        "give the page's `path` before the text flow": "skills/shared/graph-page.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -985,6 +989,19 @@ class TestSharedSkillIncludes:
         assert design.count(include) == 2, "design warns in the contract line and again at delivery"
         assert include in explain
         assert include in run
+
+    def test_the_graph_page_is_given_where_a_skill_presents_the_flow_and_nowhere_else(self) -> None:
+        """`mthds_validate` writes `method-graph.html` beside `{ path }` files, whichever skill
+        called it. Explain, design's delivery and run's dry run present a method's flow, so each
+        gives the page's path before its text flow (L-260926-d89a39, then L-260926-14cb83); every
+        other skill that validates by path leaves the page without a word, as `docs/decisions.md`
+        records. A skill that starts naming the page, or stops, changes that ruling, so the roster
+        is pinned here."""
+        include = "skills/shared/graph-page.md.j2"
+        carriers = sorted(
+            path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in path.read_text(encoding="utf-8")
+        )
+        assert carriers == ["pipelex-design", "pipelex-explain", "pipelex-run"]
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_language_reference_carries_the_same_warning(self, target_name: str) -> None:
@@ -1129,12 +1146,30 @@ class TestPipelexRunSkill:
         """A scaffold is a *valid* bundle and `mthds_inputs_template` answers validity
         alone, so the template call cannot stand in for validation on the by-id path:
         a stored method with pending signatures would reach the run and burn its
-        implemented pipes before stopping at the one that is not."""
+        implemented pipes before stopping at the one that is not. Validation now runs
+        before the template call, so the order says it and the sentence that did went."""
         body = self.run_skill
         assert "Prove the target before spending credit" in body
         assert "Never run a method that did not pass." in body
         assert "the same call with `method_id` in place of `files`" in body
-        assert "a scaffold is a *valid* bundle" in body
+        assert "does not stand in for it" not in body
+
+    def test_validation_comes_before_the_inputs(self) -> None:
+        """The inputs step reads which inputs are optional from the validate verdict's
+        `main_pipe`, which the inputs template does not carry, so the verdict has to exist
+        before the check (box E of the design behind L-260927-87d267). A dry run is the
+        validation step and ends the turn, so it now stops before any input is read by the
+        order alone, and the detour that sent it ahead went with the sentence saying so."""
+        body = self.run_skill
+        validate = body.index("### 2. Prove the target before spending credit")
+        inputs = body.index("### 3. The inputs")
+        assert validate < body.index("**A dry run is this step, shown.**") < inputs < body.index("Then call **`mthds_inputs_template`** once")
+        assert "a dry run is Start a run's step 2, shown" in body
+        assert "the values step 3 settled on, verbatim" in body
+        assert "goes to step 3 first" not in body
+        # The dry run reads no input, so its report no longer says what the inputs still need.
+        assert "Say that no model ran and nothing was spent." in body
+        assert "what the inputs still need" not in body
 
     def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
         """Step 7 saves under `runs/`, an artifact keeps its filename extension, and
@@ -1160,10 +1195,56 @@ class TestPipelexRunSkill:
 
     def test_user_values_are_laid_over_a_prepared_set(self) -> None:
         """Restating one input of a filled set is ordinary; without the merge it drops
-        every other key and fails the template check as drift."""
+        every other key and fails the template check as drift. A sample with an `https`
+        document needs no preparation, so no prepared file exists and the base is
+        `inputs.json` (`L-260927-235a99`): "prove it on the sample with the question asked
+        in French" keeps the sample's document. The paid run's line names the replaced keys."""
         body = self.run_skill
-        assert "laid over a current `inputs.prepared.json`" in body
-        assert "replace only the keys the user named" in body
+        assert "laid over a current `inputs.prepared.json`, else over `inputs.json`" in body
+        assert "replace only the keys the user named and keep every other" in body
+        assert "With neither file, the request's values are the whole set." in body
+        assert "With no prepared file, the request's values are the whole set." not in body
+        assert "where the inputs came from and which keys the request replaced" in body
+
+    def test_a_run_by_id_finds_its_sample_where_it_is(self) -> None:
+        """The catalog never holds an `inputs.json`: a save sends `.mthds` and `.py` files
+        alone, so a saved method's sample lives only in a directory on disk, the one
+        `/pipelex-inputs` writes for an id or the one its link file names (`L-260927-d7c594`).
+        The two are peers, since ranking them picks one sample over another in silence, and
+        a run on the wrong sample is paid, so two candidates holding one is a question."""
+        body = self.run_skill
+        assert (
+            "For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory "
+            "whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which."
+        ) in body
+        assert "**When several do, ask which; never choose.**" in body
+        assert "by default `./<method_id>/`" not in body
+
+    def test_a_missing_optional_input_is_not_drift_on_the_main_pipe(self) -> None:
+        """The light template lists every declared input and marks none optional, so a sample
+        that leaves an optional input out read as drift (`L-260927-7f577e`). The validate
+        verdict's `main_pipe` says which are optional, and it is always the entry pipe's
+        signature: on a pipe the user named, its flags belong to another signature, so the
+        allowance stops at the main pipe until `mthds_validate` takes a `pipe_ref`."""
+        body = self.run_skill
+        assert (
+            "the key set, where a key the inputs lack is fine when the run is on the main pipe "
+            "and step 2's verdict marks it `required: false`, and per key"
+        ) in body
+
+    def test_an_enveloped_input_is_checked_by_its_content(self) -> None:
+        """The `{concept, content}` envelope is a first-class form the runtime reads key by
+        key, and every cookbook sample writes it, so comparing it with the light template's
+        shape read it as drift (`L-260927-0e6ba4`). Its content is compared instead, where a
+        native scalar's one-field content stands for the bare value the template shows; the
+        clause is limited to an envelope the template does not show, since a dynamic input's
+        template is the envelope itself."""
+        body = self.run_skill
+        assert (
+            "A `{concept, content}` envelope the template does not show is checked by its `content`, "
+            'where a one-field object like `{"text": …}` stands for a bare value, and a file-ish input'
+        ) in body
+        assert "is the prepare rewrite; neither is drift." in body
 
     def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
         """The example is the most-copied part of a skill: one that still overwrites
@@ -1660,7 +1741,7 @@ class TestPipelexInputsSizeLimitDiscipline:
     behavioral boundary: size rejection stops, while an unreadable path may be
     corrected without changing the selected asset.
 
-    The size diet (`wip/skill-size-diet/`, phase 3) split the two halves by what a
+    The size diet (L-260923-a9bdfe, phase 3) split the two halves by what a
     model must have read before it acts. The file-fidelity rule is a guard — a
     derived file uploaded in place of the user's is silently wrong — so it stays in
     `SKILL.md`, once, at the prepare step. The failure branches announce themselves
@@ -2104,7 +2185,7 @@ class TestSyntheticInputsSkill:
 
 
 class TestPipelexExplainSkill:
-    """Boxes F and M of `wip/plugin-skills-gaps/design.md`: explain is brought on
+    """Boxes F and M of the design behind L-260921-cfb760: explain is brought on
     par with the main skills — a directory target, every pipe type named, the
     workshop optional, a remote method at contract level — and it is strictly
     read-only, which the tool list is made to match."""
@@ -2209,10 +2290,12 @@ class TestPipelexExplainSkill:
 
     def test_the_skill_writes_nothing_and_says_so(self) -> None:
         """Box F, amended at ratification: the first draft wrote a `README.md` on
-        request."""
+        request. Amended 2026-09-26: the workshop's method graph page is the one
+        file an explanation of a bundle on disk leaves, and the skill says so."""
         body = self.body()
-        assert "strictly read-only" in body.lower()
-        assert "writes no file" in body
+        assert "writes nothing of its own" in body
+        assert "the one file it leaves is the workshop's method graph page" in body
+        assert "graph_page: false" not in body
 
     def test_the_description_no_longer_offers_to_document(self) -> None:
         """Box F: "document this pipeline" leaves the description, because it is
@@ -2343,7 +2426,7 @@ class TestBundleHome:
 
 
 class TestEditClassifiesFirstAndTriggersStopColliding:
-    """Box L of `wip/plugin-skills-gaps/design.md`.
+    """Box L of the design behind L-260921-cfb760.
 
     Two things a description cannot say twice and a step order that decides who
     pays for a verdict: `pipelex-edit` routes a structural change to
@@ -2509,9 +2592,9 @@ class TestHookRendering:
         assert os.access(hook_script, os.X_OK)
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
-        """One vendored check.mjs bundle serves all three platforms."""
+        """One vendored check.mjs bundle serves all three platforms, and its MIT notice ships beside it on each."""
         for platform in Platform:
-            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs"]
+            assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 
     def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
         """check.mjs must bypass Jinja: its body (a generated bundle) may contain
@@ -2523,9 +2606,10 @@ class TestHookRendering:
 
     def test_generate_writes_static_asset_into_target(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
-        asset = template_tree / "pipelex" / "hooks" / "check.mjs"
-        assert asset.is_file()
-        assert asset.read_text() == STATIC_ASSET_BODIES["hooks/assets/check.mjs"]
+        for name, body in STATIC_ASSET_BODIES.items():
+            asset = template_tree / "pipelex" / "hooks" / Path(name).name
+            assert asset.is_file()
+            assert asset.read_text() == body
 
     def test_missing_static_asset_raises(self, template_tree: Path) -> None:
         (template_tree / "templates" / "hooks" / "assets" / "check.mjs").unlink()
@@ -2587,7 +2671,7 @@ class TestNoShippedSkillNamesAnAbsentSkill:
 class TestPublishedAddressTarget:
     """A published address is the third target form in `pipelex-inputs` and `pipelex-run`.
 
-    Box E of `wip/plugin-skills-gaps/design.md` at the workspace root, ratified
+    Box E of the design behind L-260921-cfb760, ratified
     2026-09-21. An address is passed as `method_ref` exactly as a catalog id is
     passed as `method_id`, so no step grows a special case — and what these pin
     is the handful of places where an address is genuinely not like an id: it
@@ -2656,14 +2740,19 @@ class TestPublishedAddressTarget:
     def test_an_address_pairs_with_no_other_selector(self) -> None:
         """`mthds_run` takes `files` + `method_id` together — the files run and the id
         is recorded as linkage — so "one selector per call" is not a rule an agent can
-        infer from the run tool it already knows. An address is the exception and says so."""
+        infer from the run tool it already knows. An address is the exception and says so,
+        in the address reference since the run-on-sample campaign (L-260927-87d267) moved the sentence there: the
+        reference is read before the first call on an address, the only time it applies,
+        and the tool refuses a second selector before anything runs."""
         body = self.run_skill
-        assert "an address pairs with nothing" in body.lower()
-        assert "complete run source" in body
-        # The stops table says what the body says: a second selector is a refusal, not a
-        # normalization the skill performs silently on the user's behalf.
-        assert "drops the extra one" not in body
-        assert "refused before anything runs" in body
+        reference = self.run_address_reference
+        assert "an address pairs with nothing" in reference.lower()
+        assert "complete run source" in reference
+        assert "an address pairs with nothing" not in body.lower(), "the sentence moved to the reference"
+        # A second selector is a refusal, not a normalization the skill performs silently
+        # on the user's behalf.
+        assert "drops the extra one" not in body + reference
+        assert "refused with an `input_domain` error before anything runs" in reference
         # And the skill does not resolve the ambiguity itself: a run is paid, so two
         # targets in hand is a question for the user, not a selector to quietly omit.
         # The stop row that restated it went in the size diet; the guard at step 1 holds it.
@@ -2675,9 +2764,10 @@ class TestPublishedAddressTarget:
         `/pipelex-edit`. A published method belongs to whoever published it, so the
         same routing would send an agent to edit source the user does not have. The
         verdict's routing is the address reference's, the run failure's is the failure
-        reference's, and step 3 points at the first where an address's verdict fails."""
+        reference's, and step 2 points at the first where an address's verdict fails."""
         body = self.run_address_reference
         assert "belongs to whoever published it" in body
+        assert "A verdict that fails at step 2 is reported" in body
         assert "is not routed to `/pipelex-design` or `/pipelex-edit`" in body
         assert "an address's verdict is reported as [its reference](references/published-address.md) says" in self.run_skill
         failure = self.run_failure_reference.split("## A published address", 1)[1]
@@ -2728,7 +2818,7 @@ class TestPublishedAddressTarget:
 
 
 class TestCatalogIdInEverySkill:
-    """Box H of `wip/plugin-skills-gaps/design.md`, with box A step 5, box F.4
+    """Box H of the design behind L-260921-cfb760, with box A step 5, box F.4
     and box R's notice: a catalog id is a target every skill accepts.
 
     The three file-based skills reach a saved method through a directory — the

@@ -61,6 +61,7 @@ EXPECTED_RECIPES = {
     ("pdf.md", "Basic PDF (canvas)"),
     ("pdf.md", "Multi-page PDF (Platypus)"),
     ("pdf.md", "Table report (Platypus)"),
+    ("pdf.md", "Results table (Platypus)"),
     ("pdf.md", "Line-item document (composed)"),
     ("png.md", "Chart (matplotlib)"),
     ("png.md", "Diagram (Pillow)"),

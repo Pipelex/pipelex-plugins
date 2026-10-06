@@ -100,7 +100,7 @@ STATIC_ASSET_DIRS = ("references", "scripts")
 # reference (`writing-mthds.md`, the one every skill that reads or writes a bundle
 # points at) and the native content types that ground the skills, and the files a
 # skill reads when one of its stops fires or one of its branches is taken, such as
-# `credentials.md` and `catalog-id.md`. Paths are relative to the templates/
+# `credentials.md`, `catalog-id.md` and `fit.md`. Paths are relative to the templates/
 # directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
@@ -112,6 +112,7 @@ SHARED_TEMPLATES = [
     "skills/shared/native-content-types.md.j2",
     "skills/shared/credentials.md.j2",
     "skills/shared/catalog-id.md.j2",
+    "skills/shared/fit.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
@@ -155,14 +156,17 @@ MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
 # rendering) from templates/hooks/assets/ to the target's hooks/ directory.
 # Today that is the vendored `check.mjs` bundle — the .mthds validation hook
-# built in pipelex-sdk-js (`npm run build:hook`, see docs/hooks.md for the
-# re-vendor procedure). It carries a provenance header and inlines a WASM
-# engine, so it must never pass through the template engine. One bundle
-# serves all three platforms behind its --platform flag.
+# built in pipelex-sdk's js/ (`npm run build:hook`, see docs/hooks.md for the
+# re-vendor procedure) — and THIRD-PARTY-NOTICES.md, the MIT notice the bundle
+# owes wherever it is copied, since the rest of the plugin is ELv2. The bundle
+# carries a provenance header and inlines a WASM engine, so it must never pass
+# through the template engine. One bundle serves all three platforms behind
+# its --platform flag.
+HOOK_BUNDLE_ASSETS = ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
-    Platform.CLAUDE: ["hooks/assets/check.mjs"],
-    Platform.CODEX: ["hooks/assets/check.mjs"],
-    Platform.MISTRAL_VIBE: ["hooks/assets/check.mjs"],
+    Platform.CLAUDE: HOOK_BUNDLE_ASSETS,
+    Platform.CODEX: HOOK_BUNDLE_ASSETS,
+    Platform.MISTRAL_VIBE: HOOK_BUNDLE_ASSETS,
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod
@@ -347,6 +351,18 @@ def resolve_output_dir(base_dir: Path, source: str) -> Path:
     return base_dir / source.rstrip("/")
 
 
+def shell_double_quoted(value: object) -> str:
+    """`value` as one double-quoted shell word, which a shell hands on exactly as it is.
+
+    Inside double quotes a shell still acts on `$`, a backtick and `\\`, and `"` ends the word, so each
+    of the four is escaped. A word holding none of them renders as it always did.
+    """
+    text = str(value)
+    for char in ("\\", '"', "$", "`"):
+        text = text.replace(char, f"\\{char}")
+    return f'"{text}"'
+
+
 def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, TemplateVarValue]) -> str:
     """Render one template by name, turning Jinja errors into a clean SystemExit."""
     try:
@@ -411,6 +427,7 @@ def render_templates(
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
+    env.filters["shell_double_quoted"] = shell_double_quoted
 
     # Collect shared templates (must all exist — fail loudly if missing)
     shared_j2_paths: list[Path] = []
@@ -536,14 +553,13 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # - Codex: spawns with a minimal whitelist env, so its entry carries
     #   `env_vars` — variable NAMES forwarded from each user's own env,
     #   never values.
-    # Dev override: point command/args at a local checkout (e.g.
-    # command = "node",
-    # args = ["../pipelex-mcp/packages/workshop/dist/main.js"]) in
-    # targets/defaults.toml, or in a target's own [vars.mcp_server], which
-    # merges into the defaults' table and so keeps env_vars and user_config
-    # (merge_template_vars), + `make build` on Claude; a same-named
-    # [mcp_servers.pipelex] entry in ~/.codex/config.toml outranks the plugin
-    # tier on Codex. Vibe gets no manifest entry because it has no manifest:
+    # Dev override: `make claude-local-mcp` renders this target with
+    # command/args pointed at another workshop into the ignored .local-mcp/
+    # (scripts/local_mcp.py), through merge_template_vars, so env_vars and
+    # user_config stay; `make codex-local-mcp` replaces the entry with `-c`
+    # overrides, which outrank the plugin tier on Codex and so must repeat
+    # env_vars. Neither edits a tracked file.
+    # Vibe gets no manifest entry because it has no manifest:
     # its target renders the same launcher as the mcp/vibe-mcp.toml config
     # fragment instead (see MCP_TEMPLATES_BY_PLATFORM). Skipped when the
     # target defines no mcp_server block.
@@ -593,7 +609,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     return base
 
 
-def _remove(path: Path) -> None:
+def remove_path(path: Path) -> None:
     """Delete whatever is at `path`, without following a symlink to its target."""
     # is_symlink() must be checked before is_dir(): a symlink-to-dir is both, and
     # rmtree would chase the link and delete its target.
@@ -610,7 +626,7 @@ def _refresh_copy(src: Path, dst: Path) -> None:
     before copytree runs. Plain files/dirs are removed too so the build is
     idempotent.
     """
-    _remove(dst)
+    remove_path(dst)
     shutil.copytree(src, dst)
 
 
@@ -645,7 +661,7 @@ def setup_static_assets(
                 # A retired source directory must take its copies with it. Without this the
                 # build leaves stale assets shipping in every target and `--check`
                 # reports an ORPHAN no rebuild can clear.
-                _remove(asset_dst)
+                remove_path(asset_dst)
 
 
 def _built_skill_names(templates_dir: Path, include_skills: list[str] | None) -> list[str]:
@@ -951,6 +967,15 @@ def render_codex_discovery_marketplace(base_dir: Path) -> str | None:
     return source_path.read_text(encoding="utf-8")
 
 
+def write_files(files: Mapping[Path, str]) -> None:
+    """Write what a build rendered (`BuildResult.files`) to disk, making the hook scripts executable."""
+    for output_path, content in files.items():
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(content, encoding="utf-8")
+        if output_path.name in EXECUTABLE_OUTPUTS:
+            output_path.chmod(0o755)
+
+
 def generate(base_dir: Path, target_name: str = "prod") -> int:
     """Render templates and write output files for one or all targets."""
     targets_dir = base_dir / TARGETS_DIR_NAME
@@ -971,12 +996,8 @@ def generate(base_dir: Path, target_name: str = "prod") -> int:
             print(f"  [{name}] No templates found.")
             continue
 
-        for output_path, content in result.files.items():
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(content, encoding="utf-8")
-            # Make hook scripts executable
-            if output_path.name in EXECUTABLE_OUTPUTS:
-                output_path.chmod(0o755)
+        write_files(result.files)
+        for output_path in result.files:
             rel = output_path.relative_to(base_dir)
             print(f"  [{name}] Generated {rel}")
         for pruned_path in result.pruned:

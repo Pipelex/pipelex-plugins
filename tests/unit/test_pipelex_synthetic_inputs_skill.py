@@ -14,7 +14,7 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 
 
 class TestPipelexSyntheticInputsSkillShape:
-    """The size diet (`wip/skill-size-diet/`, phase 6) rewrote the skill in the read-before-act
+    """The size diet (L-260923-a9bdfe, phase 6) rewrote the skill in the read-before-act
     shape: what it makes and refuses, its guards, the main path and a stop table in `SKILL.md`, the
     venv rung in a reference read when `uv` is absent, and the recipes in the references they
     already lived in. What these pin is that shape holding: each reference pointed at where its

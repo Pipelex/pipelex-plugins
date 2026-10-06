@@ -23,6 +23,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
+- **A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**: a run fetches it without the user's sign-in, so download or export the file first.
 - **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` each copy's path before writing it, `inputs.json` when a value holds a file's text, and `inputs.prepared.json` before step 5's call. For a path not ignored, add `<output_dir>/inputs/`, `inputs.json` or `inputs.prepared.json` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 ## Process
@@ -31,7 +32,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 The target takes three forms, and every call takes exactly one selector.
 
-- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback.
+- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback.
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: its current stored content, which needs the API key. `<output_dir>` is a directory the user names, by default a new `./<method_id>/`.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 

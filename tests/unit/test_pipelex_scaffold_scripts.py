@@ -1,6 +1,6 @@
 """Execute the scripts `pipelex-scaffold`'s initializer branch runs by path.
 
-Box E of the size diet (`wip/skill-size-diet/design.md`): a procedure whose text is its correctness
+Box E of the size diet's design (L-260923-a9bdfe): a procedure whose text is its correctness
 ships as a script, and the unit suite executes the script directly. These tests run each one as a
 user's harness does, through `bash`, against a scratch project, and read what it leaves behind.
 The skill's side, which runs the scripts and keys its stop table on their verdicts, is pinned in

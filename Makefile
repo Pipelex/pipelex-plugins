@@ -18,7 +18,8 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
 	test agent-test test-recipes tp \
 	cleanderived cleanenv cleanall reinstall ri \
-	codex-use-local codex-use-official codex-refresh codex-status
+	codex-use-local codex-use-official codex-refresh codex-status \
+	claude-local-mcp codex-local-mcp
 
 ##########################################################################################
 ### SETUP
@@ -173,10 +174,10 @@ build: install ## Build all targets (prod + codex + mistral-vibe)
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all
 	@echo "Done: built all targets"
 
-# Where the check.mjs hook bundle is built (override for a non-sibling checkout).
-SDK_JS_DIR ?= ../pipelex-sdk-js
+# Where the check.mjs hook bundle is built: the js/ directory of a pipelex-sdk checkout (override for a non-sibling one).
+SDK_JS_DIR ?= ../pipelex-sdk/js
 
-vendor-hook: ## Rebuild check.mjs in pipelex-sdk-js and vendor it into templates/hooks/assets/
+vendor-hook: ## Rebuild check.mjs in pipelex-sdk's js/ and vendor it into templates/hooks/assets/
 	@cd "$(SDK_JS_DIR)" && npm run build:hook
 	@cp "$(SDK_JS_DIR)/dist-hooks/check.mjs" templates/hooks/assets/check.mjs
 	@head -3 templates/hooks/assets/check.mjs | tail -1
@@ -224,3 +225,30 @@ codex-status: ## Show which source is currently registered for the Codex pipelex
 		"$$HOME/.codex/config.toml" \
 		| grep -E "^(source_type|source|last_revision|last_updated)" \
 		|| echo "• No '$(CODEX_MARKETPLACE_NAME)' marketplace registered."
+
+##########################################################################################
+### LOCAL WORKSHOP (start an agent on a pipelex-mcp the plugin does not ship)
+##########################################################################################
+
+# MCP is a pipelex-mcp checkout or worktree, whose workshop scripts/local_mcp.py builds
+# with the checkout's own `make build-local` first; MCP_VERSION, a published @pipelex/mcp
+# version or dist-tag, replaces it and builds nothing. WORKDIR is where the session
+# starts, which is where the workshop resolves a { path } file. ARGS goes to claude or
+# codex as it is. Neither target writes a tracked file: see "A local build of
+# pipelex-mcp" in docs/development.md.
+#
+# Each is read from make's command line alone, and never assigned here: the names are
+# generic, so a shell variable called WORKDIR or ARGS belongs to some other tool, and it
+# reaches the session as it was. Each is taken unexpanded, so make acts on no `$` in it,
+# and a path goes as one single-quoted shell word, which the shell does not act on either.
+local_mcp_given = $(if $(filter command line,$(origin $(1))),$(value $(1)),$(2))
+local_mcp_word = '$(subst ','\'',$(call local_mcp_given,$(1),$(2)))'
+
+LOCAL_MCP_SOURCE = $(if $(call local_mcp_given,MCP_VERSION,),--mcp-version $(call local_mcp_word,MCP_VERSION,),--mcp $(call local_mcp_word,MCP,../pipelex-mcp))
+LOCAL_MCP_OPTIONS = $(LOCAL_MCP_SOURCE) --workdir $(call local_mcp_word,WORKDIR,.) -- $(call local_mcp_given,ARGS,)
+
+claude-local-mcp: install ## Start Claude Code on this checkout's skills with another workshop (MCP=path or MCP_VERSION=x.y.z)
+	@$(VENV_PYTHON) scripts/local_mcp.py claude $(LOCAL_MCP_OPTIONS)
+
+codex-local-mcp: install ## Start Codex with another workshop in place of the plugin's (MCP=path or MCP_VERSION=x.y.z)
+	@$(VENV_PYTHON) scripts/local_mcp.py codex $(LOCAL_MCP_OPTIONS)

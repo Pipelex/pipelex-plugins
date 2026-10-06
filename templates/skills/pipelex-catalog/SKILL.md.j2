@@ -20,7 +20,7 @@ Every gesture between a bundle directory and the organization's method catalog: 
 - **`mthds_list_methods`**, **`mthds_save_method`** and **`mthds_get_method`** are required, with no fallback: the catalog lives behind the API key.
 {% set mcp_absent_lead %}the catalog tools are{% endset -%}
 {% set mcp_absent_suffix %} Never report a method id, a name, or a method as saved when the answer did not come from these tools.{% endset -%}
-{% set mcp_requirements_extra %}- **`mthds_validate`** is optional, for one question: *would this save?* Never call it on the way to a save: `mthds_save_method` reads the files, validates them and saves those same bytes in one call.{% endset -%}
+{% set mcp_requirements_extra %}- **`mthds_validate`** is optional, for one question: *would this save?* Never call it on the way to a save: `mthds_save_method` reads the files, validates them and saves those same bytes in one call. Ask it with `graph_page: false` wherever the tool lists that argument: a question writes no file, and `{path}` files would otherwise get `method-graph.html` beside them.{% endset -%}
 {% include "skills/shared/mcp-requirements.md.j2" %}
 
 ## Guards

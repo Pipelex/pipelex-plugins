@@ -1,4 +1,4 @@
-"""The guard registry (box H of `wip/skill-size-diet/design.md`).
+"""The guard registry (box H of the size diet's design, L-260923-a9bdfe).
 
 A guard is a sentence a model must have read before it acts: skipping it loses something that
 cannot be recovered, sends something off the machine, spends credit, or leaves a result wrong with
@@ -35,6 +35,8 @@ TARGET_OUTPUTS = ("pipelex", "pipelex-codex", "pipelex-vibe")
 GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-design": (
         "this skill never guesses at validity",
+        "read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**",
+        "**A `PipeFunc` computes; it never calls another service or holds a credential.**",
         "Do not write `.mthds` files without validation available.",
         "Never silently skip validation.",
         "**Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**",
@@ -50,6 +52,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Never redesign on a broken baseline**",
         "**Retain the original contents until the final verdict is restored.**",
         "restore the retained baseline contents and report the failure",
+        "give the page's `path` before the text flow",
     ),
     "pipelex-explain": (
         "Accept it, and say so in one line.",
@@ -57,13 +60,15 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "a narrower explanation, not a stop",
         "That stop is only for a target that lives on the platform",
         "Same scope: on a local bundle a `config` error costs the verdict line and nothing else",
-        "**This skill is strictly read-only.** It writes no file, saves no document and changes nothing in the bundle",
+        "**This skill writes nothing of its own.** It saves no document and changes nothing in the bundle",
         "**Read them all before saying anything about any of them.**",
         "with the `method_id` and **no `output_dir`**",
         "Do not pass it, not even to a temporary directory.",
         "**pending only when no concrete pipe of the same code exists anywhere in the files you read.**",
         "**When the workshop answered, its `pending_signatures` is the authority**",
         "explain from the source and **say the verdict was not checked**",
+        "**and, when the verdict wrote the graph page, its path in the same opening lines, never at the end**",
+        "give the page's `path` before the text flow",
         "do not present a validation verdict, a typed signature or a pending list as the workshop's when the workshop did not answer",
         "**On a target that is not on disk there is no such fallback.**",
         "whether it is **complete** or a **scaffold with a backlog**",
@@ -98,6 +103,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never write or edit `pipelex-method.json`",
     ),
     "pipelex-integrate": (
+        "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
         (
             "Every `mthds_codegen` call passes `output_dir`; "
             "a refused or failed write is a refusal, never a reason to write the returned bytes yourself."
@@ -133,6 +139,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Never silently improvise a template.",
         "never hand-fake a storage reference",
         "**The template is authoritative**: fill its values; never invent shapes it doesn't have.",
+        "**A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**",
         "**A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**",
         "**The user's own files stay out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
@@ -161,6 +168,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-catalog": (
         "Never report a method id, a name, or a method as saved when the answer did not come from these tools.",
         "Never call it on the way to a save",
+        "Ask it with `graph_page: false` wherever the tool lists that argument",
         "**This skill writes no file itself.**",
         "Never hand-write or hand-edit a link file.",
         "**A save is never proposed as a side effect of other work**",
@@ -193,7 +201,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-run": (
         "**A dry run is this step, shown.**",
-        "**A dry-run request goes to step 3 first.**",
+        "give the page's `path` before the text flow",
         "Then end the turn there, even when the same request asked for the real run too",
         "a paid run never starts on a dry-run request whose flow the user has not been shown",
         "they keep credit from being spent on a method or inputs that cannot work",
@@ -201,17 +209,20 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "keep polling on its hint, and never call the run stuck or failed from it.",
         "**When an address and another target are both in hand, ask which one is meant; never pick one yourself**",
         "**carry its `pipe_ref` through every call**",
+        "choosing by name and description and asking when several fit",
+        "When several do, ask which; never choose.",
         "Not current is not run-ready",
         "Do not prepare inputs here.",
         "Never run a method that did not pass.",
         "**Never start a run nobody asked for.**",
-        "the values step 2 settled on, verbatim",
+        "the values step 3 settled on, verbatim",
         "**Say which method it was filed under, and do not let the filing read as the saved method having run.**",
         "**Report that id the moment it returns, before anything else.**",
         "**For an address, give `method_provenance` beside it**",
         "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**",
         "**report the paths the tool returns**",
+        "**with the inputs' source and the keys the request replaced**",
         "**A saved run stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "Give `failure_message` **verbatim** first",
@@ -220,6 +231,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.",
     ),
     "pipelex-scaffold": (
+        "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
         "exactly two branches and carries no templates of its own",
         "never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room",
         "A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else",
@@ -270,7 +282,11 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**A key is written and shown before the first run of its case, and never adjusted to fit an output.**",
         "**Every run is logged**, failed and unfinished ones included",
         "**A failing line is checked against the case's inputs before the method is touched**",
-        "**State no capability that frame.md does not state**",
+        "**State no capability that fit.md does not state**",
+        (
+            "**A candidate is the method's part of the request: name what carries the rest, "
+            "and never promise a schedule, a connector or a write-back that no carrier provides.**"
+        ),
         "**Ask it to stop at run-ready, with no run offer**",
         "**A case of the user's own files stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",

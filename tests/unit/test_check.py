@@ -103,7 +103,7 @@ def skill_tree(tmp_path: Path) -> Path:
     """Create a minimal valid skill directory structure with target configs."""
     template_shared = tmp_path / "templates" / "skills" / "shared"
     template_shared.mkdir(parents=True)
-    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"]:
+    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2"]:
         (template_shared / name).write_text("# placeholder\n")
 
     (tmp_path / "pipelex" / "skills" / "shared").mkdir(parents=True)
@@ -437,7 +437,7 @@ class TestCredentialWiring:
     """
 
     REPO_ROOT = Path(__file__).parents[2]
-    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/packages/workshop/dist/main.js"]\n'
+    DEV_OVERRIDE = '\n[vars.mcp_server]\ncommand = "node"\nargs = ["../pipelex-mcp/dist/main.js"]\n'
 
     def _built_tree(self, tmp_path: Path, override: str = "") -> Path:
         """The repository's targets, `override` appended to each, built from its templates into `tmp_path`."""
@@ -798,7 +798,7 @@ class TestSharedFilesExist:
     def test_all_missing(self, tmp_path: Path) -> None:
         (tmp_path / "templates" / "skills" / "shared").mkdir(parents=True)
         errors = check_shared_files_exist(tmp_path)
-        assert len(errors) == len(["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2"])
+        assert len(errors) == len(["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2"])
 
 
 class TestNoTemplatesInOutput:

@@ -7,7 +7,9 @@
    `/pipelex-run` saves a completed run's artifacts. `pipelex-integrate` sets
    `validate_call_file_set = false` and states its own set, because the set it
    submits is the set its generated call site loads at runtime, and that is
-   the call site's to define.
+   the call site's to define. Why `runs/` is excluded — a method that emits or
+   echoes a `.mthds` file would otherwise submit its own output as source — is
+   rationale, and lives in `docs/decisions.md` beside the artifact `dir`.
 
    The local workshop resolves a `{ path }` item against its own working
    directory and refuses one that resolves outside it (`pipelex-mcp`,
@@ -21,5 +23,5 @@
    only beside a `{ path }` root file: for a save, the inline form is the one
    that leaves a new method unlinked, or an updated one's link behind the
    catalog. -#}
-{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts: a method that emits or echoes a `.mthds` file would otherwise have its own output submitted as part of its source. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback.") }}
+{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback.") }}
 {#- -#}

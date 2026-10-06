@@ -1,7 +1,7 @@
 """The vendored hook bundle: what its banner says it was built from, and the code below the banner.
 
-`templates/hooks/assets/check.mjs` is built in `pipelex-sdk-js` by `npm run build:hook`, whose
-`scripts/build-hook.mjs` writes a three-line comment banner above the bundled code. The third line
+`templates/hooks/assets/check.mjs` is built in the `js/` directory of `pipelex-sdk` by `npm run build:hook`,
+whose `scripts/build-hook.mjs` writes a three-line comment banner above the bundled code. The third line
 names the sources the bundle was built from:
 
     // Provenance: @pipelex/sdk 0.23.0 (63e9ba5) + @pipelex/tools-wasm 0.3.0 (npm)
@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 HOOK_BUNDLE_PATH = Path("templates") / "hooks" / "assets" / "check.mjs"
+# The MIT notice the bundle ships beside it, which names every package the bundle inlines.
+HOOK_NOTICES_PATH = Path("templates") / "hooks" / "assets" / "THIRD-PARTY-NOTICES.md"
 # The banner `scripts/build-hook.mjs` writes: a title, the do-not-edit line, then the provenance.
 BANNER_LINE_COUNT = 3
 PROVENANCE_PATTERN = re.compile(
@@ -27,6 +29,9 @@ PROVENANCE_PATTERN = re.compile(
 # The engine origin the build writes when it bundled the npm devDependency. Anything else is
 # `local checkout <sha>`, which `PIPELEX_TOOLS_WASM_PATH` produces from an unreleased engine build.
 NPM_ORIGIN = "npm"
+# esbuild's comment above each module it inlines from a dependency, `// node_modules/mthds/dist/x.js`
+# or `// node_modules/@pipelex/tools-wasm/dist/index.js`, from which the package name is read.
+INLINED_MODULE_PATTERN = re.compile(r"^// (?:\S*/)?node_modules/(?P<package>@[^/\s]+/[^/\s]+|[^@/\s][^/\s]*)/", re.MULTILINE)
 # `git rev-parse --short HEAD`, which `core.abbrev` can shorten to four characters, up to a full
 # SHA-256 object name. Outside a git checkout the build writes `unknown` instead.
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{4,64}")
@@ -66,7 +71,7 @@ def unpublished_sources(provenance: Provenance) -> list[str]:
         )
     if COMMIT_PATTERN.fullmatch(provenance.sdk_commit) is None:
         problems.append(
-            f"the SDK commit is `{provenance.sdk_commit}`, not a commit: the bundle was built outside a git checkout of pipelex-sdk-js, "
+            f"the SDK commit is `{provenance.sdk_commit}`, not a commit: the bundle was built outside a git checkout of pipelex-sdk, "
             "so no branch holds the source it was built from"
         )
     return problems
@@ -75,7 +80,7 @@ def unpublished_sources(provenance: Provenance) -> list[str]:
 def bundle_body(bundle: str) -> str:
     """Everything below the banner: the code a rebuild of the same sources reproduces.
 
-    The banner names the SDK commit, which moves with every commit to `pipelex-sdk-js`, including
+    The banner names the SDK commit, which moves with every commit to `pipelex-sdk`, including
     the ones that leave the hook alone, so it is left out of the comparison.
     """
     return "".join(bundle.splitlines(keepends=True)[BANNER_LINE_COUNT:])
@@ -95,6 +100,11 @@ def first_body_difference(vendored: str, rebuilt: str) -> int | None:
             return BANNER_LINE_COUNT + index + 1
     # One body is the other plus lines at its end.
     return BANNER_LINE_COUNT + min(len(vendored_lines), len(rebuilt_lines)) + 1
+
+
+def inlined_packages(bundle: str) -> set[str]:
+    """The npm packages whose code the bundle inlines, read from the comment esbuild writes above each of their modules."""
+    return {match.group("package") for match in INLINED_MODULE_PATTERN.finditer(bundle)}
 
 
 def read_bundle(path: Path) -> str:

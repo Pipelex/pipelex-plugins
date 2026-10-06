@@ -2,7 +2,7 @@
 
 The Pipelex plugin for Claude Code and Codex: your agent builds AI methods, runs them, and puts them in your TypeScript or Python code or in a new webapp, with skills for each step, a hook that checks every edit, and the Pipelex tools.
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE)
 
 <!-- onboarding: front-door -->
 <!-- Generated from the Pipelex onboarding source; this region is replaced from https://raw.githubusercontent.com/Pipelex/.github/main/onboarding/rendered/front-door--open_source-plugin.md — do not edit it here. -->
@@ -56,13 +56,13 @@ Then ask your chatbot:
 
 > What methods do I have?
 >
-> Run the invoice method on https://example.com/invoice.pdf
+> Run the invoice method on https://raw.githubusercontent.com/Pipelex/pipelex-cookbook/main/assets/extract_proof_of_purchase/restaurant_invoice.pdf
 
 You get a run id straight away, and you can ask for its status, its results or the files it produced at any time.
 
 Give the file as a URL the Pipelex MCP can reach. In ChatGPT you can attach it to the conversation instead and ask for a run on it; Claude has no way yet to hand the Pipelex MCP a file you attached.
 
-**The other two ways, built by your agent too.** Ask it for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-method-apps) and leaves it running on your machine. Ask it to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). Any other software runs a method via API through `POST /v1/start`, with any HTTP client.
+**The other two ways, built by your agent too.** Ask it for a webapp around the method, and `/pipelex-scaffold` creates a new app from the [method-app template](https://github.com/Pipelex/pipelex-sdk/tree/main/method-apps) and leaves it running on your machine. Ask it to call the method from your TypeScript or Python code, and `/pipelex-integrate` generates the method's types and one typed call that runs it, through the TypeScript SDK [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) or the Python SDK [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/). Any other software runs a method via API through `POST /v1/start`, with any HTTP client.
 
 **Next:** [what Pipelex is](https://go.pipelex.com/product) · [documentation](https://go.pipelex.com/docs) · [your console](https://app.pipelex.com) · [Discord](https://go.pipelex.com/discord)
 
@@ -146,4 +146,4 @@ To run your changes in Claude Code or Codex before they are released, see [the d
 
 ## License
 
-Apache 2.0. See [LICENSE](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE).
+The Pipelex plugin is licensed under the Elastic License 2.0 (ELv2), a source-available license. You may install it, use it and adapt it for your own work, your team's or your company's. What the Elastic License 2.0 rules out is offering the plugin to others as a hosted or managed service that gives them its skills. See [LICENSE](https://github.com/Pipelex/pipelex-plugins/blob/main/LICENSE) for the full terms, including notices and redistribution, and the [license page](https://docs.pipelex.com/latest/license/) for how Pipelex reads them. Two things are not under the Elastic License 2.0. Code the skills copy or write into your own project, such as the codegen check scripts and the call-site modules `pipelex-integrate` writes, is yours to use, change and publish under [MIT-0](https://spdx.org/licenses/MIT-0.html), with no conditions. The validation hook, `check.mjs`, is MIT code bundled from other Pipelex packages and a fork of Taplo, and its notice ships beside it as `hooks/THIRD-PARTY-NOTICES.md`.

@@ -5,9 +5,9 @@ It answers two questions, and answers both on every run so that a stale bundle i
 
 1. Is the vendored engine npm's latest? The `@pipelex/tools-wasm` version in the bundle's
    provenance line is compared with `npm view @pipelex/tools-wasm version`.
-2. Would re-vendoring change the bundle? `npm ci` and `npm run build:hook` run in the
-   `pipelex-sdk-js` checkout, and everything below the three-line banner of the rebuilt bundle is
-   compared with the vendored one byte for byte. That is exact where a guess at which source files
+2. Would re-vendoring change the bundle? `npm ci` and `npm run build:hook` run in the `js/`
+   directory of the `pipelex-sdk` checkout, and everything below the three-line banner of the rebuilt
+   bundle is compared with the vendored one byte for byte. That is exact where a guess at which source files
    feed the bundle would not be, and it leaves out the banner's SDK commit, which moves with commits
    that never touch the hook.
 
@@ -39,7 +39,7 @@ from scripts.hook_bundle import (
 
 SDK_JS_BASE = "dev"
 TOOLS_WASM_PACKAGE = "@pipelex/tools-wasm"
-# What identifies a pipelex-sdk-js checkout, and where its build writes the bundle.
+# What identifies the js/ directory of a pipelex-sdk checkout, and where its build writes the bundle.
 BUILD_SCRIPT = Path("scripts") / "build-hook.mjs"
 REBUILT_BUNDLE = Path("dist-hooks") / "check.mjs"
 # `npm ci` on a cold cache is the slow step; this is a ceiling, not an expectation.
@@ -83,18 +83,20 @@ def _git(sdk_js_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
 def sibling_refusals(sdk_js_dir: Path) -> list[str]:
     """Why the checkout cannot stand for what re-vendoring would produce, or nothing when it can.
 
-    It must be a pipelex-sdk-js checkout on its base with nothing uncommitted, and level with
-    origin's base once fetched: a checkout behind origin would rebuild an old hook and pass a bundle
+    It must be the js/ directory of a pipelex-sdk checkout on its base with nothing uncommitted
+    anywhere in that checkout, and level with origin's base once fetched: a checkout behind origin would rebuild an old hook and pass a bundle
     that `dev` has already moved past.
     """
     if not (sdk_js_dir / BUILD_SCRIPT).is_file():
-        return [f"{sdk_js_dir} is not a pipelex-sdk-js checkout: it has no {BUILD_SCRIPT.as_posix()}. Point SDK_JS_DIR at one."]
+        return [f"{sdk_js_dir} is not the js/ directory of a pipelex-sdk checkout: it has no {BUILD_SCRIPT.as_posix()}. Point SDK_JS_DIR at one."]
 
     branch = _git(sdk_js_dir, "symbolic-ref", "--quiet", "--short", "HEAD")
     if branch.returncode != 0:
         return [f"{sdk_js_dir} is not on a branch. Check out {SDK_JS_BASE} there."]
     if branch.stdout.strip() != SDK_JS_BASE:
-        return [f"{sdk_js_dir} is on {branch.stdout.strip()}, not on its base {SDK_JS_BASE}. Point SDK_JS_DIR at the main checkout."]
+        return [
+            f"{sdk_js_dir} is on {branch.stdout.strip()}, not on its base {SDK_JS_BASE}. Point SDK_JS_DIR at the js/ directory of the main checkout."
+        ]
 
     status = _git(sdk_js_dir, "status", "--porcelain")
     if status.returncode != 0:
@@ -168,10 +170,10 @@ def engine_findings(vendored: Provenance, rebuilt: Provenance | None, latest: st
         return []
     finding = f"the bundle embeds {TOOLS_WASM_PACKAGE} {vendored.tools_wasm_version}, and npm's latest is {latest}."
     if rebuilt is not None and rebuilt.tools_wasm_version == latest:
-        return [f"{finding} pipelex-sdk-js already builds with {latest}: re-vendor with {REVENDOR}."]
+        return [f"{finding} pipelex-sdk's js/ already builds with {latest}: re-vendor with {REVENDOR}."]
     pinned = rebuilt.tools_wasm_version if rebuilt is not None else "an older version"
     return [
-        f"{finding} pipelex-sdk-js pins {pinned}, so bump the pin there first "
+        f"{finding} pipelex-sdk's js/ pins {pinned}, so bump the pin there first "
         f"(`npm install --save-dev --save-exact {TOOLS_WASM_PACKAGE}@{latest}`), merge it to {SDK_JS_BASE}, "
         f"then re-vendor with {REVENDOR}."
     ]
@@ -183,7 +185,7 @@ def body_findings(vendored: str, rebuilt: str) -> list[str]:
     if line is None:
         return []
     return [
-        f"a rebuild of pipelex-sdk-js at {SDK_JS_BASE} differs from the vendored bundle from line {line} on.\n"
+        f"a rebuild of pipelex-sdk's js/ at {SDK_JS_BASE} differs from the vendored bundle from line {line} on.\n"
         f"    vendored: {provenance_line(vendored)}\n"
         f"    rebuilt:  {provenance_line(rebuilt)}\n"
         f"    Re-vendor with {REVENDOR}."
@@ -201,7 +203,9 @@ def _report(title: str, findings: list[str], success: str) -> bool:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("--sdk-js-dir", required=True, type=Path, help="The pipelex-sdk-js checkout to rebuild in (the Makefile's SDK_JS_DIR).")
+    parser.add_argument(
+        "--sdk-js-dir", required=True, type=Path, help="The js/ directory of the pipelex-sdk checkout to rebuild in (the Makefile's SDK_JS_DIR)."
+    )
     parser.add_argument("--bundle", type=Path, default=None, help=f"The vendored bundle to judge. Default: {HOOK_BUNDLE_PATH.as_posix()}.")
     return parser.parse_args(argv)
 
