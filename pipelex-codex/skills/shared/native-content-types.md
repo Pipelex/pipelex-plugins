@@ -15,8 +15,11 @@ A path never goes into an input name: an input is a plain name holding one whole
 | Native Concept | Content Class | Key Attributes |
 |----------------|---------------|----------------|
 | `Text` | TextContent | `text` |
+| `Markdown` | MarkdownContent | `text` (the Markdown source) |
 | `Number` | NumberContent | `number` |
-| `YesNo` | YesNoContent | `yes_no` |
+| `YesNo` | YesNoContent | `yes_no`, `probability` (only when the producer reports one) |
+| `Choice` | ChoiceContent | `choice`, `confidence`, `probabilities` |
+| `Rating` | RatingContent | `level`, `confidence`, `probabilities`, `position` |
 | `Date` | DateContent | `date`, `time` (only when the source states one) |
 | `Time` | TimeContent | `time` |
 | `Image` | ImageContent | `url`, `filename`, `caption`, `mime_type`, `width`, `height` |
@@ -30,7 +33,7 @@ A path never goes into an input name: an input is a plain name holding one whole
 | `Dynamic` | DynamicContent | user-defined fields |
 | `Composite` | CompositeContent | one field per component, named when the composition is made (a `PipeParallel`'s branch `result` names) |
 
-**In a binding step's path**, a native whose value is its one attribute, `Text` (`text`), `Number` (`number`), `Time` (`time`) or `JSON` (`json_obj`), is a leaf: bind it whole, `from = "note"`, since `from = "note.text"` is refused as `binding_path_unresolved`, even though `$note.text` works in a prompt. A native with several attributes is walked through them, and the binding copies everything the path reaches: `page.page_view` binds an `Image`, its `caption` included, and `page.page_view.caption` a `Text`. `Dynamic`, `Anything` and `Composite` declare no attributes, so a path cannot go into them.
+**In a binding step's path**, a native whose value is its one attribute, `Text` (`text`), `Markdown` (`text`), `Number` (`number`), `Time` (`time`) or `JSON` (`json_obj`), is a leaf: bind it whole, `from = "note"`, since `from = "note.text"` is refused as `binding_path_unresolved`, even though `$note.text` works in a prompt. A native with several attributes is walked through them, and the binding copies everything the path reaches: `page.page_view` binds an `Image`, its `caption` included, and `page.page_view.caption` a `Text`. `Dynamic`, `Anything` and `Composite` declare no attributes, so a path cannot go into them.
 
 ## Detailed Attribute Reference
 
@@ -59,6 +62,7 @@ A path never goes into an input name: an input is a plain name holding one whole
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `yes_no` | `bool` | Whether the answer is yes (`true`) or no (`false`) |
+| `probability` | `float` or `None` | The probability that the answer is yes, from 0 to 1, when the producer reports one |
 
 **Access**: `$var.yes_no` in prompts.
 
