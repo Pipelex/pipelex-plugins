@@ -1,9 +1,0 @@
-{
-  "invoice": {
-    "concept": "invoice_filing.Invoice",
-    "content": {
-      "number": "F-2026-0412",
-      "total": 318.0
-    }
-  }
-}

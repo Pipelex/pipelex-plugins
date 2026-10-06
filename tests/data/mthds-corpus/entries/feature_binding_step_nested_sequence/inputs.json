@@ -1,9 +1,0 @@
-{
-  "order": {
-    "concept": "bakery_orders.BakeryOrder",
-    "content": {
-      "customer": "Café de la Mairie",
-      "loaves": 12
-    }
-  }
-}
