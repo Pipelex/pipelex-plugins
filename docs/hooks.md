@@ -46,6 +46,8 @@ On Claude Code, both variables can come from the **plugin configuration** instea
 
 **Schema pinning:** the WASM engine embeds the MTHDS schema frozen at `@pipelex/tools-wasm` build time, so plugin releases are the local schema update cadence; the server-side validate is the authoritative verdict when the two skew.
 
+**Where the embedded schema comes from.** It crosses four repositories, each step a build or a publish. `pipelex` generates it as `derived/mthds_schema.json`. `vscode-pipelex` copies it into `crates/taplo-common/schemas/mthds_schema.json`, which the engine compiles in with `include_str!`, and publishes the engine to npm as `@pipelex/tools-wasm`. The `js/` directory of `pipelex-sdk` pins that version as a devDependency and bundles it into `check.mjs` with `npm run build:hook`. This repository then vendors the bundle with `make vendor-hook`. So a language form reaches the hook only after a `@pipelex/tools-wasm` release and a pin bump in `pipelex-sdk`, and a corpus copy synced before then turns the corpus sweep below red on every entry using the form. An engine built from an unreleased `vscode-pipelex` can be tried locally through `PIPELEX_TOOLS_WASM_PATH`, but `make check` refuses to ship the bundle it produces ("Re-vendoring check.mjs" below).
+
 ### Re-vendoring check.mjs
 
 `check.mjs` is a **static hook asset** (`templates/hooks/assets/check.mjs` — copied verbatim by the build, never rendered through Jinja). It is MIT code inside an ELv2 plugin, so a second static asset, `templates/hooks/assets/THIRD-PARTY-NOTICES.md`, ships beside it in every target with the MIT notice and the list of packages it inlines. When the hook source in `pipelex-sdk`'s `js/` changes (or its `@pipelex/tools-wasm` npm dependency is bumped):

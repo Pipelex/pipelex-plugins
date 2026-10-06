@@ -29,7 +29,8 @@ main_pipe = "main_pipe_code"          # optional but recommended — entry point
 - `domain` — `snake_case`, may have dots (e.g. `legal.contracts`). Reserved first segments: `native`, `mthds`, `pipelex`.
 - Concept codes — `PascalCase`, singular, no adjectives (`Invoice`, not `Invoices` or `LargeInvoice`).
 - Pipe codes — `snake_case`.
-- Input names — `snake_case`.
+- Input names — plain `snake_case`, never dotted (section 5).
+- Names starting with `_bound_` are reserved: never start a step's or a branch's `result`, `batch_as` or `batch_over`, or a `PipeBatch`'s `input_item_name`, with it. Validation refuses them as `invalid_input_name`, and a binding step's `result`, which must be a plain `snake_case` name, as `binding_step_invalid`.
 
 **A bundle split across files shares its header by domain.** Every file that declares the same `domain` is one domain at run time: the `system_prompt` written once in the root is the default of every `PipeLLM` of that domain, whichever file defines it, the root's `description` is the domain's, and a sibling file declares only `domain`. Two files giving different values keep the first loaded, with a warning, so write each once. A file with another `domain` is another domain and inherits nothing.
 
@@ -194,7 +195,8 @@ output      = "Summary"
 ```
 
 - `type`, `description`, `output` are required for every pipe.
-- `inputs` is optional in the schema but almost always present. Keys are `snake_case`, values are concept refs with optional multiplicity. Keep on a single line.
+- `inputs` is optional in the schema but almost always present. Keys are plain `snake_case` names, each naming one whole value; values are concept refs with optional multiplicity. Keep on a single line.
+- **An input name never holds a dot.** A key such as `"invoice.total" = "Number"` does not declare a field of `invoice`: validation refuses it as `invalid_input_name`. A pipe that needs one field of a value either declares the whole value and reads the field in its template (`invoice = "Invoice"`, read as `$invoice.total`), or declares the field's concept under a plain name (`total_amount = "Number"`) and lets the calling sequence hand the field over with a binding step (section 6, `PipeSequence`).
 
 ## 6. Pipe Type Reference
 
@@ -265,11 +267,95 @@ steps = [
 ]
 ```
 
-**Step blueprint:**
+**A step is a pipe step or a binding step.** A step carrying `pipe` runs a pipe; a step carrying `from` binds a value already in working memory to a new name (below). A step carries exactly one of the two: one carrying both is refused as `binding_step_invalid`.
+
+**Pipe step:**
 - `pipe` — the pipe reference: bare (`extract_text`) for a pipe of this domain, domain-qualified (`finance.extract_text`) for a pipe of another domain (section 8).
 - `result` — optional: the working-memory name for this step's output, which is how a later step refers to it.
 - `nb_output` or `multiple_output` — optional, never both: how many items the step's output is expected to hold (`nb_output`, an integer), or that it holds several (`multiple_output = true`).
 - `batch_over` + `batch_as` — optional inline batch (see below). Must both be present or both absent.
+
+**Steps have NO `inputs` field.** Each step automatically sees the sequence's inputs and all earlier steps' `result` values, and its pipe receives them by name: an input `x` reads the value stored as `x`. When the value is stored under another name, or the pipe needs one field of it, a binding step hands it over.
+
+**Binding step** — hand a pipe one field of a value, or a value under the name its input declares:
+
+```toml
+[concept.Invoice]
+description = "An invoice received from a supplier"
+
+[concept.Invoice.structure]
+supplier_name = { type = "text", description = "The supplier's name", required = true }
+total         = { type = "number", description = "The total amount due", required = true }
+
+[pipe.review_invoice]
+type        = "PipeSequence"
+description = "Say whether an invoice needs a manager's approval"
+inputs      = { invoice = "Invoice" }
+output      = "Text"
+steps = [
+    { from = "invoice.total", result = "total_amount" },
+    { pipe = "assess_amount", result = "assessment" },
+]
+
+[pipe.assess_amount]
+type        = "PipeLLM"
+description = "Say whether an amount needs a manager's approval"
+inputs      = { total_amount = "Number" }
+output      = "Text"
+prompt      = "Does an invoice total of $total_amount need a manager's approval? Answer in one sentence."
+```
+
+The first step binds the invoice's `total` under the plain name `total_amount`, as a `Number`, and `assess_amount` declares exactly that input, so it receives the amount and nothing else of the invoice.
+
+- `from` — a path: its root names a value in working memory, a sequence input or an earlier step's `result`, and each following segment names a field of the value reached so far, separated by single dots. Segments are identifiers: no subscript (`lines[0]`), expression or whitespace, since anything computed is a pipe's job.
+- `result` — required, a plain `snake_case` name.
+- Nothing else: a binding step carries no `pipe`, `batch_over`, `batch_as`, `nb_output` or `multiple_output`. Any of them, a missing `result`, or a `from` outside the path grammar is refused as `binding_step_invalid`.
+- **A bare name renames.** `{ from = "departure_board", result = "board" }` binds a copy of the whole value, with its concept and multiplicity, under the name the next pipe's input declares: this is how a sequence adapts a name between two pipes.
+- **The result's concept comes from the declared structures**, before any run. A `concept` field gives its `concept_ref`; a `text` field or one declared by `choices` alone gives `Text`; `number` and `integer` give `Number`, with or without `choices`; `boolean` gives `YesNo`; `date` gives `Date`; a `list` field gives a list of its items' concept. A native concept is walked through its attributes ([Native Content Types](native-content-types.md)), so `page.page_view` is an `Image`. The step reading the result declares that concept and multiplicity, or validation refuses it.
+- **Crossing a list maps and flattens.** When the path crosses a list, the rest of the path applies to every item and the result is one flat list: `pages.page_view` over `Page[]` gives `Image[]`, `order.lines.amount` gives `Number[]`. An item that holds nothing contributes nothing.
+- **A path the structures cannot walk is refused** as `binding_path_unresolved`: a segment naming no field, a segment after a plain field (`invoice.total.number`), and a segment into a concept with no structure, or into `Text`, `Markdown`, `Number`, `Time` or `JSON`, whose value is their one field. Bind such a value whole (`from = "note"`).
+- **The value is a copy**, taken when the step runs and never an alias of the root, with every field of what the path reaches.
+- **Only in a `PipeSequence`'s `steps`.** A `PipeParallel` branch is always a pipe step: a binding step in `branches` is refused as `binding_step_invalid`, so bind the value in a sequence step before the parallel.
+
+**The absence rule.** A structure field that is not `required` and has no `default_value` may be missing from the data, and fields default to `required = false`. A binding whose path walks such a field, or whose root may be absent, binds a **maybe-absent** value: when the field holds nothing, the step records an absence, not an error. The step reading it must handle that, or the author must:
+
+- declare the input optional and guard its read, `courier_note = "Text?"` read as `@?courier_note`, and the step runs either way; or
+- keep a plain input, which skips the step when the value is missing, so the step's output may be absent in turn, and a sequence whose output that step produces declares its output optional (`output = "Text?"`).
+
+A maybe-absent value reaching a sequence output without `?` is refused as `optional_not_handled`. A path through required fields only, from a root that is always there, binds a value that is always there, and a list result is never absent: it is shorter, or empty.
+
+```toml
+[concept.Delivery]
+description = "A parcel delivery"
+
+[concept.Delivery.structure]
+address = { type = "text", description = "The delivery address", required = true }
+note    = { type = "text", description = "A note the sender left for the courier" }
+
+[pipe.brief_courier]
+type        = "PipeSequence"
+description = "Write the courier's briefing for a delivery"
+inputs      = { delivery = "Delivery" }
+output      = "Text"
+steps = [
+    { from = "delivery.address", result = "address" },
+    { from = "delivery.note", result = "courier_note" },
+    { pipe = "write_briefing", result = "briefing" },
+]
+
+[pipe.write_briefing]
+type        = "PipeLLM"
+description = "Write a short briefing for the courier"
+inputs      = { address = "Text", courier_note = "Text?" }
+output      = "Text"
+prompt      = """
+Write a one-paragraph briefing for a courier delivering to $address.
+
+@?courier_note
+"""
+```
+
+`note` is not required, so `courier_note` may be absent, and `write_briefing` takes it as `Text?` and guards it with `@?`. `address` is required, so its binding is always there.
 
 **Inline batch step:**
 
@@ -279,9 +365,7 @@ steps = [
 ]
 ```
 
-`batch_as` (singular) MUST differ from `batch_over` (plural). `batch_over` supports dotted paths (e.g. `"search_result.sources"`).
-
-**Steps have NO `inputs` field.** Each step automatically sees the sequence's inputs and all earlier steps' `result` values.
+`batch_as` (singular) MUST differ from `batch_over` (plural). `batch_over` names a list in working memory, or is a dotted path to a list held in a field (`"catalog.pages"`, `"search_result.sources"`). **A dotted `batch_over` runs as a binding step of that path followed by the batch** over the bound list, so the path follows every rule of a binding step above, and it must reach a list, through a list root or a list field along or at the end of the path: one deriving a single value is refused. Only a sequence step may carry one: on a `PipeParallel` branch a dotted `batch_over` is refused as `binding_step_invalid`, so bind the list in a sequence step before the parallel and give the branch a plain `batch_over`.
 
 ### PipeBatch — map one pipe over each item in a list
 
@@ -299,6 +383,7 @@ input_item_name  = "document"
 **Required:** `branch_pipe_code` (the pipe applied to each item, a pipe reference like a step's `pipe`), `input_list_name` (the input holding the list, declared with `[]`), `input_item_name` (the name each item is passed to the branch pipe under).
 
 **Constraints:**
+- `input_list_name` is a plain input name, never a path into a field: `"catalog.pages"` is refused as `invalid_input_name`. To map a pipe over a list held in a field, declare the list itself (`pages = "CatalogPage[]"`, `input_list_name = "pages"`) and have the calling sequence bind the field to it (`{ from = "catalog.pages", result = "pages" }`), or run the branch pipe in a sequence step with a dotted `batch_over` instead of a `PipeBatch`.
 - `input_item_name` MUST differ from `input_list_name`: name the list in the plural and the item in the singular (`documents` and `document`; for a compound name, `report_data` and `single_report_data`).
 - `input_item_name` MUST NOT match any other key in `inputs`.
 - For non-batched inputs (passed through to the branch), use singular types (e.g. `context = "Context"`, NOT `"Context[]"`): the branch pipe receives one item at a time, and declares singular inputs.
@@ -320,7 +405,7 @@ branches = [
 ]
 ```
 
-**Required:** `branches`, each a sub-pipe written like a sequence step. The declared `output` is always the combined result and MUST be `Composite` or a structured concept whose field names match the branches' `result` names. Do not use `[]` or `[N]` on `output`. There is no `combined_output` field: the declared `output` is the combination.
+**Required:** `branches`, each a sub-pipe written like a sequence's pipe step: never a binding step, and with a plain `batch_over` if it batches, never a dotted one. Both are refused as `binding_step_invalid`, because a branch runs alongside the others and cannot bind: bind what the branches need in a sequence step before the parallel. The declared `output` is always the combined result and MUST be `Composite` or a structured concept whose field names match the branches' `result` names. Do not use `[]` or `[N]` on `output`. There is no `combined_output` field: the declared `output` is the combination.
 
 Each branch runs on its own deep copy of working memory. `add_each_output = true` is optional and only exposes branch results individually in working memory.
 
@@ -414,7 +499,7 @@ tags           = ["urgent"]    # literal list
 ```
 
 Each construct field is one of:
-- `{ from = "input.path" }` — variable reference: a whole input variable or a dotted path into it.
+- `{ from = "input.path" }` — variable reference: a whole input variable or a dotted path into it, read inside the pipe through an input it declares (this is not a sequence's binding step).
 - `{ template = "..." }` — Jinja2 template string with shorthands.
 - A literal value (string, number, boolean, list), assigned directly and never wrapped in `{ value = ... }`.
 
@@ -614,6 +699,11 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 ## 10. Common Mistakes to Avoid
 
 - ❌ `inputs` field on a `PipeSequence` step — steps see the sequence's inputs automatically.
+- ❌ A dotted input name (`"invoice.total" = "Number"`) — refused as `invalid_input_name`; declare the whole value and read `$invoice.total`, or bind the field in the calling sequence under a plain name.
+- ❌ A binding step in a `PipeParallel`'s `branches`, or a dotted `batch_over` on a branch — bind in a sequence step before the parallel.
+- ❌ A binding step carrying `pipe`, `batch_over`, `batch_as`, `nb_output` or `multiple_output`, or lacking `result`.
+- ❌ A binding over a field that is not `required`, read through a plain input by the step producing the sequence's output, with no `?` on that output — refused as `optional_not_handled`; take the input as `X?` and guard it, or declare the output optional.
+- ❌ A `result`, `batch_as`, `batch_over` or `input_item_name` starting with `_bound_` — the prefix is reserved.
 - ❌ Adjectives or circumstances in concept names (`LongArticle`, `CounterArgument`).
 - ❌ Plural concept names (`Invoices` — use `Invoice` plus multiplicity).
 - ❌ An optional field written as a bare string — the shorthand is always a required text field.
