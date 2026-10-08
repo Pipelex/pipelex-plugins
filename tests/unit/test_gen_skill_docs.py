@@ -953,7 +953,7 @@ class TestSharedSkillIncludes:
         "Prefer the path form ": "skills/shared/validate-call.md.j2",
         "now stale and offer": "skills/shared/stale-types-notice.md.j2",
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
-        "**The saved method does not have this change.**": "skills/shared/saved-copy-notice.md.j2",
+        "**Save the linked method's draft.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
         "read [the catalog-id reference](../shared/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
@@ -1164,7 +1164,7 @@ class TestPipelexRunSkill:
         validate = body.index("### 2. Prove the target before spending credit")
         inputs = body.index("### 3. The inputs")
         assert validate < body.index("**A dry run is this step, shown.**") < inputs < body.index("Then call **`mthds_inputs_template`** once")
-        assert "a dry run is Start a run's step 2, shown" in body
+        assert "a dry run is step 2, shown" in body
         assert "the values step 3 settled on, verbatim" in body
         assert "goes to step 3 first" not in body
         # The dry run reads no input, so its report no longer says what the inputs still need.
@@ -1242,7 +1242,7 @@ class TestPipelexRunSkill:
         body = self.run_skill
         assert (
             "A `{concept, content}` envelope the template does not show is checked by its `content`, "
-            'where a one-field object like `{"text": …}` stands for a bare value, and a file-ish input'
+            'a one-field `{"text": …}` standing for a bare value, and a file input'
         ) in body
         assert "is the prepare rewrite; neither is drift." in body
 
@@ -1341,7 +1341,8 @@ class TestPipelexRunSkill:
         completed run with the run id alone and passes no `dir` of its own."""
         body = self.run_skill
         assert "save the run, file or no file" in body
-        assert "with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/`" in body
+        assert "with the run id alone writes the output as `main_stuff.json`" in body
+        assert "into `runs/<run_id>/` under the workshop's working directory" in body
         assert 'dir: "runs/<run_id>"' not in body, "the default folder is the tool's; the skill no longer passes it"
         assert "report the paths the tool returns" in body
         assert '**"save run X"**' in body
@@ -1396,12 +1397,13 @@ class TestPipelexCatalogSkill:
     """`pipelex-catalog` owns every gesture between a bundle directory and the
     organization's catalog, and the expensive mistakes are all irreversible ones.
 
-    An update rewrites the whole catalog row with no earlier version kept, and
-    every caller of the id runs the new content from its next call — so a save
-    made on the skill's own initiative, one made over a change it never saw, or
-    one carrying a `.py` file that is not the method's cannot be taken back. The
-    pull is the same hazard pointing the other way: it writes into a directory
-    the user is standing in."""
+    Since the drafts campaign (`L-261007-6deb87`) a save writes the method's
+    draft, which callers of the bare id do not run, so it needs no confirmation;
+    a publish makes the draft the version every caller of the bare id runs, and
+    a published version is never taken back, so it is made only on the user's
+    request. A save over a draft it never saw, or one carrying a `.py` file that
+    is not the method's, still cannot be taken back. The pull is the same hazard
+    pointing the other way: it writes into a directory the user is standing in."""
 
     REPO_ROOT = Path(__file__).parents[2]
     TEMPLATES = REPO_ROOT / "templates" / "skills"
@@ -1420,30 +1422,43 @@ class TestPipelexCatalogSkill:
         assert "## Save" in body
         assert "## Pull" in body
 
-    def test_the_update_line_says_an_update_is_a_deployment(self) -> None:
-        """Box Q's one non-optional sentence. An update reaches production call
-        sites on their next call, and the catalog keeps no earlier version, so a
-        user who was not told that cannot have consented to it."""
+    def test_the_publish_line_says_a_publish_is_a_deployment(self) -> None:
+        """Box Q's one non-optional sentence, moved from the save to the publish by the
+        drafts campaign. A publish reaches production call sites on their next call and is
+        never taken back, so a user who was not told that cannot have consented to it."""
         body = self.catalog_skill
-        assert "This is a deployment: every caller of that id, a production call site included, runs the new content from its next call." in body
+        assert (
+            "This is a deployment: every caller of the bare id, a production call site included, "
+            "runs it from its next call, and a published version is never taken back."
+        ) in body
         assert "the user's request is the consent" in body
+        assert "This is a deployment: every caller of that id" not in body, "a save is no longer a deployment"
 
-    def test_it_never_saves_on_its_own_initiative(self) -> None:
+    def test_it_saves_freely_and_publishes_only_on_request(self) -> None:
+        """A save writes the draft, so it needs no confirmation and other skills may make one;
+        a publish is the deployment, so it waits for the user's request, and the description
+        says so too, since that is what a host reads before the body."""
         body = self.catalog_skill
-        assert "**A save is never proposed as a side effect of other work**" in body
-        assert "never saves on its own initiative" in body, "the description must carry it too — that is what a host reads before the body"
+        assert "**A save writes the draft and needs no confirmation; a publish is made only when the user asks for one**" in body
+        assert "**Publish only when the user asks for a publish**" in body
+        assert "this skill publishes only when the user asks" in body
+        assert "**A save is never proposed as a side effect of other work**" not in body
+        assert "never saves on its own initiative" not in body
 
-    def test_it_does_not_validate_on_the_way_to_a_save(self) -> None:
-        """`mthds_save_method` reads, validates and saves in one call precisely so
-        that the saved bytes are provably the validated ones. A skill that took its
-        own verdict first would read the files twice and pay twice for it."""
+    def test_it_takes_no_verdict_of_its_own(self) -> None:
+        """`mthds_save_method` reads, validates and saves in one call, and since the drafts
+        campaign it stores an invalid bundle as the draft with the verdict beside it, while a
+        publish answers its own verdict. The question `mthds_validate` used to answer here,
+        *would this save?*, no longer has an answer other than yes, so the tool went."""
         body = self.catalog_skill
-        assert "Never call it on the way to a save" in body
-        assert "reads the files, validates them and saves those same bytes in one call" in body
+        assert "mthds_validate" not in body
+        assert "would this save" not in body
 
     def test_an_invalid_bundle_is_a_verdict_and_not_an_error(self) -> None:
+        """A draft is work in progress, so the workshop saves an invalid bundle all the same
+        and a publish is where validity is required."""
         body = self.catalog_skill
-        assert "is a **produced verdict**, not an error" in body
+        assert "a **produced verdict**, not an error: the save stored the draft anyway, and the publish published nothing" in body
         assert "A **valid bundle with pending signatures is saved**" in body
 
     def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
@@ -1467,11 +1482,26 @@ class TestPipelexCatalogSkill:
         body = self.catalog_skill
         assert "{% set validate_call_inline %}" in body
         assert "**a save takes the path form**" in body
-        assert "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes" in body
+        assert "read [link-file.md](references/link-file.md) before offering to save inline, which waits for the user's yes" in body
         assert "Never pass `link_dir`" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "Say that this session cannot write the link, and what that costs" in link_file
+        assert "Save inline only on the user's yes." in link_file
         # The update arm too: an inline update leaves the link's `synced_updated_at` behind the catalog, so the
         # directory's next save is refused at `expected_updated_at`, a conflict with this session's own save.
-        assert "a method updated that way keeps the link's old sync time" in body
+        assert "after an update, the next save from here is refused as a conflict with this one" in link_file
+
+    def test_an_inline_update_carries_the_link_s_token_by_hand(self) -> None:
+        """The workshop sends the link's token only beside a `{ path }` root file (`linkDirectoryOf`
+        answers nothing for inline files, so `draftTokenOf` finds no link), which makes an inline update
+        last-writer-wins. So that one save passes `synced_updated_at` itself, and is never made from a
+        link recording a pulled version, which would restore it unasked."""
+        body = self.catalog_skill
+        assert "an inline update loses the guard against a newer draft" in body
+        assert "**Never pass its `synced_updated_at` or its `name`** unless a reference says to" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "pass the link's `synced_updated_at` as `expected_updated_at` yourself" in link_file
+        assert "Never save inline from a link recording a `synced_version`" in link_file
 
     def test_a_conflict_with_this_session_s_own_save_is_not_called_somebody_else_s(self) -> None:
         """A save whose link write failed, an inline one always, leaves the link's sync time behind the
@@ -1480,15 +1510,23 @@ class TestPipelexCatalogSkill:
         reported, says so, and carries the save on with that `updated_at` as the expectation; step 5
         names the cure for the stale link, a pull into the same directory, rather than a bare save again."""
         conflict = self.catalog_reference("conflict.md")
-        own = conflict.split("**First, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        own = conflict.split("**Then, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        assert "Only for a link that records no `synced_version`" in own
         assert "never say that somebody saved over the method" in own
         assert "with `expected_updated_at` set to that stored `updated_at`" in own
         assert "relaunched from a directory holding the bundle" in own
-        assert conflict.index("**First, is it this session's own save?**") < conflict.index("somebody saved over this method")
+        # A pulled version is recognised first: its refusal names the link's token, which can equal this
+        # session's own last save, and the own-save branch would then restore the version unasked.
+        assert (
+            conflict.index("**First, does the directory hold a pulled version?**")
+            < conflict.index("**Then, is it this session's own save?**")
+            < conflict.index("somebody saved over the draft")
+        )
         body = self.catalog_skill
-        assert "unless it finds this session's own save, give the user both timestamps" in body
-        assert "a pull of this method into this directory rewrites the link alone while the files still match what was saved" in body
-        assert "fix whatever blocked the write and save again" not in body
+        assert "unless it finds this session's own save, give the user the timestamps" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "a pull of this method's draft into this directory rewrites the link alone while the files still match what was saved" in link_file
+        assert "fix whatever blocked the write and save again" not in body + link_file
 
     def test_python_is_chosen_and_never_swept(self) -> None:
         """The workshop gates on the `.py` extension and on bundle containment and
@@ -1550,14 +1588,18 @@ class TestPipelexCatalogSkill:
         body = self.catalog_skill
         assert "deletion is admin-only on the platform and erases every run the method produced" in body
 
-    def test_design_and_edit_point_at_it_without_gaining_catalog_tools(self) -> None:
-        """Box Q: the catalog logic lives in one skill and the others gain a
-        sentence. A design or edit that declared a catalog tool could save."""
+    def test_the_file_based_skills_may_save_a_draft_and_never_publish(self) -> None:
+        """Box Q, amended by the drafts campaign: design, edit and organize end by saving the
+        linked method's draft, so each declares the save tool; the publish and the pull stay
+        the catalog's, so none declares those."""
+        for skill in ("pipelex-design", "pipelex-edit", "pipelex-organize"):
+            body = (self.TEMPLATES / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+            assert "mcp__plugin_pipelex_pipelex__mthds_save_method" in body, f"{skill} must declare the save tool"
+            assert "mthds_publish_method" not in body, f"{skill} must not declare the publish tool"
+            assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
         for skill in ("pipelex-design", "pipelex-edit"):
             body = (self.TEMPLATES / skill / "SKILL.md.j2").read_text(encoding="utf-8")
             assert "/pipelex-catalog" in body, f"{skill} must point at the catalog skill"
-            assert "mthds_save_method" not in body, f"{skill} must not declare the save tool"
-            assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
 
     def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
         """`function_name` is a key in the runtime's flat function registry — by
@@ -1609,24 +1651,92 @@ class TestPipelexCatalogSkill:
         telling a still-linked directory it is unlinked advises passing a `method_id`
         by hand — which is how the wrong method gets overwritten."""
         body = self.catalog_skill
-        assert "**Never tell this directory it is unlinked**" in body
-        assert "**Linked but stale**" in body
-        assert "**Genuinely unlinked**" in body
+        assert "**Never tell this directory it is unlinked** unless the tool says no link survives" in body
+        assert "on `written: false`, read [link-file.md](references/link-file.md) before saying anything about the link" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "**Linked but stale**" in link_file
+        assert "**Rewritten by another call**" in link_file
+        assert "**Genuinely unlinked**" in link_file
+        # The workshop's save also answers that the link cannot be read, which refuses every save from the
+        # directory until the user repairs or removes it.
+        assert "**Unreadable**" in link_file
 
-    def test_the_forced_overwrite_says_the_name_goes_with_it(self) -> None:
-        """An update rewrites the row's `name` from the call and the link's copy was
-        taken at the last sync, so a forced save reverts a rename made since — and
-        the refusal that led there carries timestamps only."""
-        assert "**The name goes with it**" in self.catalog_reference("conflict.md")
-
-    def test_it_does_not_route_a_publish_request_at_integrate(self) -> None:
-        """`/pipelex-integrate` consumes an address and recommends publishing one;
-        no skill here performs that act, so a user who asks to publish must not be
-        sent to a skill that will ask them for the address instead."""
+    def test_a_save_sends_neither_the_link_s_token_nor_its_name(self) -> None:
+        """The workshop reads the link's token itself and treats an explicit one as the
+        caller's informed decision, so passing `synced_updated_at` by hand turns a save from
+        a directory holding a pulled version into an unconfirmed restore; and the link's
+        `name` may predate a rename made in the webapp. The forced save of the conflict
+        reference passes the draft's current token, which the refusal names, so the
+        platform's compare-and-swap still holds; it never omits the token."""
         body = self.catalog_skill
+        assert "**Never pass its `synced_updated_at` or its `name`**" in body
+        assert "keep the `name` it records" not in body
+        conflict = self.catalog_reference("conflict.md")
+        assert "the same call with `expected_updated_at` set to the draft's current `updated_at`" in conflict
+        assert "`expected_updated_at` omitted" not in conflict
+        assert "**The name goes with it**" not in conflict
+        assert "no compare-and-swap" not in conflict
+
+    def test_a_pulled_version_is_restored_only_on_request(self) -> None:
+        """A pull of `mt_…@<n>` records the version in the link, and saving from there
+        replaces the draft with it. The workshop refuses that save without a token; the
+        reference makes the restore only on the user's request, and sends the version's
+        Python, since an omitted `python` keeps the draft's."""
+        conflict = self.catalog_reference("conflict.md")
+        assert "**First, does the directory hold a pulled version?**" in conflict
+        assert "made only on the user's request or an explicit yes" in conflict
+        # The token is the draft as the version pull found it, so a draft saved since refuses the restore;
+        # before a requested restore there is no refusal to take one from.
+        assert "with `expected_updated_at` set to the `updated_at` the version pull reported" in conflict
+        assert "Never take the draft's current `updated_at` for a restore before that refusal" in conflict
+        assert "`python` as the version's `.py` files, or `[]` when it has none" in conflict
+        assert "read [conflict.md](references/conflict.md) first" in self.catalog_skill
+
+    def test_a_pulled_version_s_local_edits_are_never_overwritten_in_passing(self) -> None:
+        """The workshop's draft pull writes over a pulled version's untouched files and refuses one
+        edited since, so the way forward that pulls the draft back must not read as harmless, and the
+        refusal is never answered with `overwrite: true` unless the user is told the edits are lost."""
+        conflict = self.catalog_reference("conflict.md")
+        assert "refuses a file edited since the version pull" in conflict
+        assert "never answer that refusal with `overwrite: true` without saying the edits are lost" in conflict
+        assert "which writes over the version's files freely" not in conflict
+
+    def test_a_save_s_miss_is_checked_against_a_read(self) -> None:
+        """A platform older than drafts serves no draft save, and its refusal reads like an unknown id;
+        offering to unlink and create would mint a duplicate and lose the link to the real method."""
+        unknown = self.catalog_reference("unknown-id.md")
+        assert "**A save's miss is checked against a read first.**" in unknown
+        assert unknown.index("**A save's miss is checked against a read first.**") < unknown.index("offer to save the directory as a **new** method")
+
+    def test_a_publish_takes_a_token_the_user_has_seen(self) -> None:
+        """`mthds_publish_method` refuses a draft that moved since its token, so the token is
+        what proves the user saw what is published: a save's or a draft pull's, never a
+        version pull's, which carries the draft's token without its content, and never the
+        one a refusal names."""
+        body = self.catalog_skill
+        assert "**Publish the draft the user has seen.**" in body
+        assert "never a version's" in body
+        # With no linked directory, the draft is read inline rather than pulled, so a publish by id writes
+        # nothing into the project; the user is told what the draft holds before it is published.
+        assert "read its draft with `mthds_get_method` without `output_dir`, tell the user what it holds" in body
+        assert "**never under the token the refusal names**" in body
+
+    def test_a_refused_publish_is_routed_by_its_reason(self) -> None:
+        """`mthds_publish_method` refuses with `reason: invalid`, carrying `validation_errors[]`, or
+        `reason: not_runnable`, a valid draft with pending signatures and no errors to report; the
+        second is design work, not an invalid save's fix."""
+        body = self.catalog_skill
+        assert "`invalid` is routed as an invalid save is" in body
+        assert "`not_runnable` names the signatures `/pipelex-design` finishes" in body
+
+    def test_publishing_to_github_is_named_as_another_gesture(self) -> None:
+        """Decision box 3 of the drafts campaign: "publish" names the catalog's gesture, and
+        giving a method a GitHub address is "publishing to GitHub", which no skill here
+        performs, so a user who asks to publish is never sent to a skill that would ask
+        them for an address instead."""
+        body = self.catalog_skill
+        assert "publishing to GitHub is another gesture, which no skill here performs" in body
         assert "`/pipelex-integrate` publishes" not in body
-        integrate = (self.TEMPLATES / "pipelex-integrate" / "SKILL.md.j2").read_text(encoding="utf-8")
-        assert "publishing an address" in integrate, "integrate recommends publishing; it does not do it"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_the_catalog_tools_are_declared_and_nothing_that_writes_files_is(self, target_name: str) -> None:
@@ -1645,8 +1755,9 @@ class TestPipelexCatalogSkill:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-catalog/SKILL.md"))
         if target_name == "prod":
-            for tool in ("mthds_list_methods", "mthds_save_method", "mthds_get_method", "mthds_validate"):
+            for tool in ("mthds_list_methods", "mthds_save_method", "mthds_publish_method", "mthds_get_method"):
                 assert f"mcp__plugin_pipelex_pipelex__{tool}" in body, f"{target_name}: pipelex-catalog must declare {tool}"
+            assert "mthds_validate" not in body, f"{target_name}: a save returns its own verdict"
             frontmatter = body.split("---")[1]
             assert "- Write" not in frontmatter, "a skill that writes no file pre-approves no writer"
             assert "- Edit" not in frontmatter, "a skill that writes no file pre-approves no editor"
@@ -2923,27 +3034,54 @@ class TestCatalogIdInEverySkill:
         assert "records no hashes" in body
         assert "do not present the local files as the saved method's current content" in body
 
-    def test_the_notice_offers_the_save_and_never_makes_it(self) -> None:
-        """A save is a deployment: `pipelex-mcp/SPEC.md`'s catalog write scope
-        and `/pipelex-catalog` both hold that no other skill saves at all. The
-        notice is the one place three skills mention the catalog right after
-        writing files, which is exactly where an autonomous save would creep
-        in."""
-        body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
-        assert "**Offer that; never do it.**" in body
-        assert "deployment" in body
-        assert "Never write or edit `pipelex-method.json`" in body
+    def test_the_bridge_says_the_work_starts_from_the_draft(self) -> None:
+        """A link records the bare id and the skills' closing save writes the draft, so a suffixed id
+        cannot be edited as given. A request naming version n is told so and asked, and a hit whose
+        link records a pulled version is handed to the catalog before any edit, since its save would
+        be refused as a restore; the pull is of the bare id, so the draft comes down."""
+        body = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
+        assert "so search for the bare id" in body
+        assert "**For `mt_…@<n>`, say so before any edit, and ask**" in body
+        assert "**When its `pipelex-method.json` records a `synced_version`, it holds that version rather than the draft**" in body
+        assert "Pass it the bare id, so it brings the draft's files to disk" in body
 
-    def test_the_notice_asserts_no_ordering_between_the_two_copies(self) -> None:
-        """The link file records no hashes, which the bridge says in as many
-        words, so the notice may claim only that this directory changed and the
-        catalog has not seen it. A teammate's save since the last sync puts the
-        catalog *ahead*, and calling the saved copy old there tells the user
-        callers are running content they are not."""
+    def test_the_notice_saves_the_draft_and_never_publishes(self) -> None:
+        """Since the drafts campaign a save writes the draft, which callers of the bare id
+        do not run, so the three file-based skills save it themselves; the publish is the
+        deployment and stays `/pipelex-catalog`'s. The notice is the one place three skills
+        touch the catalog right after writing files, which is exactly where an autonomous
+        publish would creep in."""
         body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
-        assert "may equally be behind the catalog" in body
-        assert "asserts an ordering nothing here can read" in body
-        assert "what compares the two" in body
+        assert "**Never publish here: a publish is `/pipelex-catalog`'s, on the user's request.**" in body
+        assert "**Offer that; never do it.**" not in body
+        assert "Never write or edit `pipelex-method.json`" in body
+        assert "Once this skill's own final verdict has proven the change" in body
+
+    def test_the_notice_never_forces_a_save_over_a_newer_draft(self) -> None:
+        """The link records no hashes, so nothing here knows whether the catalog moved since
+        the directory synced. The workshop does: it sends the link's token, and the platform
+        refuses a save over a draft that moved, or from a directory holding a pulled version.
+        So the notice sends nothing from the link but its id, and a refusal goes to the
+        catalog, which asks the user, rather than being retried with a token or inline."""
+        body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
+        assert "**no `name`, no `expected_updated_at`, no `python`, no `link_dir`**" in body
+        assert "never retry with a token or inline" in body
+        # A link the save could not refresh makes the next save from the directory a refusal that a later
+        # session reads as somebody else's save, so the notice relays the tool's words on it.
+        assert "and its words on a link it could not write" in body
+        # A key that may validate but not write the catalog makes the save a `config`-class error; that is
+        # this save's failure alone, never a reason to stop over a change already validated on disk.
+        assert "when the tool is absent or refuses, a `config`-class error included" in body
+        assert "Leave the save to `/pipelex-catalog`, saying the change is not saved" in body
+        bridge = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
+        assert "`/pipelex-catalog` is what compares the two" in bridge
+        assert "it is also the only way the work done here reaches the saved copy" not in bridge
+
+    def test_edit_offers_a_publish_only_after_a_save(self) -> None:
+        """With no link, or after a refused save, there is no draft of this change to publish."""
+        body = self.skill("pipelex-edit")
+        assert "to publish the draft once the closing save went through" in body
+        assert "or to save a directory with no link as a new method" in body
 
     def test_organize_leaves_the_notice_to_design_when_design_called_it(self) -> None:
         """`/pipelex-design`'s delivery step invokes `/pipelex-organize` and
@@ -3069,6 +3207,13 @@ class TestCatalogIdInEverySkill:
         assert "hosted console" not in reference, "the console serves no `mthds_*` tool, so it is no cause of this one's absence"
         assert "`pipelex_*` tools" in reference
         assert "name the cause [not-on-disk.md](references/not-on-disk.md) gives" in body
+
+    def test_explain_validates_the_bare_id_where_suffixes_are_refused(self) -> None:
+        """A platform that does not resolve versions yet refuses `mt_…@draft`, and its hint says a bare
+        id reads the draft there, so the explanation keeps its verdict by validating the bare id."""
+        reference = (self.REPO_ROOT / "skills" / "pipelex-explain" / "references" / "not-on-disk.md").read_text(encoding="utf-8")
+        assert "A platform that does not resolve versions yet refuses the suffix" in reference
+        assert "validate the bare id then" in reference
 
     def test_explain_still_reads_an_invalid_catalog_id_from_its_source(self) -> None:
         """The stops table is titled for where the skill stops, so an agent

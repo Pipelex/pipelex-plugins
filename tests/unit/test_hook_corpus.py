@@ -7,13 +7,14 @@ hints came to be refused while the hosted validator accepted them. This suite is
 catches it: `tests/data/mthds-corpus/` is a vendored copy of the whole corpus, written by the
 workspace's corpus sync and never edited here, and every entry in it is run through the hook.
 
-The rule is the corpus contract's (`docs/specs/mthds-test-corpus.md` in the workspace, "`fails_at`"):
-an entry blocks exactly when its `error.*` tag has `fails_at = "schema"` in the vendored
-`vocabulary.toml`, and every other entry passes silently. The suite never branches on `validity`,
-and it keeps no list of entries or faults of its own, so a newly synced entry is swept with no change
-here. It runs `templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, on a
-copy of each entry in a temporary directory, because the format stage writes back in place, and with
-the Pipelex credentials stripped, so the validate stage never runs and the sweep stays offline.
+The rule is the corpus contract's, the spec `conformance/specs/mthds-test-corpus.md` in the `conformance`
+repo, in its section "`fails_at` — the layer that catches a fault first": an entry blocks exactly when its
+`error.*` tag has `fails_at = "schema"` in the vendored `vocabulary.toml`, and every other entry passes
+silently. The suite never branches on `validity`, and it keeps no list of entries or faults of its own, so
+a newly synced entry is swept with no change here. It runs `templates/hooks/assets/check.mjs`, the copy
+every target carries byte for byte, on a copy of each entry in a temporary directory, because the format
+stage writes back in place, and with the Pipelex credentials stripped, so the validate stage never runs
+and the sweep stays offline.
 """
 
 from __future__ import annotations

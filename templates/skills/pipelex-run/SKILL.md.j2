@@ -1,6 +1,6 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run it again", "run mt_abc123", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "show me the output of that run", "do a dry run first", or "download the files from yesterday's run". Takes a local bundle directory, a registered method's catalog id (mt_…), or a published method's address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_run
@@ -15,7 +15,7 @@ description: Run an MTHDS method on the hosted Pipelex API, and follow a run tha
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle through two entries: [Start a run](#start-a-run) from a target and its inputs, and [Follow a run](#follow-a-run) from a run id alone, which outlives the session that started it; a dry run is Start a run's step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone, which outlives the session that started it; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
 
 ## Requirements
 
@@ -29,7 +29,7 @@ This skill owns the run lifecycle through two entries: [Start a run](#start-a-ru
 
 ### 1. The target and the pipe
 
-The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. Every call in this skill takes the form settled here. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
+The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`: read [by-id.md](references/by-id.md) before the first call; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. Every call in this skill takes the form settled here. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
 
 The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, the code qualified by its own file's domain.
 
@@ -39,7 +39,7 @@ For a **bundle directory**, one `mthds_validate` call over the file set step 5 s
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass.
 
-**A dry run is this step, shown.** The workshop has no mock-inference mode, so when the user asks for a dry run or anything "before spending credit", this call is it (a test run on test files is a real run). {% include "skills/shared/graph-page.md.j2" %} Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
+**A dry run is this step, shown.** The workshop has no mock-inference mode, so for a dry run, or anything "before spending credit", this call is it (a run on test files is a real run). {% include "skills/shared/graph-page.md.j2" %} Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
 ### 3. The inputs
 
@@ -50,7 +50,7 @@ They sit beside the bundle unless the caller named another directory. For an id,
 3. **An `inputs.json` holding no local file value**, every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference.
 4. **An empty object**, when the pipe declares no input at all.
 
-Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**: the key set, where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`, and per key the JSON kind and a structured value's field names. A `{concept, content}` envelope the template does not show is checked by its `content`, where a one-field object like `{"text": …}` stands for a bare value, and a file-ish input the template shows as a bare URL-or-path string and the prepared file holds as `{"url": "pipelex-storage://…"}` is the prepare rewrite; neither is drift.
+Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**: the key set, where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`, and per key the JSON kind and a structured value's field names. A `{concept, content}` envelope the template does not show is checked by its `content`, a one-field `{"text": …}` standing for a bare value, and a file input held as `{"url": "pipelex-storage://…"}` where the template shows a string is the prepare rewrite; neither is drift.
 
 Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a real drift — is not run-ready, and nothing is spent: name the input at fault and how, and hand to `/pipelex-inputs`{% if platform == "claude" %}{% else %}; there is no cross-skill invocation on {{ harness_name }}, so open that skill's `SKILL.md` beside this one and follow it{% endif %}. Do not prepare inputs here.
 
@@ -60,7 +60,7 @@ One line before the call: the target, the pipe, where the inputs came from and w
 
 > Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
-**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run by its id alone carries it.
+**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
 
 The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A `/pipelex-lab` case is the exception: its runs wait for the user's go on its keys, even when the request asked for them.
 
@@ -70,7 +70,7 @@ Call `mthds_run` with the same target — the whole-bundle `files` submission, `
 
 When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside the `files`: the files are what run, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
-The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
+The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an id, say which version ran** (`method_version`); **for an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 
 ### 6. Follow it to terminal
 
@@ -82,7 +82,7 @@ The tool returns a durable `run_id` at once and never blocks. **Report that id t
 {% set git_ignore_entry %}the workshop's `runs/`, anchored (`/runs/`, or `/app/runs/` for a workshop in `app/`),{% endset -%}
 **A saved run stays out of version control**: {% include "skills/shared/git-ignore.md.j2" %}
 
-`mthds_run_results`, then report the main output, **with the inputs' source and the keys the request replaced**, and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the whole output as `main_stuff.json` into `runs/<run_id>/` under the workshop's own working directory, beside each stored file it references. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
+`mthds_run_results`, then report the main output, **with the inputs' source and the keys the request replaced**, and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the output as `main_stuff.json`, beside each stored file it references, into `runs/<run_id>/` under the workshop's working directory. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
 
 When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
@@ -110,6 +110,7 @@ An unknown run id is reported in the tool's own words.
 
 ## References
 
+- [by-id.md](references/by-id.md): an `mt_…` target, before the first call.
 - [published-address.md](references/published-address.md): a `method_ref` target, before the first call.
 - [failed-run.md](references/failed-run.md): a failed run, before routing it.
 - [linked-run.md](references/linked-run.md): a linked run refused at `method_id`.

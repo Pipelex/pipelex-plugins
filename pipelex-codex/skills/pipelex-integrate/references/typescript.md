@@ -109,7 +109,7 @@ Follow the project's conventions where you can see them — module style, quotin
 Variants by selector, replacing the `mthds_contents` line and dropping `BUNDLE_DIR` and `readBundle`:
 
 - **`method_ref`**, a published address: `{ method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]", pipe_code: PIPE_CODE, inputs }` — omit `pipe_code` to run the package's declared pipe. The tag is optional and is the pin; without one the address resolves to the default branch at its head on every run, so the call site can run a method the committed types were never generated from; when the address carries no tag, the module's header says it floats.
-- **`method_id`**: `{ method_id: "mt_…", inputs }` — the catalog resolves the stored method; the module's header says the catalog is unversioned.
+- **`method_id`**: `{ method_id: "mt_…@<n>", inputs }` — the platform resolves the id: `mt_…@<n>` runs published version n for good, a bare `mt_…` the latest published version and `mt_…@draft` the draft. The module's header names the id it runs and, for a bare or `@draft` id, says that a publish or a save changes what runs under the committed types.
 
 The shared client helper, created once per project and reused by every method (if the project already constructs a `PipelexApiClient` somewhere, import that instead):
 
