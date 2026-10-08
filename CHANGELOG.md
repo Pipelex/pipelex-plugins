@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The hook's corpus sweep runs over the MTHDS Test Corpus of pipelex v0.78.0**: the corpus vocabulary now points readers at the public corpus page alone, and it declares the `llm_setting_refused_by_model` error as one the corpus leaves out, since which settings a model takes depends on each consumer's model deck. No entry changes, so the hook is swept over the same methods as before.
+
 ## [0.10.1] - 2026-10-06
 
 ### Changed
