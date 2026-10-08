@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex-catalog` publishes a method's draft, on your request**: the skill gains a Publish gesture over the Pipelex tools' new `mthds_publish_method`, made only when you ask for a publish. It saves the linked directory first, so what is published is what is on disk, says that every caller of the method's bare id runs the new version from its next call and that a published version is never taken back, and reports the version number, which `mt_…@<n>` then names for good. A pull takes `mt_…@<n>` to bring a published version to disk, and saving that directory restores the version over the draft only when you ask for it.
+
+### Changed
+
+- **A save writes the method's draft, and needs no confirmation (Breaking)**: with `@pipelex/mcp` 0.23.0 a save stores the bundle as the saved method's draft, an invalid one included, and changes nothing a caller of the method's bare id runs, so `pipelex-catalog` no longer calls a save a deployment and saves when asked without one. It sends nothing from `pipelex-method.json` but the method's id: the Pipelex tools send the link's token themselves, so a save over a draft somebody saved since is refused rather than made, and the link's name, which can predate a rename made in the webapp, is never sent back. The skill no longer declares `mthds_validate`, since a save and a publish each answer their own verdict.
+- **`pipelex-design`, `pipelex-edit` and `pipelex-organize` save the linked method's draft (Breaking)**: when the directory they changed is linked to a saved method, each ends by saving the change as that method's draft, where it used to offer `/pipelex-catalog` and save nothing, and says that `mt_…@draft` runs it. None of them publishes. A save the Pipelex tools refuse, an absent tool, or a change to a `PipeFunc`'s Python is left to `/pipelex-catalog`. A catalog id with a version suffix given to one of them finds the directory linked to the bare id.
+- **The skills say which version of a saved method they read or ran**: a bare `mt_…` names the method's latest published version, `mt_…@<n>` version n and `mt_…@draft` the draft. `pipelex-run` reports which version ran beside the run id, and runs a method that was never published as its draft, saying so before the run; `pipelex-inputs` says which version the template came from and offers the run on the same id; `pipelex-explain` says whether it explained the draft or a version, validates the content it read rather than the bare id, and says when the draft differs from what callers run.
+- **`pipelex-integrate` recommends pinning a published version**: for a saved method it recommends `mt_…@<n>`, which never changes, instead of warning that the catalog is unversioned, and integrates a bare or `@draft` id only on your say-so, since a publish or a save changes what runs under the committed types.
+- **The validation hook embeds `@pipelex/sdk` 0.35.0**: the `check.mjs` bundle every target runs on a `.mthds` edit embedded `@pipelex/sdk` 0.30.0 and now embeds 0.35.0, built in the `js/` directory of `Pipelex/pipelex-sdk`, and names that version in its validate stage's `User-Agent`. Its local lint and format still run on `@pipelex/tools-wasm` 0.4.0.
+
 ## [0.10.1] - 2026-10-06
 
 ### Changed

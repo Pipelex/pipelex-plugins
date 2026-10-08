@@ -26,7 +26,7 @@ class TestPipelexCatalogSkillShape:
 
     REPO_ROOT = Path(__file__).parents[2]
     REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-catalog" / "references"
-    REFERENCES = ("python.md", "conflict.md", "unknown-id.md")
+    REFERENCES = ("python.md", "link-file.md", "conflict.md", "unknown-id.md")
 
     def render(self, target_name: str) -> str:
         """The skill as the named target renders it — what a user of that harness installs."""
@@ -59,6 +59,7 @@ class TestPipelexCatalogSkillShape:
             "3. **Decide `python`.**": "references/python.md",
             "| `input_domain` at `expected_updated_at`": "references/conflict.md",
             "| `input_domain` at `method_id`": "references/unknown-id.md",
+            "on `written: false`, read [link-file.md]": "references/link-file.md",
         }
         for decision, target in at_the_decision.items():
             line = self.the_line(body, decision)
@@ -72,8 +73,8 @@ class TestPipelexCatalogSkillShape:
         """The stop-table row names the error, not the tool, so a pull of an unknown id reaches the reference
         as well as a save does. Phase 6's smoke sessions found it written for a save alone."""
         reference = self.reference("unknown-id.md")
-        assert "`mthds_save_method` or a pull's `mthds_get_method`" in reference.splitlines()[2]
-        assert "**A pull has no link to judge.**" in reference
+        assert "`mthds_save_method`, `mthds_publish_method` or a pull's `mthds_get_method`" in reference.splitlines()[2]
+        assert "**A pull or a publish has no link to judge.**" in reference
         assert "An empty stored source answers at the same location and is not a miss" in reference
 
     @pytest.mark.parametrize("target_name", TARGETS)

@@ -37,7 +37,7 @@ lab/<method>/
   log.md           one entry per run, newest last
 ```
 
-**Never put the lab inside the bundle directory**: the catalog saves that directory and a Python package ships it, and a case's files can stand in for confidential documents. **The loop runs the directory, never an `mt_…` id or an address**: a fix lands in the files, and the saved method changes only when `/pipelex-catalog` saves it, which is a deployment the loop never makes. For a saved method, work in the directory linked to it, or one `/pipelex-catalog` pulls.
+**Never put the lab inside the bundle directory**: the catalog saves that directory and a Python package ships it, and a case's files can stand in for confidential documents. **The loop runs the directory, never an `mt_…` id or an address**: a fix lands in the files, and a run of the method's id sees it only once it is saved, and its bare id only once that draft is published, a publish the loop never makes. For a saved method, work in the directory linked to it, or one `/pipelex-catalog` pulls.
 
 ## Guards
 

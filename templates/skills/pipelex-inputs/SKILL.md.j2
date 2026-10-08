@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo[/selector][@tag]) — also use when the user names one of those, e.g. "prepare inputs for mt_abc123" or "prepare inputs for github.com/Pipelex/methods/documents". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches. Defaults to automatic mode.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo[/selector][@tag]) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
@@ -23,7 +23,7 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 ## Mode
 
-**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "step by step", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
 
 ## Guards
 
@@ -41,12 +41,12 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 The target takes three forms, and every call takes exactly one selector.
 
 - **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. {% include "skills/shared/validate-call.md.j2" %}
-- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: its current stored content, which needs the API key. `<output_dir>` is a directory the user names, by default a new `./<method_id>/`.
+- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`, which needs the API key: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `method_not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 
 ### 2. The template
 
-Call **`mthds_inputs_template`** with the selector and **`explicit: false`**: the tool defaults to the `{concept, content}` envelope, and this skill works in the light shape. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
+Call **`mthds_inputs_template`** with the selector and **`explicit: false`**: the tool defaults to the `{concept, content}` envelope; this skill works in the light shape. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
 
 ### 3. The strategy
 
@@ -99,7 +99,7 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 
 | Condition | Do this |
 |---|---|
-| template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`/pipelex-design` resumes it), then retried; a registered method is fixed where it is edited (the webapp editor), not here; a published one is reported as [its reference](references/published-address.md) says |
+| template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`/pipelex-design` resumes it), then retried; a registered method through `/pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
 | template: `input_domain` | an unknown `pipe_ref` or unresolvable `main_pipe`: pass an explicit `pipe_ref`. At `method_id` or `method_ref`, report it in the tool's words; another organization's id reads as a miss |
 | `runtime`, either call | report, and retry once |
 | the factory returns no path | leave that one input unfilled, carry on with the others; report the reason and ask for the user's own file. Never fabricate a value or abandon `inputs.json` |

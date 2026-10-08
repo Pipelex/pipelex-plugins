@@ -86,7 +86,7 @@ class TestPipelexOrganizeSkill:
         condition = "**When invoked on its own rather than by `/pipelex-design`**"
         assert body.count(condition) == 1
         _, governed = self.section(body, "### Step 5 — Report").split(condition, 1)
-        for notice in ("now stale and offer", "**The saved method does not have this change.**"):
+        for notice in ("now stale and offer", "**Save the linked method's draft.**"):
             assert body.count(notice) == 1, f"{target_name}: {notice!r} is said more than once"
             assert notice in governed, f"{target_name}: {notice!r} is not under the condition"
 

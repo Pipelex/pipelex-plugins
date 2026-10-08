@@ -15,7 +15,7 @@ description: Explain an MTHDS method in plain language — its contract, its flo
 Read a method and say what it does, in plain language. Reading costs nothing and changes nothing in the method, so there is no confirmation to ask for. It takes:
 
 - **A bundle directory**: every `.mthds` file beneath it outside `runs/`, read as one library. A single file is the same job with one file in it.
-- **A registered method's catalog id** (`mt_…`): the user's own organization's method, so its stored source is read and explained exactly as a bundle on disk is.
+- **A registered method's catalog id** (`mt_…`): the user's own organization's method, so its source is read and explained exactly as a bundle on disk is — the draft for a bare id or `mt_…@draft`, version n for `mt_…@<n>`.
 - **A published address** (`github.com/<owner>/<repo>[/<selector>][@<tag>]`): explained at the level of its contract, through the workshop; the source stays in the repository it names. **An address with no `@<tag>` floats**: it resolves to the default branch's head, so the same question can get a different answer tomorrow. Accept it, and say so in one line.
 
 ## Requirements — the workshop is optional here
@@ -37,7 +37,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 
 For a bundle, read every `.mthds` file beneath the directory, not the root alone, and none under `runs/`, which holds a run's artifacts. They are one method: a concept declared in one file is used in another, and a pipe's implementation often sits in another file than the `PipeSignature` that declared it. **Read them all before saying anything about any of them.**
 
-**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
+**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
 
 ### 2. Resolve every signature before calling it pending
 
