@@ -1692,6 +1692,22 @@ class TestPipelexCatalogSkill:
         assert "`python` as the version's `.py` files, or `[]` when it has none" in conflict
         assert "read [conflict.md](references/conflict.md) first" in self.catalog_skill
 
+    def test_a_pulled_version_s_local_edits_are_never_overwritten_in_passing(self) -> None:
+        """The workshop's draft pull writes over a pulled version's untouched files and refuses one
+        edited since, so the way forward that pulls the draft back must not read as harmless, and the
+        refusal is never answered with `overwrite: true` unless the user is told the edits are lost."""
+        conflict = self.catalog_reference("conflict.md")
+        assert "refuses a file edited since the version pull" in conflict
+        assert "never answer that refusal with `overwrite: true` without saying the edits are lost" in conflict
+        assert "which writes over the version's files freely" not in conflict
+
+    def test_a_save_s_miss_is_checked_against_a_read(self) -> None:
+        """A platform older than drafts serves no draft save, and its refusal reads like an unknown id;
+        offering to unlink and create would mint a duplicate and lose the link to the real method."""
+        unknown = self.catalog_reference("unknown-id.md")
+        assert "**A save's miss is checked against a read first.**" in unknown
+        assert unknown.index("**A save's miss is checked against a read first.**") < unknown.index("offer to save the directory as a **new** method")
+
     def test_a_publish_takes_a_token_the_user_has_seen(self) -> None:
         """`mthds_publish_method` refuses a draft that moved since its token, so the token is
         what proves the user saw what is published: a save's or a draft pull's, never a
@@ -1699,7 +1715,10 @@ class TestPipelexCatalogSkill:
         one a refusal names."""
         body = self.catalog_skill
         assert "**Publish the draft the user has seen.**" in body
-        assert "never of a version" in body
+        assert "never a version's" in body
+        # With no linked directory, the draft is read inline rather than pulled, so a publish by id writes
+        # nothing into the project; the user is told what the draft holds before it is published.
+        assert "read its draft with `mthds_get_method` without `output_dir`, tell the user what it holds" in body
         assert "**never under the token the refusal names**" in body
 
     def test_a_refused_publish_is_routed_by_its_reason(self) -> None:
@@ -3050,10 +3069,19 @@ class TestCatalogIdInEverySkill:
         # A link the save could not refresh makes the next save from the directory a refusal that a later
         # session reads as somebody else's save, so the notice relays the tool's words on it.
         assert "and its words on a link it could not write" in body
+        # A key that may validate but not write the catalog makes the save a `config`-class error; that is
+        # this save's failure alone, never a reason to stop over a change already validated on disk.
+        assert "when the tool is absent or refuses, a `config`-class error included" in body
         assert "Leave the save to `/pipelex-catalog`, saying the change is not saved" in body
         bridge = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
         assert "`/pipelex-catalog` is what compares the two" in bridge
         assert "it is also the only way the work done here reaches the saved copy" not in bridge
+
+    def test_edit_offers_a_publish_only_after_a_save(self) -> None:
+        """With no link, or after a refused save, there is no draft of this change to publish."""
+        body = self.skill("pipelex-edit")
+        assert "to publish the draft once the closing save went through" in body
+        assert "or to save a directory with no link as a new method" in body
 
     def test_organize_leaves_the_notice_to_design_when_design_called_it(self) -> None:
         """`/pipelex-design`'s delivery step invokes `/pipelex-organize` and
@@ -3179,6 +3207,13 @@ class TestCatalogIdInEverySkill:
         assert "hosted console" not in reference, "the console serves no `mthds_*` tool, so it is no cause of this one's absence"
         assert "`pipelex_*` tools" in reference
         assert "name the cause [not-on-disk.md](references/not-on-disk.md) gives" in body
+
+    def test_explain_validates_the_bare_id_where_suffixes_are_refused(self) -> None:
+        """A platform that does not resolve versions yet refuses `mt_…@draft`, and its hint says a bare
+        id reads the draft there, so the explanation keeps its verdict by validating the bare id."""
+        reference = (self.REPO_ROOT / "skills" / "pipelex-explain" / "references" / "not-on-disk.md").read_text(encoding="utf-8")
+        assert "A platform that does not resolve versions yet refuses the suffix" in reference
+        assert "validate the bare id then" in reference
 
     def test_explain_still_reads_an_invalid_catalog_id_from_its_source(self) -> None:
         """The stops table is titled for where the skill stops, so an agent

@@ -6,7 +6,9 @@ An unknown `method_id` comes back at that location, and so do several other faul
 
 **A version suffix is refused there too, and is not a miss.** A save and a publish take the bare id, since both act on the draft, so `mt_…@<n>` is refused before anything is sent: call again with the bare id, and to publish an old version's content again, pull that version, restore it as the draft and publish that. A pull of a version the method never had names the versions it has: offer one of those, or the draft.
 
-When the hint does say the id is not visible, report it **with the `api_host` the link file records** — that is what makes it diagnosable: the link was made against another plane, or with another organization's key.
+**A save's miss is checked against a read first.** When a save answers that the id is not visible, call `mthds_get_method` on the same bare id without `output_dir`: when it reads the method, the id is alive and this platform has no draft save yet, a platform older than drafts. Say so and stop; the link stays and nothing here creates a method.
+
+When the hint does say the id is not visible, and a read does not find it either, report it **with the `api_host` the link file records** — that is what makes it diagnosable: the link was made against another plane, or with another organization's key.
 
 Then offer to save the directory as a **new** method. That needs the stale link gone first: the workshop refuses a create into a directory another link claims, rather than minting a duplicate nobody can delete. So ask, and on a yes remove `pipelex-method.json` and run the create, which writes a fresh link.
 
