@@ -182,7 +182,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "with the **root file first**",
         "because the platform derives the method's listed description from the first file",
         "**a save takes the path form**",
-        "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes",
+        "before offering to save inline, which waits for the user's yes",
         "**Never pass its `synced_updated_at` or its `name`**",
         "Never pass `link_dir`",
         "**A bundle with no `PipeFunc` sends no `python` at all**",

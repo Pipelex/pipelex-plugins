@@ -91,6 +91,9 @@ class TestPipelexRunSkill:
         assert "long after `created_at`" in self.the_step(body, 6), "elapsed time is the one signal the status carries"
         assert "do not call it failed" in self.the_step(body, 6), "elapsed time alone cannot tell a slow run from a dead one"
         assert "`PipeFunc`, the line says its Python does not travel" in self.the_step(body, 4), "said before credit is spent"
+        # A save writes the draft alone, so only `mt_…@draft` runs the Python just saved: a bare id runs the
+        # latest published version, or is refused for a method never published.
+        assert "run as `mt_…@draft` carries it" in self.the_step(body, 4)
         assert "A status marked `degraded` is the last-known one" in self.the_step(body, 6), "a stale read proves nothing"
         assert "RUNNING" not in self.the_step(body, 8)
         assert "RUNNING" not in self.reference("failed-run.md")

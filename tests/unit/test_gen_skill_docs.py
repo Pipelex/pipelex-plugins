@@ -1214,7 +1214,7 @@ class TestPipelexRunSkill:
         a run on the wrong sample is paid, so two candidates holding one is a question."""
         body = self.run_skill
         assert (
-            "For an id, in the one the user named, else in `./<method_id>/` or a directory below "
+            "For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory "
             "whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which."
         ) in body
         assert "**When several do, ask which; never choose.**" in body
@@ -1482,11 +1482,26 @@ class TestPipelexCatalogSkill:
         body = self.catalog_skill
         assert "{% set validate_call_inline %}" in body
         assert "**a save takes the path form**" in body
-        assert "say that this session cannot write the link and which of the two that costs, and save inline only on the user's yes" in body
+        assert "read [link-file.md](references/link-file.md) before offering to save inline, which waits for the user's yes" in body
         assert "Never pass `link_dir`" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "Say that this session cannot write the link, and what that costs" in link_file
+        assert "Save inline only on the user's yes." in link_file
         # The update arm too: an inline update leaves the link's `synced_updated_at` behind the catalog, so the
         # directory's next save is refused at `expected_updated_at`, a conflict with this session's own save.
-        assert "after an update is refused as a conflict with this one" in body
+        assert "after an update, the next save from here is refused as a conflict with this one" in link_file
+
+    def test_an_inline_update_carries_the_link_s_token_by_hand(self) -> None:
+        """The workshop sends the link's token only beside a `{ path }` root file (`linkDirectoryOf`
+        answers nothing for inline files, so `draftTokenOf` finds no link), which makes an inline update
+        last-writer-wins. So that one save passes `synced_updated_at` itself, and is never made from a
+        link recording a pulled version, which would restore it unasked."""
+        body = self.catalog_skill
+        assert "an inline update loses the guard against a newer draft" in body
+        assert "**Never pass its `synced_updated_at` or its `name`** unless a reference says to" in body
+        link_file = self.catalog_reference("link-file.md")
+        assert "pass the link's `synced_updated_at` as `expected_updated_at` yourself" in link_file
+        assert "Never save inline from a link recording a `synced_version`" in link_file
 
     def test_a_conflict_with_this_session_s_own_save_is_not_called_somebody_else_s(self) -> None:
         """A save whose link write failed, an inline one always, leaves the link's sync time behind the
@@ -1495,11 +1510,18 @@ class TestPipelexCatalogSkill:
         reported, says so, and carries the save on with that `updated_at` as the expectation; step 5
         names the cure for the stale link, a pull into the same directory, rather than a bare save again."""
         conflict = self.catalog_reference("conflict.md")
-        own = conflict.split("**First, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        own = conflict.split("**Then, is it this session's own save?**", 1)[1].split("\n\n", 1)[0]
+        assert "Only for a link that records no `synced_version`" in own
         assert "never say that somebody saved over the method" in own
         assert "with `expected_updated_at` set to that stored `updated_at`" in own
         assert "relaunched from a directory holding the bundle" in own
-        assert conflict.index("**First, is it this session's own save?**") < conflict.index("somebody saved over the draft")
+        # A pulled version is recognised first: its refusal names the link's token, which can equal this
+        # session's own last save, and the own-save branch would then restore the version unasked.
+        assert (
+            conflict.index("**First, does the directory hold a pulled version?**")
+            < conflict.index("**Then, is it this session's own save?**")
+            < conflict.index("somebody saved over the draft")
+        )
         body = self.catalog_skill
         assert "unless it finds this session's own save, give the user the timestamps" in body
         link_file = self.catalog_reference("link-file.md")
@@ -1658,8 +1680,12 @@ class TestPipelexCatalogSkill:
         reference makes the restore only on the user's request, and sends the version's
         Python, since an omitted `python` keeps the draft's."""
         conflict = self.catalog_reference("conflict.md")
-        assert "**Then, does the directory hold a pulled version?**" in conflict
+        assert "**First, does the directory hold a pulled version?**" in conflict
         assert "made only on the user's request or an explicit yes" in conflict
+        # The token is the draft as the version pull found it, so a draft saved since refuses the restore;
+        # before a requested restore there is no refusal to take one from.
+        assert "with `expected_updated_at` set to the `updated_at` the version pull reported" in conflict
+        assert "Never take the draft's current `updated_at` for a restore before that refusal" in conflict
         assert "`python` as the version's `.py` files, or `[]` when it has none" in conflict
         assert "read [conflict.md](references/conflict.md) first" in self.catalog_skill
 
@@ -1672,6 +1698,14 @@ class TestPipelexCatalogSkill:
         assert "**Publish the draft the user has seen.**" in body
         assert "never of a version" in body
         assert "**never under the token the refusal names**" in body
+
+    def test_a_refused_publish_is_routed_by_its_reason(self) -> None:
+        """`mthds_publish_method` refuses with `reason: invalid`, carrying `validation_errors[]`, or
+        `reason: not_runnable`, a valid draft with pending signatures and no errors to report; the
+        second is design work, not an invalid save's fix."""
+        body = self.catalog_skill
+        assert "`invalid` is routed as an invalid save is" in body
+        assert "`not_runnable` names the signatures `/pipelex-design` finishes" in body
 
     def test_publishing_to_github_is_named_as_another_gesture(self) -> None:
         """Decision box 3 of the drafts campaign: "publish" names the catalog's gesture, and
@@ -2977,6 +3011,17 @@ class TestCatalogIdInEverySkill:
         body = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
         assert "records no hashes" in body
         assert "do not present the local files as the saved method's current content" in body
+
+    def test_the_bridge_says_the_work_starts_from_the_draft(self) -> None:
+        """A link records the bare id and the skills' closing save writes the draft, so a suffixed id
+        cannot be edited as given. A request naming version n is told so and asked, and a hit whose
+        link records a pulled version is handed to the catalog before any edit, since its save would
+        be refused as a restore; the pull is of the bare id, so the draft comes down."""
+        body = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
+        assert "so search for the bare id" in body
+        assert "**For `mt_…@<n>`, say so before any edit, and ask**" in body
+        assert "**When its `pipelex-method.json` records a `synced_version`, it holds that version rather than the draft**" in body
+        assert "Pass it the bare id, so it brings the draft's files to disk" in body
 
     def test_the_notice_saves_the_draft_and_never_publishes(self) -> None:
         """Since the drafts campaign a save writes the draft, which callers of the bare id

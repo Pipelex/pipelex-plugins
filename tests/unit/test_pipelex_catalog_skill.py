@@ -60,6 +60,7 @@ class TestPipelexCatalogSkillShape:
             "| `input_domain` at `expected_updated_at`": "references/conflict.md",
             "| `input_domain` at `method_id`": "references/unknown-id.md",
             "on `written: false`, read [link-file.md]": "references/link-file.md",
+            "When the workshop refuses a path, read [link-file.md]": "references/link-file.md",
         }
         for decision, target in at_the_decision.items():
             line = self.the_line(body, decision)

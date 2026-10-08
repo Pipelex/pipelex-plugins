@@ -1,6 +1,6 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "is it done yet", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 ---
 
 # Run an MTHDS method
@@ -32,7 +32,7 @@ The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signature
 
 ### 3. The inputs
 
-They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else in `./<method_id>/` or a directory below whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
+They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
 
 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set.
 2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
@@ -49,7 +49,7 @@ One line before the call: the target, the pipe, where the inputs came from and w
 
 > Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
-**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run by its id alone carries it.
+**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
 
 The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A `/pipelex-lab` case is the exception: its runs wait for the user's go on its keys, even when the request asked for them.
 
