@@ -1657,6 +1657,9 @@ class TestPipelexCatalogSkill:
         assert "**Linked but stale**" in link_file
         assert "**Rewritten by another call**" in link_file
         assert "**Genuinely unlinked**" in link_file
+        # The workshop's save also answers that the link cannot be read, which refuses every save from the
+        # directory until the user repairs or removes it.
+        assert "**Unreadable**" in link_file
 
     def test_a_save_sends_neither_the_link_s_token_nor_its_name(self) -> None:
         """The workshop reads the link's token itself and treats an explicit one as the
@@ -3044,6 +3047,9 @@ class TestCatalogIdInEverySkill:
         body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
         assert "**no `name`, no `expected_updated_at`, no `python`, no `link_dir`**" in body
         assert "never retry with a token or inline" in body
+        # A link the save could not refresh makes the next save from the directory a refusal that a later
+        # session reads as somebody else's save, so the notice relays the tool's words on it.
+        assert "and its words on a link it could not write" in body
         assert "Leave the save to `/pipelex-catalog`, saying the change is not saved" in body
         bridge = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
         assert "`/pipelex-catalog` is what compares the two" in bridge
