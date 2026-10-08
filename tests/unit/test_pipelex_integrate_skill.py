@@ -783,8 +783,9 @@ class TestPipelexIntegrateSkill:
         which refresh mode — a reference since the size diet — carries.
         """
         body = self.integrate
-        assert "the catalog is unversioned, so a stored edit silently invalidates committed types" in body
-        assert "proceed only on the user's say-so" in body
+        assert "**recommend pinning `mt_…@<n>`**, a published version, which never changes" in body
+        assert "the catalog is unversioned" not in body
+        assert "proceed with one only on the user's say-so" in body
         refresh = self.reference("refresh.md")
         assert "**The call site is edited if it no longer type-checks, if the `pipe` record no longer matches the signature**" in refresh
         assert "**or if it still returns the output alone instead of the results beside it**" in refresh

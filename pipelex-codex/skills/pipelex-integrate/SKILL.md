@@ -1,6 +1,6 @@
 ---
 name: pipelex-integrate
-description: Wire an MTHDS method into a Python or TypeScript codebase with generated, drift-proof types and one typed call site that runs it through @pipelex/sdk or pipelex-sdk. Use when the user says "use this method in my app", "call this from my code", "generate types for this method", "wire the method into my project", "add this pipeline to my service", "typed client for this method", "integrate the method", "refresh the generated types", "regenerate the types", "the types are stale", or wants application code that runs a .mthds method — from a local bundle, a catalog id (mt_…) or a published method_ref address. Also the refresh path after a bundle edit. Not for authoring or editing the method itself (/pipelex-design, /pipelex-edit), and not for a project that does not exist yet (/pipelex-scaffold).
+description: Wire an MTHDS method into a Python or TypeScript codebase with generated, drift-proof types and one typed call site that runs it through @pipelex/sdk or pipelex-sdk. Use when the user says "use this method in my app", "call this from my code", "generate types for this method", "wire the method into my project", "typed client for this method", "refresh the generated types", "the types are stale", or wants application code that runs a .mthds method — from a local bundle, a catalog id (mt_…) or a published method_ref address. Also the refresh path after a bundle edit. Not for authoring or editing the method itself (/pipelex-design, /pipelex-edit), and not for a project that does not exist yet (/pipelex-scaffold).
 ---
 
 # Integrate an MTHDS method into a codebase
@@ -35,7 +35,7 @@ Pass exactly one selector to every tool call:
 
 - **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
-- **`method_id: "mt_…"`**: the catalog is unversioned, so a stored edit silently invalidates committed types: say so, recommend committing the source or publishing an address, and proceed only on the user's say-so.
+- **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes; the number is the user's, or the latest `/pipelex-catalog` reports. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
 **The project** is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory; several is a question, none means offering the `pipelex-scaffold` skill (`../pipelex-scaffold/SKILL.md`). Read its language reference now: [typescript.md](references/typescript.md) or [python.md](references/python.md).
 
@@ -119,7 +119,7 @@ Format **only the files you wrote**, then run the type checker and the gate. You
 
 ### 12. Report
 
-What was generated and where, the target and why, the call site's signature, the tooling changes, the gate's command, and any orphans as the orphans reference says. For a `method_id`, the catalog is unversioned; **for a `method_ref` with no tag, the types committed here are the ones the address resolved to on the day they were generated**, which no gate sees move. Refreshing is this skill again; then hand off to `/pipelex-inputs`.
+What was generated and where, the target and why, the call site's signature, the tooling changes, the gate's command, and any orphans as the orphans reference says. For an id not pinned, say what can move under the types; **for a `method_ref` with no tag, the types committed here are the ones the address resolved to on the day they were generated**, which no gate sees move. Refreshing is this skill again; then hand off to `/pipelex-inputs`.
 
 ## Stops
 

@@ -30,7 +30,7 @@ class TestPipelexRunSkill:
 
     REPO_ROOT = Path(__file__).parents[2]
     REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-run" / "references"
-    REFERENCES = ("published-address.md", "failed-run.md", "linked-run.md")
+    REFERENCES = ("by-id.md", "published-address.md", "failed-run.md", "linked-run.md")
 
     def render(self, target_name: str) -> str:
         """The skill as the named target renders it — what a user of that harness installs."""
@@ -65,7 +65,7 @@ class TestPipelexRunSkill:
         point, read before acting — a pointer only in the closing index is a caveat that will not be read."""
         body = self.render(target_name)
         at_the_decision = {
-            "as `method_ref`: read [": ("references/published-address.md",),
+            "as `method_ref`: read [": ("references/by-id.md", "references/published-address.md"),
             "an address's verdict is reported as [": ("references/published-address.md",),
             "Give `failure_message` **verbatim** first": ("references/failed-run.md",),
             "| `mthds_run`: `input_domain` at `method_id`": ("references/linked-run.md",),
@@ -76,6 +76,7 @@ class TestPipelexRunSkill:
                 assert f"]({target})" in line, f"{target_name}: {target} is not pointed at where its branch is taken: {line!r}"
             assert "before" in line or "as [" in line, f"{target_name}: the pointer does not say to read before acting: {line!r}"
         assert "](references/published-address.md) before the first call" in self.the_step(body, 1)
+        assert "](references/by-id.md) before the first call" in self.the_step(body, 1)
         assert "](references/failed-run.md) before routing it" in self.the_step(body, 8)
         index = body.split("## References", 1)[1]
         for name in self.REFERENCES:
@@ -90,6 +91,9 @@ class TestPipelexRunSkill:
         assert "long after `created_at`" in self.the_step(body, 6), "elapsed time is the one signal the status carries"
         assert "do not call it failed" in self.the_step(body, 6), "elapsed time alone cannot tell a slow run from a dead one"
         assert "`PipeFunc`, the line says its Python does not travel" in self.the_step(body, 4), "said before credit is spent"
+        # A save writes the draft alone, so only `mt_…@draft` runs the Python just saved: a bare id runs the
+        # latest published version, or is refused for a method never published.
+        assert "run as `mt_…@draft` carries it" in self.the_step(body, 4)
         assert "A status marked `degraded` is the last-known one" in self.the_step(body, 6), "a stale read proves nothing"
         assert "RUNNING" not in self.the_step(body, 8)
         assert "RUNNING" not in self.reference("failed-run.md")

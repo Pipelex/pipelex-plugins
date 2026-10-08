@@ -6,7 +6,9 @@ The two targets part company on ownership rather than convenience. **A catalog i
 
 ## A catalog id: read it in full
 
-Call `mthds_get_method` with the `method_id`, as the skill's step 1 says. The `files` it returns are explained **exactly as a bundle on disk is**, through the skill's steps 1 to 5, with the returned contents standing in for the files you would have read. The verdict of step 3 is one `mthds_validate` call with the same `method_id`.
+Call `mthds_get_method` with the `method_id`, as the skill's step 1 says. The `files` it returns are explained **exactly as a bundle on disk is**, through the skill's steps 1 to 5, with the returned contents standing in for the files you would have read. The verdict of step 3 is one `mthds_validate` call naming the content that was read: `mt_…@draft` when the result's `version` is `draft`, and `mt_…@<n>` for version n. A platform that does not resolve versions yet refuses the suffix, with a hint saying that a bare id reads the draft there: validate the bare id then, which reads the same stored content on that platform, and say so.
+
+**A bare id reads the draft here and the latest published version everywhere else.** `mthds_get_method` reads a bare id's draft, which is what the next save replaces, while a validation, an inputs template or a run of the same bare id reads the latest published version, what the method's callers run. So never validate a draft's source under the bare id, and say which content the explanation is of. The result's `publish_state` says how the two stand: `draft_ahead` means callers of the bare id run version `latest_version`, which differs from what you explained, so say so and offer to explain `mt_…@<latest_version>`; `draft_unchanged` means they run what you explained; `never_published` means a bare id runs nothing yet.
 
 Three things about the returned set are worth knowing before you describe it:
 
@@ -16,7 +18,7 @@ Three things about the returned set are worth knowing before you describe it:
 
 ## Without `mthds_get_method`
 
-When the other tools answer and `mthds_get_method` does not, read the id at contract level exactly as an address is read below, with `method_id` as the selector, and say that the source was not read rather than implying there was none to read. **The cause is a local workshop that predates the tool**, which `npx -y @pipelex/mcp@latest` refreshes; say so. The Pipelex connector's `pipelex_*` tools, when the session has them too, belong to a different server with no tool of this name, so they neither cause this nor stand in for the workshop.
+When the other tools answer and `mthds_get_method` does not, read the id at contract level exactly as an address is read below, with `method_id` as the selector, and say that the source was not read rather than implying there was none to read. A bare id there is the latest published version, and one never published is refused as `method_not_published`, whose draft `mt_…@draft` can be read instead; say which you read. **The cause is a local workshop that predates the tool**, which `npx -y @pipelex/mcp@latest` refreshes; say so. The Pipelex connector's `pipelex_*` tools, when the session has them too, belong to a different server with no tool of this name, so they neither cause this nor stand in for the workshop.
 
 ## A published address: its contract
 

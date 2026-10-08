@@ -90,7 +90,7 @@ Your agent picks the skill your request calls for, and you can also name one you
 #### Run and save
 
 - **`/pipelex-run`** runs a method on the hosted Pipelex API, prints its run id at once, and follows a run to its status, its results and its files.
-- **`/pipelex-catalog`** saves a method to your Pipelex account, lists what is saved there, and pulls a saved method back to disk.
+- **`/pipelex-catalog`** saves a method to your Pipelex account as a draft, publishes the draft as the version your code and your chatbot run when you ask it to, lists what is saved there, and pulls a saved method back to disk.
 - **`/pipelex-lab`** frames a use case into candidate methods, writes each test case's answer before the first run, then runs, scores, logs and fixes the method round after round within a budget you agree.
 
 #### Put a method in your code
