@@ -485,6 +485,16 @@ def _marker_owner(marker: Path) -> str | None:
     return owner if isinstance(owner, str) else None
 
 
+def _litter_is_ignored(target: OutsideTarget, files: Mapping[str, OutputFile]) -> bool:
+    """Whether a file git ignores in the output is litter the render leaves alone, as the in-repo build does.
+
+    Only when git ignores none of the files the render produces: a consumer that ignores its output
+    as a whole ignores what ships, so there every file counts, for the ownership check, the pruning
+    and `--check` alike, or an ignored directory of somebody else's skills would look empty.
+    """
+    return not git_ignored(target.output_dir, [target.output_dir / rel for rel in files])
+
+
 def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
     """Why the output directory is not this render's to write and prune; nothing when it is.
 
@@ -508,7 +518,7 @@ def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> 
             whose = f"the outside target {owner!r}" if owner is not None else "nobody this render can read"
             errors.append(f"{label}: its {OWNER_MARKER_NAME} names {whose}, not {target.name!r}; give each target an output directory of its own")
     else:
-        foreign = orphaned_outputs(output_dir, output_dir, set())
+        foreign = orphaned_outputs(output_dir, output_dir, set(), skip_ignored=_litter_is_ignored(target, files))
         if foreign:
             named = ", ".join(_label(target, path) for path in foreign[:3]) + (", …" if len(foreign) > 3 else "")
             errors.append(
@@ -579,7 +589,7 @@ def build(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
     target.output_dir.mkdir(parents=True, exist_ok=True)
     _write_files(target.output_dir, files)
     produced = {target.output_dir / rel for rel in files}
-    for removed in prune_orphans(target.output_dir, target.output_dir, produced):
+    for removed in prune_orphans(target.output_dir, target.output_dir, produced, skip_ignored=_litter_is_ignored(target, files)):
         print(f"  Removed {_label(target, removed)} (the render no longer produces it)")
     print(f"  [{target.name}] Rendered {len(files)} files into {target.output_dir}.")
     return 0
@@ -605,7 +615,7 @@ def check(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
         elif bool(path.stat().st_mode & stat.S_IXUSR) != file.executable:
             findings.append(f"MODE: {label} (executable bit differs from its source)")
     produced = {target.output_dir / rel for rel in files}
-    for orphan in orphaned_outputs(target.output_dir, target.output_dir, produced):
+    for orphan in orphaned_outputs(target.output_dir, target.output_dir, produced, skip_ignored=_litter_is_ignored(target, files)):
         label = _label(target, orphan)
         if orphan.suffix == ".j2":
             findings.append(f"LEAKED TEMPLATE: {label} (a template belongs under the source root's templates/: move it there, or delete it)")

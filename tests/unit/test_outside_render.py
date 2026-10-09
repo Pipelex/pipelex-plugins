@@ -472,3 +472,24 @@ class TestOutsideRender:
         assert render_outside(target) == expected
         with pytest.raises(SystemExit, match=re.escape("[skills] include names 'ignored-skill', a skill that exists neither upstream nor")):
             load_outside_target(_edit(target_file, '"house-notes"]', '"house-notes", "ignored-skill"]'))
+
+    def test_an_output_git_ignores_whole_is_held_to_every_file_it_holds(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A consumer that git-ignores its rendering ignores what ships, so ignored files there are not litter: an
+        ignored directory of somebody's skills is not empty, and a skill the target stops rendering is still removed."""
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+        _write(tmp_path / ".gitignore", "rendered/\n")
+        target_file = _fixture(tmp_path)
+        output = tmp_path / "rendered"
+        theirs = _write(output / "pipelex-edit" / "SKILL.md", "Somebody else's skill.\n")
+        assert build(load_outside_target(target_file)) == 1
+        assert "rendered: holds files no render of this target wrote (rendered/pipelex-edit/SKILL.md)" in capsys.readouterr().out
+        assert theirs.read_text() == "Somebody else's skill.\n"
+        shutil.rmtree(output)
+        assert build(load_outside_target(target_file)) == 0
+        target = load_outside_target(_edit(target_file, ', "house-notes"]', "]"))
+        capsys.readouterr()
+        assert check(target) == 1
+        assert "ORPHAN: rendered/house-notes/SKILL.md" in capsys.readouterr().out
+        assert build(target) == 0
+        assert not (output / "house-notes").exists()
+        assert check(target) == 0
