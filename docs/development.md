@@ -84,3 +84,29 @@ A target given `MCP` first builds that checkout's workshop with its own `make bu
 - **Mistral Vibe.** There is no target. Set `command = "node"` and `args = ["/path/to/pipelex-mcp/dist/main.js"]` in the `pipelex` entry you appended to `~/.vibe/config.toml`, which Vibe reads instead of the fragment in this repository, after `make build-local` in that checkout. A checkout built while `pipelex-mcp` was an npm workspace still holds that layout's `packages/workshop/dist/main.js`, which nothing rebuilds any more and only `make clean` there removes, so never point Vibe at it.
 
 The repository's `/pipelex-mcp-source` skill, under `.claude/skills/`, reports which version npm and a local build serve and which version the hosted console should serve, and says which target runs the one you want. Why these are make targets rather than a skill, and how their behaviour was verified, is in [decisions.md](decisions.md), "A local workshop is one make target".
+
+## Rendering for an outside target
+
+A repository that keeps skills of its own renders this plugin's skills with them through the `pipelex-plugins-render` console command, from a target file and templates that never enter this public repository. What a target file holds and what the render refuses are in [build-targets.md](build-targets.md), "Outside targets"; this section is how a consumer runs the command and keeps its declarations current.
+
+**Run it at a pin.** uv builds the command from a git ref into an environment of its own, so the consumer needs uv and nothing else:
+
+```bash
+uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref> pipelex-plugins-render path/to/target.toml           # render into the target's output
+uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref> pipelex-plugins-render path/to/target.toml --check   # compare the output with a fresh rendering; write nothing
+```
+
+The ref is the pin: the package carries the templates, static assets and targets of that commit inside itself, so the consumer's rendering changes only when it moves the ref. A release tag is the ref to pin; `@dev` follows the development branch, for trying a change before it is released. Run it through `uvx` rather than installing it into a project's environment: the package installs a top-level `scripts` package, a name another distribution may also use ([decisions.md](decisions.md), "The outside render ships in the tooling package").
+
+**A declaration's hash** is the SHA-256 of the upstream file's bytes at the pin, written `sha256:` and the 64 hex digits. Compute it from a checkout of this repository at that ref, or straight from GitHub:
+
+```bash
+shasum -a 256 templates/skills/shared/saved-copy-notice.md.j2                     # in a checkout at the ref
+curl -sL https://raw.githubusercontent.com/Pipelex/pipelex-plugins/<ref>/templates/skills/shared/saved-copy-notice.md.j2 | shasum -a 256
+```
+
+When the pin moves past a change to a declared file, the render refuses and names the file and both hashes. Read the upstream change, carry what applies into the replacement, then write the new hash.
+
+**Try a change here against a consumer** before it is pushed: `uvx --from /path/to/this/checkout pipelex-plugins-render path/to/target.toml`. uv builds the package from the checkout's files, committed or not, leaving out what git ignores, and rebuilds it whenever one of them changes (`[tool.uv] cache-keys` in `pyproject.toml`), so each run reads the checkout as it is. From this checkout itself, `python -m scripts.outside_render` takes the same arguments without a build.
+
+**This repository checks the command itself** with a smoke fixture, `tests/data/outside-target-smoke/`, whose rendering is committed beside it. `make check-outside-smoke` builds the package and runs the installed command's `--check` on a copy of it outside the checkout, as CI does on every pull request ([ci.md](ci.md)); `make render-outside-smoke` re-renders the committed output after a change to the one upstream partial its skill includes.

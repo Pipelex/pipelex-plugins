@@ -19,9 +19,11 @@ somebody has read it and updated the hash. The rules, and why, are in docs/build
 It renders for the `agent-skills` platform only, and writes no hooks, no manifest, no MCP
 declaration and no marketplace file.
 
-Usage:
-    python -m scripts.outside_render <target file>           # render into the target's output
-    python -m scripts.outside_render <target file> --check   # compare the output, write nothing
+Usage, from the installed package (docs/development.md, "Rendering for an outside target"):
+    pipelex-plugins-render <target file>           # render into the target's output
+    pipelex-plugins-render <target file> --check   # compare the output, write nothing
+
+and from a checkout, `python -m scripts.outside_render` with the same arguments.
 """
 
 from __future__ import annotations
@@ -60,8 +62,11 @@ from scripts.gen_skill_docs import (
 )
 from scripts.skill_links import SHARED_DIR_NAME, linked_paths, skill_link_errors
 
-# The checkout this module sits in, whose templates, static assets and defaults are the upstream.
-UPSTREAM_ROOT = Path(__file__).resolve().parent.parent
+# The upstream: the templates, static assets and targets the render reads. The installed package
+# carries them inside itself (pyproject's `[tool.hatch.build.targets.wheel]`); in a checkout they
+# sit beside this package, at the repository's root.
+PACKAGE_DIR = Path(__file__).resolve().parent
+UPSTREAM_ROOT = PACKAGE_DIR if (PACKAGE_DIR / TEMPLATES_DIR_NAME).is_dir() else PACKAGE_DIR.parent
 
 # The directory of upstream and outside static assets, one subdirectory per skill.
 SKILLS_DIR_NAME = "skills"
@@ -290,6 +295,25 @@ def _source_files(root: Path, subdirs: Sequence[str]) -> list[str]:
     return [path.relative_to(root).as_posix() for path in files if path not in ignored]
 
 
+def _upstream_files(upstream_root: Path, subdirs: Sequence[str]) -> list[str]:
+    """The upstream's files under `subdirs`, as `_source_files` lists them when the upstream is a checkout.
+
+    Git is asked only about a checkout, whose root holds `.git`. The installed package holds what
+    its wheel was built with, which leaves out what git ignored then, and asking git about it would
+    be asking whatever repository the environment happens to sit in: one inside a `.venv` its
+    repository ignores would have every upstream file reported ignored, and none rendered.
+    """
+    if (upstream_root / GIT_DIR_NAME).exists():
+        return _source_files(upstream_root, subdirs)
+    return sorted(
+        path.relative_to(upstream_root).as_posix()
+        for subdir in subdirs
+        if (upstream_root / subdir).is_dir()
+        for path in (upstream_root / subdir).rglob("*")
+        if path.is_file()
+    )
+
+
 def _skill_names(upstream_root: Path, outside_files: Sequence[str]) -> list[str]:
     """Every skill there is to render: the upstream ones, and those the outside files hold a `SKILL.md.j2` for."""
     outside = {
@@ -433,7 +457,7 @@ def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -
     checked the declarations (`declaration_errors`).
     """
     outside_files = _source_files(target.source_root, (TEMPLATES_DIR_NAME, SKILLS_DIR_NAME))
-    upstream_assets = _source_files(upstream_root, (SKILLS_DIR_NAME,))
+    upstream_assets = _upstream_files(upstream_root, (SKILLS_DIR_NAME,))
     skills = _rendered_skill_names(target, upstream_root, outside_files)
     with _outside_templates(target.source_root, outside_files) as outside_dir:
         rendered = render_templates(

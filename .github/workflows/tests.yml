@@ -7,6 +7,9 @@
 #
 # `pyproject.toml`'s `addopts = "-m 'not recipes'"` deselects the recipe suite,
 # which downloads packages on a cold uv cache; `recipes.yml` runs that one.
+#
+# The second step builds the package and runs the outside render's console
+# command the way a consumer does; docs/ci.md says what it proves.
 name: Tests
 
 on:
@@ -54,3 +57,10 @@ jobs:
 
       - name: Run tests
         run: make agent-test
+
+      # The command an outside target's repository runs, built from this checkout
+      # into its own environment and run on a copy of the smoke fixture outside
+      # it: its committed rendering must pass `--check`, and fail it once a byte
+      # has changed. Only this proves the wheel carries what the render reads.
+      - name: Outside render from the built package
+        run: make check-outside-smoke

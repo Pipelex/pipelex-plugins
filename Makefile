@@ -14,9 +14,9 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 
 .PHONY: \
 	help env check-uv install lock li \
-	gen-skill-docs build vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
+	gen-skill-docs build render-outside-smoke vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
-	test agent-test test-recipes tp \
+	test agent-test test-recipes check-outside-smoke tp \
 	cleanderived cleanenv cleanall reinstall ri \
 	codex-use-local codex-use-official codex-refresh codex-status \
 	claude-local-mcp codex-local-mcp
@@ -142,6 +142,19 @@ tp: install ## Run tests with prints (TEST=name to filter)
 test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
 	@$(VENV_PYTEST) tests/recipes -m recipes -v
 
+# The installed command against a copy of the smoke fixture outside this checkout, as a consumer runs it:
+# its committed rendering must pass `--check`, and fail it once a byte of it has changed. uv rebuilds the
+# package whenever a file it carries changes, per pyproject's `[tool.uv] cache-keys`.
+check-outside-smoke: check-uv ## Build the package and run its pipelex-plugins-render --check on a copy of the smoke fixture
+	@scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+	cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/"; \
+	uvx --from . pipelex-plugins-render "$$scratch/source/smoke.toml" --check; \
+	printf 'x' >> "$$scratch/rendered/smoke-notes/SKILL.md"; \
+	if uvx --from . pipelex-plugins-render "$$scratch/source/smoke.toml" --check >/dev/null; then \
+		echo "FAIL: --check passed on a rendering changed by one byte"; exit 1; \
+	fi; \
+	echo "• The installed pipelex-plugins-render checks the smoke fixture"
+
 agent-test: install ## Run unit tests quietly (output only on failure)
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
@@ -173,6 +186,17 @@ gen-skill-docs: install ## Generate SKILL.md from .j2 templates (use TARGET=name
 build: install ## Build all targets (prod + codex + mistral-vibe)
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all
 	@echo "Done: built all targets"
+
+# The outside-target smoke fixture, whose rendering is committed beside its source. The render refuses an
+# output inside this repository, so the fixture is rendered in a scratch copy and the result copied back.
+OUTSIDE_SMOKE_DIR := tests/data/outside-target-smoke
+
+render-outside-smoke: install ## Re-render the outside-target smoke fixture's committed output
+	@scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+	cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/"; \
+	$(VENV_PYTHON) -m scripts.outside_render "$$scratch/source/smoke.toml"; \
+	rm -rf "$(OUTSIDE_SMOKE_DIR)/rendered"; \
+	cp -R "$$scratch/rendered" "$(OUTSIDE_SMOKE_DIR)/rendered"
 
 # Where the check.mjs hook bundle is built: the js/ directory of a pipelex-sdk checkout (override for a non-sibling one).
 SDK_JS_DIR ?= ../pipelex-sdk/js

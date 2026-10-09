@@ -1,13 +1,19 @@
 [project]
 name = "pipelex-plugins-tools"
 # Internal tooling version — not tied to the plugin version in plugin.json/marketplace.json.
-# This package is not published; bump only when the tooling itself changes meaningfully.
+# This package is not published to PyPI: an outside target's repository installs it from a git ref,
+# which is the version it pins (docs/development.md). Bump only when the tooling changes meaningfully.
 version = "0.1.0"
 requires-python = ">=3.13"
+# The outside render's one dependency: `pipelex-plugins-render` runs from the installed package.
+dependencies = ["jinja2>=3.1.4"]
+
+[project.scripts]
+# Renders the skills for an outside target; see docs/build-targets.md, "Outside targets".
+pipelex-plugins-render = "scripts.outside_render:main"
 
 [project.optional-dependencies]
 dev = [
-  "jinja2>=3.1.4",
   "mypy>=1.11.2",
   # Not imported by the tooling: `tests/unit` runs `pipelex-integrate`'s shipped Python drift gate
   # (`skills/pipelex-integrate/references/codegen_check.py`) against the real offline check, and
@@ -38,11 +44,31 @@ markers = [
   "recipes: executes the pipelex-synthetic-inputs recipe blocks (runs uv, downloads packages)",
 ]
 
+# The wheel carries the outside render's upstream inside the `scripts` package: the skill templates, the
+# static assets and the targets, which `scripts/outside_render.py` reads there once installed. Unlike
+# `force-include`, `only-include` leaves out what git ignores, so a local build ships no litter. The
+# editable install puts the repository root on the path instead, where the checkout holds them.
 [tool.hatch.build.targets.wheel]
-packages = ["scripts"]
+only-include = ["scripts", "templates/skills", "skills", "targets"]
+dev-mode-dirs = ["."]
+
+[tool.hatch.build.targets.wheel.sources]
+"templates" = "scripts/templates"
+"skills" = "scripts/skills"
+"targets" = "scripts/targets"
 
 [tool.uv]
 required-version = ">=0.7.2"
+# uv rebuilds a local package only when one of these files changes, `pyproject.toml` alone by default, so
+# `uvx --from <this checkout>` would keep rendering from the templates of its first build. These are
+# what the wheel carries.
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "scripts/**/*.py" },
+  { file = "templates/skills/**/*" },
+  { file = "skills/**/*" },
+  { file = "targets/*.toml" },
+]
 
 [tool.mypy]
 packages = ["scripts", "tests"]
