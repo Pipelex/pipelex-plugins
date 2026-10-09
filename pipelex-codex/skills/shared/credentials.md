@@ -11,3 +11,5 @@ The Pipelex connector's `pipelex_*` tools, when the session has them, belong to 
 ## Where the key comes from
 
 The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+
+A key the user saved with the pipelex CLI's `pipelex login` does not count: that command writes it to `~/.pipelex/.env`, a file only the pipelex CLI reads, so it reaches neither the server nor the hook. Ask the user to give the server a key by exporting `PIPELEX_API_KEY` in the shell Codex starts from: a new one from app.pipelex.com, or the `PIPELEX_API_KEY` value in that file, which they copy themselves. Never read that file or print a key yourself.
