@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.35.1 (f0ac33b) + @pipelex/tools-wasm 0.4.0 (npm)
+// Provenance: @pipelex/sdk 0.37.0 (5c801b7) + @pipelex/tools-wasm 0.4.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2583,15 +2583,20 @@ var RUN_RESULT_ARTIFACTS = [
 ];
 function assertArtifactSelection(artifacts) {
   if (artifacts === void 0) return;
-  if (!Array.isArray(artifacts) || artifacts.length === 0) {
-    throw new RangeError(
+  if (!Array.isArray(artifacts)) {
+    throw new TypeError(
+      `"artifacts" must be an array naming one or more of ${RUN_RESULT_ARTIFACTS.join(", ")}.`
+    );
+  }
+  if (artifacts.length === 0) {
+    throw new RequestArgumentError(
       `"artifacts" must name one or more of ${RUN_RESULT_ARTIFACTS.join(", ")}; omit it to read every artifact.`
     );
   }
   const known = RUN_RESULT_ARTIFACTS;
   const unknown = artifacts.filter((name) => !known.includes(name));
   if (unknown.length > 0) {
-    throw new RangeError(
+    throw new RequestArgumentError(
       `Unknown result artifact(s) ${unknown.join(", ")}; valid artifacts are: ${RUN_RESULT_ARTIFACTS.join(", ")}.`
     );
   }
@@ -2797,7 +2802,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.35.1";
+var SDK_VERSION = "0.37.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -5120,8 +5125,8 @@ var PipelexApiClient = class {
    * comma-separated `?artifacts=` parameter: only those are read, and an
    * unselected artifact is absent from the result (`undefined`) while a
    * selected one the run never wrote is `null`. Omitted, every artifact is
-   * read. An empty selection or an unknown name throws a `RangeError` before
-   * any request. `MissingMainStuffError` is thrown only for a read that asked
+   * read. An empty selection or an unknown name throws a `RequestArgumentError`
+   * before any request. `MissingMainStuffError` is thrown only for a read that asked
    * for `main_stuff` — no selection, or one naming it.
    *
    * Throws `RunLifecycleUnavailableError` when the lifecycle routes are absent
