@@ -1440,7 +1440,7 @@ class TestPipelexIntegrateSkill:
         clause = re.search(r"at least: `zod`, `@pipelex/sdk` (\S+) \(`ts-zod`\)", step_8)
         assert clause, "step 8 names no @pipelex/sdk floor"
         assert clause.group(1) == self.TYPESCRIPT_SDK_FLOOR
-        assert "Raise and report older pins, **`pipelex` only on the user's yes** (python.md)." in step_8
+        assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
         regions: dict[str, str] = {}
@@ -1482,21 +1482,30 @@ class TestPipelexIntegrateSkill:
         raises the SDKs — so a project on an older runtime is not left with a call site that fails at its import.
 
         That raise crosses breaking releases of the project's own runtime, so it waits for the user's yes even in
-        automatic mode, and the configuration is migrated after it with a previewed `pipelex migrate`, never with
-        the bare command, whose own terminal question an agent's shell cannot answer."""
+        automatic mode, asked at step 4 where the target is chosen, before anything is written, so a no leaves no
+        tree or sidecar without a call site; the configuration is migrated after it with a previewed
+        `pipelex migrate`, never with the bare command, whose own terminal question an agent's shell cannot answer."""
         floor = load_version_floors(self.REPO_ROOT)["pipelex"]
         for target_name in ("prod", "codex", "mistral-vibe"):
-            step_8 = self.the_line(self.render(target_name), "With the project's package manager, at least:")
+            body = self.render(target_name)
+            step_8 = self.the_line(body, "With the project's package manager, at least:")
             assert f"`pipelex` {floor} (`python-structures`)" in step_8, target_name
-            assert "**`pipelex` only on the user's yes** (python.md)" in step_8, target_name
+            row = self.the_line(body, "| a Pipelex host: `pipelex` a dependency")
+            assert "`python-structures`; **ask before raising a `pipelex` below step 8's floor**: python.md" in row, target_name
+            assert "pause only for a genuinely ambiguous choice or where a step asks." in body, target_name
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         paragraph = self.the_line(python, "**Where `pipelex_sdk` comes from.**")
         assert f"from the `pipelex` {floor} that step 8 raises the project to" in paragraph
         assert "Add no `pipelex-sdk` requirement of the project's own" in paragraph
-        raise_rule = self.the_line(python, "**Raising `pipelex` waits for the user's yes, even in automatic mode.**")
+        raise_rule = self.the_line(python, "**Raising `pipelex` waits for the user's yes, asked at step 4.**")
         for breaking in ("`--runner local|hosted`", "`targets_api = 5`", "`FormerReleaseConfigError`"):
             assert breaking in raise_rule, breaking
+        assert "before step 5 writes anything" in raise_rule
+        assert "On a no, write nothing: stop before step 5" in raise_rule
+        assert "`https://github.com/Pipelex/pipelex/blob/main/CHANGELOG.md`" in raise_rule
+        assert "summarised from the changelog itself and never from memory" in raise_rule
+        assert "The raise targets the latest `pipelex` release" in raise_rule
         assert "`pipelex migrate --dry-run`" in raise_rule
         assert "run `pipelex migrate --yes` only on their yes" in raise_rule
         assert "Never run `pipelex migrate` with neither flag" in raise_rule
@@ -1505,7 +1514,7 @@ class TestPipelexIntegrateSkill:
 
         left_alone = self.refresh_cells(self.reference("refresh.md"))["left alone"]
         assert "a `python-structures` project's `pipelex`, pinned below step 8's floor, raised as step 8 raises it" in left_alone
-        assert "`pipelex` only on the user's yes and with its configuration migrated" in left_alone
+        assert "`pipelex` only on a yes asked before the regeneration, as step 4 asks it" in left_alone
 
     def refresh_cells(self, text: str) -> dict[str, str]:
         """Refresh mode's table, its one body row cut into its three cells, keyed by the header it sits under."""

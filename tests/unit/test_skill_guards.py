@@ -129,7 +129,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**",
         "never relocate silently or clear it",
         "**Do this before step 6**",
-        "**`pipelex` only on the user's yes**",
+        "**ask before raising a `pipelex` below step 8's floor**",
         "Read it off the two lists, never from `is_current`",
         "never delete, move or clear it, and never offer to",
         '**A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**',
