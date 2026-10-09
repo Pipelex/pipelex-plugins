@@ -1,0 +1,10 @@
+{#- pipelex-design's delivery step 5, the hand-off to the skills
+   that come after a design.
+
+   A per-skill partial: its own file so an outside target can replace this
+   list item alone, declared and pinned, and keep the rest of the skill
+   (docs/build-targets.md, "Per-skill partials"). Strips its own trailing
+   newline (the closing comment below), so the including template supplies the
+   line break. -#}
+**Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
+{#- -#}

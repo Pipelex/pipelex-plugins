@@ -1,0 +1,7 @@
+# The output of pipelex-plugins' outside render for this target, which owns the directory: each render
+# rewrites it and removes whatever it no longer produces. Delete the whole directory to take it back.
+target = "smoke"
+files = [
+    "smoke-notes/SKILL.md",
+    "smoke-notes/references/notes.md",
+]

@@ -1,0 +1,10 @@
+{#- pipelex-design's step 2, where a new bundle lives: the order
+   of the candidate homes, the casing of `<name>`, and the method-app question.
+
+   A per-skill partial: its own file so an outside target can replace this
+   paragraph alone, declared and pinned, and keep the rest of the skill
+   (docs/build-targets.md, "Per-skill partials"). Strips its own trailing
+   newline (the closing comment below), so the including template supplies the
+   line break. -#}
+**A path the user named** wins over the rest, which apply in order: `<package>/methods/<name>/` in a packaged Python project, or a Python project that owns a codegen harness; `<project root>/methods/<name>/` in any other project, TypeScript harness projects included, the project being {% include "skills/shared/project-root.md.j2" %}; otherwise `./methods/<name>/`. `<name>` is the `domain` in the project language's casing — `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project — a dot becoming that separator, never a nested directory or a literal dot. **On a method app, ask first**: its `make add-method` never overwrites and also writes the action trio, narrower and registry entry a plain write leaves out; let the user choose. A bundle that already lives elsewhere stays there.
+{#- -#}

@@ -11,3 +11,5 @@ The Pipelex connector's `pipelex_*` tools, when the session has them, belong to 
 ## Where the key comes from
 
 The server authenticates to the API with **`PIPELEX_API_KEY`** from its `env` table in `~/.vibe/config.toml`, never from the session environment: Mistral Vibe passes no shell variables to a stdio MCP server, so an exported key reaches the plugin's validation hook but not the server.
+
+A key the user saved with the pipelex CLI's `pipelex login` does not count: that command writes it to `~/.pipelex/.env`, or to the `.env` of `PIPELEX_HOME` when that is set, a file only pipelex itself loads, when its Python package is imported, so it reaches neither the server nor the hook. Ask the user to give the server a key in that `env` table: a new one from app.pipelex.com, or the `PIPELEX_API_KEY` value in that file, which they copy themselves. Never read that file or print a key yourself.

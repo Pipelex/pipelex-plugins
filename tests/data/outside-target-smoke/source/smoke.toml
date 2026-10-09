@@ -1,0 +1,16 @@
+# The smoke fixture: the installed `pipelex-plugins-render --check` runs against it in CI, from a
+# copy of this directory outside the checkout (docs/ci.md), and must find `../rendered` current.
+# It declares nothing and renders its own skill alone, so the only upstream file its rendering
+# depends on is the partial that skill includes. After a change to that partial, re-render it
+# with `make render-outside-smoke`.
+
+[render]
+output = "../rendered"
+
+[skills]
+include = ["smoke-notes"]
+
+[vars]
+platform = "agent-skills"
+harness_name = "the smoke harness"
+skill_dir = "<skill-dir>"

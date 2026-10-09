@@ -116,14 +116,17 @@ class TestPipelexCatalogSkillShape:
 
     def test_a_reference_never_sends_the_model_to_another(self) -> None:
         """References are one level deep: one read is enough to take a branch. A reference may name the skill's
-        guards and its tools in words, but never another reference, and it links nothing but the shared files."""
+        guards and its tools in words, but never another reference, and it links nothing but its own headings: a
+        static reference is copied verbatim, and where the shared files sit differs between layouts."""
         for name in self.REFERENCES:
             text = self.reference(name)
             for other in self.REFERENCES:
                 if other != name:
                     assert other not in text, f"references/{name} sends the model on to references/{other}"
             for target in re.findall(r"\]\(([^)]+)\)", text):
-                assert target.startswith("../../shared/"), f"references/{name} links {target}, which is not a shared file"
+                assert target.startswith("#"), (
+                    f"references/{name} links {target}; a static reference is copied verbatim, so it links only its own headings"
+                )
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_target_ships_the_references_byte_for_byte(self, target_name: str) -> None:

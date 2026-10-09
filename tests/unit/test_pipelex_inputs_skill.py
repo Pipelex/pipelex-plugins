@@ -83,14 +83,17 @@ class TestPipelexInputsSkill:
 
     def test_a_reference_never_sends_the_model_to_another(self) -> None:
         """References are one level deep: one read is enough to take a branch. A reference may name the skill's
-        steps, its guards and its stop table, and the shared files, but never another reference."""
+        steps, its guards and its stop table, but never another reference. It links no shared file: a static
+        reference is copied verbatim, and where the shared files sit differs between layouts."""
         for name in self.REFERENCES:
             text = self.reference(name)
             for other in self.REFERENCES:
                 if other != name:
                     assert other not in text, f"references/{name} sends the model on to references/{other}"
             for target in re.findall(r"\]\(([^)]+)\)", text):
-                assert target.startswith("../../shared/"), f"references/{name} links {target}, which is not a shared file"
+                assert target.startswith("#"), (
+                    f"references/{name} links {target}; a static reference is copied verbatim, so it links only its own headings"
+                )
 
     def test_the_references_carry_no_per_target_spelling(self) -> None:
         """A static reference is the same file on every target, so it cannot tell a Codex or Vibe user to type

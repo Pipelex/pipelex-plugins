@@ -32,9 +32,9 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 ### 1. Capture the contract
 
-**When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
+**When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md]({{ shared_dir }}/fit.md) before fixing the contract, and design only the method's part.**
 
-Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks and the like), write the closest in-scope equivalent and call out the deviation.
+Read [writing-mthds.md]({{ shared_dir }}/writing-mthds.md) **before writing**: it is the syntax source of truth. For what it does not cover (`dict` field types, `PipeStructure`, inline `templating_style` blocks and the like), write the closest in-scope equivalent and call out the deviation.
 
 Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
@@ -42,7 +42,7 @@ Fix the **input concept(s)**, the **output concept** and the **description**, pr
 
 ### 2. Resolve the bundle home before writing
 
-**A path the user named** wins over the rest, which apply in order: `<package>/methods/<name>/` in a packaged Python project, or a Python project that owns a codegen harness; `<project root>/methods/<name>/` in any other project, TypeScript harness projects included, the project being {% include "skills/shared/project-root.md.j2" %}; otherwise `./methods/<name>/`. `<name>` is the `domain` in the project language's casing — `summarize-pdf` in TypeScript, `summarize_pdf` in Python and where there is no project — a dot becoming that separator, never a nested directory or a literal dot. **On a method app, ask first**: its `make add-method` never overwrites and also writes the action trio, narrower and registry entry a plain write leaves out; let the user choose. A bundle that already lives elsewhere stays there.
+{% include "skills/pipelex-design/parts/bundle-home.md.j2" %}
 
 ### 3. Infer the construction mode
 
@@ -71,7 +71,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. {% include "skills/shared/graph-page.md.j2" %}
 4. **Warn again for a `PipeFunc`**, naming its pipes: {% include "skills/shared/pipefunc-warning.md.j2" %}
-5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
+5. {% include "skills/pipelex-design/parts/hand-off.md.j2" %}
 6. {% include "skills/shared/stale-types-notice.md.j2" %}
 
 {% include "skills/shared/saved-copy-notice.md.j2" %}
@@ -80,7 +80,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 {% include "skills/shared/catalog-id-pointer.md.j2" %}
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md]({{ shared_dir }}/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
@@ -92,7 +92,7 @@ For a completed method, re-gather the whole bundle and confirm **`is_valid: true
 
 ## References
 
-- [writing-mthds.md](../shared/writing-mthds.md): before writing any `.mthds` file.
+- [writing-mthds.md]({{ shared_dir }}/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise at step 3 or 4, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a structural change to an existing method.
-- [Native content types](../shared/native-content-types.md): a native's fields, for `$var.field` and `from`.
+- [Native content types]({{ shared_dir }}/native-content-types.md): a native's fields, for `$var.field` and `from`.

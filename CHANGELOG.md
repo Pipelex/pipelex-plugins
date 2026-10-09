@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.0] - 2026-10-09
+
+### Added
+
+- **Outside targets render the skills from another repository's templates**: the `pipelex-plugins-render <target file> [--check]` command, run with `uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref>` and carrying the templates of that ref, renders this plugin's skills for a target file kept in another repository, on a new `agent-skills` platform with no hooks, manifest or MCP declaration, from that repository's own skills and overlays and its replacements of upstream files, each declared and pinned by SHA-256 so that an upstream change to one stops the render. The sentences a consumer is expected to replace have partials of their own under `templates/skills/<skill>/parts/`, so replacing one does not fork its skill. The render owns its output directory, marked with `.pipelex-plugins-render.toml`, refuses one it does not own and writes nothing when a link breaks, and `--check` compares without writing; `docs/build-targets.md`, "Outside targets", has the rules.
+- **Each release is tagged `vX.Y.Z` on its merge to `main`**: a new workflow, `release-tag.yml`, pushes the annotated tag when a push raises the version in `targets/prod.toml` to one not tagged yet, so an outside target can pin the render to a release with `uvx --from git+https://github.com/Pipelex/pipelex-plugins@vX.Y.Z`.
+
+### Changed
+
+- **The validation hook embeds `@pipelex/sdk` 0.37.0**: the `check.mjs` bundle every target runs on a `.mthds` edit embedded `@pipelex/sdk` 0.35.1 and now embeds 0.37.0, built in the `js/` directory of `Pipelex/pipelex-sdk`, and names that version in its validate stage's `User-Agent`; nothing else the hook does changes, and its local lint and format still run on `@pipelex/tools-wasm` 0.4.0.
+- **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env`, or under `PIPELEX_HOME`, reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.
+
+### Fixed
+
+- **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so step 8 and refresh mode now raise a `pipelex` older than the first release that depends on `pipelex-sdk` as they raise the SDKs, without a question. The Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly, and to run `pipelex migrate --yes` when the raised runtime refuses a configuration written for a former release.
+- **`make build` never deletes a repository made inside a target's directory**: the pruning removed every file a target does not produce, a `.git` included, so `git init` inside `pipelex/`, `pipelex-codex/` or `pipelex-vibe/` lost its history at the next build. The build now never enters or lists a `.git`.
+
 ## [0.11.0] - 2026-10-08
 
 ### Added

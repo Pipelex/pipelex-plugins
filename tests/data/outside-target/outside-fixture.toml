@@ -1,0 +1,26 @@
+# The fixture outside target of tests/unit/test_outside_render.py. Every hash below is a
+# placeholder the test replaces with the SHA-256 of the upstream file as it is today, in a
+# copy of this directory, so an upstream edit to a file named here never breaks the suite.
+
+[render]
+output = "../rendered"
+shared = "in-each-skill"
+
+[render.replaces]
+"templates/skills/shared/saved-copy-notice.md.j2" = "sha256:computed-by-the-test"
+"templates/skills/pipelex-edit/parts/closing-suggestions.md.j2" = "sha256:computed-by-the-test"
+"templates/skills/pipelex-synthetic-inputs/SKILL.md.j2" = "sha256:computed-by-the-test"
+
+[render.drops]
+"skills/pipelex-synthetic-inputs/references/venv.md" = "sha256:computed-by-the-test"
+
+[render.pins]
+"skills/pipelex-synthetic-inputs/references/pdf.md" = "sha256:computed-by-the-test"
+
+[skills]
+include = ["pipelex-edit", "pipelex-synthetic-inputs", "house-notes"]
+
+[vars]
+platform = "agent-skills"
+harness_name = "the fixture harness"
+skill_dir = "<skill-dir>"

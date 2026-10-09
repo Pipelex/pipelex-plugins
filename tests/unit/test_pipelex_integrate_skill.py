@@ -808,7 +808,7 @@ class TestPipelexIntegrateSkill:
         assert raised.startswith("| either gate:"), raised
         assert "never swap it for `pipelex codegen check`" in failures
         # The gate runs the SDK's check, which the project's pin has to reach.
-        assert f"at least `pipelex-sdk` {self.PYTHON_SDK_FLOOR} for `python-pydantic`" in body
+        assert f"`pipelex-sdk` {self.PYTHON_SDK_FLOOR} (`python-pydantic`)" in body
         assert "the gate's command" in self.the_line(body, "What was generated and where")
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
@@ -834,12 +834,14 @@ class TestPipelexIntegrateSkill:
         assert "The Python SDK does not carry" not in body
 
         # Every place that told a Python consumer it has no gate, swept together: this skill, its
-        # references, the sibling skills that repeated the claim, and the repo's own account of itself.
+        # references, the sibling skills that repeated the claim with their own partials, which are
+        # part of the skill, and the repo's own account of itself.
+        siblings = tuple(self.REPO_ROOT / "templates" / "skills" / skill for skill in ("pipelex-edit", "pipelex-design"))
         swept = (
             self.TEMPLATE,
             *(self.REFERENCES_DIR / name for name in ("python.md", *self.BRANCH_REFERENCES)),
-            self.REPO_ROOT / "templates" / "skills" / "pipelex-edit" / "SKILL.md.j2",
-            self.REPO_ROOT / "templates" / "skills" / "pipelex-design" / "SKILL.md.j2",
+            *(sibling / "SKILL.md.j2" for sibling in siblings),
+            *(partial for sibling in siblings for partial in sorted((sibling / "parts").glob("*.md.j2"))),
             self.REPO_ROOT / "docs" / "decisions.md",
             self.REPO_ROOT / "docs" / "build-targets.md",
             self.REPO_ROOT / "README.md",
@@ -1436,11 +1438,11 @@ class TestPipelexIntegrateSkill:
         # test is about is the number a user reads. A floor that rendered as the empty string — Jinja's
         # answer to a misspelled key — fails here as well as in `check_version_floors`.
         body = self.render("prod")
-        step_8 = self.the_line(body, "With the project's package manager:")
-        clause = re.search(r"`zod` and at least `@pipelex/sdk` (\S+) for `ts-zod`", step_8)
+        step_8 = self.the_line(body, "With the project's package manager, at least:")
+        clause = re.search(r"at least: `zod`, `@pipelex/sdk` (\S+) \(`ts-zod`\)", step_8)
         assert clause, "step 8 names no @pipelex/sdk floor"
         assert clause.group(1) == self.TYPESCRIPT_SDK_FLOOR
-        assert "Raise an older pin and report it." in step_8
+        assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
         regions: dict[str, str] = {}
@@ -1457,7 +1459,7 @@ class TestPipelexIntegrateSkill:
         assert self.VERSION.findall(failures) == [], "gate-failures.md names a version instead of deferring to step 8"
         assert "below step 8's floor" in failures
         refresh_dependencies = (
-            "the dependencies (except an `@pipelex/sdk`, or a `python-pydantic` project's `pipelex-sdk`, "
+            "the dependencies (except an `@pipelex/sdk`, a `python-pydantic` project's `pipelex-sdk` or a `python-structures` project's `pipelex`, "
             "pinned below step 8's floor, raised as step 8 raises it"
         )
         assert refresh_dependencies in self.refresh_cells(self.reference("refresh.md"))["left alone"]
@@ -1473,7 +1475,53 @@ class TestPipelexIntegrateSkill:
         for target_name in ("prod", "codex", "mistral-vibe"):
             config = load_target_config(self.REPO_ROOT / "targets", target_name)
             installed = (resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "SKILL.md").read_text(encoding="utf-8")
-            assert f"`zod` and at least `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR} for `ts-zod`" in installed, target_name
+            assert f"at least: `zod`, `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR} (`ts-zod`)" in installed, target_name
+
+    def test_a_python_structures_project_gets_its_sdk_through_pipelex(self) -> None:
+        """A `python-structures` call site imports `pipelex_sdk`, which such a project gets from `pipelex` itself,
+        from the first release that depends on `pipelex-sdk`. Step 8 names that `pipelex` floor, the Python reference
+        says why and forbids a second `pipelex-sdk` requirement, and refresh mode raises a `pipelex` below it as it
+        raises the SDKs — so a project on an older runtime is not left with a call site that fails at its import.
+
+        Pipelex has no project in the field to shield from a breaking release, so that raise is step 8's like the
+        SDKs', with no question: no clause at step 4, no changelog summary, no previewed migration. A configuration
+        the raised runtime refuses as a former release's is brought along by `pipelex migrate --yes`, never by the
+        bare command, whose own terminal question an agent's shell cannot answer."""
+        floor = load_version_floors(self.REPO_ROOT)["pipelex"]
+        for target_name in ("prod", "codex", "mistral-vibe"):
+            body = self.render(target_name)
+            step_8 = self.the_line(body, "With the project's package manager, at least:")
+            assert f"`pipelex` {floor} (`python-structures`)" in step_8, target_name
+            assert "Raise and report older pins." in step_8, target_name
+            row = self.the_line(body, "| a Pipelex host: `pipelex` a dependency")
+            assert row == "| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |", (
+                target_name
+            )
+            assert "pause only for a genuinely ambiguous choice or where a step asks." in body, target_name
+
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        paragraph = self.the_line(python, "**Where `pipelex_sdk` comes from.**")
+        assert f"from the `pipelex` {floor} that step 8 raises the project to" in paragraph
+        assert "Add no `pipelex-sdk` requirement of the project's own" in paragraph
+        raising = self.the_line(python, "**Raising `pipelex`.**")
+        assert "Step 8 raises a `python-structures` project's `pipelex` to at least the floor as it raises the SDKs, with no question." in raising
+        assert "refuses, with `FormerReleaseConfigError`, a configuration written for a former release, run `pipelex migrate --yes`" in raising
+        # The floor is stated once, in the anchored sentence.
+        assert python.count(floor) == 1
+
+        left_alone = self.refresh_cells(self.reference("refresh.md"))["left alone"]
+        assert "a `python-structures` project's `pipelex`, pinned below step 8's floor, raised as step 8 raises it, with no question" in left_alone
+
+        # The question is gone from every file the skill reads, not only reworded: no ask, no changelog summary, no preview.
+        for where, text in (("SKILL.md", self.render("prod")), ("python.md", python), ("refresh.md", self.reference("refresh.md"))):
+            for gone in (
+                "ask before raising",
+                "pipelex/blob/main/CHANGELOG.md",
+                "--dry-run",
+                "only on their yes",
+                "only on a yes",
+            ):
+                assert gone not in text, f"{where} still carries {gone!r}"
 
     def refresh_cells(self, text: str) -> dict[str, str]:
         """Refresh mode's table, its one body row cut into its three cells, keyed by the header it sits under."""

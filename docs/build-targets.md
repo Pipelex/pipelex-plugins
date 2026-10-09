@@ -41,7 +41,7 @@ scripts/gen_skill_docs.py       renders .j2 templates with merged variables
 
 **`skills/`** at the repo root (if present) holds only static per-skill assets — `references/`, read on a branch, and `scripts/`, run by path — that are copied into every target, a script's executable bit included. Most skills use it — and a reference need not be Markdown: `pipelex-integrate` ships `codegen-check.mjs` and `codegen_check.py`, the scripts the skill copies verbatim into TypeScript and Python projects, so a reference edit is followed by `make build` and, for a script, by running it — `tests/unit/test_pipelex_integrate_skill.py` executes both, and pyright type-checks the Python one against the real `pipelex-sdk`. **`pipelex/`**, **`pipelex-codex/`**, and **`pipelex-vibe/`** are generated output directories (build artifacts checked into git).
 
-**The build owns each target's output directory.** After `make build`, a target's directory holds exactly what the build produces — the rendered skills, shared references, hook files and MCP fragment, the generated manifest, the vendored `check.mjs` and the copied `references/` and `scripts/` — and the build removes anything else, printing each file it removes: the output of a template that was renamed or retired, a whole skill directory whose template is gone, the other platform's manifest after a target changed platform, a stray file. Two kinds of file are never removed. A `.j2` template is a source written in the wrong place, perhaps somebody's work, so `--check` names it as a leaked template for its author to move under `templates/`. A file git ignores, such as the `.DS_Store` Finder leaves, never ships, so it is neither removed nor reported. A file placed in a target's directory by hand is therefore removed by the next build: add it under `templates/` or `skills/` instead. Because the build deletes inside that directory, it refuses a target whose `source` is not a directory of its own inside the repository, one that holds or sits inside one of the repository's own directories (`REPOSITORY_OWN_PATHS` in `scripts/gen_skill_docs.py`: `templates/`, `skills/`, `targets/`, `docs/` and the rest), or one that overlaps another target's output. A target written to the repository root (`source = "./"`, which is also what a target TOML without a `source` line gets) is the exception: the root holds every source beside the output, so the build prunes nothing there, and `--check` reports a skill whose template is gone with the cure of deleting it. Its output is the top-level directories its templates render into, one for every directory directly under `templates/` (`skills/`, `hooks/` and `mcp/`), and they count as its output in the overlap check: a target whose `source` holds or sits inside one of them is refused, since its pruning would delete the root target's files. [decisions.md](decisions.md), "The build owns its target directories, and a target's table merges into the defaults'", records why the build prunes rather than asking for each file to be deleted.
+**The build owns each target's output directory.** After `make build`, a target's directory holds exactly what the build produces — the rendered skills, shared references, hook files and MCP fragment, the generated manifest, the vendored `check.mjs` and the copied `references/` and `scripts/` — and the build removes anything else, printing each file it removes: the output of a template that was renamed or retired, a whole skill directory whose template is gone, the other platform's manifest after a target changed platform, a stray file. Some files are never removed. A `.j2` template is a source written in the wrong place, perhaps somebody's work, so `--check` names it as a leaked template for its author to move under `templates/`. A file git ignores, such as the `.DS_Store` Finder leaves, never ships, so it is neither removed nor reported. A `.git`, a repository's own directory or a worktree's file naming one, is never entered or listed, so a repository made inside a target keeps its history whatever git ignores. A file placed in a target's directory by hand is therefore removed by the next build: add it under `templates/` or `skills/` instead. Because the build deletes inside that directory, it refuses a target whose `source` is not a directory of its own inside the repository, one that holds or sits inside one of the repository's own directories (`REPOSITORY_OWN_PATHS` in `scripts/gen_skill_docs.py`: `templates/`, `skills/`, `targets/`, `docs/` and the rest), or one that overlaps another target's output. A target written to the repository root (`source = "./"`, which is also what a target TOML without a `source` line gets) is the exception: the root holds every source beside the output, so the build prunes nothing there, and `--check` reports a skill whose template is gone with the cure of deleting it. Its output is the top-level directories its templates render into, one for every directory directly under `templates/` (`skills/`, `hooks/` and `mcp/`), and they count as its output in the overlap check: a target whose `source` holds or sits inside one of them is refused, since its pruning would delete the root target's files. [decisions.md](decisions.md), "The build owns its target directories, and a target's table merges into the defaults'", records why the build prunes rather than asking for each file to be deleted.
 
 ## Target configuration
 
@@ -55,6 +55,7 @@ marketplace_name = "pipelex-plugins"
 platform = "claude"
 harness_name = "Claude Code"
 skill_dir = "${CLAUDE_SKILL_DIR}"   # "<skill-dir>" on Codex and Mistral Vibe
+shared_dir = "../shared"            # "shared" in an outside target's in-each-skill layout
 
 [vars.mcp_server]
 command = "npx"
@@ -99,6 +100,9 @@ The target platform is selected with `[vars].platform`:
 - `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
 - `mistral-vibe`: renders skills, the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`) and the workshop launcher as the `mcp/vibe-mcp.toml` config fragment, with no Claude/Codex plugin manifest.
+- `agent-skills`: skills and shared files alone, for an outside target ("Outside targets" below). The build refuses an in-repo target on it, and so does `make check`. Its wording is the Codex and Vibe branches', except where a template describes what a plugin carries and this platform lacks: the workshop's connection and its key (`shared/credentials.md.j2`) and the validation hook (`shared/writing-mthds.md.j2`, `pipelex-edit`'s validation guard and `pipelex-organize`'s confirmation on disk) each have an `agent-skills` branch of their own. A template that comes to describe a manifest, a hook or an MCP declaration needs one too.
+
+What a platform emits is asked of the `Platform` enum in `scripts/gen_skill_docs.py` (`manifest_dirname`, `has_plugin_manifest`, `is_outside_only`), each an exhaustive `match`, and every per-platform table has an entry for every platform, so a new platform is a type error or a failed lookup where it matters rather than a silent fallback to Claude's files.
 
 ### Variable resolution
 
@@ -176,6 +180,7 @@ A file git ignores is left out of the comparison, as it is left out of the pruni
 - **The credential wiring.** Every target must carry the wiring `[vars.mcp_server]` in `targets/defaults.toml` declares, read from the defaults and never from a target's own variables, since a target whose override lost `env_vars` or `user_config` renders files that agree with it and passes the freshness check. On Claude, the manifest's `userConfig` offers every option of `user_config`, a sensitive one still sensitive; its `pipelex` server spawns `launch-pipelex-mcp.sh` with each option substituted into `PIPELEX_PLUGIN_<KEY>`; and both the launcher and the `check-mthds.sh` hook wrapper promote their variable to `PIPELEX_<KEY>` only when it is non-empty. On Codex, the manifest's `pipelex` server forwards every `env_vars` name. On Mistral Vibe, the `mcp/vibe-mcp.toml` fragment's `env` table names every `env_vars` name with an empty value for the user to fill in.
 - **The build-error marker** (`PIPELEX_BUILD_ERROR`, see "Shared template files" below) in any text file of any target — a shared reference, a hook script, the MCP fragment and a manifest as well as a skill.
 - **Leaked templates** anywhere in a target's directory, and under the root's `skills/`, `hooks/` and `mcp/`.
+- **An in-repo target on an outside-only platform**, `agent-skills`, which the build refuses as well ("Outside targets" below).
 
 ## Per-target skill overlays
 
@@ -183,7 +188,87 @@ A skill can carry **target-only content** without touching its shared `SKILL.md.
 
 Overlays are append-only, so they add or override behavior (a later instruction in the rendered skill wins) but cannot delete earlier content. Because overlays render in the same Jinja environment, they may use template variables and `{% include %}` shared partials.
 
-The mechanism is implemented in `render_templates()` (`scripts/gen_skill_docs.py`, `target_name` parameter).
+The mechanism is implemented in `render_templates()` (`scripts/gen_skill_docs.py`, `target_name` parameter), which looks the overlay up by name through every template directory it searches, so an outside target's overlay sits in its own `templates/` rather than beside the upstream skill.
+
+## Outside targets
+
+Another repository can render this plugin's skills with this renderer, from a target file and templates that never enter this public repository: its own skills beside the upstream ones, overlays on upstream skills, and replacements of upstream files. [decisions.md](decisions.md), "Outside targets render this plugin's skills from private templates", records why it works this way. The renderer is `scripts/outside_render.py`, which the package installs as the `pipelex-plugins-render` console command; a consumer runs it with `uvx` at a pinned ref, as [development.md](development.md), "Rendering for an outside target", shows:
+
+```bash
+pipelex-plugins-render <target file>           # render into the target's output
+pipelex-plugins-render <target file> --check   # compare the output with a fresh rendering; write nothing
+```
+
+From a checkout, `python -m scripts.outside_render` takes the same arguments.
+
+### The upstream the render reads
+
+The upstream is this repository's `templates/skills/`, `skills/` and `targets/`. The wheel carries the three inside its `scripts` package (`[tool.hatch.build.targets.wheel]` in `pyproject.toml`), and the render reads them there when it runs installed and beside the package when it runs from a checkout. The wheel holds what the repository's `.gitignore` did not ignore when it was built, so git is asked about the upstream only in a checkout: an installed package can sit in an environment some repository ignores, a `.venv` inside it, where git would report every upstream file ignored. What the installer adds beside the wheel's files there, the `__pycache__` it compiles for a Python file a skill ships, is left out, as git leaves it out of a checkout.
+
+### The target file and its source root
+
+An outside target is one TOML file. The directory holding it is the target's **source root**, laid out like this repository: its templates under `templates/skills/…` and its static assets under `skills/<skill>/references/` and `skills/<skill>/scripts/`. Its name is the file's stem, which is the `<target>` of its overlays (`SKILL.<target>.md.j2`) and the value of `plugin_name`. Paths in the file are relative to it.
+
+```toml
+[render]
+output = "../skills"        # the directory the render owns, one subdirectory per skill
+shared = "in-each-skill"    # or "beside", the plugin's own layout and the default
+
+[render.replaces]           # replaced by the file of the same path under the source root
+"templates/skills/shared/saved-copy-notice.md.j2" = "sha256:…"
+"templates/skills/pipelex-inputs/SKILL.md.j2" = "sha256:…"
+
+[render.drops]              # upstream static assets left out of the output
+"skills/pipelex-synthetic-inputs/references/venv.md" = "sha256:…"
+
+[render.pins]               # upstream files used as they are, whose change must still stop the render
+"skills/pipelex-synthetic-inputs/references/pdf.md" = "sha256:…"
+
+[skills]
+include = ["pipelex-design", "pipelex-edit", "an-outside-skill"]   # omitted: every upstream and outside skill
+
+[vars]
+platform = "agent-skills"
+harness_name = "…"
+skill_dir = "<skill-dir>"
+```
+
+The target's `[vars]` are laid over `targets/defaults.toml` as an in-repo target's are, so the version floors, the workshop launcher and every other default reach the outside render, and a misspelled variable still fails it. It must set `platform = "agent-skills"`, `harness_name` and `skill_dir` itself, since the defaults are Claude Code's, and may not set `plugin_name` or `shared_dir`, which the render derives from the file's name and its layout.
+
+The render refuses, naming the cure: a key the format does not have, such as a misspelled `[render.replace]`; a name an in-repo target already has, whose overlays it would pick up; a missing `output`, or one that holds or sits inside the source root or this repository; a `shared` value other than `beside` and `in-each-skill`; an `include` naming a skill that exists neither upstream nor under the source root, and a skill named `shared`; and a declaration that is not a path under `templates/skills/` or `skills/`, whose value is not `sha256:` and 64 hex digits, or which sits in two tables.
+
+### What it reads and writes
+
+One Jinja environment searches the outside `templates/` first and this repository's second, so an outside overlay or skill can `{% include %}` any upstream partial by name, and a declared replacement is found before the file it replaces. An outside skill is a `templates/skills/<name>/SKILL.md.j2` under the source root, and its static assets are copied beside it as an upstream skill's are; an outside static asset may also be added to an upstream skill, for a reference its overlay links. Files git ignores in either source are left out, the template loader's included: it reads a scratch copy of the outside templates git does not ignore, so an ignored file is never rendered, as it is never checked against the declarations.
+
+The render writes its output directory and nothing else: `<output>/<skill>/SKILL.md` with that skill's `references/` and `scripts/`, a script keeping its executable bit, and the shared files. It writes no hooks, no manifest, no MCP fragment and no marketplace file, and never writes into this repository. It owns the output directory as the build owns an in-repo target's, so it removes what it no longer produces, never a `.j2` file, and a file git ignores only when an earlier render of the target wrote it. The marker below lists what each render wrote, so a skill the target stops rendering is removed and `--check` reports it even from an output the consumer git-ignores, in part or as a whole, while a Finder `.DS_Store` there is left alone and never reported.
+
+Because it deletes there, it writes `.pipelex-plugins-render.toml` at the top of the output, naming the target and listing the files it wrote, and writes only into a directory that is new or empty or that carries this marker for the same target. An output holding anything else is refused with nothing written: another checkout, whose `.git/` the pruning would delete, a harness's skills directory with other skills in it, or another target's rendering. Where git ignores any of the files the render writes, an unmarked directory must hold nothing at all, an ignored file included, since there an ignored file may be somebody else's at a path the render would write. A `.git` at any depth is refused even in a marked output, since a repository made there after a render is not the render's: the pruning never enters one, and the render does not share its output with one. So is a symbolic link on the path of a file the render writes, which would carry the write to wherever it points. `--check` refuses the same directories.
+
+### Replacing, dropping and pinning upstream files
+
+The outside target may add anything. It may also replace any upstream template, a skill's own `SKILL.md.j2` included, and replace or drop any upstream static asset, but only what it declares, each declaration naming the file by its path in this repository and pinning it by the SHA-256 of its bytes (`shasum -a 256 <file>`). And it may pin an upstream file it uses as it is, so that a change to that file stops the render too. Before anything is rendered, the render refuses:
+
+- an outside file at an upstream path that no table declares — the error gives the hash to declare it with, once the upstream file has been read;
+- a declaration naming no upstream file, which is what an upstream rename or removal looks like from the consumer's side;
+- a declaration whose hash no longer matches the upstream file, naming both hashes and the `git diff <old-ref>..<new-ref> -- <path>` that shows the upstream change;
+- a declared replacement with no file under the source root, since a file left out is a drop;
+- a drop of a template, which is left out by leaving its skill out or by replacing it, and a drop or a pin of a file the source root also holds, which is a replacement;
+- an outside file the render would never read: under `templates/` but not a `.j2` under `templates/skills/`, or under `skills/` but not in a skill's `references/` or `scripts/`.
+
+A skill whose body is mostly steps the consumer cannot take is replaced whole under its upstream name, a fork in place, so that every hand-off to it keeps working; its whole-file hash then fails the render at every upstream edit to it, which a fork wants.
+
+### Shared files
+
+Every link to a shared file is written `{{ shared_dir }}/<file>`. With `shared = "beside"` the render keeps `shared_dir = "../shared"`, the default, and writes the shared files once in `<output>/shared/`; with `shared = "in-each-skill"` it renders with `shared_dir = "shared"` and copies into each skill the shared files it links to. Either way only the shared files a skill or a reference links to are written, followed through the shared files' own links to each other (`writing-mthds.md` links `native-content-types.md`), so a skill uploaded alone carries everything its links name.
+
+### The checks
+
+Before it writes, the render runs the link check of `scripts/skill_links.py`, the one `make check` holds the in-repo targets to, over the rendering in a scratch directory: every link names a file and every anchor a heading, and every shipped reference, script and shared file is named. Its boundary is the output directory in the `beside` layout, and each skill's own directory in the `in-each-skill` layout, where a link that leaves its skill names a file the skill's uploaded copy does not carry. A broken link fails the render, which then writes nothing.
+
+`--check` renders in memory and reports every way the output differs from it, as the in-repo freshness check does: `MISSING`, `STALE`, `MODE` for a script whose executable bit differs, `ORPHAN` for a file the render no longer produces, `LEAKED TEMPLATE` for a `.j2` file in the output, and `LINK` for a link error. It exits non-zero on any of them and never writes, which is what a consumer's CI runs.
+
+The compaction ceiling and the strict-YAML frontmatter check are not run on an outside rendering: both are facts about Claude Code and Mistral Vibe, and the consumer's harness has its own limits. `tests/unit/test_outside_render.py` exercises every case against the fixture under `tests/data/outside-target/`, whose hashes the tests compute from the upstream files as they are. A second fixture, `tests/data/outside-target-smoke/`, declares nothing and renders one outside skill with an overlay, its rendering committed beside it: CI runs the installed command's `--check` on a copy of it, then on every upstream skill as the checkout renders it ([ci.md](ci.md)), which is how the wheel's contents are checked.
 
 ## Commands
 
@@ -231,9 +316,10 @@ All targets share the same version string in lockstep — `make check` fails on 
 | `platform` | `defaults.toml` (overridden per target) | `frontmatter.md.j2` (Claude-only `allowed-tools`) |
 | `harness_name` | `defaults.toml` (overridden per target) | every template that names the harness to the user or the model: skill text and shared partials, the hook wrappers, `launch-pipelex-mcp.sh.j2` and `mcp/vibe-mcp.toml.j2` |
 | `skill_dir` | `defaults.toml` (`${CLAUDE_SKILL_DIR}`), overridden to `<skill-dir>` in `codex.toml` and `mistral-vibe.toml` | a sentence that names one of the skill's own files by path — today `pipelex-integrate`'s `cp` of its gate scripts. See below |
+| `shared_dir` | `defaults.toml` (`../shared`); set to `shared` by an outside target's `in-each-skill` layout, and never by a target's own `[vars]` | every link to a shared file, `{{ shared_dir }}/<file>`, in a skill or an include-only partial. See "Outside targets" |
 | `mcp_server` | `defaults.toml` (`[vars.mcp_server]` table, overridable per target, key by key) | `make_plugin_json()` — the local workshop launcher baked into the plugin-declared `pipelex-mcp` entry: Claude gets `type: stdio` pointing at the `launch-pipelex-mcp.sh` wrapper (which promotes the `PIPELEX_PLUGIN_*` user-config values to their real `PIPELEX_*` names only when non-empty, then `exec`s `command`/`args`, each argument double-quoted by the renderer's `shell_double_quoted` filter so a path holding `$`, a backtick, `"` or `\` reaches the workshop as it is), or `command`/`args` directly when the target declares no `user_config`; Codex gets bare `command`/`args` plus `env_vars` (variable *names* forwarded from the user's env — Codex whitelist-filters MCP spawn env; see [decisions.md](decisions.md) "Dual-MCP flip"). Dev override: `make claude-local-mcp` renders the Claude target with `command`/`args` pointed at another workshop into a directory of that workshop's own under the ignored `.local-mcp/` (`scripts/local_mcp.py`), and `make codex-local-mcp` starts Codex with `-c` overrides of its `pipelex` entry, `env_vars` included, since an entry at that tier replaces the plugin's whole; neither edits a tracked file. A target's own table merges into the defaults', so `env_vars` and `user_config` stay, and `make check` fails a target that lost the credential wiring anyway. `mcp/vibe-mcp.toml.j2`, the Vibe target's one MCP template (`MCP_TEMPLATES_BY_PLATFORM`), renders the same `command`/`args` as a Vibe `[[mcp_servers]]` stdio entry, listing every `env_vars` name as an empty `env` key the user fills in |
 | `floors` | `defaults.toml` (`[vars.floors]` table) | `pipelex-integrate` and `pipelex-scaffold`, which state the minimum versions to the user. See below |
-| `plugin_name` | derived from `[plugin].name` | available in all templates |
+| `plugin_name` | derived from `[plugin].name`, or an outside target file's stem | available in all templates |
 
 ### The skill directory
 
@@ -245,7 +331,7 @@ Two rules come with it. **A verbatim copy is a `cp` from `{{ skill_dir }}/refere
 
 ### Version floors
 
-`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, and the Python range `pipelex-sdk` installs into. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
+`[vars.floors]` in `targets/defaults.toml` carries the minimum versions the skills state to the user: the two SDKs, the workshop, Node, the Python range `pipelex-sdk` installs into, and the `pipelex` a `python-structures` project needs. `pipelex-integrate` and `pipelex-scaffold` read them as `{{ floors.<key> }}`, so a bump is one edit instead of a hunt through prose. Each key's comment in the table says what makes it a floor — "the first release carrying X" — because a floor without that is a preference.
 
 These are **value substitutions**, which is why they do not contradict the trimmed-variable rule this repo inherited from `mthds-plugins`: nothing branches on a floor, it is only printed. The rule that bans dead switches bans variables a skill *reads to decide what to do*.
 
@@ -304,3 +390,17 @@ A parameter left unset falls back to the partial's own default, so a skill sets 
 **A parameter with no default is left bare, because strict mode is the guard.** Under `StrictUndefined` an unset or misspelled name raises at render time and `_render_or_die` names the template and the variable, so a parameter with no default needs no marker for the absent case — and an `{% if x is defined %}` guard around one would suppress that failure rather than add to it, trading a precise build error for a marker caught later. What strict mode cannot see is a name that is **present and wrong**: a partial that selects one of several blocks by a parameter's value falls off the end of its chain on a misspelled value and drops the block entirely, so such a chain ends in an `{% else %}` that emits `PIPELEX_BUILD_ERROR`, which `scripts/check.py` refuses in any text file of any target, not only in a skill, since a shared reference, a hook script and the MCP fragment are rendered from templates too. No partial branches on a value today — `stale_types_variant` did until the size diet unified its three wordings — and the check stays for the next one. `catalog_id_bridge_resume` is interpolated rather than branched on, so it has no wrong-value case to catch.
 
 Hook templates (`templates/hooks/`, listed per platform in `HOOK_TEMPLATES_BY_PLATFORM`) are rendered per target, and so is the MCP template (`templates/mcp/`, in `MCP_TEMPLATES_BY_PLATFORM`), which only the Vibe target has, since the Claude and Codex manifests declare the workshop themselves. Claude maps `.mthds` validation to `PostToolUse` over `Write|Edit`; Codex maps it to `PostToolUse` over `apply_patch` and `Bash`, a patch run through the shell being reported as `Bash`; Mistral Vibe maps the same behavior to `post_tool` over `edit|write_file` (stable hooks API, Vibe 2.21.0+). See [hooks.md](hooks.md) for the validation pipeline, the CLI-free silent-pass posture, and the Codex enablement note.
+
+### Per-skill partials
+
+A sentence an outside target has to replace, because it names a step or a skill the consumer does not have, gets a partial of its own beside its skill's template, `templates/skills/<skill>/parts/<name>.md.j2`, included where the sentence was. The consumer then replaces that one file, declared and pinned like any replacement (see "Replacing, dropping and pinning upstream files" above), rather than forking a skill whose other steps it keeps, and an upstream edit to the rest of the skill still reaches it. A per-skill partial follows the shared partials' mechanics: it strips its own trailing newline, so the including template supplies the line break, and it receives whatever the including template has set, so a replacement can keep the parameters it needs. It is never rendered on its own, since only a skill's `SKILL.md.j2` is, and the rendering is byte-identical to the sentence it holds.
+
+| Partial | What it carries |
+| --- | --- |
+| `pipelex-design/parts/bundle-home.md.j2` | step 2, where a new bundle lives |
+| `pipelex-design/parts/hand-off.md.j2` | the delivery's hand-off to the skills that follow a design |
+| `pipelex-edit/parts/closing-suggestions.md.j2` | the skills the report suggests next |
+| `pipelex-explain/parts/not-on-disk-pointer.md.j2` | the pointer for a catalog id or a published address, with the inline read's guard |
+| `pipelex-explain/parts/change-route.md.j2` | the stop-table row routing a change to the method or its files on disk |
+
+A new one is added when a consumer's item asks for it, one sentence at a time: a partial nobody replaces is an indirection with no reader.

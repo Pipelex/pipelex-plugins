@@ -138,7 +138,8 @@ class TestPipelexDesignSkill:
         """References are one level deep: one read is enough to take a branch. A reference may name the skill's
         steps and guards, the authoring reference the skill reads before writing, and the stepwise reference a
         signature-driven re-entry reads, in words, but never another reference by its file, and it links nothing
-        but the shared files. A signature-driven re-entry needs both branch references, so the skill points at
+        but its own headings, since a static reference is copied verbatim and where the shared files sit differs
+        between layouts. A signature-driven re-entry needs both branch references, so the skill points at
         both from the same line, and `re-entry.md` names the stepwise one in words where that mode is taken."""
         for name in self.BRANCH_REFERENCES:
             text = self.reference(name)
@@ -146,7 +147,9 @@ class TestPipelexDesignSkill:
                 if other != name:
                     assert other not in text, f"references/{name} sends the model on to references/{other}"
             for target in re.findall(r"\]\(([^)]+)\)", text):
-                assert target.startswith("../../shared/"), f"references/{name} links {target}, which is not a shared file"
+                assert target.startswith("#"), (
+                    f"references/{name} links {target}; a static reference is copied verbatim, so it links only its own headings"
+                )
 
     def test_the_references_carry_no_per_target_spelling(self) -> None:
         """A static reference is the same file on every target, so it cannot carry a sentence that differs per
