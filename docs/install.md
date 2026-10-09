@@ -16,7 +16,7 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 
 In every agent, the plugin needs Node.js on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The Pipelex MCP needs nothing on your machine.
 
-**A key from `pipelex login` does not reach the plugin.** The pipelex CLI's `pipelex login` saves its key in `~/.pipelex/.env`, a file only the pipelex CLI reads: neither the hook nor the Pipelex tools look there. Give the plugin its key as your agent's section below says. `pipelex login` never prints the key it saves, so create another one in your console at [app.pipelex.com](https://app.pipelex.com), or copy the `PIPELEX_API_KEY` value from that file.
+**A key from `pipelex login` does not reach the plugin.** The pipelex CLI's `pipelex login` saves its key in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set, a file only pipelex itself loads, when its Python package is imported: neither the hook nor the Pipelex tools look there. Give the plugin its key as your agent's section below says. `pipelex login` never prints the key it saves, so create another one in your console at [app.pipelex.com](https://app.pipelex.com), or copy the `PIPELEX_API_KEY` value from that file.
 
 Cursor takes no plugin. Registering the Pipelex tools there by hand is described in [`pipelex-mcp`'s host registration page](https://github.com/Pipelex/pipelex-mcp/blob/main/docs/hosts.md#cursor).
 

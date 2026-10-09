@@ -98,7 +98,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ### 8. Dependencies
 
-With the project's package manager: `zod` and at least `@pipelex/sdk` 0.18.0 for `ts-zod`; `pydantic` and at least `pipelex-sdk` 0.10.2 for `python-pydantic`. Raise an older pin and report it.
+With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
 
 ### 9. The call site
 

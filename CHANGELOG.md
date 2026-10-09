@@ -4,11 +4,11 @@
 
 ### Changed
 
-- **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env` reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.
+- **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env`, or under `PIPELEX_HOME`, reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.
 
 ### Fixed
 
-- **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, from `pipelex` 0.79.0, so the Python reference now has step 8 raise an older `pipelex` to it and add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly.
+- **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so step 8 and refresh mode now raise a `pipelex` older than the first release that depends on `pipelex-sdk`, and the Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly.
 
 ## [0.11.0] - 2026-10-08
 
