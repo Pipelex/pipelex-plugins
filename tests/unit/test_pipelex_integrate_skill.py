@@ -1495,7 +1495,7 @@ class TestPipelexIntegrateSkill:
             assert row == "| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |", (
                 target_name
             )
-            assert "pause only for a genuinely ambiguous choice." in body, target_name
+            assert "pause only for a genuinely ambiguous choice or where a step asks." in body, target_name
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         paragraph = self.the_line(python, "**Where `pipelex_sdk` comes from.**")
@@ -1514,7 +1514,6 @@ class TestPipelexIntegrateSkill:
         for where, text in (("SKILL.md", self.render("prod")), ("python.md", python), ("refresh.md", self.reference("refresh.md"))):
             for gone in (
                 "ask before raising",
-                "where a step asks",
                 "pipelex/blob/main/CHANGELOG.md",
                 "--dry-run",
                 "only on their yes",

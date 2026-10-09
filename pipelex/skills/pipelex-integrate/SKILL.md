@@ -28,7 +28,7 @@ Leave a Python or TypeScript project calling an MTHDS method through one typed m
 
 ## Guards
 
-Automatic unless the user asks to be walked through it, which confirms dependency and tooling edits first; pause only for a genuinely ambiguous choice.
+Automatic unless the user asks to be walked through it, which confirms dependency and tooling edits first; pause only for a genuinely ambiguous choice or where a step asks.
 
 - **The write arm, always.** Every `mthds_codegen` call passes `output_dir`; a refused or failed write is a refusal, never a reason to write the returned bytes yourself.
 - **Generated files are never opened for editing, never formatted, never linted**; a failure inside the tree is reported, never patched.
