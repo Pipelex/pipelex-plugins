@@ -24,7 +24,7 @@ The repository itself is the artifact, and the merge to `main` publishes it. On 
 The same merge tags the release. `.github/workflows/release-tag.yml` runs on the push to `main`: it reads `targets/prod.toml`'s `[plugin].version`, and when that push raised the version and the tag does not exist yet, it creates and pushes the annotated tag `vX.Y.Z` on the merge commit. A push that leaves the version alone or lowers it tags nothing, even with the tag missing, so no later commit or revert can take a release's tag. A missing `## [X.Y.Z] - ` heading in `CHANGELOG.md` is a warning in that run rather than a refusal, since the merge has already published the version: a missing entry is stopped before the merge or not at all, by this skill reading the `Changelog entry` check (see **CI on the release pull request**), since no ruleset requires it. The tag is the pin an outside target renders the skills at (`docs/development.md`, "Rendering for an outside target"). Never create it by hand ahead of the merge: the workflow tags the merge commit, and finding the tag already there it tags nothing. No GitHub Release is made. The landing reads the run and the tag, and prints the rest of this block for the session to run:
 
 ```bash
-gh run list --workflow=release-tag.yml --branch main --limit 3 --json status,conclusion,headSha,url   # the run whose headSha is the merge SHA: completed, success
+gh run list --repo Pipelex/pipelex-plugins --workflow=release-tag.yml --branch main --limit 3 --json databaseId,status,conclusion,headSha,url   # the run whose headSha is the merge SHA: completed, success
 git -C <main> fetch --prune --tags origin
 git -C <main> tag --list vX.Y.Z                                                    # the tag
 git -C <main> rev-list -n 1 vX.Y.Z                                                 # the merge commit
@@ -34,7 +34,7 @@ git -C <main> show origin/main:.claude-plugin/marketplace.json | grep '"version"
 git -C <main> show origin/main:pipelex/.claude-plugin/plugin.json | grep '"version"'
 ```
 
-A run still `queued` or `in_progress` has no conclusion and has pushed no tag yet, which reads exactly like a failed publish: wait for it (`gh run watch <run id>`) before reading the tag. When it failed, read its log, then re-run it from the Actions page. A re-run repeats the same push, so it tags the merge commit even after later pushes to `main`, which never tag a version they did not change.
+A run still `queued` or `in_progress` has no conclusion and has pushed no tag yet, which reads exactly like a failed publish: wait for it (`gh run watch <databaseId> --repo Pipelex/pipelex-plugins`) before reading the tag. When it failed, read its log. A transient failure is re-run from the Actions page: a re-run repeats the same push, so it tags the merge commit even after later pushes to `main`, which never tag a version they did not raise. A re-run executes the workflow as the merge commit holds it, though, so it cannot cure a defect in `release-tag.yml` itself, and GitHub allows one only for 30 days. In either case the version is already published on `main`, so cut the tag by hand at the merge commit, as the play allows for a publish whose tag is missing — `git -C <main> tag -a vX.Y.Z -m vX.Y.Z <merge SHA> && git -C <main> push origin vX.Y.Z` — and fix the workflow on `dev` for the next release. A run that failed because `vX.Y.Z` already sits at another commit names that commit: read why before deleting the tag and re-running.
 
 ## Version files and the lock
 

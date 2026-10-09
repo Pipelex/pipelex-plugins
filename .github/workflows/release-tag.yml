@@ -19,7 +19,11 @@
 # Only the push that raises the version tags, and only when the tag does not exist yet. A push
 # that leaves the version alone, or lowers it, tags nothing, even when the tag is missing, so a
 # later commit or a revert can never take a release's tag; the release's own run, re-run, is what
-# tags it. There is no
+# tags it. A raising push that finds the tag already at another commit fails rather than going
+# green over a release it did not tag. A re-run executes the workflow as the release's commit
+# holds it, so it cures a transient failure and not a defect in this file: the release skill
+# names the tag cut by hand at the merge commit for that, and for a run past GitHub's re-run
+# window. There is no
 # concurrency group, since GitHub cancels a pending run that a newer one supersedes in a group,
 # which could cancel the release's run.
 name: Release tag
@@ -56,14 +60,23 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
         run: |
-          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            echo "v$VERSION already exists, at $(git rev-list -n 1 "v$VERSION"): nothing to tag."
+          PREVIOUS=$(git show "$BEFORE:targets/prod.toml" | python3 -c 'import sys,tomllib;print(tomllib.loads(sys.stdin.read())["plugin"]["version"])')
+          TAGGED_AT=$(git rev-list -n 1 "refs/tags/v$VERSION" 2>/dev/null || true)
+          if ! python3 -c 'import sys; before, after = (tuple(int(part) for part in v.split(".")) for v in sys.argv[1:]); sys.exit(after <= before)' "$PREVIOUS" "$VERSION"; then
+            if [ -z "$TAGGED_AT" ]; then
+              echo "::warning::v$VERSION is not tagged, and this push did not raise the version (it was $PREVIOUS), so it tags nothing: only the run of the push that raised the version to $VERSION tags it, and a re-run of that run does."
+            else
+              echo "This push did not raise the version (it was $PREVIOUS), and v$VERSION is at $TAGGED_AT: nothing to tag."
+            fi
             exit 0
           fi
-          PREVIOUS=$(git show "$BEFORE:targets/prod.toml" | python3 -c 'import sys,tomllib;print(tomllib.loads(sys.stdin.read())["plugin"]["version"])')
-          if ! python3 -c 'import sys; before, after = (tuple(int(part) for part in v.split(".")) for v in sys.argv[1:]); sys.exit(after <= before)' "$PREVIOUS" "$VERSION"; then
-            echo "::warning::v$VERSION is not tagged, and this push did not raise the version (it was $PREVIOUS), so it tags nothing: only the run of the push that raised the version to $VERSION tags it, and a re-run of that run does."
+          if [ "$TAGGED_AT" = "$(git rev-parse HEAD)" ]; then
+            echo "v$VERSION is already on this push's commit: nothing to tag."
             exit 0
+          fi
+          if [ -n "$TAGGED_AT" ]; then
+            echo "::error::This push raised the version to $VERSION, but v$VERSION already exists at $TAGGED_AT, not at this push's commit $(git rev-parse HEAD). It was cut by hand or by another push; read where it points, delete it if it is wrong, and re-run this run."
+            exit 1
           fi
           echo "RELEASE=1" >> "$GITHUB_ENV"
           echo "This push moves the version from $PREVIOUS to $VERSION."
