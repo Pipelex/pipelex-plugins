@@ -1481,40 +1481,45 @@ class TestPipelexIntegrateSkill:
         says why and forbids a second `pipelex-sdk` requirement, and refresh mode raises a `pipelex` below it as it
         raises the SDKs — so a project on an older runtime is not left with a call site that fails at its import.
 
-        That raise crosses breaking releases of the project's own runtime, so it waits for the user's yes even in
-        automatic mode, asked at step 4 where the target is chosen, before anything is written, so a no leaves no
-        tree or sidecar without a call site; the configuration is migrated after it with a previewed
-        `pipelex migrate`, never with the bare command, whose own terminal question an agent's shell cannot answer."""
+        Pipelex has no project in the field to shield from a breaking release, so that raise is step 8's like the
+        SDKs', with no question: no clause at step 4, no changelog summary, no previewed migration. A configuration
+        the raised runtime refuses as a former release's is brought along by `pipelex migrate --yes`, never by the
+        bare command, whose own terminal question an agent's shell cannot answer."""
         floor = load_version_floors(self.REPO_ROOT)["pipelex"]
         for target_name in ("prod", "codex", "mistral-vibe"):
             body = self.render(target_name)
             step_8 = self.the_line(body, "With the project's package manager, at least:")
             assert f"`pipelex` {floor} (`python-structures`)" in step_8, target_name
+            assert "Raise and report older pins." in step_8, target_name
             row = self.the_line(body, "| a Pipelex host: `pipelex` a dependency")
-            assert "`python-structures`; **ask before raising a `pipelex` below step 8's floor**: python.md" in row, target_name
+            assert row == "| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |", (
+                target_name
+            )
             assert "pause only for a genuinely ambiguous choice or where a step asks." in body, target_name
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         paragraph = self.the_line(python, "**Where `pipelex_sdk` comes from.**")
         assert f"from the `pipelex` {floor} that step 8 raises the project to" in paragraph
         assert "Add no `pipelex-sdk` requirement of the project's own" in paragraph
-        raise_rule = self.the_line(python, "**Raising `pipelex` waits for the user's yes, asked at step 4.**")
-        for breaking in ("`--runner local|hosted`", "`targets_api = 5`", "`FormerReleaseConfigError`"):
-            assert breaking in raise_rule, breaking
-        assert "before step 5 writes anything" in raise_rule
-        assert "On a no, write nothing: stop before step 5" in raise_rule
-        assert "`https://github.com/Pipelex/pipelex/blob/main/CHANGELOG.md`" in raise_rule
-        assert "summarised from the changelog itself and never from memory" in raise_rule
-        assert "The raise targets the latest `pipelex` release" in raise_rule
-        assert "`pipelex migrate --dry-run`" in raise_rule
-        assert "run `pipelex migrate --yes` only on their yes" in raise_rule
-        assert "Never run `pipelex migrate` with neither flag" in raise_rule
-        # The floor is stated once, in the anchored sentence: the breaking changes name their release by what it did.
+        raising = self.the_line(python, "**Raising `pipelex`.**")
+        assert "Step 8 raises a `python-structures` project's `pipelex` to at least the floor as it raises the SDKs, with no question." in raising
+        assert "refuses, with `FormerReleaseConfigError`, a configuration written for a former release, run `pipelex migrate --yes`" in raising
+        # The floor is stated once, in the anchored sentence.
         assert python.count(floor) == 1
 
         left_alone = self.refresh_cells(self.reference("refresh.md"))["left alone"]
-        assert "a `python-structures` project's `pipelex`, pinned below step 8's floor, raised as step 8 raises it" in left_alone
-        assert "`pipelex` only on a yes asked before the regeneration, as step 4 asks it" in left_alone
+        assert "a `python-structures` project's `pipelex`, pinned below step 8's floor, raised as step 8 raises it, with no question" in left_alone
+
+        # The question is gone from every file the skill reads, not only reworded: no ask, no changelog summary, no preview.
+        for where, text in (("SKILL.md", self.render("prod")), ("python.md", python), ("refresh.md", self.reference("refresh.md"))):
+            for gone in (
+                "ask before raising",
+                "pipelex/blob/main/CHANGELOG.md",
+                "--dry-run",
+                "only on their yes",
+                "only on a yes",
+            ):
+                assert gone not in text, f"{where} still carries {gone!r}"
 
     def refresh_cells(self, text: str) -> dict[str, str]:
         """Refresh mode's table, its one body row cut into its three cells, keyed by the header it sits under."""

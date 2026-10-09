@@ -70,7 +70,7 @@ State the target, the destination and the generator in one line. The target foll
 |---|---|
 | `package.json` with a TypeScript build | `ts-zod` |
 | `pyproject.toml`, no `pipelex` dependency | `python-pydantic` |
-| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures`; **ask before raising a `pipelex` below step 8's floor**: python.md |
+| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |
 
 The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/` by default, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
 

@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so the skill now asks, before it writes anything, to raise a `pipelex` older than the first release that depends on `pipelex-sdk`, naming the breaking changes the raise crosses as pipelex's changelog lists them; on your yes, step 8 and refresh mode raise it and migrate the project's configuration with `pipelex migrate`, previewed with `--dry-run` and applied with `--yes` on your yes. The Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly.
+- **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so step 8 and refresh mode now raise a `pipelex` older than the first release that depends on `pipelex-sdk` as they raise the SDKs, without a question. The Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly, and to run `pipelex migrate --yes` when the raised runtime refuses a configuration written for a former release.
 
 ## [0.11.0] - 2026-10-08
 
