@@ -78,7 +78,7 @@ The destination is one directory per method, `src/generated/<method>/` or `<pack
 
 ### 5. Tooling exclusions
 
-Put the generated directory and the gate script step 10 copies in the formatter's and linter's ignores, per the language reference, keeping the tree type-checked and committed. **Do this before step 6**: the first project-wide format would rewrite the stamps.
+Put the generated directory and the gate script step 10 copies in the formatter's and linter's ignores, per the language reference, keeping the tree type-checked and committed. **Do this before step 6**.
 
 ### 6. Generate
 
@@ -109,7 +109,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ### 8. Dependencies
 
-With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
+With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins, **`pipelex` only on the user's yes** (python.md).
 
 ### 9. The call site
 
