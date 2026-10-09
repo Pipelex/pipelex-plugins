@@ -10,6 +10,7 @@ file as it is today, so an upstream edit to a file the fixture names never break
 
 from __future__ import annotations
 
+import compileall
 import re
 import shutil
 import stat
@@ -422,7 +423,8 @@ class TestOutsideRender:
     def test_an_installed_upstream_in_an_environment_git_ignores_renders_as_the_checkout_does(self, tmp_path: Path) -> None:
         """The installed package carries the upstream inside itself, and git is never asked about it there: in a
         `.venv` its repository ignores, git reports every upstream file ignored, and the skills would ship without
-        their references and scripts."""
+        their references and scripts. An installer that compiles bytecode, as pip does by default, adds a
+        `__pycache__` beside each Python file the wheel carries, which is not the upstream's and never ships."""
         consumer = tmp_path / "consumer"
         packaged = consumer / ".venv" / "scripts"
         listed = subprocess.run(
@@ -431,6 +433,8 @@ class TestOutsideRender:
         for rel in filter(None, listed.split("\0")):
             (packaged / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO_ROOT / rel, packaged / rel)
+        assert compileall.compile_dir(packaged / "skills", quiet=1)
+        assert list((packaged / "skills").rglob("__pycache__/*.pyc")), "the packaged copy holds no Python file to compile"
         _write(consumer / ".gitignore", ".venv/\n")
         subprocess.run(["git", "init", "-q", str(consumer)], check=True)
         reference = packaged / "skills" / "pipelex-synthetic-inputs" / "references" / "pdf.md"

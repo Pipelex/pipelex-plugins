@@ -70,6 +70,8 @@ UPSTREAM_ROOT = PACKAGE_DIR if (PACKAGE_DIR / TEMPLATES_DIR_NAME).is_dir() else 
 
 # The directory of upstream and outside static assets, one subdirectory per skill.
 SKILLS_DIR_NAME = "skills"
+# Where an installer writes the bytecode it compiles for a Python file, beside the wheel's own files.
+INSTALLER_BYTECODE_DIR = "__pycache__"
 
 # The keys an outside target file may hold. Anything else is refused, since a misspelled table
 # (`[render.replace]`) would otherwise be ignored and its declarations with it.
@@ -301,7 +303,9 @@ def _upstream_files(upstream_root: Path, subdirs: Sequence[str]) -> list[str]:
     Git is asked only about a checkout, whose root holds `.git`. The installed package holds what
     its wheel was built with, which leaves out what git ignored then, and asking git about it would
     be asking whatever repository the environment happens to sit in: one inside a `.venv` its
-    repository ignores would have every upstream file reported ignored, and none rendered.
+    repository ignores would have every upstream file reported ignored, and none rendered. What the
+    installer added beside the wheel's files is left out instead: the bytecode it compiles for a
+    Python file a skill ships, as pip does by default, which git ignores in a checkout.
     """
     if (upstream_root / GIT_DIR_NAME).exists():
         return _source_files(upstream_root, subdirs)
@@ -310,7 +314,7 @@ def _upstream_files(upstream_root: Path, subdirs: Sequence[str]) -> list[str]:
         for subdir in subdirs
         if (upstream_root / subdir).is_dir()
         for path in (upstream_root / subdir).rglob("*")
-        if path.is_file()
+        if path.is_file() and INSTALLER_BYTECODE_DIR not in path.relative_to(upstream_root).parts
     )
 
 
