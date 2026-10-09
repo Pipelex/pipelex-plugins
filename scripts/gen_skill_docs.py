@@ -201,7 +201,7 @@ MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # re-vendor procedure) — and THIRD-PARTY-NOTICES.md, the MIT notice the bundle
 # owes wherever it is copied, since the rest of the plugin is ELv2. The bundle
 # carries a provenance header and inlines a WASM engine, so it must never pass
-# through the template engine. One bundle serves the three hook platforms behind
+# through the template engine. One bundle serves every hook platform behind
 # its --platform flag.
 HOOK_BUNDLE_ASSETS = ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {

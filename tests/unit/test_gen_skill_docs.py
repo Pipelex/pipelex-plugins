@@ -2732,7 +2732,7 @@ class TestHookRendering:
         assert os.access(hook_script, os.X_OK)
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
-        """One vendored check.mjs bundle serves the three hook platforms, and its MIT notice ships beside it on each."""
+        """One vendored check.mjs bundle serves every hook platform, and its MIT notice ships beside it on each."""
         for platform in (Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE):
             assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
         assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.AGENT_SKILLS] == []
