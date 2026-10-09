@@ -60,10 +60,12 @@ dev-mode-dirs = ["."]
 [tool.uv]
 required-version = ">=0.7.2"
 # uv rebuilds a local package only when one of these files changes, `pyproject.toml` alone by default, so
-# `uvx --from <this checkout>` would keep rendering from the templates of its first build. These are
-# what the wheel carries.
+# `uvx --from <this checkout>` would keep rendering from the templates of its first build. These are what the
+# wheel carries and the `.gitignore` that selects them. A glob key follows the newest modification time among
+# its files, so deleting a file leaves the old build in place: `--no-cache` rebuilds it.
 cache-keys = [
   { file = "pyproject.toml" },
+  { file = ".gitignore" },
   { file = "scripts/**/*.py" },
   { file = "templates/skills/**/*" },
   { file = "skills/**/*" },
