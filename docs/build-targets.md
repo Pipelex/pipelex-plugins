@@ -203,7 +203,7 @@ From a checkout, `python -m scripts.outside_render` takes the same arguments.
 
 ### The upstream the render reads
 
-The upstream is this repository's `templates/skills/`, `skills/` and `targets/`. The wheel carries the three inside its `scripts` package (`[tool.hatch.build.targets.wheel]` in `pyproject.toml`), and the render reads them there when it runs installed and beside the package when it runs from a checkout. The wheel holds what git did not ignore when it was built, so git is asked about the upstream only in a checkout: an installed package can sit in an environment some repository ignores, a `.venv` inside it, where git would report every upstream file ignored.
+The upstream is this repository's `templates/skills/`, `skills/` and `targets/`. The wheel carries the three inside its `scripts` package (`[tool.hatch.build.targets.wheel]` in `pyproject.toml`), and the render reads them there when it runs installed and beside the package when it runs from a checkout. The wheel holds what git did not ignore when it was built, so git is asked about the upstream only in a checkout: an installed package can sit in an environment some repository ignores, a `.venv` inside it, where git would report every upstream file ignored. What the installer adds beside the wheel's files there, the `__pycache__` it compiles for a Python file a skill ships, is left out, as git leaves it out of a checkout.
 
 ### The target file and its source root
 
