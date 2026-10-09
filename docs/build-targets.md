@@ -100,7 +100,7 @@ The target platform is selected with `[vars].platform`:
 - `claude` (default): renders Claude plugin metadata and the `PostToolUse` hook (`hooks.json` + `check-mthds.sh`).
 - `codex`: renders Codex plugin metadata and the bundled hook config (`codex-hooks.json`).
 - `mistral-vibe`: renders skills, the Vibe `post_tool` hook files (`vibe-hooks.toml` + `check-mthds-vibe.sh`) and the workshop launcher as the `mcp/vibe-mcp.toml` config fragment, with no Claude/Codex plugin manifest.
-- `agent-skills`: skills and shared files alone, for an outside target ("Outside targets" below). The build refuses an in-repo target on it, and so does `make check`.
+- `agent-skills`: skills and shared files alone, for an outside target ("Outside targets" below). The build refuses an in-repo target on it, and so does `make check`. Its wording is the Codex and Vibe branches', except where a template describes what a plugin carries and this platform lacks: the workshop's connection and its key (`shared/credentials.md.j2`) and the validation hook (`shared/writing-mthds.md.j2`, and `pipelex-edit`'s validation guard) each have an `agent-skills` branch of their own. A template that comes to describe a manifest, a hook or an MCP declaration needs one too.
 
 What a platform emits is asked of the `Platform` enum in `scripts/gen_skill_docs.py` (`manifest_dirname`, `has_plugin_manifest`, `is_outside_only`), each an exhaustive `match`, and every per-platform table has an entry for every platform, so a new platform is a type error or a failed lookup where it matters rather than a silent fallback to Claude's files.
 
@@ -233,9 +233,11 @@ The render refuses, naming the cure: a key the format does not have, such as a m
 
 ### What it reads and writes
 
-One Jinja environment searches the outside `templates/` first and this repository's second, so an outside overlay or skill can `{% include %}` any upstream partial by name, and a declared replacement is found before the file it replaces. An outside skill is a `templates/skills/<name>/SKILL.md.j2` under the source root, and its static assets are copied beside it as an upstream skill's are; an outside static asset may also be added to an upstream skill, for a reference its overlay links. Files git ignores in either source are left out.
+One Jinja environment searches the outside `templates/` first and this repository's second, so an outside overlay or skill can `{% include %}` any upstream partial by name, and a declared replacement is found before the file it replaces. An outside skill is a `templates/skills/<name>/SKILL.md.j2` under the source root, and its static assets are copied beside it as an upstream skill's are; an outside static asset may also be added to an upstream skill, for a reference its overlay links. Files git ignores in either source are left out, the template loader's included: it reads a scratch copy of the outside templates git does not ignore, so an ignored file is never rendered, as it is never checked against the declarations.
 
 The render writes its output directory and nothing else: `<output>/<skill>/SKILL.md` with that skill's `references/` and `scripts/`, a script keeping its executable bit, and the shared files. It writes no hooks, no manifest, no MCP fragment and no marketplace file, and never writes into this repository. It owns the output directory as the build owns an in-repo target's, so it removes what it no longer produces, never a `.j2` file and never a file git ignores.
+
+Because it deletes there, it writes `.pipelex-plugins-render.toml` at the top of the output, naming the target, and writes only into a directory that is new or empty or that carries this marker for the same target. An output holding anything else is refused with nothing written: another checkout, whose `.git/` the pruning would delete, a harness's skills directory with other skills in it, or another target's rendering. So is a symbolic link on the path of a file the render writes, which would carry the write to wherever it points. `--check` refuses the same directories.
 
 ### Replacing, dropping and pinning upstream files
 

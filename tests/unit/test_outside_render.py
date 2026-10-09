@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import shutil
 import stat
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,11 +23,13 @@ import yaml
 from scripts.check import check_target_platforms
 from scripts.gen_skill_docs import load_target_config
 from scripts.outside_render import (
+    OWNER_MARKER_NAME,
     OutsideTarget,
     build,
     check,
     declaration_errors,
     file_sha256,
+    link_errors,
     load_outside_target,
     main,
     render_outside,
@@ -96,6 +99,24 @@ def _snapshot(*roots: Path) -> dict[Path, tuple[int, int]]:
                     info = path.stat()
                     files[path] = (info.st_size, info.st_mtime_ns)
     return files
+
+
+def _every_skill(tmp_path: Path, layout: str) -> Path:
+    """A target with no file of its own beside it, so it renders every upstream skill as the upstream ships it."""
+    return _write(
+        tmp_path / "src" / "every-skill.toml",
+        f'[render]\noutput = "../rendered"\nshared = "{layout}"\n\n'
+        '[vars]\nplatform = "agent-skills"\nharness_name = "the harness"\nskill_dir = "<skill-dir>"\n',
+    )
+
+
+def _git_checkout(output: Path) -> None:
+    subprocess.run(["git", "init", "--quiet", str(output)], check=True)
+    _write(output / "README.md", "# Somebody's repository\n")
+
+
+def _another_target_s_output(output: Path) -> None:
+    _write(output / OWNER_MARKER_NAME, 'target = "another-target"\n')
 
 
 def _without_output(target_file: Path) -> Path:
@@ -236,6 +257,8 @@ class TestOutsideRender:
         for skill_md in output.glob("*/SKILL.md"):
             assert _frontmatter_keys(skill_md) == {"name", "description"}, skill_md
         assert not [path for path in output.rglob("*") if path.name in {"hooks", "mcp", ".claude-plugin", ".codex-plugin"}]
+        # The marker at the top names the target whose output this is.
+        assert (output / OWNER_MARKER_NAME).read_text().endswith('target = "outside-fixture"\n')
         assert check(target) == 0
 
     @pytest.mark.parametrize(
@@ -377,3 +400,75 @@ class TestOutsideRender:
         assert target.template_vars["plugin_name"] == "outside-fixture"
         assert target.template_vars["shared_dir"] == "shared"
         assert target.output_dir == (tmp_path / "rendered").resolve()
+
+    @pytest.mark.parametrize("layout", ["in-each-skill", "beside"])
+    def test_every_upstream_skill_renders_with_every_link_whole(self, tmp_path: Path, layout: str) -> None:
+        """A template link written `../shared/…` rather than through `shared_dir`, or a static reference linking a shared
+        file, works for every in-repo target and breaks only in a consumer's `in-each-skill` render, in another repository's CI."""
+        target = load_outside_target(_every_skill(tmp_path, layout))
+        assert declaration_errors(target) == []
+        files = render_outside(target)
+        upstream_skills = {path.parent.name for path in (REPO_ROOT / "templates/skills").glob("*/SKILL.md.j2")}
+        assert {rel.split("/")[0] for rel in files if rel.endswith("/SKILL.md")} == upstream_skills
+        assert link_errors(target, files) == []
+
+    def test_a_symbolic_link_in_the_output_is_refused_and_nothing_is_written_through_it(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        target = load_outside_target(_fixture(tmp_path))
+        assert build(target) == 0
+        output = tmp_path / "rendered"
+        elsewhere = _write(tmp_path / "elsewhere" / "SKILL.md", "Somebody else's skill.\n").parent
+        shutil.rmtree(output / "pipelex-edit")
+        (output / "pipelex-edit").symlink_to(elsewhere, target_is_directory=True)
+        capsys.readouterr()
+        assert build(target) == 1
+        assert "rendered/pipelex-edit: a symbolic link, which the render would write through" in capsys.readouterr().out
+        assert check(target) == 1
+        assert [path.name for path in elsewhere.iterdir()] == ["SKILL.md"]
+        assert (elsewhere / "SKILL.md").read_text() == "Somebody else's skill.\n"
+
+    @pytest.mark.parametrize(
+        ("prepare", "refusal"),
+        [
+            (_git_checkout, "rendered: holds files no render of this target wrote (rendered/.git/"),
+            (_another_target_s_output, f"rendered: its {OWNER_MARKER_NAME} names the outside target 'another-target', not 'outside-fixture'"),
+        ],
+    )
+    def test_an_output_directory_holding_what_another_wrote_is_refused_untouched(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str], prepare: Callable[[Path], None], refusal: str
+    ) -> None:
+        target = load_outside_target(_fixture(tmp_path))
+        output = tmp_path / "rendered"
+        prepare(output)
+        before = _snapshot(output)
+        assert build(target) == 1
+        assert refusal in capsys.readouterr().out
+        assert check(target) == 1
+        assert _snapshot(output) == before
+
+    def test_a_new_or_empty_output_directory_is_the_render_s(self, tmp_path: Path) -> None:
+        target = load_outside_target(_fixture(tmp_path))
+        (tmp_path / "rendered").mkdir()
+        assert build(target) == 0
+        assert check(target) == 0
+
+    def test_a_file_git_ignores_under_the_source_root_changes_nothing(self, tmp_path: Path) -> None:
+        """What git ignores is never checked against the declarations, so the render never reads it: an ignored file at
+        an upstream path would otherwise replace that file with no declaration and no hash."""
+        target_file = _fixture(tmp_path)
+        source = target_file.parent
+        subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+        expected = render_outside(load_outside_target(target_file))
+        _write(
+            source / ".gitignore",
+            "templates/skills/shared/stale-types-notice.md.j2\ntemplates/skills/ignored-skill/\nskills/house-notes/scripts/scratch.sh\n",
+        )
+        _write(source / "templates/skills/shared/stale-types-notice.md.j2", "An ignored replacement.\n")
+        _write(source / "templates/skills/ignored-skill/SKILL.md.j2", "---\nname: ignored-skill\n---\nAn ignored skill.\n")
+        _write(source / "skills/house-notes/scripts/scratch.sh", "echo an ignored script\n")
+        target = load_outside_target(target_file)
+        assert declaration_errors(target) == []
+        assert render_outside(target) == expected
+        with pytest.raises(SystemExit, match=re.escape("[skills] include names 'ignored-skill', a skill that exists neither upstream nor")):
+            load_outside_target(_edit(target_file, '"house-notes"]', '"house-notes", "ignored-skill"]'))

@@ -4,10 +4,10 @@
 An outside target is one TOML file in the consumer's repository. The directory holding it is the
 target's **source root**, laid out like this repository: its own templates under
 `templates/skills/…`, its own static assets under `skills/<skill>/references/` and
-`skills/<skill>/scripts/`. The render reads three sources — this repository's templates, static
-assets and defaults (the upstream), the outside templates, and the outside static assets — and
-writes one directory, the target's output, which it owns: one subdirectory per skill, and the
-shared files either beside them or copied into each skill.
+`skills/<skill>/scripts/`. The render reads this repository's templates, static assets and
+defaults (the upstream), then the outside templates and static assets git does not ignore, and
+writes one directory, the target's output, which it owns: one subdirectory per skill, the shared
+files either beside them or copied into each skill, and the marker that says whose output it is.
 
 The outside target may add anything. It may also replace any upstream template or static asset,
 and drop any upstream static asset, but only what it declares, each declaration pinning the
@@ -28,12 +28,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
+import shutil
 import stat
 import sys
 import tempfile
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -78,6 +81,11 @@ REQUIRED_VARS = ("platform", "harness_name", "skill_dir")
 DECLARABLE_PREFIXES = (f"{TEMPLATES_DIR_NAME}/{SKILLS_DIR_NAME}/", f"{SKILLS_DIR_NAME}/")
 HASH_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
+# The file each render writes at the top of its output, naming the target whose output it is. The
+# render prunes its output to what it produces, so it writes only into a directory that is new or
+# empty, or that carries this marker for the same target: anything else is somebody else's.
+OWNER_MARKER_NAME = ".pipelex-plugins-render.toml"
+
 
 class SharedLayout(StrEnum):
     """Where the shared files go: once beside the skills, as the plugin ships them, or into each skill that links one."""
@@ -110,12 +118,8 @@ class OutsideTarget:
     include_skills: list[str] | None
     template_vars: dict[str, TemplateVarValue]
 
-    @property
-    def outside_templates_dir(self) -> Path:
-        return self.source_root / TEMPLATES_DIR_NAME
-
     def declarations(self) -> dict[str, dict[str, str]]:
-        """The three declaration tables by name."""
+        """The declaration tables, by name."""
         return {"replaces": self.replaces, "drops": self.drops, "pins": self.pins}
 
 
@@ -259,7 +263,7 @@ def load_outside_target(target_file: Path, upstream_root: Path = UPSTREAM_ROOT) 
         include_skills=include_skills,
         template_vars=template_vars,
     )
-    known = set(skill_template_names(_template_dirs(target, upstream_root)))
+    known = set(_skill_names(upstream_root, _source_files(source_root, (TEMPLATES_DIR_NAME,))))
     if SHARED_DIR_NAME in known:
         raise _refuse(path, f"a skill may not be named {SHARED_DIR_NAME!r}, the directory the shared files go in")
     for skill in include_skills or []:
@@ -274,19 +278,46 @@ def _table(target_file: Path, raw: object, where: str) -> dict[str, object]:
     return {str(key): value for key, value in cast("dict[object, object]", raw).items()}
 
 
-def _template_dirs(target: OutsideTarget, upstream_root: Path) -> list[Path]:
-    """The template directories in search order: the outside one first, when there is one."""
-    dirs = [upstream_root / TEMPLATES_DIR_NAME]
-    if target.outside_templates_dir.is_dir():
-        dirs.insert(0, target.outside_templates_dir)
-    return dirs
-
-
 def _source_files(root: Path, subdirs: Sequence[str]) -> list[str]:
-    """Every file under `root`'s `subdirs`, as POSIX paths relative to `root`, leaving out what git ignores there."""
+    """Every file under `root`'s `subdirs`, as POSIX paths relative to `root`, leaving out what git ignores there.
+
+    This is the whole of what the render reads from a source root, templates included: a file git
+    ignores is neither checked against the declarations nor rendered, so it can change nothing.
+    """
     files = sorted(path for subdir in subdirs if (root / subdir).is_dir() for path in (root / subdir).rglob("*") if path.is_file())
     ignored = git_ignored(root, files)
     return [path.relative_to(root).as_posix() for path in files if path not in ignored]
+
+
+def _skill_names(upstream_root: Path, outside_files: Sequence[str]) -> list[str]:
+    """Every skill there is to render: the upstream ones, and those the outside files hold a `SKILL.md.j2` for."""
+    outside = {
+        parts[2]
+        for parts in (rel.split("/") for rel in outside_files)
+        if len(parts) == 4 and parts[:2] == [TEMPLATES_DIR_NAME, SKILLS_DIR_NAME] and parts[3] == "SKILL.md.j2"
+    }
+    return sorted(set(skill_template_names([upstream_root / TEMPLATES_DIR_NAME])) | outside)
+
+
+@contextmanager
+def _outside_templates(source_root: Path, outside_files: Sequence[str]) -> Generator[Path | None]:
+    """The outside templates the render reads, copied into a scratch `templates/` directory; None when there are none.
+
+    The template loader searches whole directories, so it is pointed at this copy of the files
+    `_source_files` lists rather than at the source root, where it would also find what git ignores,
+    which the declaration check never sees.
+    """
+    templates = [rel for rel in outside_files if rel.startswith(f"{TEMPLATES_DIR_NAME}/")]
+    if not templates:
+        yield None
+        return
+    with tempfile.TemporaryDirectory() as scratch:
+        root = Path(scratch)
+        for rel in templates:
+            destination = root / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_root / rel, destination)
+        yield root / TEMPLATES_DIR_NAME
 
 
 def _is_static_asset(rel: str) -> bool:
@@ -337,7 +368,9 @@ def declaration_errors(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROO
             match table:
                 case "replaces":
                     if rel not in outside_set:
-                        errors.append(f"[render.replaces] {rel}: no file at that path under the source root; a file left out is a drop")
+                        errors.append(
+                            f"[render.replaces] {rel}: no file at that path under the source root, or one git ignores; a file left out is a drop"
+                        )
                 case "drops":
                     if not _is_static_asset(rel):
                         errors.append(f"[render.drops] {rel}: only a static asset is dropped; replace a template, or leave its skill out")
@@ -351,20 +384,23 @@ def declaration_errors(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROO
     return errors
 
 
-def _rendered_skill_names(target: OutsideTarget, upstream_root: Path) -> list[str]:
-    names = skill_template_names(_template_dirs(target, upstream_root))
+def _rendered_skill_names(target: OutsideTarget, upstream_root: Path, outside_files: Sequence[str]) -> list[str]:
+    names = _skill_names(upstream_root, outside_files)
     if target.include_skills is None:
         return names
     return [name for name in names if name in target.include_skills]
 
 
-def _static_assets(target: OutsideTarget, upstream_root: Path, skill: str) -> dict[str, OutputFile]:
-    """A skill's static assets, by their path in the output: the upstream ones less the drops, then the outside ones over them."""
+def _static_assets(target: OutsideTarget, sources: Sequence[tuple[Path, Sequence[str]]], skill: str) -> dict[str, OutputFile]:
+    """A skill's static assets, by their path in the output: the upstream ones less the drops, then the outside ones over them.
+
+    `sources` is each root with the files `_source_files` lists under it, the upstream first.
+    """
     assets: dict[str, OutputFile] = {}
-    asset_dirs = [f"{SKILLS_DIR_NAME}/{skill}/{name}" for name in STATIC_ASSET_DIRS]
-    for root, dropped in ((upstream_root, set(target.drops)), (target.source_root, set[str]())):
-        for rel in _source_files(root, asset_dirs):
-            if rel in dropped:
+    prefixes = tuple(f"{SKILLS_DIR_NAME}/{skill}/{name}/" for name in STATIC_ASSET_DIRS)
+    for root, files in sources:
+        for rel in files:
+            if not rel.startswith(prefixes) or rel in target.drops:
                 continue
             source = root / rel
             executable = bool(source.stat().st_mode & stat.S_IXUSR)
@@ -391,19 +427,22 @@ def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -
 
     Each skill is `<skill>/SKILL.md` with its static assets beside it. The shared files the skills
     link to, followed through their own links, go once in `shared/` (`beside`) or into each skill
-    that links one (`in-each-skill`), and a shared file nothing links is left out. The caller has
+    that links one (`in-each-skill`), and a shared file nothing links is left out. The owner marker
+    goes at the top. Only what `_source_files` lists is read from the source root. The caller has
     checked the declarations (`declaration_errors`).
     """
-    outside_dir = target.outside_templates_dir if target.outside_templates_dir.is_dir() else None
-    skills = _rendered_skill_names(target, upstream_root)
-    rendered = render_templates(
-        upstream_root / TEMPLATES_DIR_NAME,
-        Path(),
-        target.template_vars,
-        include_skills=skills,
-        target_name=target.name,
-        outside_templates_dir=outside_dir,
-    )
+    outside_files = _source_files(target.source_root, (TEMPLATES_DIR_NAME, SKILLS_DIR_NAME))
+    upstream_assets = _source_files(upstream_root, (SKILLS_DIR_NAME,))
+    skills = _rendered_skill_names(target, upstream_root, outside_files)
+    with _outside_templates(target.source_root, outside_files) as outside_dir:
+        rendered = render_templates(
+            upstream_root / TEMPLATES_DIR_NAME,
+            Path(),
+            target.template_vars,
+            include_skills=skills,
+            target_name=target.name,
+            outside_templates_dir=outside_dir,
+        )
     shared: dict[str, str] = {}
     files: dict[str, OutputFile] = {}
     for output_path, content in rendered.items():
@@ -415,8 +454,9 @@ def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -
             shared[parts[2]] = content
         else:
             files[f"{parts[1]}/{parts[2]}"] = OutputFile(content.encode("utf-8"))
+    sources = ((upstream_root, upstream_assets), (target.source_root, outside_files))
     for skill in skills:
-        files.update(_static_assets(target, upstream_root, skill))
+        files.update(_static_assets(target, sources, skill))
     match target.shared_layout:
         case SharedLayout.BESIDE:
             files.update(_shared_closure(files, SHARED_DIR_NAME, shared))
@@ -424,7 +464,70 @@ def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -
             for skill in skills:
                 own = {rel: file for rel, file in files.items() if rel.startswith(f"{skill}/")}
                 files.update(_shared_closure(own, f"{skill}/{SHARED_DIR_NAME}", shared))
+    files[OWNER_MARKER_NAME] = OutputFile(_owner_marker(target.name).encode("utf-8"))
     return dict(sorted(files.items()))
+
+
+def _owner_marker(name: str) -> str:
+    return (
+        "# The output of pipelex-plugins' outside render for this target, which owns the directory: each render\n"
+        "# rewrites it and removes whatever it no longer produces. Delete the whole directory to take it back.\n"
+        f"target = {json.dumps(name)}\n"
+    )
+
+
+def _marker_owner(marker: Path) -> str | None:
+    """The target an owner marker names, or None when it names none."""
+    try:
+        owner = tomllib.loads(marker.read_text(encoding="utf-8")).get("target")
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError):
+        return None
+    return owner if isinstance(owner, str) else None
+
+
+def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
+    """Why the output directory is not this render's to write and prune; nothing when it is.
+
+    The render removes everything in its output that it does not produce, so it writes only into a
+    directory that is new or empty, or that carries the owner marker an earlier render of this same
+    target left: a directory holding anything else is somebody else's, a checkout's `.git/` or a
+    harness's other skills. And it writes through no symbolic link: a link on the path of a file it
+    produces would carry the write outside the output, where the link points.
+    """
+    output_dir = target.output_dir
+    if not output_dir.exists():
+        return []
+    label = _label(target, output_dir)
+    if not output_dir.is_dir():
+        return [f"{label}: the render's output is not a directory"]
+    errors: list[str] = []
+    marker = output_dir / OWNER_MARKER_NAME
+    if marker.is_file() and not marker.is_symlink():
+        owner = _marker_owner(marker)
+        if owner != target.name:
+            whose = f"the outside target {owner!r}" if owner is not None else "nobody this render can read"
+            errors.append(f"{label}: its {OWNER_MARKER_NAME} names {whose}, not {target.name!r}; give each target an output directory of its own")
+    else:
+        foreign = orphaned_outputs(output_dir, output_dir, set())
+        if foreign:
+            named = ", ".join(_label(target, path) for path in foreign[:3]) + (", …" if len(foreign) > 3 else "")
+            errors.append(
+                f"{label}: holds files no render of this target wrote ({named}), and the render removes what it does not produce; "
+                "name a new or empty directory as the output, or delete this one if it is an earlier rendering"
+            )
+    links: set[Path] = set()
+    for rel in files:
+        parts = rel.split("/")
+        for depth in range(1, len(parts)):
+            ancestor = output_dir.joinpath(*parts[:depth])
+            if ancestor.is_symlink():
+                links.add(ancestor)
+                break
+    errors.extend(
+        f"{_label(target, link)}: a symbolic link, which the render would write through into {link.resolve()}; replace it with a directory"
+        for link in sorted(links)
+    )
+    return errors
 
 
 def link_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
@@ -470,6 +573,9 @@ def build(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
     problems = link_errors(target, files)
     if problems:
         return _fail(problems, "The rendering has a broken link, or ships a file nothing names; nothing was written.")
+    problems = ownership_errors(target, files)
+    if problems:
+        return _fail(problems, "The output directory is not this render's to write; nothing was written.")
     target.output_dir.mkdir(parents=True, exist_ok=True)
     _write_files(target.output_dir, files)
     produced = {target.output_dir / rel for rel in files}
@@ -485,6 +591,9 @@ def check(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
     if problems:
         return _fail(problems, "The target changes upstream files without declaring them, or a declaration no longer holds.")
     files = render_outside(target, upstream_root)
+    problems = ownership_errors(target, files)
+    if problems:
+        return _fail(problems, "The output directory is not this render's; nothing was compared.")
     findings = [f"LINK: {error}" for error in link_errors(target, files)]
     for rel, file in files.items():
         path = target.output_dir / rel
