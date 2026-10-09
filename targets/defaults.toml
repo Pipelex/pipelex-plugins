@@ -20,6 +20,15 @@ harness_name = "Claude Code"
 # sentence (the size diet's facts, L-260923-a9bdfe, sections 3 to 5).
 skill_dir = "${CLAUDE_SKILL_DIR}"
 
+# Where a skill's links find the shared files (`writing-mthds.md`, `fit.md` and
+# the rest), relative to its SKILL.md: every link to one is written
+# `{{ shared_dir }}/<file>`. The plugin ships them once, in `skills/shared/`
+# beside the skills, so every in-repo target keeps this default. An outside
+# target whose layout copies the shared files into each skill renders with
+# `shared` instead, which `scripts/outside_render.py` sets from its
+# `[render] shared` option (docs/build-targets.md, "Outside targets").
+shared_dir = "../shared"
+
 # Version floors the skills state to the user. One table, so a bump is one edit
 # rather than a hunt through prose. These are VALUE substitutions — the kind the
 # trimmed-variable rule allows — not switches a skill branches on: nothing reads

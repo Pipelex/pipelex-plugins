@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Outside targets render the skills from another repository's templates**: `scripts/outside_render.py <target file> [--check]` renders this plugin's skills for a target file kept in another repository, with that repository's own skills, overlays and replacements of upstream templates and static assets, for a new `agent-skills` platform whose skills carry a frontmatter of `name` and `description` alone and no hooks, manifest or MCP declaration. Every upstream file the target replaces, drops or pins is declared with the SHA-256 of its bytes, and the render refuses an undeclared replacement and a declaration the upstream file no longer matches; the shared files go once beside the skills, or into each skill that links one, and the link check holds the rendering before anything is written. `--check` writes nothing and fails on a missing, stale or orphaned file and on a broken link.
+
 ### Changed
 
 - **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env`, or under `PIPELEX_HOME`, reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.

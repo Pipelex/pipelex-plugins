@@ -35,7 +35,7 @@ import stat
 import subprocess
 import sys
 import tomllib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -45,9 +45,44 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFo
 
 
 class Platform(StrEnum):
+    """The harness a target renders for.
+
+    `agent-skills` is a harness that loads Agent Skills directories and nothing else a plugin
+    carries: no manifest, no hooks, no MCP declaration. It is for outside targets only
+    (`scripts/outside_render.py`), and an in-repo target on it is refused. What a platform emits
+    is asked of its properties, each an exhaustive `match`, so a new value is a type error where
+    it matters rather than a silent fallback to Claude's files.
+    """
+
     CLAUDE = "claude"
     CODEX = "codex"
     MISTRAL_VIBE = "mistral-vibe"
+    AGENT_SKILLS = "agent-skills"
+
+    @property
+    def has_plugin_manifest(self) -> bool:
+        """Whether the build writes a Claude or Codex plugin manifest for this platform."""
+        return self.manifest_dirname is not None
+
+    @property
+    def manifest_dirname(self) -> str | None:
+        """The directory holding the platform's `plugin.json` and `plugin-base.json`, or None when it has no manifest."""
+        match self:
+            case Platform.CLAUDE:
+                return ".claude-plugin"
+            case Platform.CODEX:
+                return ".codex-plugin"
+            case Platform.MISTRAL_VIBE | Platform.AGENT_SKILLS:
+                return None
+
+    @property
+    def is_outside_only(self) -> bool:
+        """Whether only an outside target may render for this platform."""
+        match self:
+            case Platform.CLAUDE | Platform.CODEX | Platform.MISTRAL_VIBE:
+                return False
+            case Platform.AGENT_SKILLS:
+                return True
 
 
 # A template variable is a scalar (coerced to str), a bool switch, a list, or a
@@ -136,21 +171,27 @@ HOOK_TEMPLATES = [
 # - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
+# - Agent Skills: nothing, since the platform has no hooks.
+# Every platform has an entry, looked up by index, so an unmapped one fails
+# rather than rendering Claude's hooks.
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
     Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
     Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
+    Platform.AGENT_SKILLS: [],
 }
 
 # MCP templates by platform: the workshop launcher's declaration where a
 # platform has no plugin manifest to carry it. Mistral Vibe gets
 # mcp/vibe-mcp.toml, a [[mcp_servers]] config fragment the user copies into
 # ~/.vibe/config.toml, as with vibe-hooks.toml. The Claude and Codex manifests
-# declare the server themselves (make_plugin_json).
+# declare the server themselves (make_plugin_json), and an Agent Skills harness
+# is given its tools by whoever runs it.
 MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: [],
     Platform.CODEX: [],
     Platform.MISTRAL_VIBE: ["mcp/vibe-mcp.toml.j2"],
+    Platform.AGENT_SKILLS: [],
 }
 
 # Static hook assets by platform: prebuilt files copied VERBATIM (no Jinja
@@ -160,13 +201,14 @@ MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
 # re-vendor procedure) — and THIRD-PARTY-NOTICES.md, the MIT notice the bundle
 # owes wherever it is copied, since the rest of the plugin is ELv2. The bundle
 # carries a provenance header and inlines a WASM engine, so it must never pass
-# through the template engine. One bundle serves all three platforms behind
+# through the template engine. One bundle serves the three hook platforms behind
 # its --platform flag.
 HOOK_BUNDLE_ASSETS = ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
 STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_BUNDLE_ASSETS,
     Platform.CODEX: HOOK_BUNDLE_ASSETS,
     Platform.MISTRAL_VIBE: HOOK_BUNDLE_ASSETS,
+    Platform.AGENT_SKILLS: [],
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod
@@ -205,13 +247,13 @@ class TargetConfig:
 
     @property
     def platform(self) -> Platform:
-        """Target platform: claude, codex, or mistral-vibe."""
+        """Target platform: claude, codex, mistral-vibe, or agent-skills for an outside target."""
         return Platform(str(self.template_vars.get("platform", Platform.CLAUDE)))
 
     @property
     def has_plugin_manifest(self) -> bool:
         """Whether this platform emits a Claude/Codex plugin manifest."""
-        return self.platform in {Platform.CLAUDE, Platform.CODEX}
+        return self.platform.has_plugin_manifest
 
 
 @dataclass
@@ -319,6 +361,13 @@ def load_target_config(targets_dir: Path, target_name: str, defaults: dict[str, 
     # Merge template vars: defaults → target overrides (tables merged key by key) → derived values
     template_vars = merge_template_vars(defaults, raw.get("vars", {}))
     template_vars["plugin_name"] = plugin["name"]
+    platform = Platform(str(template_vars.get("platform", Platform.CLAUDE)))
+    if platform.is_outside_only:
+        msg = (
+            f"{target_path.name}: platform {platform.value!r} is for outside targets only, rendered by scripts/outside_render.py "
+            '(docs/build-targets.md, "Outside targets"); an in-repo target renders for claude, codex or mistral-vibe'
+        )
+        raise SystemExit(msg)
 
     include_skills: list[str] | None = None
     skills_section = raw.get("skills", {})
@@ -378,12 +427,28 @@ def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[
         raise SystemExit(msg) from exc
 
 
+def find_template(template_dirs: Sequence[Path], name: str) -> Path | None:
+    """The file a template name resolves to: the first of `template_dirs` that holds it, as the loader searches them."""
+    for template_dir in template_dirs:
+        path = template_dir / name
+        if path.is_file():
+            return path
+    return None
+
+
+def skill_template_names(template_dirs: Sequence[Path]) -> list[str]:
+    """Every skill with a `SKILL.md.j2` in any of `template_dirs`, by its directory name, sorted."""
+    return sorted({path.parent.name for template_dir in template_dirs for path in template_dir.glob("skills/*/SKILL.md.j2")})
+
+
 def render_templates(
     templates_dir: Path,
     base_dir: Path,
     template_vars: Mapping[str, TemplateVarValue],
     include_skills: list[str] | None = None,
     target_name: str | None = None,
+    *,
+    outside_templates_dir: Path | None = None,
 ) -> dict[Path, str]:
     """Render all .j2 templates and return {output_path: rendered_content}.
 
@@ -400,6 +465,12 @@ def render_templates(
             `SKILL.<target_name>.md.j2` (next to a skill's `SKILL.md.j2`) is
             appended to that skill's output — so a target can add content without
             touching the shared template. Targets with no overlay are unaffected.
+        outside_templates_dir: An outside target's own `templates/`, searched before
+            `templates_dir` for every name: its skills are rendered beside the
+            upstream ones, its overlays are found, a file of its at an upstream path
+            replaces that file, and it can include any upstream partial by name.
+            Which replacements it may make is `scripts/outside_render.py`'s to check
+            before this is called.
 
     Raises:
         SystemExit: On missing include files or template syntax errors.
@@ -407,6 +478,7 @@ def render_templates(
     if not templates_dir.is_dir():
         msg = f"Templates directory not found: {templates_dir}"
         raise SystemExit(msg)
+    template_dirs = [templates_dir] if outside_templates_dir is None else [outside_templates_dir, templates_dir]
 
     # `StrictUndefined`, because the default `Undefined` renders a misspelled key as
     # the empty string without raising: `{{ floors.pipelex_sdk_jss }}` would ship a
@@ -423,82 +495,65 @@ def render_templates(
     # when this was turned on, so nothing was migrated; the rule is for what comes
     # next.
     env = Environment(
-        loader=FileSystemLoader(str(templates_dir)),
+        loader=FileSystemLoader([str(template_dir) for template_dir in template_dirs]),
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
     env.filters["shell_double_quoted"] = shell_double_quoted
 
-    # Collect shared templates (must all exist — fail loudly if missing)
-    shared_j2_paths: list[Path] = []
-    for name in SHARED_TEMPLATES:
-        path = templates_dir / name
-        if not path.is_file():
-            msg = f"Declared shared template not found: {name}"
-            raise SystemExit(msg)
-        shared_j2_paths.append(path)
+    def declared(names: Sequence[str], kind: str) -> list[str]:
+        """The names, each of which must resolve to a file — fail loudly if one is missing."""
+        for name in names:
+            if find_template(template_dirs, name) is None:
+                msg = f"Declared {kind} not found: {name}"
+                raise SystemExit(msg)
+        return list(names)
 
-    # Collect hook templates (platform-specific — must all exist)
+    # Shared templates, then the platform's hook and MCP templates (indexed, never
+    # defaulted: a platform with no entry is a bug, not Claude).
     platform = Platform(str(template_vars.get("platform", Platform.CLAUDE)))
-    hook_template_list = HOOK_TEMPLATES_BY_PLATFORM.get(platform, HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE])
-    hook_j2_paths: list[Path] = []
-    for name in hook_template_list:
-        path = templates_dir / name
-        if not path.is_file():
-            msg = f"Declared hook template not found: {name}"
-            raise SystemExit(msg)
-        hook_j2_paths.append(path)
+    shared_names = declared(SHARED_TEMPLATES, "shared template")
+    hook_names = declared(HOOK_TEMPLATES_BY_PLATFORM[platform], "hook template")
+    mcp_names = declared(MCP_TEMPLATES_BY_PLATFORM[platform], "MCP template")
 
-    # Collect MCP templates (platform-specific — must all exist)
-    mcp_j2_paths: list[Path] = []
-    for name in MCP_TEMPLATES_BY_PLATFORM.get(platform, []):
-        path = templates_dir / name
-        if not path.is_file():
-            msg = f"Declared MCP template not found: {name}"
-            raise SystemExit(msg)
-        mcp_j2_paths.append(path)
-
-    # Collect skill templates (templates/skills/*/SKILL.md.j2)
-    j2_paths = sorted(templates_dir.glob("skills/*/SKILL.md.j2"))
+    # Skill templates (templates/skills/*/SKILL.md.j2), from every template directory
+    skill_names = skill_template_names(template_dirs)
     if include_skills is not None:
-        j2_paths = [path for path in j2_paths if path.parent.name in include_skills]
+        skill_names = [name for name in skill_names if name in include_skills]
+    skill_template_set = {f"skills/{name}/SKILL.md.j2" for name in skill_names}
 
-    all_j2_paths = j2_paths + shared_j2_paths + hook_j2_paths + mcp_j2_paths
+    all_names = sorted(skill_template_set) + shared_names + hook_names + mcp_names
 
     # No templates at all (no skills found and no shared/hook templates)
-    if not all_j2_paths:
+    if not all_names:
         return {}
 
-    # Collect static hook assets (copied verbatim, no rendering — must all exist)
+    # Static hook assets (copied verbatim, no rendering — must all exist)
     static_asset_paths: list[Path] = []
-    for name in STATIC_HOOK_ASSETS_BY_PLATFORM.get(platform, []):
-        path = templates_dir / name
-        if not path.is_file():
+    for name in STATIC_HOOK_ASSETS_BY_PLATFORM[platform]:
+        path = find_template(template_dirs, name)
+        if path is None:
             msg = f"Declared static hook asset not found: {name} — re-vendor it (see docs/hooks.md)"
             raise SystemExit(msg)
         static_asset_paths.append(path)
 
-    skill_j2_set = set(j2_paths)
     results: dict[Path, str] = {}
-    for j2_path in all_j2_paths:
-        template_name = j2_path.relative_to(templates_dir).as_posix()
+    for template_name in all_names:
         rendered = _render_or_die(env, template_name, template_vars)
 
         # Per-target skill overlay: a `SKILL.<target_name>.md.j2` next to a skill
         # is appended to that skill's output ONLY when building <target_name>. The
         # shared `SKILL.md.j2` is never modified, so every other target stays
         # byte-identical — target-specific content lives in a target-only file.
-        if target_name is not None and j2_path in skill_j2_set:
-            overlay_path = j2_path.parent / f"SKILL.{target_name}.md.j2"
-            if overlay_path.is_file():
-                overlay_name = overlay_path.relative_to(templates_dir).as_posix()
+        if target_name is not None and template_name in skill_template_set:
+            overlay_name = f"{template_name.removesuffix('/SKILL.md.j2')}/SKILL.{target_name}.md.j2"
+            if find_template(template_dirs, overlay_name) is not None:
                 rendered += _render_or_die(env, overlay_name, template_vars)
 
         # Map template path to output path:
         # templates/skills/X/SKILL.md.j2 -> skills/X/SKILL.md
         # templates/hooks/X.sh.j2 -> hooks/X.sh
-        output_rel = j2_path.relative_to(templates_dir).with_suffix("")  # strip .j2
-        output_path = base_dir / output_rel
+        output_path = base_dir / template_name.removesuffix(".j2")
         results[output_path] = rendered
 
     # Static hook assets: templates/hooks/assets/X -> hooks/X (verbatim copy,
@@ -517,10 +572,10 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     - Claude: .claude-plugin/plugin-base.json
     - Codex: .codex-plugin/plugin-base.json
     """
-    if not config.has_plugin_manifest:
+    base_dirname = config.platform.manifest_dirname
+    if base_dirname is None:
         msg = f"{config.name}: platform {config.platform} does not use plugin.json"
         raise SystemExit(msg)
-    base_dirname = ".codex-plugin" if config.platform == Platform.CODEX else ".claude-plugin"
     base_plugin_path = base_dir / base_dirname / "plugin-base.json"
     base: dict[str, object] = json.loads(base_plugin_path.read_text(encoding="utf-8"))
     base["name"] = config.plugin_name
@@ -604,7 +659,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
                 if env_var_names:
                     codex_entry["env_vars"] = env_var_names
                 base["mcpServers"] = {MCP_SERVER_NAME: codex_entry}
-            case Platform.MISTRAL_VIBE:
+            case Platform.MISTRAL_VIBE | Platform.AGENT_SKILLS:
                 pass
     return base
 
@@ -748,11 +803,11 @@ def orphaned_outputs(base_dir: Path, output_dir: Path, produced: set[Path]) -> l
         candidates.extend(current / name for name in filenames if current / name not in produced)
         # os.walk lists a symlink to a directory among the directories and never descends it.
         candidates.extend(current / name for name in dirnames if (current / name).is_symlink() and current / name not in produced_dirs)
-    ignored = _git_ignored(base_dir, candidates)
+    ignored = git_ignored(base_dir, candidates)
     return sorted(path for path in candidates if path not in ignored)
 
 
-def _git_ignored(base_dir: Path, paths: list[Path]) -> set[Path]:
+def git_ignored(base_dir: Path, paths: list[Path]) -> set[Path]:
     """The paths among `paths` that git ignores in the work tree holding `base_dir`.
 
     None outside a work tree or without git, where every file is the build's like any other. Asked
@@ -930,10 +985,10 @@ def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False)
 
         # Generate plugin.json for platforms that have a plugin manifest.
         # Mistral Vibe uses skill_paths plus hooks.toml wiring instead.
-        if config.has_plugin_manifest:
+        manifest_dirname = config.platform.manifest_dirname
+        if manifest_dirname is not None:
             plugin_json = make_plugin_json(base_dir, config)
             result.plugin_json = plugin_json
-            manifest_dirname = ".codex-plugin" if config.platform == Platform.CODEX else ".claude-plugin"
             plugin_dir = output_dir / manifest_dirname
             if not dry_run:
                 plugin_dir.mkdir(parents=True, exist_ok=True)

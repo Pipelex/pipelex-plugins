@@ -15,6 +15,7 @@ import yaml
 
 from scripts.gen_skill_docs import CLAUDE_MCP_LAUNCHER_COMMAND, MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 from scripts.hook_bundle import HOOK_BUNDLE_PATH, HOOK_NOTICES_PATH, inlined_packages, read_bundle, read_provenance, unpublished_sources
+from scripts.skill_links import skill_link_errors
 
 SHARED_TEMPLATE_FILES = [Path(template_path).name for template_path in SHARED_TEMPLATES]
 _SHARED_STEMS = [Path(template_path).name.removesuffix(".md.j2") for template_path in SHARED_TEMPLATES]
@@ -38,16 +39,6 @@ ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 # times the lowest characters-per-token ratio measured over every rendered SKILL.md on every
 # target (2.77, the Claude 5 tokenizer), less a margin — the size diet's facts (L-260923-a9bdfe).
 SKILL_CEILING_CHARS = 13_000
-
-# A Markdown link's target: `[text](target)`, the target running to the first `)` or space.
-MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
-# A fenced block, indented or not (a list item indents its fences), closed by a fence of the same
-# character at least as long as the one that opened it, so a four-backtick fence can wrap a three.
-FENCED_BLOCK_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,}).*?^[ \t]*(?P=fence)[`~]*[ \t]*$", re.MULTILINE | re.DOTALL)
-INLINE_CODE_PATTERN = re.compile(r"`[^`\n]*`")
-# Where a skill names one of its own scripts: after the skill-directory expression, whatever a
-# target spells it as, so the check keys on the `/scripts/<name>` tail that every spelling shares.
-SKILL_SCRIPT_MENTION_PATTERN = re.compile(r"/scripts/([A-Za-z0-9_.\-/]+)")
 
 TARGETS_DIR_NAME = "targets"
 
@@ -215,6 +206,25 @@ def _platform_for_config(config: dict[str, Any], defaults: dict[str, str] | None
     return Platform(str(platform))
 
 
+def check_target_platforms(base_dir: Path) -> list[str]:
+    """Refuse an in-repo target on a platform meant for outside targets only.
+
+    `agent-skills` renders skills alone, for a consumer's private target rendered by
+    `scripts/outside_render.py`; a public skills-only rendering in this repository would be a
+    product surface of its own, to be decided on its own (docs/decisions.md, "Outside targets").
+    """
+    defaults = load_defaults_vars(base_dir)
+    errors: list[str] = []
+    for target_name, config in load_target_configs(base_dir).items():
+        platform = _platform_for_config(config, defaults)
+        if platform.is_outside_only:
+            errors.append(
+                f"targets/{target_name}.toml: platform {platform.value!r} is for outside targets only, rendered by "
+                "scripts/outside_render.py; an in-repo target renders for claude, codex or mistral-vibe"
+            )
+    return errors
+
+
 def check_matched_target_versions(base_dir: Path) -> list[str]:
     """Check that every target's ``[plugin].version`` is the same.
 
@@ -244,11 +254,10 @@ def check_target_plugin_versions(base_dir: Path) -> tuple[list[str], dict[str, s
         source = plugin_section.get("source", "./")
         plugin_name = plugin_section.get("name", target_name)
 
-        platform = _platform_for_config(config, defaults)
-        if platform == Platform.MISTRAL_VIBE:
+        manifest_dirname = _platform_for_config(config, defaults).manifest_dirname
+        if manifest_dirname is None:
             versions[target_name] = str(config_version)
             continue
-        manifest_dirname = ".codex-plugin" if platform == Platform.CODEX else ".claude-plugin"
 
         if source == "./":
             plugin_json_path = base_dir / manifest_dirname / "plugin.json"
@@ -579,96 +588,15 @@ def check_skill_ceiling(base_dir: Path) -> list[str]:
     return [line for _, line in sorted(over, key=lambda item: -item[0])]
 
 
-def _without_fenced_blocks(text: str) -> str:
-    """The text with fenced blocks blanked, line count kept, so a `#` comment in code is never a heading."""
-    return FENCED_BLOCK_PATTERN.sub(lambda match: "\n" * match.group(0).count("\n"), text)
-
-
-def _markdown_prose(text: str) -> str:
-    """The text with fenced blocks and inline code blanked, so an example is never read as a link."""
-    return INLINE_CODE_PATTERN.sub("``", _without_fenced_blocks(text))
-
-
-def _heading_slugs(text: str) -> set[str]:
-    """The anchors GitHub-flavoured Markdown gives the file's headings.
-
-    Lowercased, every character that is not a letter, a digit, a space, a hyphen or an underscore
-    dropped, and each space turned into a hyphen — so `Step 8 — a method` becomes `step-8--a-method`.
-    Inline code keeps its text and loses only its backticks, as on GitHub, so a heading naming a tool
-    keeps the tool's name in its anchor.
-    """
-    slugs: set[str] = set()
-    seen: dict[str, int] = {}
-    for line in _without_fenced_blocks(text).splitlines():
-        match = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
-        if match:
-            slug = re.sub(r"[^\w\- ]", "", match.group(1).lower()).replace(" ", "-")
-            # A repeated heading's later occurrences are `slug-1`, `slug-2`, … on GitHub.
-            count = seen.get(slug, 0)
-            seen[slug] = count + 1
-            slugs.add(slug if count == 0 else f"{slug}-{count}")
-    return slugs
-
-
-def _link_targets(text: str) -> list[str]:
-    """Every relative link target in the prose of a Markdown file, anchors included."""
-    targets: list[str] = []
-    for match in MARKDOWN_LINK_PATTERN.finditer(_markdown_prose(text)):
-        target = match.group(1)
-        if re.match(r"^[a-z][a-z0-9+.\-]*:", target) or target.startswith("/"):
-            continue  # a URL, a mailto: or an absolute path is not a file of the plugin
-        targets.append(target)
-    return targets
-
-
 def check_skill_links(base_dir: Path) -> list[str]:
     """Links resolve both ways in every target (box H of the size diet's design, L-260923-a9bdfe).
 
-    Forward: every relative link in a skill, a reference or a shared file names a file that
-    exists in the same target, and every anchor names a heading of the file it points into.
-    Backward: every file a skill ships under `references/` or `scripts/` is named by something the
-    model reads first — a reference by a SKILL.md link, a script by a SKILL.md or by a reference of
-    its own skill — and every shared file by a skill or a reference. A pointer to nothing sends the
-    model to a read that fails; a file named by nothing is a caveat no model will ever read.
+    The rule is `scripts/skill_links.py`'s, which an outside target's rendering is held to as well;
+    here each in-repo target's directory is the boundary no link may leave.
     """
     errors: list[str] = []
     for output_dir in _collect_output_dirs(base_dir):
-        skills_dir = output_dir / "skills"
-        target_root = output_dir.resolve()
-        markdown_files = (
-            sorted(skills_dir.glob("*/SKILL.md")) + sorted(skills_dir.glob("*/references/**/*.md")) + sorted(skills_dir.glob("shared/*.md"))
-        )
-        named: set[Path] = set()
-        for md_file in markdown_files:
-            text = md_file.read_text(encoding="utf-8")
-            rel = md_file.relative_to(base_dir)
-            for target in _link_targets(text):
-                path_part, _, anchor = target.partition("#")
-                resolved = (md_file.parent / path_part).resolve() if path_part else md_file.resolve()
-                if path_part:
-                    if not resolved.is_relative_to(target_root):
-                        errors.append(f"{rel}: link to `{target}` leaves the target, whose installed copy does not carry it")
-                        continue
-                    if not resolved.is_file():
-                        errors.append(f"{rel}: link to `{target}` names no file in this target")
-                        continue
-                    if md_file.name == "SKILL.md" or resolved.parent.name == "scripts":
-                        named.add(resolved)
-                    elif resolved.parent.name == "shared":
-                        named.add(resolved)
-                if anchor and resolved.suffix == ".md" and anchor not in _heading_slugs(resolved.read_text(encoding="utf-8")):
-                    errors.append(f"{rel}: anchor `#{anchor}` names no heading of {resolved.name}")
-            skill_root = skills_dir / md_file.relative_to(skills_dir).parts[0]
-            for match in SKILL_SCRIPT_MENTION_PATTERN.finditer(text):
-                script = (skill_root / "scripts" / match.group(1).rstrip(".")).resolve()
-                if script.is_file():
-                    named.add(script)
-        for asset in sorted(skills_dir.glob("*/references/**/*")) + sorted(skills_dir.glob("*/scripts/**/*")):
-            if asset.is_file() and asset.resolve() not in named:
-                errors.append(f"{asset.relative_to(base_dir)}: shipped but named by nothing the model reads")
-        for shared in sorted(skills_dir.glob("shared/*.md")):
-            if shared.resolve() not in named:
-                errors.append(f"{shared.relative_to(base_dir)}: shipped but named by no skill and no reference")
+        errors.extend(skill_link_errors(output_dir / "skills", base_dir, boundary=output_dir))
     return errors
 
 
@@ -1024,6 +952,8 @@ def check_credential_wiring(base_dir: Path) -> list[str]:
                 errors.extend(_codex_credential_errors(label, output_dir, env_vars))
             case Platform.MISTRAL_VIBE:
                 errors.extend(_vibe_credential_errors(label, output_dir, env_vars))
+            case Platform.AGENT_SKILLS:
+                pass  # an in-repo target on it is refused by check_target_platforms, and it declares no workshop
     return errors
 
 
@@ -1191,6 +1121,13 @@ def run_shared_checks(base_dir: Path) -> bool:
         for target_name, version in versions.items():
             print(f"  [{target_name}] version: {version}")
         print("  All target plugin versions consistent.")
+
+    failed |= _run_check(
+        "Checking every in-repo target renders for an in-repo platform...",
+        check_target_platforms(base_dir),
+        "FAIL: An in-repo target names a platform meant for outside targets only.",
+        "  Every in-repo target renders for claude, codex or mistral-vibe.",
+    )
 
     failed |= _run_check(
         "Checking target versions are in matched-version lockstep...",

@@ -631,6 +631,20 @@ class TestTargetConfig:
         assert config.platform == "mistral-vibe"
         assert not config.has_plugin_manifest
 
+    @pytest.mark.parametrize(
+        ("platform", "manifest_dirname", "outside_only"),
+        [
+            (Platform.CLAUDE, ".claude-plugin", False),
+            (Platform.CODEX, ".codex-plugin", False),
+            (Platform.MISTRAL_VIBE, None, False),
+            (Platform.AGENT_SKILLS, None, True),
+        ],
+    )
+    def test_what_a_platform_emits_is_a_property_of_the_platform(self, platform: Platform, manifest_dirname: str | None, outside_only: bool) -> None:
+        assert platform.manifest_dirname == manifest_dirname
+        assert platform.has_plugin_manifest is (manifest_dirname is not None)
+        assert platform.is_outside_only is outside_only
+
     def test_load_codex_target_config(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "codex")
@@ -955,7 +969,7 @@ class TestSharedSkillIncludes:
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
         "**Save the linked method's draft.**": "skills/shared/saved-copy-notice.md.j2",
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
-        "read [the catalog-id reference](../shared/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
+        "read [the catalog-id reference]({{ shared_dir }}/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
         "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
@@ -2657,12 +2671,27 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
 
 class TestHookRendering:
     def test_all_platforms_declare_their_hook_templates(self) -> None:
-        """Each platform declares its own hook template set, and the MCP fragment is not among them."""
-        assert set(HOOK_TEMPLATES_BY_PLATFORM) == {Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE}
+        """Each platform declares its own hook template set, and the MCP fragment is not among them.
+
+        Every platform has an entry, an empty one where it has no hooks, so the renderer looks a platform
+        up by index and an unmapped one fails instead of rendering Claude's hooks."""
+        assert set(HOOK_TEMPLATES_BY_PLATFORM) == set(Platform)
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
-        assert MCP_TEMPLATES_BY_PLATFORM == {Platform.CLAUDE: [], Platform.CODEX: [], Platform.MISTRAL_VIBE: ["mcp/vibe-mcp.toml.j2"]}
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.AGENT_SKILLS] == []
+        assert MCP_TEMPLATES_BY_PLATFORM == {
+            Platform.CLAUDE: [],
+            Platform.CODEX: [],
+            Platform.MISTRAL_VIBE: ["mcp/vibe-mcp.toml.j2"],
+            Platform.AGENT_SKILLS: [],
+        }
+
+    def test_agent_skills_renders_skills_and_shared_files_alone(self, tmp_path: Path) -> None:
+        """The outside-only platform has no hooks, no hook bundle and no MCP fragment, even where the templates exist."""
+        tree = _create_codex_tree(tmp_path)
+        results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "agent-skills"})
+        assert {path.relative_to(tree).parts[0] for path in results} == {"skills"}
 
     def test_a_missing_mcp_template_is_named_for_what_it_is(self, tmp_path: Path) -> None:
         """The Vibe fragment is the workshop launcher's declaration, not a hook, and its absence says so."""
@@ -2703,9 +2732,10 @@ class TestHookRendering:
         assert os.access(hook_script, os.X_OK)
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
-        """One vendored check.mjs bundle serves all three platforms, and its MIT notice ships beside it on each."""
-        for platform in Platform:
+        """One vendored check.mjs bundle serves the three hook platforms, and its MIT notice ships beside it on each."""
+        for platform in (Platform.CLAUDE, Platform.CODEX, Platform.MISTRAL_VIBE):
             assert STATIC_HOOK_ASSETS_BY_PLATFORM[platform] == ["hooks/assets/check.mjs", "hooks/assets/THIRD-PARTY-NOTICES.md"]
+        assert STATIC_HOOK_ASSETS_BY_PLATFORM[Platform.AGENT_SKILLS] == []
 
     def test_static_asset_copied_verbatim_not_rendered(self, template_tree: Path) -> None:
         """check.mjs must bypass Jinja: its body (a generated bundle) may contain
@@ -2971,7 +3001,7 @@ class TestCatalogIdInEverySkill:
         assert 'include "skills/shared/catalog-id-bridge.md.j2"' not in body, "the block has one carrier per skill"
         assert body.count('include "skills/shared/catalog-id-pointer.md.j2"') == 1, "the pointer is said once, in the shared words"
         pointer = (self.TEMPLATES / "shared" / "catalog-id-pointer.md.j2").read_text(encoding="utf-8")
-        assert "read [the catalog-id reference](../shared/catalog-id.md) before reading any file" in pointer
+        assert "read [the catalog-id reference]({{ shared_dir }}/catalog-id.md) before reading any file" in pointer
         assert "**For a catalog id (`mt_…`) or a published address**" in pointer, "an address is the bridge's to refuse"
         assert "never choose" in pointer
         assert "**Never present a linked directory as the saved method's current content.**" in pointer

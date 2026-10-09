@@ -1,0 +1,530 @@
+#!/usr/bin/env python3
+"""Render this plugin's skills for an outside target: a target file and templates kept in another repository.
+
+An outside target is one TOML file in the consumer's repository. The directory holding it is the
+target's **source root**, laid out like this repository: its own templates under
+`templates/skills/…`, its own static assets under `skills/<skill>/references/` and
+`skills/<skill>/scripts/`. The render reads three sources — this repository's templates, static
+assets and defaults (the upstream), the outside templates, and the outside static assets — and
+writes one directory, the target's output, which it owns: one subdirectory per skill, and the
+shared files either beside them or copied into each skill.
+
+The outside target may add anything. It may also replace any upstream template or static asset,
+and drop any upstream static asset, but only what it declares, each declaration pinning the
+upstream file by the SHA-256 of its bytes; and it may pin an upstream file it uses as it is. So an
+upstream change to a file the consumer replaced, dropped or depends on stops the render until
+somebody has read it and updated the hash. The rules, and why, are in docs/build-targets.md,
+"Outside targets", and docs/decisions.md.
+
+It renders for the `agent-skills` platform only, and writes no hooks, no manifest, no MCP
+declaration and no marketplace file.
+
+Usage:
+    python -m scripts.outside_render <target file>           # render into the target's output
+    python -m scripts.outside_render <target file> --check   # compare the output, write nothing
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import re
+import stat
+import sys
+import tempfile
+import tomllib
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from typing import cast
+
+from scripts.gen_skill_docs import (
+    STATIC_ASSET_DIRS,
+    TARGETS_DIR_NAME,
+    TEMPLATES_DIR_NAME,
+    Platform,
+    TemplateVarValue,
+    git_ignored,
+    list_targets,
+    load_defaults,
+    merge_template_vars,
+    orphaned_outputs,
+    prune_orphans,
+    render_templates,
+    skill_template_names,
+)
+from scripts.skill_links import SHARED_DIR_NAME, linked_paths, skill_link_errors
+
+# The checkout this module sits in, whose templates, static assets and defaults are the upstream.
+UPSTREAM_ROOT = Path(__file__).resolve().parent.parent
+
+# The directory of upstream and outside static assets, one subdirectory per skill.
+SKILLS_DIR_NAME = "skills"
+
+# The keys an outside target file may hold. Anything else is refused, since a misspelled table
+# (`[render.replace]`) would otherwise be ignored and its declarations with it.
+TOP_LEVEL_KEYS = frozenset({"render", "skills", "vars"})
+DECLARATION_TABLES = ("replaces", "drops", "pins")
+RENDER_KEYS = frozenset({"output", "shared", *DECLARATION_TABLES})
+SKILLS_KEYS = frozenset({"include"})
+
+# The variables the render sets itself, which a target's `[vars]` may therefore not set.
+DERIVED_VARS = ("plugin_name", "shared_dir")
+# The variables whose defaults are Claude Code's, which an outside target must set itself.
+REQUIRED_VARS = ("platform", "harness_name", "skill_dir")
+
+# The upstream files a declaration may name: a template a skill renders or includes, or a skill's static asset.
+DECLARABLE_PREFIXES = (f"{TEMPLATES_DIR_NAME}/{SKILLS_DIR_NAME}/", f"{SKILLS_DIR_NAME}/")
+HASH_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+class SharedLayout(StrEnum):
+    """Where the shared files go: once beside the skills, as the plugin ships them, or into each skill that links one."""
+
+    BESIDE = "beside"
+    IN_EACH_SKILL = "in-each-skill"
+
+    @property
+    def shared_dir(self) -> str:
+        """The `shared_dir` template variable: where a SKILL.md's links find the shared files."""
+        match self:
+            case SharedLayout.BESIDE:
+                return f"../{SHARED_DIR_NAME}"
+            case SharedLayout.IN_EACH_SKILL:
+                return SHARED_DIR_NAME
+
+
+@dataclass(frozen=True)
+class OutsideTarget:
+    """A parsed outside target file. Declaration keys are paths in this repository (`templates/…`, `skills/…`)."""
+
+    name: str
+    path: Path
+    source_root: Path
+    output_dir: Path
+    shared_layout: SharedLayout
+    replaces: dict[str, str]
+    drops: dict[str, str]
+    pins: dict[str, str]
+    include_skills: list[str] | None
+    template_vars: dict[str, TemplateVarValue]
+
+    @property
+    def outside_templates_dir(self) -> Path:
+        return self.source_root / TEMPLATES_DIR_NAME
+
+    def declarations(self) -> dict[str, dict[str, str]]:
+        """The three declaration tables by name."""
+        return {"replaces": self.replaces, "drops": self.drops, "pins": self.pins}
+
+
+@dataclass(frozen=True)
+class OutputFile:
+    """One file the render produces: its bytes, and whether it is executable (a skill's script)."""
+
+    content: bytes
+    executable: bool = False
+
+
+def file_sha256(path: Path) -> str:
+    """A declaration's hash of a file: `sha256:` and the hex digest of its bytes."""
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def _refuse(target_file: Path, message: str) -> SystemExit:
+    return SystemExit(f"{target_file.name}: {message}")
+
+
+def _string_table(target_file: Path, raw: object, where: str) -> dict[str, str]:
+    """A TOML table of strings, refused when it is anything else."""
+    if not isinstance(raw, dict):
+        raise _refuse(target_file, f"{where} must be a table")
+    table: dict[str, str] = {}
+    for key, value in cast("dict[object, object]", raw).items():
+        if not isinstance(value, str):
+            raise _refuse(target_file, f"{where} {key!r} must be a string")
+        table[str(key)] = value
+    return table
+
+
+def _check_declared_path(target_file: Path, table: str, key: str) -> None:
+    """A declaration names an upstream file by its POSIX path in this repository, under `templates/skills/` or `skills/`."""
+    if "\\" in key or any(part in {"", ".", ".."} for part in key.split("/")):
+        raise _refuse(target_file, f"[render.{table}] {key!r} is not a relative POSIX path in this repository")
+    if not key.startswith(DECLARABLE_PREFIXES):
+        message = f"[render.{table}] {key!r} names no skill template or static asset: a declaration starts with templates/skills/ or skills/"
+        raise _refuse(target_file, message)
+
+
+def load_outside_target(target_file: Path, upstream_root: Path = UPSTREAM_ROOT) -> OutsideTarget:
+    """Read and validate an outside target file, laying its `[vars]` over the upstream defaults.
+
+    Refused, each naming its cure: a file that is not TOML; a key the format does not have; a name
+    an in-repo target already has, whose overlays it would pick up; a missing `output`, or one that
+    holds or sits inside the source root or the upstream; a `shared` layout the render does not
+    know; a malformed declaration, or one path in two tables; a target not on `agent-skills`, or one
+    leaving `harness_name` or `skill_dir` to the defaults, which are Claude Code's; a variable the
+    render derives itself; and an `include` naming a skill that exists neither upstream nor under
+    the source root.
+    """
+    path = target_file.resolve()
+    if not path.is_file():
+        msg = f"Outside target file not found: {target_file}"
+        raise SystemExit(msg)
+    try:
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        raise _refuse(path, f"not valid TOML: {exc}") from exc
+
+    unknown = sorted(set(raw) - TOP_LEVEL_KEYS)
+    if unknown:
+        raise _refuse(path, f"unknown key(s) {', '.join(unknown)}: an outside target holds [render], [skills] and [vars]")
+    render = _table(path, raw.get("render", {}), "[render]")
+    unknown = sorted(set(render) - RENDER_KEYS)
+    if unknown:
+        raise _refuse(path, f"unknown [render] key(s) {', '.join(unknown)}: it holds output, shared, and the replaces, drops and pins tables")
+    skills = _table(path, raw.get("skills", {}), "[skills]")
+    unknown = sorted(set(skills) - SKILLS_KEYS)
+    if unknown:
+        raise _refuse(path, f"unknown [skills] key(s) {', '.join(unknown)}: it holds include")
+
+    name = path.stem
+    targets_dir = upstream_root / TARGETS_DIR_NAME
+    if name in list_targets(targets_dir):
+        raise _refuse(path, f"its name {name!r} is an in-repo target's, whose overlays it would pick up: rename the file")
+
+    source_root = path.parent
+    output = render.get("output")
+    if not isinstance(output, str) or not output:
+        raise _refuse(path, "[render] output is required: the directory the render owns, relative to this file")
+    output_dir = (source_root / output).resolve()
+    if output_dir.is_relative_to(source_root) or source_root.is_relative_to(output_dir):
+        raise _refuse(path, f"[render] output {output!r} holds or sits inside the source root, whose templates the render would prune")
+    upstream = upstream_root.resolve()
+    if output_dir.is_relative_to(upstream) or upstream.is_relative_to(output_dir):
+        raise _refuse(path, f"[render] output {output!r} overlaps pipelex-plugins itself, which the render never writes into")
+
+    raw_layout = render.get("shared", SharedLayout.BESIDE.value)
+    try:
+        shared_layout = SharedLayout(str(raw_layout))
+    except ValueError as exc:
+        layouts = ", ".join(repr(layout.value) for layout in SharedLayout)
+        raise _refuse(path, f"[render] shared {raw_layout!r} is not a layout: it is one of {layouts}") from exc
+
+    declarations: dict[str, dict[str, str]] = {}
+    seen: dict[str, str] = {}
+    for table in DECLARATION_TABLES:
+        entries = _string_table(path, render.get(table, {}), f"[render.{table}]")
+        for key, value in entries.items():
+            _check_declared_path(path, table, key)
+            if not HASH_PATTERN.match(value):
+                raise _refuse(path, f"[render.{table}] {key!r} = {value!r} is not a hash: write sha256: and the 64 hex digits of the upstream file")
+            if key in seen:
+                raise _refuse(path, f"{key!r} is declared in both [render.{seen[key]}] and [render.{table}]: a file is replaced, dropped or pinned")
+            seen[key] = table
+        declarations[table] = entries
+
+    overrides = _table(path, raw.get("vars", {}), "[vars]")
+    for derived in DERIVED_VARS:
+        if derived in overrides:
+            raise _refuse(path, f"[vars] {derived} is set by the render itself (the file's name, and the [render] shared layout)")
+    missing = [key for key in REQUIRED_VARS if key not in overrides]
+    if missing:
+        message = f"[vars] must set {', '.join(missing)}: the defaults are Claude Code's, and an outside target renders for another harness"
+        raise _refuse(path, message)
+    template_vars = merge_template_vars(load_defaults(targets_dir), overrides)
+    platform_value = str(template_vars["platform"])
+    if platform_value not in {platform.value for platform in Platform if platform.is_outside_only}:
+        raise _refuse(path, f"[vars] platform is {platform_value!r}: an outside target renders for {Platform.AGENT_SKILLS.value!r}")
+    template_vars["plugin_name"] = name
+    template_vars["shared_dir"] = shared_layout.shared_dir
+
+    include_skills: list[str] | None = None
+    if "include" in skills:
+        raw_include: object = skills["include"]
+        if not isinstance(raw_include, list) or not all(isinstance(item, str) for item in cast("list[object]", raw_include)):
+            raise _refuse(path, "[skills] include must be a list of skill names")
+        include_skills = [str(item) for item in cast("list[object]", raw_include)]
+
+    target = OutsideTarget(
+        name=name,
+        path=path,
+        source_root=source_root,
+        output_dir=output_dir,
+        shared_layout=shared_layout,
+        replaces=declarations["replaces"],
+        drops=declarations["drops"],
+        pins=declarations["pins"],
+        include_skills=include_skills,
+        template_vars=template_vars,
+    )
+    known = set(skill_template_names(_template_dirs(target, upstream_root)))
+    if SHARED_DIR_NAME in known:
+        raise _refuse(path, f"a skill may not be named {SHARED_DIR_NAME!r}, the directory the shared files go in")
+    for skill in include_skills or []:
+        if skill not in known:
+            raise _refuse(path, f"[skills] include names {skill!r}, a skill that exists neither upstream nor under {TEMPLATES_DIR_NAME}/skills/ here")
+    return target
+
+
+def _table(target_file: Path, raw: object, where: str) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise _refuse(target_file, f"{where} must be a table")
+    return {str(key): value for key, value in cast("dict[object, object]", raw).items()}
+
+
+def _template_dirs(target: OutsideTarget, upstream_root: Path) -> list[Path]:
+    """The template directories in search order: the outside one first, when there is one."""
+    dirs = [upstream_root / TEMPLATES_DIR_NAME]
+    if target.outside_templates_dir.is_dir():
+        dirs.insert(0, target.outside_templates_dir)
+    return dirs
+
+
+def _source_files(root: Path, subdirs: Sequence[str]) -> list[str]:
+    """Every file under `root`'s `subdirs`, as POSIX paths relative to `root`, leaving out what git ignores there."""
+    files = sorted(path for subdir in subdirs if (root / subdir).is_dir() for path in (root / subdir).rglob("*") if path.is_file())
+    ignored = git_ignored(root, files)
+    return [path.relative_to(root).as_posix() for path in files if path not in ignored]
+
+
+def _is_static_asset(rel: str) -> bool:
+    """Whether a path under `skills/` is a skill's static asset, `skills/<skill>/references|scripts/…`."""
+    parts = rel.split("/")
+    return len(parts) >= 4 and parts[0] == SKILLS_DIR_NAME and parts[2] in STATIC_ASSET_DIRS
+
+
+def declaration_errors(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> list[str]:
+    """What the target changes upstream without saying so, or says it changes and no longer can.
+
+    An outside file at an upstream path must be declared in `[render.replaces]`, and a declared
+    replacement must have its file under the source root. Every declaration must name an upstream
+    file, whose bytes must still hash to the declared value. A drop names a static asset and is
+    not provided, and a pin is not replaced. An outside file the render would never read — under
+    `templates/` but not a skill template, or under `skills/` but not a skill's `references/` or
+    `scripts/` — is refused too, since it can only be a file in the wrong place.
+    """
+    errors: list[str] = []
+    outside = _source_files(target.source_root, (TEMPLATES_DIR_NAME, SKILLS_DIR_NAME))
+    outside_set = set(outside)
+    for rel in outside:
+        if rel.startswith(f"{TEMPLATES_DIR_NAME}/"):
+            if not rel.startswith(DECLARABLE_PREFIXES[0]) or not rel.endswith(".j2"):
+                errors.append(f"{rel}: the render reads only templates under {DECLARABLE_PREFIXES[0]} ending .j2; move it there, or delete it")
+                continue
+        elif not _is_static_asset(rel):
+            errors.append(f"{rel}: the render copies only a skill's references/ and scripts/ from {SKILLS_DIR_NAME}/; move it there, or delete it")
+            continue
+        upstream_file = upstream_root / rel
+        if upstream_file.is_file() and not any(rel in entries for entries in target.declarations().values()):
+            errors.append(
+                f"{rel}: replaces the upstream file at the same path without saying so; declare it in [render.replaces] "
+                f'as "{rel}" = "{file_sha256(upstream_file)}" once you have read the upstream file'
+            )
+    for table, entries in target.declarations().items():
+        for rel, declared in sorted(entries.items()):
+            upstream_file = upstream_root / rel
+            if not upstream_file.is_file():
+                errors.append(f"[render.{table}] {rel}: names no upstream file; it was renamed or removed upstream, so find where its content went")
+                continue
+            actual = file_sha256(upstream_file)
+            if actual != declared:
+                errors.append(
+                    f"[render.{table}] {rel}: the upstream file changed: declared {declared}, now {actual}. Read the change "
+                    f"(`git diff <old-tag>..<new-tag> -- {rel}` in pipelex-plugins), carry it over or decide against it, then update the hash"
+                )
+            match table:
+                case "replaces":
+                    if rel not in outside_set:
+                        errors.append(f"[render.replaces] {rel}: no file at that path under the source root; a file left out is a drop")
+                case "drops":
+                    if not _is_static_asset(rel):
+                        errors.append(f"[render.drops] {rel}: only a static asset is dropped; replace a template, or leave its skill out")
+                    elif rel in outside_set:
+                        errors.append(f"[render.drops] {rel}: dropped, yet the source root holds a file at that path; replace it instead")
+                case "pins":
+                    if rel in outside_set:
+                        errors.append(f"[render.pins] {rel}: pinned as used as it is, yet the source root holds a file there; replace it instead")
+                case _:
+                    pass
+    return errors
+
+
+def _rendered_skill_names(target: OutsideTarget, upstream_root: Path) -> list[str]:
+    names = skill_template_names(_template_dirs(target, upstream_root))
+    if target.include_skills is None:
+        return names
+    return [name for name in names if name in target.include_skills]
+
+
+def _static_assets(target: OutsideTarget, upstream_root: Path, skill: str) -> dict[str, OutputFile]:
+    """A skill's static assets, by their path in the output: the upstream ones less the drops, then the outside ones over them."""
+    assets: dict[str, OutputFile] = {}
+    asset_dirs = [f"{SKILLS_DIR_NAME}/{skill}/{name}" for name in STATIC_ASSET_DIRS]
+    for root, dropped in ((upstream_root, set(target.drops)), (target.source_root, set[str]())):
+        for rel in _source_files(root, asset_dirs):
+            if rel in dropped:
+                continue
+            source = root / rel
+            executable = bool(source.stat().st_mode & stat.S_IXUSR)
+            assets[rel.removeprefix(f"{SKILLS_DIR_NAME}/")] = OutputFile(source.read_bytes(), executable)  # <skill>/references/…
+    return assets
+
+
+def _shared_closure(files: Mapping[str, OutputFile], shared_prefix: str, shared: Mapping[str, str]) -> dict[str, OutputFile]:
+    """The shared files that `files` link to under `shared_prefix`, followed through the shared files' own links."""
+    closure: dict[str, OutputFile] = {}
+    pending = [(rel, file.content.decode("utf-8")) for rel, file in files.items() if rel.endswith(".md")]
+    while pending:
+        rel, text = pending.pop()
+        for linked in linked_paths(text, rel):
+            directory, _, filename = linked.rpartition("/")
+            if directory == shared_prefix and filename in shared and linked not in closure:
+                closure[linked] = OutputFile(shared[filename].encode("utf-8"))
+                pending.append((linked, shared[filename]))
+    return closure
+
+
+def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> dict[str, OutputFile]:
+    """Everything the outside target's output holds, by its POSIX path in the output directory, rendered in memory.
+
+    Each skill is `<skill>/SKILL.md` with its static assets beside it. The shared files the skills
+    link to, followed through their own links, go once in `shared/` (`beside`) or into each skill
+    that links one (`in-each-skill`), and a shared file nothing links is left out. The caller has
+    checked the declarations (`declaration_errors`).
+    """
+    outside_dir = target.outside_templates_dir if target.outside_templates_dir.is_dir() else None
+    skills = _rendered_skill_names(target, upstream_root)
+    rendered = render_templates(
+        upstream_root / TEMPLATES_DIR_NAME,
+        Path(),
+        target.template_vars,
+        include_skills=skills,
+        target_name=target.name,
+        outside_templates_dir=outside_dir,
+    )
+    shared: dict[str, str] = {}
+    files: dict[str, OutputFile] = {}
+    for output_path, content in rendered.items():
+        parts = output_path.parts
+        if len(parts) != 3 or parts[0] != SKILLS_DIR_NAME:
+            msg = f"the agent-skills platform rendered {output_path}, which is neither a skill nor a shared file"
+            raise SystemExit(msg)
+        if parts[1] == SHARED_DIR_NAME:
+            shared[parts[2]] = content
+        else:
+            files[f"{parts[1]}/{parts[2]}"] = OutputFile(content.encode("utf-8"))
+    for skill in skills:
+        files.update(_static_assets(target, upstream_root, skill))
+    match target.shared_layout:
+        case SharedLayout.BESIDE:
+            files.update(_shared_closure(files, SHARED_DIR_NAME, shared))
+        case SharedLayout.IN_EACH_SKILL:
+            for skill in skills:
+                own = {rel: file for rel, file in files.items() if rel.startswith(f"{skill}/")}
+                files.update(_shared_closure(own, f"{skill}/{SHARED_DIR_NAME}", shared))
+    return dict(sorted(files.items()))
+
+
+def link_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
+    """The link check of `scripts/skill_links.py` over a rendering, run in a scratch copy of it.
+
+    Its boundary is the output directory in the `beside` layout, and each skill's own directory in
+    the `in-each-skill` layout, where a link that leaves its skill names a file the skill's uploaded
+    copy does not carry. Findings name files as `<output>/<path>`.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        root = Path(scratch)
+        output = root / target.output_dir.name
+        _write_files(output, files)
+        boundary = output if target.shared_layout == SharedLayout.BESIDE else None
+        return skill_link_errors(output, root, boundary=boundary)
+
+
+def _write_files(output_dir: Path, files: Mapping[str, OutputFile]) -> None:
+    """Write each file whose bytes or executable bit differ, and leave the others untouched."""
+    for rel, file in files.items():
+        path = output_dir / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.is_file() or path.is_symlink() or path.read_bytes() != file.content:
+            if path.is_symlink():
+                path.unlink()
+            path.write_bytes(file.content)
+        mode = path.stat().st_mode
+        wanted = mode | 0o111 if file.executable else mode & ~0o111
+        if wanted != mode:
+            path.chmod(stat.S_IMODE(wanted))
+
+
+def _label(target: OutsideTarget, path: Path) -> str:
+    return path.relative_to(target.output_dir.parent).as_posix()
+
+
+def build(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
+    """Render the target into its output directory and prune what it no longer produces; write nothing on a refusal or a broken link."""
+    problems = declaration_errors(target, upstream_root)
+    if problems:
+        return _fail(problems, "The target changes upstream files without declaring them, or a declaration no longer holds.")
+    files = render_outside(target, upstream_root)
+    problems = link_errors(target, files)
+    if problems:
+        return _fail(problems, "The rendering has a broken link, or ships a file nothing names; nothing was written.")
+    target.output_dir.mkdir(parents=True, exist_ok=True)
+    _write_files(target.output_dir, files)
+    produced = {target.output_dir / rel for rel in files}
+    for removed in prune_orphans(target.output_dir, target.output_dir, produced):
+        print(f"  Removed {_label(target, removed)} (the render no longer produces it)")
+    print(f"  [{target.name}] Rendered {len(files)} files into {target.output_dir}.")
+    return 0
+
+
+def check(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
+    """Render in memory and report every way the output directory differs from it, and every link error. Writes nothing."""
+    problems = declaration_errors(target, upstream_root)
+    if problems:
+        return _fail(problems, "The target changes upstream files without declaring them, or a declaration no longer holds.")
+    files = render_outside(target, upstream_root)
+    findings = [f"LINK: {error}" for error in link_errors(target, files)]
+    for rel, file in files.items():
+        path = target.output_dir / rel
+        label = _label(target, path)
+        if not path.is_file():
+            findings.append(f"MISSING: {label}")
+        elif path.read_bytes() != file.content:
+            findings.append(f"STALE: {label}")
+        elif bool(path.stat().st_mode & stat.S_IXUSR) != file.executable:
+            findings.append(f"MODE: {label} (executable bit differs from its source)")
+    produced = {target.output_dir / rel for rel in files}
+    for orphan in orphaned_outputs(target.output_dir, target.output_dir, produced):
+        label = _label(target, orphan)
+        if orphan.suffix == ".j2":
+            findings.append(f"LEAKED TEMPLATE: {label} (a template belongs under the source root's templates/: move it there, or delete it)")
+        else:
+            findings.append(f"ORPHAN: {label} (the render does not produce it, and removes it)")
+    if findings:
+        return _fail(findings, "The rendering is out of date. Render the target again, and apply any other cure a line above names.")
+    print(f"  [{target.name}] All {len(files)} rendered files are fresh in {target.output_dir}.")
+    return 0
+
+
+def _fail(lines: Sequence[str], summary: str) -> int:
+    for line in lines:
+        print(f"  {line}")
+    print(f"FAIL: {summary}")
+    return 1
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Render pipelex-plugins' skills for an outside target.")
+    parser.add_argument("target_file", type=Path, help="the outside target's TOML file")
+    parser.add_argument("--check", action="store_true", help="compare the output directory with a fresh rendering; write nothing")
+    args = parser.parse_args(argv)
+    target = load_outside_target(cast("Path", args.target_file))
+    if cast("bool", args.check):
+        return check(target)
+    return build(target)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
