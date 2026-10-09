@@ -10,6 +10,7 @@ file as it is today, so an upstream edit to a file the fixture names never break
 
 from __future__ import annotations
 
+import compileall
 import re
 import shutil
 import stat
@@ -22,7 +23,7 @@ import pytest
 import yaml
 
 from scripts.check import check_target_platforms
-from scripts.gen_skill_docs import load_target_config
+from scripts.gen_skill_docs import git_ignored, load_target_config
 from scripts.outside_render import (
     OWNER_MARKER_NAME,
     OutsideTarget,
@@ -38,6 +39,8 @@ from scripts.outside_render import (
 
 REPO_ROOT = Path(__file__).parents[2]
 FIXTURE = REPO_ROOT / "tests" / "data" / "outside-target"
+# The fixture CI renders with the installed command, its rendering committed beside it (docs/ci.md).
+SMOKE_FIXTURE = REPO_ROOT / "tests" / "data" / "outside-target-smoke"
 TARGET_FILE = "outside-fixture.toml"
 PLACEHOLDER = "sha256:computed-by-the-test"
 WRONG_HASH = "sha256:" + "0" * 64
@@ -330,7 +333,7 @@ class TestOutsideRender:
         errors = declaration_errors(load_outside_target(target_file))
         assert errors == [
             f"[render.{table}] {path}: the upstream file changed: declared {WRONG_HASH}, now {actual}. Read the change "
-            f"(`git diff <old-tag>..<new-tag> -- {path}` in pipelex-plugins), carry it over or decide against it, then update the hash"
+            f"(`git diff <old-ref>..<new-ref> -- {path}` in pipelex-plugins), carry it over or decide against it, then update the hash"
         ]
 
     def test_a_link_that_leaves_its_skill_fails_and_nothing_is_written(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -416,6 +419,46 @@ class TestOutsideRender:
         upstream_skills = {path.parent.name for path in (REPO_ROOT / "templates/skills").glob("*/SKILL.md.j2")}
         assert {rel.split("/")[0] for rel in files if rel.endswith("/SKILL.md")} == upstream_skills
         assert link_errors(target, files) == []
+
+    def test_an_installed_upstream_in_an_environment_git_ignores_renders_as_the_checkout_does(self, tmp_path: Path) -> None:
+        """The installed package carries the upstream inside itself, and git is never asked about it there: in a
+        `.venv` its repository ignores, git reports every upstream file ignored, and the skills would ship without
+        their references and scripts. An installer that compiles bytecode, as pip does by default, adds a
+        `__pycache__` beside each Python file the wheel carries, which is not the upstream's and never ships."""
+        consumer = tmp_path / "consumer"
+        packaged = consumer / ".venv" / "scripts"
+        # What a wheel built from this checkout carries: every file git does not ignore, committed or not.
+        listed = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard", "templates/skills", "skills", "targets"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for rel in filter(None, listed.split("\0")):
+            if (REPO_ROOT / rel).is_file():
+                (packaged / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(REPO_ROOT / rel, packaged / rel)
+        assert compileall.compile_dir(packaged / "skills", quiet=1)
+        assert list((packaged / "skills").rglob("__pycache__/*.pyc")), "the packaged copy holds no Python file to compile"
+        _write(consumer / ".gitignore", ".venv/\n")
+        subprocess.run(["git", "init", "-q", str(consumer)], check=True)
+        reference = packaged / "skills" / "pipelex-synthetic-inputs" / "references" / "pdf.md"
+        assert git_ignored(packaged, [reference]) == {reference}, "the test no longer puts the upstream where git ignores it"
+
+        target_file = _every_skill(tmp_path, "beside")
+        installed = render_outside(load_outside_target(target_file, packaged), packaged)
+        assert "pipelex-synthetic-inputs/references/pdf.md" in installed
+        assert installed == render_outside(load_outside_target(target_file))
+
+    def test_the_smoke_fixture_s_committed_rendering_is_current(self, tmp_path: Path) -> None:
+        """CI runs the installed command's `--check` on a copy of the smoke fixture, and this catches the same staleness
+        first. It declares nothing and renders its own skill alone, so only the partial that skill includes can stale it."""
+        smoke = tmp_path / "outside-target-smoke"
+        shutil.copytree(SMOKE_FIXTURE, smoke)
+        target = load_outside_target(smoke / "source" / "smoke.toml")
+        assert target.declarations() == {"replaces": {}, "drops": {}, "pins": {}}
+        assert target.include_skills == ["smoke-notes"]
+        assert check(target) == 0, "the smoke fixture's rendering is stale: run `make render-outside-smoke`"
 
     def test_a_symbolic_link_in_the_output_is_refused_and_nothing_is_written_through_it(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]

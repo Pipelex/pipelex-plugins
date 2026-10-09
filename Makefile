@@ -14,9 +14,9 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 
 .PHONY: \
 	help env check-uv install lock li \
-	gen-skill-docs build vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
+	gen-skill-docs build render-outside-smoke vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
-	test agent-test test-recipes tp \
+	test agent-test test-recipes check-outside-smoke tp \
 	cleanderived cleanenv cleanall reinstall ri \
 	codex-use-local codex-use-official codex-refresh codex-status \
 	claude-local-mcp codex-local-mcp
@@ -142,6 +142,32 @@ tp: install ## Run tests with prints (TEST=name to filter)
 test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
 	@$(VENV_PYTEST) tests/recipes -m recipes -v
 
+# The command a consumer runs, from a wheel built from this checkout and installed into a fresh environment
+# with its bytecode compiled, as pip does by default, then run outside the checkout, in two checks. The smoke
+# fixture's committed rendering must pass `--check`, and fail it once a byte of it has changed. Then every
+# upstream skill, rendered from the checkout, must pass the installed command's `--check`, bytes and executable
+# bits alike, so the wheel carries all the render reads and nothing the installer adds beside it. The wheel and
+# the environment are new on every run, so no uv cache can hand back an older build, which `uvx --from .` does
+# after a file is deleted. `set -e` because the macOS make ignores .SHELLFLAGS.
+check-outside-smoke: install ## Build the wheel, install it in a fresh environment, and run its pipelex-plugins-render --check outside the checkout
+	@set -euo pipefail; scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+	uv build --wheel --quiet --out-dir "$$scratch/dist"; \
+	uv venv --quiet "$$scratch/venv"; \
+	uv pip install --quiet --compile-bytecode --python "$$scratch/venv/bin/python" "$$scratch"/dist/*.whl; \
+	render="$$scratch/venv/bin/pipelex-plugins-render"; \
+	mkdir -p "$$scratch/smoke"; cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/smoke/"; \
+	"$$render" "$$scratch/smoke/source/smoke.toml" --check; \
+	printf 'x' >> "$$scratch/smoke/rendered/smoke-notes/SKILL.md"; \
+	if "$$render" "$$scratch/smoke/source/smoke.toml" --check >/dev/null; then \
+		echo "FAIL: --check passed on a rendering changed by one byte"; exit 1; \
+	fi; \
+	mkdir -p "$$scratch/every-skill"; \
+	printf '[render]\noutput = "../every-skill-rendered"\n\n[vars]\nplatform = "agent-skills"\nharness_name = "the harness"\nskill_dir = "<skill-dir>"\n' \
+		> "$$scratch/every-skill/every-skill.toml"; \
+	$(VENV_PYTHON) -m scripts.outside_render "$$scratch/every-skill/every-skill.toml" >/dev/null; \
+	"$$render" "$$scratch/every-skill/every-skill.toml" --check; \
+	echo "• The installed pipelex-plugins-render checks the smoke fixture, and renders every skill as the checkout does"
+
 agent-test: install ## Run unit tests quietly (output only on failure)
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
@@ -173,6 +199,17 @@ gen-skill-docs: install ## Generate SKILL.md from .j2 templates (use TARGET=name
 build: install ## Build all targets (prod + codex + mistral-vibe)
 	@$(VENV_PYTHON) scripts/gen_skill_docs.py --target all
 	@echo "Done: built all targets"
+
+# The outside-target smoke fixture, whose rendering is committed beside its source. The render refuses an
+# output inside this repository, so the fixture is rendered in a scratch copy and the result copied back.
+OUTSIDE_SMOKE_DIR := tests/data/outside-target-smoke
+
+render-outside-smoke: install ## Re-render the outside-target smoke fixture's committed output
+	@set -euo pipefail; scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+	cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/"; \
+	$(VENV_PYTHON) -m scripts.outside_render "$$scratch/source/smoke.toml"; \
+	rm -rf "$(OUTSIDE_SMOKE_DIR)/rendered"; \
+	cp -R "$$scratch/rendered" "$(OUTSIDE_SMOKE_DIR)/rendered"
 
 # Where the check.mjs hook bundle is built: the js/ directory of a pipelex-sdk checkout (override for a non-sibling one).
 SDK_JS_DIR ?= ../pipelex-sdk/js
