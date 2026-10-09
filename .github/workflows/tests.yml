@@ -59,8 +59,9 @@ jobs:
         run: make agent-test
 
       # The command an outside target's repository runs, built from this checkout
-      # into its own environment and run on a copy of the smoke fixture outside
-      # it: its committed rendering must pass `--check`, and fail it once a byte
-      # has changed. Only this proves the wheel carries what the render reads.
+      # into its own environment and run outside it: the smoke fixture's committed
+      # rendering must pass `--check`, and fail it once a byte has changed, and
+      # every upstream skill must render as the checkout renders it, which is how
+      # the wheel's contents are checked.
       - name: Outside render from the built package
         run: make check-outside-smoke

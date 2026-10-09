@@ -46,7 +46,7 @@ markers = [
 
 # The wheel carries the outside render's upstream inside the `scripts` package: the skill templates, the
 # static assets and the targets, which `scripts/outside_render.py` reads there once installed. Unlike
-# `force-include`, `only-include` leaves out what git ignores, so a local build ships no litter. The
+# `force-include`, `only-include` leaves out what `.gitignore` ignores, so a local build ships no litter. The
 # editable install puts the repository root on the path instead, where the checkout holds them.
 [tool.hatch.build.targets.wheel]
 only-include = ["scripts", "templates/skills", "skills", "targets"]

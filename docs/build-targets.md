@@ -203,7 +203,7 @@ From a checkout, `python -m scripts.outside_render` takes the same arguments.
 
 ### The upstream the render reads
 
-The upstream is this repository's `templates/skills/`, `skills/` and `targets/`. The wheel carries the three inside its `scripts` package (`[tool.hatch.build.targets.wheel]` in `pyproject.toml`), and the render reads them there when it runs installed and beside the package when it runs from a checkout. The wheel holds what git did not ignore when it was built, so git is asked about the upstream only in a checkout: an installed package can sit in an environment some repository ignores, a `.venv` inside it, where git would report every upstream file ignored. What the installer adds beside the wheel's files there, the `__pycache__` it compiles for a Python file a skill ships, is left out, as git leaves it out of a checkout.
+The upstream is this repository's `templates/skills/`, `skills/` and `targets/`. The wheel carries the three inside its `scripts` package (`[tool.hatch.build.targets.wheel]` in `pyproject.toml`), and the render reads them there when it runs installed and beside the package when it runs from a checkout. The wheel holds what the repository's `.gitignore` did not ignore when it was built, so git is asked about the upstream only in a checkout: an installed package can sit in an environment some repository ignores, a `.venv` inside it, where git would report every upstream file ignored. What the installer adds beside the wheel's files there, the `__pycache__` it compiles for a Python file a skill ships, is left out, as git leaves it out of a checkout.
 
 ### The target file and its source root
 
@@ -251,7 +251,7 @@ The outside target may add anything. It may also replace any upstream template, 
 
 - an outside file at an upstream path that no table declares — the error gives the hash to declare it with, once the upstream file has been read;
 - a declaration naming no upstream file, which is what an upstream rename or removal looks like from the consumer's side;
-- a declaration whose hash no longer matches the upstream file, naming both hashes and the `git diff <old-tag>..<new-tag> -- <path>` that shows the upstream change;
+- a declaration whose hash no longer matches the upstream file, naming both hashes and the `git diff <old-ref>..<new-ref> -- <path>` that shows the upstream change;
 - a declared replacement with no file under the source root, since a file left out is a drop;
 - a drop of a template, which is left out by leaving its skill out or by replacing it, and a drop or a pin of a file the source root also holds, which is a replacement;
 - an outside file the render would never read: under `templates/` but not a `.j2` under `templates/skills/`, or under `skills/` but not in a skill's `references/` or `scripts/`.
@@ -268,7 +268,7 @@ Before it writes, the render runs the link check of `scripts/skill_links.py`, th
 
 `--check` renders in memory and reports every way the output differs from it, as the in-repo freshness check does: `MISSING`, `STALE`, `MODE` for a script whose executable bit differs, `ORPHAN` for a file the render no longer produces, `LEAKED TEMPLATE` for a `.j2` file in the output, and `LINK` for a link error. It exits non-zero on any of them and never writes, which is what a consumer's CI runs.
 
-The compaction ceiling and the strict-YAML frontmatter check are not run on an outside rendering: both are facts about Claude Code and Mistral Vibe, and the consumer's harness has its own limits. `tests/unit/test_outside_render.py` exercises every case against the fixture under `tests/data/outside-target/`, whose hashes the tests compute from the upstream files as they are. A second fixture, `tests/data/outside-target-smoke/`, declares nothing and renders one outside skill with an overlay, its rendering committed beside it: CI runs the installed command's `--check` on a copy of it ([ci.md](ci.md)), the one check that reads the wheel rather than the checkout.
+The compaction ceiling and the strict-YAML frontmatter check are not run on an outside rendering: both are facts about Claude Code and Mistral Vibe, and the consumer's harness has its own limits. `tests/unit/test_outside_render.py` exercises every case against the fixture under `tests/data/outside-target/`, whose hashes the tests compute from the upstream files as they are. A second fixture, `tests/data/outside-target-smoke/`, declares nothing and renders one outside skill with an overlay, its rendering committed beside it: CI runs the installed command's `--check` on a copy of it, then on every upstream skill as the checkout renders it ([ci.md](ci.md)), which is how the wheel's contents are checked.
 
 ## Commands
 

@@ -301,7 +301,7 @@ def _upstream_files(upstream_root: Path, subdirs: Sequence[str]) -> list[str]:
     """The upstream's files under `subdirs`, as `_source_files` lists them when the upstream is a checkout.
 
     Git is asked only about a checkout, whose root holds `.git`. The installed package holds what
-    its wheel was built with, which leaves out what git ignored then, and asking git about it would
+    its wheel was built with, which leaves out what `.gitignore` ignored then, and asking git about it would
     be asking whatever repository the environment happens to sit in: one inside a `.venv` its
     repository ignores would have every upstream file reported ignored, and none rendered. What the
     installer added beside the wheel's files is left out instead: the bytecode it compiles for a
@@ -392,7 +392,7 @@ def declaration_errors(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROO
             if actual != declared:
                 errors.append(
                     f"[render.{table}] {rel}: the upstream file changed: declared {declared}, now {actual}. Read the change "
-                    f"(`git diff <old-tag>..<new-tag> -- {rel}` in pipelex-plugins), carry it over or decide against it, then update the hash"
+                    f"(`git diff <old-ref>..<new-ref> -- {rel}` in pipelex-plugins), carry it over or decide against it, then update the hash"
                 )
             match table:
                 case "replaces":

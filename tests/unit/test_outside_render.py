@@ -333,7 +333,7 @@ class TestOutsideRender:
         errors = declaration_errors(load_outside_target(target_file))
         assert errors == [
             f"[render.{table}] {path}: the upstream file changed: declared {WRONG_HASH}, now {actual}. Read the change "
-            f"(`git diff <old-tag>..<new-tag> -- {path}` in pipelex-plugins), carry it over or decide against it, then update the hash"
+            f"(`git diff <old-ref>..<new-ref> -- {path}` in pipelex-plugins), carry it over or decide against it, then update the hash"
         ]
 
     def test_a_link_that_leaves_its_skill_fails_and_nothing_is_written(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -427,12 +427,17 @@ class TestOutsideRender:
         `__pycache__` beside each Python file the wheel carries, which is not the upstream's and never ships."""
         consumer = tmp_path / "consumer"
         packaged = consumer / ".venv" / "scripts"
+        # What a wheel built from this checkout carries: every file git does not ignore, committed or not.
         listed = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), "ls-files", "-z", "templates/skills", "skills", "targets"], capture_output=True, text=True, check=True
+            ["git", "-C", str(REPO_ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard", "templates/skills", "skills", "targets"],
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout
         for rel in filter(None, listed.split("\0")):
-            (packaged / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPO_ROOT / rel, packaged / rel)
+            if (REPO_ROOT / rel).is_file():
+                (packaged / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(REPO_ROOT / rel, packaged / rel)
         assert compileall.compile_dir(packaged / "skills", quiet=1)
         assert list((packaged / "skills").rglob("__pycache__/*.pyc")), "the packaged copy holds no Python file to compile"
         _write(consumer / ".gitignore", ".venv/\n")

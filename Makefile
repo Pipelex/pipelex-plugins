@@ -142,18 +142,26 @@ tp: install ## Run tests with prints (TEST=name to filter)
 test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
 	@$(VENV_PYTEST) tests/recipes -m recipes -v
 
-# The installed command against a copy of the smoke fixture outside this checkout, as a consumer runs it:
-# its committed rendering must pass `--check`, and fail it once a byte of it has changed. uv rebuilds the
-# package whenever a file it carries changes, per pyproject's `[tool.uv] cache-keys`.
-check-outside-smoke: check-uv ## Build the package and run its pipelex-plugins-render --check on a copy of the smoke fixture
-	@scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+# The command a consumer runs, built from this checkout by uvx into an environment of its own and run outside
+# the checkout, in two checks. The smoke fixture's committed rendering must pass `--check`, and fail it once a
+# byte of it has changed. Then every upstream skill, rendered from the checkout, must pass the installed
+# command's `--check`, bytes and executable bits alike, so the wheel carries all the render reads; it runs
+# with the installer compiling bytecode, as pip does by default. uv rebuilds the package whenever a file it
+# carries changes, per pyproject's `[tool.uv] cache-keys`. `set -e` because the macOS make ignores .SHELLFLAGS.
+check-outside-smoke: install ## Build the package and run its pipelex-plugins-render --check outside the checkout
+	@set -euo pipefail; scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
 	cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/"; \
 	uvx --from . pipelex-plugins-render "$$scratch/source/smoke.toml" --check; \
 	printf 'x' >> "$$scratch/rendered/smoke-notes/SKILL.md"; \
 	if uvx --from . pipelex-plugins-render "$$scratch/source/smoke.toml" --check >/dev/null; then \
 		echo "FAIL: --check passed on a rendering changed by one byte"; exit 1; \
 	fi; \
-	echo "• The installed pipelex-plugins-render checks the smoke fixture"
+	mkdir -p "$$scratch/every-skill"; \
+	printf '[render]\noutput = "../every-skill-rendered"\n\n[vars]\nplatform = "agent-skills"\nharness_name = "the harness"\nskill_dir = "<skill-dir>"\n' \
+		> "$$scratch/every-skill/every-skill.toml"; \
+	$(VENV_PYTHON) -m scripts.outside_render "$$scratch/every-skill/every-skill.toml" >/dev/null; \
+	UV_COMPILE_BYTECODE=1 uvx --from . pipelex-plugins-render "$$scratch/every-skill/every-skill.toml" --check; \
+	echo "• The installed pipelex-plugins-render checks the smoke fixture, and renders every skill as the checkout does"
 
 agent-test: install ## Run unit tests quietly (output only on failure)
 	@echo "• Running unit tests..."
@@ -192,7 +200,7 @@ build: install ## Build all targets (prod + codex + mistral-vibe)
 OUTSIDE_SMOKE_DIR := tests/data/outside-target-smoke
 
 render-outside-smoke: install ## Re-render the outside-target smoke fixture's committed output
-	@scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
+	@set -euo pipefail; scratch="$$(mktemp -d)"; trap 'rm -rf "$$scratch"' EXIT; \
 	cp -R "$(OUTSIDE_SMOKE_DIR)/." "$$scratch/"; \
 	$(VENV_PYTHON) -m scripts.outside_render "$$scratch/source/smoke.toml"; \
 	rm -rf "$(OUTSIDE_SMOKE_DIR)/rendered"; \
