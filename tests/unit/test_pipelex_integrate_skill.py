@@ -834,12 +834,14 @@ class TestPipelexIntegrateSkill:
         assert "The Python SDK does not carry" not in body
 
         # Every place that told a Python consumer it has no gate, swept together: this skill, its
-        # references, the sibling skills that repeated the claim, and the repo's own account of itself.
+        # references, the sibling skills that repeated the claim with their own partials, which are
+        # part of the skill, and the repo's own account of itself.
+        siblings = tuple(self.REPO_ROOT / "templates" / "skills" / skill for skill in ("pipelex-edit", "pipelex-design"))
         swept = (
             self.TEMPLATE,
             *(self.REFERENCES_DIR / name for name in ("python.md", *self.BRANCH_REFERENCES)),
-            self.REPO_ROOT / "templates" / "skills" / "pipelex-edit" / "SKILL.md.j2",
-            self.REPO_ROOT / "templates" / "skills" / "pipelex-design" / "SKILL.md.j2",
+            *(sibling / "SKILL.md.j2" for sibling in siblings),
+            *(partial for sibling in siblings for partial in sorted((sibling / "parts").glob("*.md.j2"))),
             self.REPO_ROOT / "docs" / "decisions.md",
             self.REPO_ROOT / "docs" / "build-targets.md",
             self.REPO_ROOT / "README.md",
