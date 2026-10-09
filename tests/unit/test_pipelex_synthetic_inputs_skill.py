@@ -79,14 +79,17 @@ class TestPipelexSyntheticInputsSkillShape:
 
     def test_a_reference_never_sends_the_model_to_another(self) -> None:
         """References are one level deep: one read is enough to take a branch. A reference may name the skill's
-        steps and its stop table, its own headings and the shared files, but never another reference."""
+        steps and its stop table, and link its own headings, but never another reference. It links no shared file: a
+        static reference is copied verbatim, and where the shared files sit differs between layouts."""
         for name in self.REFERENCES:
             text = self.reference(name)
             for other in self.REFERENCES:
                 if other != name:
                     assert other not in text, f"references/{name} sends the model on to references/{other}"
             for target in re.findall(r"\]\(([^)]+)\)", text):
-                assert target.startswith(("#", "../../shared/")), f"references/{name} links {target}, which is not its own heading or a shared file"
+                assert target.startswith("#"), (
+                    f"references/{name} links {target}; a static reference is copied verbatim, so it links only its own headings"
+                )
 
     def test_the_photograph_rule_is_the_skills_and_sees_a_scanned_photo(self) -> None:
         """How a photograph is made is a guard, so it lives in `SKILL.md` and not in the PNG recipes, which are

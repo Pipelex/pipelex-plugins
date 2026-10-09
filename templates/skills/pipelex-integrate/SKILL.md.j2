@@ -14,7 +14,7 @@ description: Wire an MTHDS method into a Python or TypeScript codebase with gene
 
 Leave a Python or TypeScript project calling an MTHDS method through one typed module, over generated types and an offline gate that says when they drift.
 
-**Not** a runner (`/pipelex-inputs`) or a design skill (`/pipelex-design`): it writes no tests, routes or UI, edits no business code, and **writes no client for another service before reading [fit.md](../shared/fit.md)**.
+**Not** a runner (`/pipelex-inputs`) or a design skill (`/pipelex-design`): it writes no tests, routes or UI, edits no business code, and **writes no client for another service before reading [fit.md]({{ shared_dir }}/fit.md)**.
 
 ## Requirements
 
@@ -153,4 +153,4 @@ What was generated and where, the target and why, the call site's signature, the
 - [orphans.md](references/orphans.md): orphans, no drift.
 - [gate-failures.md](references/gate-failures.md): a gate exits `2`.
 - [codegen-check.mjs](references/codegen-check.mjs), [codegen_check.py](references/codegen_check.py): step 10's gates.
-- [MTHDS reference](../shared/writing-mthds.md): the fallback's bundle reading.
+- [MTHDS reference]({{ shared_dir }}/writing-mthds.md): the fallback's bundle reading.

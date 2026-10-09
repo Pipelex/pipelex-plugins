@@ -19,8 +19,8 @@
 
    The fragment strips its own trailing newline (the closing comment below), so
    it can be included inline as well as on a line of its own. -#}
-- **If {{ mcp_absent_lead | default("the tool is") }} absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for {{ harness_name }}.{{ mcp_absent_suffix | default("") }}
-- **If a call returns `status: "error"` with an error of class `config`**{{ mcp_config_parenthetical | default(" (missing or rejected `PIPELEX_API_KEY`, unreachable API)") }}, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.{{ mcp_config_suffix | default("") }}
+- **If {{ mcp_absent_lead | default("the tool is") }} absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference]({{ shared_dir }}/credentials.md#the-tool-is-absent) says for {{ harness_name }}.{{ mcp_absent_suffix | default("") }}
+- **If a call returns `status: "error"` with an error of class `config`**{{ mcp_config_parenthetical | default(" (missing or rejected `PIPELEX_API_KEY`, unreachable API)") }}, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from]({{ shared_dir }}/credentials.md#where-the-key-comes-from) before saying anything more.{{ mcp_config_suffix | default("") }}
 {%- if mcp_requirements_extra is defined %}
 {{ mcp_requirements_extra }}
 {%- endif %}

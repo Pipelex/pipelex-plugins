@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Outside targets render the skills from another repository's templates**: `scripts/outside_render.py <target file> [--check]` renders this plugin's skills for a target file kept in another repository, with that repository's own skills, overlays and replacements of upstream templates and static assets, for a new `agent-skills` platform whose skills carry a frontmatter of `name` and `description` alone and no hooks, manifest or MCP declaration. Every upstream file the target replaces, drops or pins is declared with the SHA-256 of its bytes, and the render refuses an undeclared replacement and a declaration the upstream file no longer matches; the shared files go once beside the skills, or into each skill that links one, and the link check holds the rendering before anything is written. The render owns its output directory and prunes it, so it marks it with `.pipelex-plugins-render.toml`, listing the files it wrote, and refuses a directory that holds files it did not write, or a symbolic link it would write through; it removes a file git ignores there only when an earlier render wrote it; a file git ignores under the target's directory is never read. `--check` writes nothing and fails on a missing, stale or orphaned file and on a broken link.
+
 ### Changed
 
 - **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env`, or under `PIPELEX_HOME`, reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.
@@ -9,6 +13,7 @@
 ### Fixed
 
 - **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so step 8 and refresh mode now raise a `pipelex` older than the first release that depends on `pipelex-sdk` as they raise the SDKs, without a question. The Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly, and to run `pipelex migrate --yes` when the raised runtime refuses a configuration written for a former release.
+- **`make build` never deletes a repository made inside a target's directory**: the pruning removed every file a target does not produce, a `.git` included, so `git init` inside `pipelex/`, `pipelex-codex/` or `pipelex-vibe/` lost its history at the next build. The build now never enters or lists a `.git`.
 
 ## [0.11.0] - 2026-10-08
 
