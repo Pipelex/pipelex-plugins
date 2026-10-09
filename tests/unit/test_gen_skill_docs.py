@@ -75,6 +75,20 @@ STATIC_ASSET_BODIES = {
 }
 
 
+def _skill_source(skill_dir: Path) -> str:
+    """A skill template's source with its own per-skill partials inlined, where the rendering includes them.
+
+    A sentence moved under `templates/skills/<skill>/parts/` for an outside target to replace is still the
+    skill's, so a test reading the skill's source reads it there; each partial's comments, which only strip
+    its whitespace, are left out.
+    """
+    source = (skill_dir / "SKILL.md.j2").read_text(encoding="utf-8")
+    for part in sorted((skill_dir / "parts").glob("*.md.j2")):
+        text = re.sub(r"\{#-.*?-#\}\n?", "", part.read_text(encoding="utf-8"), flags=re.DOTALL).rstrip("\n")
+        source = source.replace(f'{{% include "skills/{skill_dir.name}/parts/{part.name}" %}}', text)
+    return source
+
+
 def _create_hook_templates(templates_dir: Path) -> None:
     """Create minimal per-platform hook templates and static assets so
     render_templates resolves them."""
@@ -873,11 +887,11 @@ class TestSkillFailureDiscipline:
     REPO_TEMPLATES = Path(__file__).parents[2] / "templates" / "skills"
 
     def test_organize_restores_original_layout_on_failed_confirmation(self) -> None:
-        body = (self.REPO_TEMPLATES / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
+        body = _skill_source(self.REPO_TEMPLATES / "pipelex-organize")
         assert "restore the original layout" in body
 
     def test_edit_offers_restore_on_no_verdict(self) -> None:
-        body = (self.REPO_TEMPLATES / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        body = _skill_source(self.REPO_TEMPLATES / "pipelex-edit")
         assert "applied but **unproven**" in body
 
     @staticmethod
@@ -961,6 +975,23 @@ class TestSkillFailureDiscipline:
             assert "plugin configuration" not in body, f"{target_name}: Vibe has no plugin manifest to configure"
 
 
+class TestPerSkillPartials:
+    """A per-skill partial holds a sentence an outside target replaces in one skill, so that skill includes it once and no
+    other template does: a second includer would change with the replacement it never asked for."""
+
+    SKILLS = Path(__file__).parents[2] / "templates" / "skills"
+
+    def test_each_partial_is_included_once_by_its_own_skill_alone(self) -> None:
+        parts = sorted(self.SKILLS.glob("*/parts/*.md.j2"))
+        assert parts
+        for part in parts:
+            skill_dir = part.parent.parent
+            include = f'{{% include "skills/{skill_dir.name}/parts/{part.name}" %}}'
+            for template in self.SKILLS.rglob("*.j2"):
+                expected = 1 if template == skill_dir / "SKILL.md.j2" else 0
+                assert template.read_text(encoding="utf-8").count(include) == expected, f"{template} includes {part.name}"
+
+
 class TestSharedSkillIncludes:
     """Box J of the design behind L-260921-cfb760: the blocks the MCP-backed
     skills used to copy live in `templates/skills/shared/` and are included.
@@ -1010,9 +1041,9 @@ class TestSharedSkillIncludes:
         warning in its own words — the same drift this test caught in the
         authoring reference, where two copies of one sentence were free to part."""
         include = "skills/shared/pipefunc-warning.md.j2"
-        design = (self.REPO_TEMPLATES / "skills" / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
-        explain = (self.REPO_TEMPLATES / "skills" / "pipelex-explain" / "SKILL.md.j2").read_text(encoding="utf-8")
-        run = (self.REPO_TEMPLATES / "skills" / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
+        design = _skill_source(self.REPO_TEMPLATES / "skills" / "pipelex-design")
+        explain = _skill_source(self.REPO_TEMPLATES / "skills" / "pipelex-explain")
+        run = _skill_source(self.REPO_TEMPLATES / "skills" / "pipelex-run")
         assert design.count(include) == 2, "design warns in the contract line and again at delivery"
         assert include in explain
         assert include in run
@@ -1076,7 +1107,7 @@ class TestSharedSkillIncludes:
         extracted from them. Each keeps it out of version control with the same procedure,
         and each used to word it for itself until run needed it too. The partial is the one
         source, and each skill names only what it checks and the entry it writes."""
-        body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        body = _skill_source(self.REPO_TEMPLATES / "skills" / skill)
         assert body.count('include "skills/shared/git-ignore.md.j2"') == 1
         assert "{% set git_ignore_paths %}" in body
         assert "{% set git_ignore_entry %}" in body
@@ -1127,7 +1158,7 @@ class TestSharedSkillIncludes:
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
-        body = (self.REPO_TEMPLATES / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        body = _skill_source(self.REPO_TEMPLATES / "skills" / skill)
         assert 'include "skills/shared/mcp-requirements.md.j2"' in body
 
     def test_pipefunc_warning_states_the_sandbox_the_experiment_and_the_risk(self) -> None:
@@ -1152,11 +1183,11 @@ class TestPipelexRunSkill:
 
     @property
     def run_skill(self) -> str:
-        return (self.TEMPLATES / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / "pipelex-run")
 
     @property
     def inputs_skill(self) -> str:
-        return (self.TEMPLATES / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / "pipelex-inputs")
 
     def test_it_has_two_entries_and_names_them(self) -> None:
         body = self.run_skill
@@ -1415,7 +1446,7 @@ class TestPipelexRunSkill:
         assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
 
     def test_design_points_at_the_run_without_running(self) -> None:
-        design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        design = _skill_source(self.TEMPLATES / "pipelex-design")
         assert "`/pipelex-run` runs the method" in design
         assert "mcp__plugin_pipelex_pipelex__mthds_run" not in design
 
@@ -1437,7 +1468,7 @@ class TestPipelexCatalogSkill:
 
     @property
     def catalog_skill(self) -> str:
-        return (self.TEMPLATES / "pipelex-catalog" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / "pipelex-catalog")
 
     def catalog_reference(self, name: str) -> str:
         """A branch the size diet moved out of `SKILL.md`, read on its condition."""
@@ -1620,12 +1651,12 @@ class TestPipelexCatalogSkill:
         linked method's draft, so each declares the save tool; the publish and the pull stay
         the catalog's, so none declares those."""
         for skill in ("pipelex-design", "pipelex-edit", "pipelex-organize"):
-            body = (self.TEMPLATES / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+            body = _skill_source(self.TEMPLATES / skill)
             assert "mcp__plugin_pipelex_pipelex__mthds_save_method" in body, f"{skill} must declare the save tool"
             assert "mthds_publish_method" not in body, f"{skill} must not declare the publish tool"
             assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
         for skill in ("pipelex-design", "pipelex-edit"):
-            body = (self.TEMPLATES / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+            body = _skill_source(self.TEMPLATES / skill)
             assert "/pipelex-catalog" in body, f"{skill} must point at the catalog skill"
 
     def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
@@ -1670,7 +1701,7 @@ class TestPipelexCatalogSkill:
         The pull mirrors the stop `/pipelex-design` already makes."""
         body = self.catalog_skill
         assert "make add-method" in body
-        design = (self.TEMPLATES / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        design = _skill_source(self.TEMPLATES / "pipelex-design")
         assert "make add-method" in design, "the pull mirrors design's stop, so design must still carry it"
 
     def test_a_failed_link_write_is_never_reported_as_unlinked(self) -> None:
@@ -1976,7 +2007,7 @@ class TestAdaptiveDesignSkill:
 
     @property
     def design(self) -> str:
-        return (self.SKILLS / "pipelex-design" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.SKILLS / "pipelex-design")
 
     @property
     def stepwise(self) -> str:
@@ -2092,14 +2123,14 @@ class TestAdaptiveDesignSkill:
         assert '"add a step", "rewire this pipeline"' in body
 
     def test_edit_hands_structural_changes_off_by_invoking_design(self) -> None:
-        edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        edit = _skill_source(self.SKILLS / "pipelex-edit")
         assert "then invoke `/pipelex-design`" in edit
         assert "hand off to `/pipelex-design` now, before any files change" in edit
         assert "and stop. Never attempt a partial structural edit here." not in edit
 
     def test_adjacent_skills_describe_organization_as_conditional(self) -> None:
-        organize = (self.SKILLS / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
-        edit = (self.SKILLS / "pipelex-edit" / "SKILL.md.j2").read_text(encoding="utf-8")
+        organize = _skill_source(self.SKILLS / "pipelex-organize")
+        edit = _skill_source(self.SKILLS / "pipelex-edit")
         assert "Direct designs are normally coherent already and skip this skill" in organize
         assert "auto-invokes it after converged signature-driven construction or re-entry" in organize
         assert "an already coherent direct result does not invoke it solely for process compliance" in organize
@@ -2121,7 +2152,7 @@ class TestSyntheticInputsSkill:
 
     @property
     def synthetic(self) -> str:
-        return (self.SKILLS / "pipelex-synthetic-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.SKILLS / "pipelex-synthetic-inputs")
 
     def test_identity_rules_are_stated(self) -> None:
         body = self.synthetic
@@ -2165,7 +2196,7 @@ class TestSyntheticInputsSkill:
         assert "pipelex-synthetic-inputs" not in MCP_SKILLS
 
     def test_inputs_delegates_instead_of_generating(self) -> None:
-        inputs = (self.SKILLS / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+        inputs = _skill_source(self.SKILLS / "pipelex-inputs")
         assert "pipelex-synthetic-inputs" in inputs
         assert "**`pipelex-synthetic-inputs` is the file factory**" in inputs
         assert "leave that one input unfilled, carry on with the others" in inputs
@@ -2527,7 +2558,7 @@ class TestBundleHome:
     SKILLS = REPO_ROOT / "templates" / "skills"
 
     def _template(self, skill: str) -> str:
-        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.SKILLS / skill)
 
     def test_design_resolves_the_home_before_it_writes(self) -> None:
         body = self._template("pipelex-design")
@@ -2575,7 +2606,7 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
     SKILLS = REPO_ROOT / "templates" / "skills"
 
     def _template(self, skill: str) -> str:
-        return (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.SKILLS / skill)
 
     def _description(self, skill: str) -> str:
         for line in self._template(skill).splitlines():
@@ -2838,11 +2869,11 @@ class TestPublishedAddressTarget:
 
     @property
     def inputs_skill(self) -> str:
-        return (self.TEMPLATES / "pipelex-inputs" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / "pipelex-inputs")
 
     @property
     def run_skill(self) -> str:
-        return (self.TEMPLATES / "pipelex-run" / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / "pipelex-run")
 
     def test_both_skills_carry_the_address_as_a_third_target(self) -> None:
         """The whole of box E rests on the selector reaching every call: a skill that
@@ -2996,7 +3027,7 @@ class TestCatalogIdInEverySkill:
     SHARED_BRIDGE = "skills/shared/catalog-id.md.j2"
 
     def skill(self, name: str) -> str:
-        return (self.TEMPLATES / name / "SKILL.md.j2").read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATES / name)
 
     def run_reference(self, name: str) -> str:
         """A `pipelex-run` reference, read on its branch since the size diet's phase 6."""

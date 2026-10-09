@@ -229,6 +229,9 @@ class TestOutsideRender:
         assert (output / "pipelex-edit/references/house-rules.md").read_bytes() == (
             FIXTURE / "skills/pipelex-edit/references/house-rules.md"
         ).read_bytes()
+        # A per-skill partial is replaced in place, and the rest of its paragraph is the upstream's.
+        assert "If inputs were refreshed or invalidated, say so. Suggest the fixture's own runner when the user wants to run the method.\n" in edit
+        assert "`/pipelex-run` when they want to run the method" not in edit
         # The replaced partial is what the upstream skill includes.
         assert "**The fixture's closing step.**" in edit
         assert "**Save the linked method's draft.**" not in edit

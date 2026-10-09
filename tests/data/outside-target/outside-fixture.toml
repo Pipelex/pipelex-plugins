@@ -8,6 +8,7 @@ shared = "in-each-skill"
 
 [render.replaces]
 "templates/skills/shared/saved-copy-notice.md.j2" = "sha256:computed-by-the-test"
+"templates/skills/pipelex-edit/parts/closing-suggestions.md.j2" = "sha256:computed-by-the-test"
 "templates/skills/pipelex-synthetic-inputs/SKILL.md.j2" = "sha256:computed-by-the-test"
 
 [render.drops]
