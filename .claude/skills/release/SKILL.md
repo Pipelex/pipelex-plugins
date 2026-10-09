@@ -21,10 +21,10 @@ The procedure is the workspace release play, [`docs/workspace/releasing.md`](../
 
 The repository itself is the artifact, and the merge to `main` publishes it. On Claude and Codex, install is a marketplace add against the GitHub repo — the README's quick start gives `claude plugin marketplace add Pipelex/pipelex-plugins` and `codex plugin marketplace add Pipelex/pipelex-plugins`, neither carrying a ref, so what is served is the repo's default branch, which is `main` (`origin/HEAD` points at `origin/main`). So when the merge lands, an install or a marketplace refresh hands users the `pipelex/` and `pipelex-codex/` trees exactly as the release branch left them, each carrying the new version in its own generated `plugin.json`. Mistral Vibe is served by no marketplace — the install page, `docs/install.md`, has the user point `skill_paths` at a local checkout of `pipelex-vibe/` — so a Vibe user takes the release by pulling `main` themselves, and the tree they get names no version at all (see **Particulars**).
 
-The same merge tags the release. `.github/workflows/release-tag.yml` runs on the push to `main`: it reads `targets/prod.toml`'s `[plugin].version`, refuses to tag a version whose `## [X.Y.Z] - ` heading `CHANGELOG.md` lacks, and creates and pushes the annotated tag `vX.Y.Z` on the merge commit when that tag does not exist yet. The tag is the pin an outside target renders the skills at (`docs/development.md`, "Rendering for an outside target"). Never create it by hand ahead of the merge: the workflow tags the merge commit, and finding the tag already there it tags nothing. No GitHub Release is made. The landing reads the run and the tag, and prints the rest of this block for the session to run:
+The same merge tags the release. `.github/workflows/release-tag.yml` runs on the push to `main`: it reads `targets/prod.toml`'s `[plugin].version`, and when that push changed the version and the tag does not exist yet, it creates and pushes the annotated tag `vX.Y.Z` on the merge commit. A push that leaves the version alone tags nothing, even with the tag missing, so no later commit can take a release's tag. A missing `## [X.Y.Z] - ` heading in `CHANGELOG.md` is a warning in that run rather than a refusal, since the merge has already published the version; the `Changelog entry` check on the release pull request is where it stops a release. The tag is the pin an outside target renders the skills at (`docs/development.md`, "Rendering for an outside target"). Never create it by hand ahead of the merge: the workflow tags the merge commit, and finding the tag already there it tags nothing. No GitHub Release is made. The landing reads the run and the tag, and prints the rest of this block for the session to run:
 
 ```bash
-gh run list --workflow=release-tag.yml --branch main --limit 3 --json conclusion,headSha,url   # the run whose headSha is the merge SHA: success
+gh run list --workflow=release-tag.yml --branch main --limit 3 --json status,conclusion,headSha,url   # the run whose headSha is the merge SHA: completed, success
 git -C <main> fetch --prune --tags origin
 git -C <main> tag --list vX.Y.Z                                                    # the tag
 git -C <main> rev-list -n 1 vX.Y.Z                                                 # the merge commit
@@ -34,7 +34,7 @@ git -C <main> show origin/main:.claude-plugin/marketplace.json | grep '"version"
 git -C <main> show origin/main:pipelex/.claude-plugin/plugin.json | grep '"version"'
 ```
 
-When the run failed, read its log before anything else. A missing changelog entry is the cause the workflow names itself, and the `Changelog entry` check on the release pull request is there to catch it first; any other failure is re-run from the Actions page, which repeats the same push and tags the same commit.
+A run still `queued` or `in_progress` has no conclusion and has pushed no tag yet, which reads exactly like a failed publish: wait for it (`gh run watch <run id>`) before reading the tag. When it failed, read its log, then re-run it from the Actions page. A re-run repeats the same push, so it tags the merge commit even after later pushes to `main`, which never tag a version they did not change.
 
 ## Version files and the lock
 
