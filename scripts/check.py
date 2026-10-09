@@ -108,6 +108,11 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
         r"pipelex-sdk (\d+\.\d+\.\d+) or later is not importable",
         "pipelex_sdk_py",
     ),
+    (
+        "skills/pipelex-integrate/references/python.md",
+        r"from the `pipelex` (\d+\.\d+\.\d+) that step 8 raises the project to",
+        "pipelex",
+    ),
 ]
 
 # A number in a template that equals a floor and means something else entirely.

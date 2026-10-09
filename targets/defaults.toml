@@ -54,6 +54,9 @@ skill_dir = "${CLAUDE_SKILL_DIR}"
 #   node             the Node the method app's `engines.node` names
 #   python_min/max   the range `pipelex-sdk`'s `requires-python` names, which the
 #                    initializer branch's Python project must be created on
+#   pipelex          the first pipelex that depends on pipelex-sdk, pinned
+#                    exactly: a python-structures project's call site imports
+#                    pipelex_sdk through it, with no requirement of its own
 [vars.floors]
 pipelex_sdk_js = "0.18.0"
 pipelex_sdk_py = "0.10.2"
@@ -61,6 +64,7 @@ pipelex_mcp = "0.13.0"
 node = "22.12"
 python_min = "3.11"
 python_max = "3.14"
+pipelex = "0.79.0"
 
 # The plugin-declared `pipelex-mcp` server is the LOCAL WORKSHOP LAUNCHER
 # (stdio) — definitive, not a BYOK workaround: builders authoring local files

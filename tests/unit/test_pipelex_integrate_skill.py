@@ -808,7 +808,7 @@ class TestPipelexIntegrateSkill:
         assert raised.startswith("| either gate:"), raised
         assert "never swap it for `pipelex codegen check`" in failures
         # The gate runs the SDK's check, which the project's pin has to reach.
-        assert f"at least `pipelex-sdk` {self.PYTHON_SDK_FLOOR} for `python-pydantic`" in body
+        assert f"`pipelex-sdk` {self.PYTHON_SDK_FLOOR} (`python-pydantic`)" in body
         assert "the gate's command" in self.the_line(body, "What was generated and where")
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
@@ -1436,11 +1436,11 @@ class TestPipelexIntegrateSkill:
         # test is about is the number a user reads. A floor that rendered as the empty string — Jinja's
         # answer to a misspelled key — fails here as well as in `check_version_floors`.
         body = self.render("prod")
-        step_8 = self.the_line(body, "With the project's package manager:")
-        clause = re.search(r"`zod` and at least `@pipelex/sdk` (\S+) for `ts-zod`", step_8)
+        step_8 = self.the_line(body, "With the project's package manager, at least:")
+        clause = re.search(r"at least: `zod`, `@pipelex/sdk` (\S+) \(`ts-zod`\)", step_8)
         assert clause, "step 8 names no @pipelex/sdk floor"
         assert clause.group(1) == self.TYPESCRIPT_SDK_FLOOR
-        assert "Raise an older pin and report it." in step_8
+        assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
         regions: dict[str, str] = {}
@@ -1457,7 +1457,7 @@ class TestPipelexIntegrateSkill:
         assert self.VERSION.findall(failures) == [], "gate-failures.md names a version instead of deferring to step 8"
         assert "below step 8's floor" in failures
         refresh_dependencies = (
-            "the dependencies (except an `@pipelex/sdk`, or a `python-pydantic` project's `pipelex-sdk`, "
+            "the dependencies (except an `@pipelex/sdk`, a `python-pydantic` project's `pipelex-sdk` or a `python-structures` project's `pipelex`, "
             "pinned below step 8's floor, raised as step 8 raises it"
         )
         assert refresh_dependencies in self.refresh_cells(self.reference("refresh.md"))["left alone"]
@@ -1473,7 +1473,48 @@ class TestPipelexIntegrateSkill:
         for target_name in ("prod", "codex", "mistral-vibe"):
             config = load_target_config(self.REPO_ROOT / "targets", target_name)
             installed = (resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-integrate" / "SKILL.md").read_text(encoding="utf-8")
-            assert f"`zod` and at least `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR} for `ts-zod`" in installed, target_name
+            assert f"at least: `zod`, `@pipelex/sdk` {self.TYPESCRIPT_SDK_FLOOR} (`ts-zod`)" in installed, target_name
+
+    def test_a_python_structures_project_gets_its_sdk_through_pipelex(self) -> None:
+        """A `python-structures` call site imports `pipelex_sdk`, which such a project gets from `pipelex` itself,
+        from the first release that depends on `pipelex-sdk`. Step 8 names that `pipelex` floor, the Python reference
+        says why and forbids a second `pipelex-sdk` requirement, and refresh mode raises a `pipelex` below it as it
+        raises the SDKs — so a project on an older runtime is not left with a call site that fails at its import.
+
+        That raise crosses breaking releases of the project's own runtime, so it waits for the user's yes even in
+        automatic mode, asked at step 4 where the target is chosen, before anything is written, so a no leaves no
+        tree or sidecar without a call site; the configuration is migrated after it with a previewed
+        `pipelex migrate`, never with the bare command, whose own terminal question an agent's shell cannot answer."""
+        floor = load_version_floors(self.REPO_ROOT)["pipelex"]
+        for target_name in ("prod", "codex", "mistral-vibe"):
+            body = self.render(target_name)
+            step_8 = self.the_line(body, "With the project's package manager, at least:")
+            assert f"`pipelex` {floor} (`python-structures`)" in step_8, target_name
+            row = self.the_line(body, "| a Pipelex host: `pipelex` a dependency")
+            assert "`python-structures`; **ask before raising a `pipelex` below step 8's floor**: python.md" in row, target_name
+            assert "pause only for a genuinely ambiguous choice or where a step asks." in body, target_name
+
+        python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        paragraph = self.the_line(python, "**Where `pipelex_sdk` comes from.**")
+        assert f"from the `pipelex` {floor} that step 8 raises the project to" in paragraph
+        assert "Add no `pipelex-sdk` requirement of the project's own" in paragraph
+        raise_rule = self.the_line(python, "**Raising `pipelex` waits for the user's yes, asked at step 4.**")
+        for breaking in ("`--runner local|hosted`", "`targets_api = 5`", "`FormerReleaseConfigError`"):
+            assert breaking in raise_rule, breaking
+        assert "before step 5 writes anything" in raise_rule
+        assert "On a no, write nothing: stop before step 5" in raise_rule
+        assert "`https://github.com/Pipelex/pipelex/blob/main/CHANGELOG.md`" in raise_rule
+        assert "summarised from the changelog itself and never from memory" in raise_rule
+        assert "The raise targets the latest `pipelex` release" in raise_rule
+        assert "`pipelex migrate --dry-run`" in raise_rule
+        assert "run `pipelex migrate --yes` only on their yes" in raise_rule
+        assert "Never run `pipelex migrate` with neither flag" in raise_rule
+        # The floor is stated once, in the anchored sentence: the breaking changes name their release by what it did.
+        assert python.count(floor) == 1
+
+        left_alone = self.refresh_cells(self.reference("refresh.md"))["left alone"]
+        assert "a `python-structures` project's `pipelex`, pinned below step 8's floor, raised as step 8 raises it" in left_alone
+        assert "`pipelex` only on a yes asked before the regeneration, as step 4 asks it" in left_alone
 
     def refresh_cells(self, text: str) -> dict[str, str]:
         """Refresh mode's table, its one body row cut into its three cells, keyed by the header it sits under."""

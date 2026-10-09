@@ -28,7 +28,7 @@ Leave a Python or TypeScript project calling an MTHDS method through one typed m
 
 ## Guards
 
-Automatic unless the user asks to be walked through it, which confirms dependency and tooling edits first; pause only for a genuinely ambiguous choice.
+Automatic unless the user asks to be walked through it, which confirms dependency and tooling edits first; pause only for a genuinely ambiguous choice or where a step asks.
 
 - **The write arm, always.** Every `mthds_codegen` call passes `output_dir`; a refused or failed write is a refusal, never a reason to write the returned bytes yourself.
 - **Generated files are never opened for editing, never formatted, never linted**; a failure inside the tree is reported, never patched.
@@ -60,7 +60,7 @@ Before step 2, read your branch: a `codegen` script or Makefile target, or a `so
 
 ### 3. The signature
 
-Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**: `PIPE_CODE` keeps the domain.
+Type and run the call site against the verdict's **`main_pipe`** when it has one, never a signature derived from the source. **The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**.
 
 No `main_pipe` (a workshop at `@pipelex/mcp` 0.13.0 or earlier, for one) → read [references/signature-fallback.md](references/signature-fallback.md) before step 4.
 
@@ -72,20 +72,20 @@ State the target, the destination and the generator in one line. The target foll
 |---|---|
 | `package.json` with a TypeScript build | `ts-zod` |
 | `pyproject.toml`, no `pipelex` dependency | `python-pydantic` |
-| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures` |
+| a Pipelex host: `pipelex` a dependency, code using `@pipe_func` or `StructuredContent` | `python-structures`; **ask before raising a `pipelex` below step 8's floor**: python.md |
 
 The destination is one directory per method, `src/generated/<method>/` or `<package>/generated/<method>/` by default, in the language's casing. **A directory holding a `codegen.lock` is this method's only when a `sources.json` beside it names this method**: a target's methods emit the same file names, so another method's files would be silently overwritten, not orphaned. Choose another and say why, unless the user names the method it is for. This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place. Unsure whose a tree is: ask; never relocate silently or clear it.
 
 ### 5. Tooling exclusions
 
-Put the generated directory and the gate script step 10 copies in the formatter's and linter's ignores, per the language reference, keeping the tree type-checked and committed. **Do this before step 6**: the first project-wide format would rewrite the stamps.
+Put the generated directory and the gate script step 10 copies in the formatter's and linter's ignores, per the language reference, keeping the tree type-checked and committed. **Do this before step 6**.
 
 ### 6. Generate
 
 **`mthds_codegen`** with the selector, `target` and `output_dir`, relative to the workshop's working directory. Branch on the result:
 
 - `status: "ok"`, `is_valid: true`, `output_dir` present → written; clean when `is_current: true` with an empty `orphans[]`.
-- **`orphans[]` non-empty and `drifts[]` empty** → carry on to step 7 and read [references/orphans.md](references/orphans.md). Read it off the two lists, never from `is_current` (`false` here too); `drifts[]` is present only when non-empty, so no `drifts` is the empty case.
+- **`orphans[]` non-empty and `drifts[]` empty** → carry on to step 7 and read [references/orphans.md](references/orphans.md). Read it off the two lists, never from `is_current`; `drifts[]` is present only when non-empty, so no `drifts` is the empty case.
 - **`output_dir already holds …, which this tool does not own`** → that file is the user's: never delete, move or clear it, and never offer to; choose or ask for another directory, before the call too.
 - anything else (`drifts[]` included) → the stops.
 
@@ -109,7 +109,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ### 8. Dependencies
 
-With the project's package manager: `zod` and at least `@pipelex/sdk` 0.18.0 for `ts-zod`; `pydantic` and at least `pipelex-sdk` 0.10.2 for `python-pydantic`. Raise an older pin and report it.
+With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
 
 ### 9. The call site
 
