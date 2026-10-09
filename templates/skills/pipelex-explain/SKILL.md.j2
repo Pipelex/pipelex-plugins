@@ -37,7 +37,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 
 For a bundle, read every `.mthds` file beneath the directory, not the root alone, and none under `runs/`, which holds a run's artifacts. They are one method: a concept declared in one file is used in another, and a pipe's implementation often sits in another file than the `PipeSignature` that declared it. **Read them all before saying anything about any of them.**
 
-**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
+{% include "skills/pipelex-explain/parts/not-on-disk-pointer.md.j2" %}
 
 ### 2. Resolve every signature before calling it pending
 
@@ -94,7 +94,7 @@ Output: final_output
 | a **catalog id** does not validate | explain it from the source read above with `validation_errors[]` beside it, and say the fix is not on this disk |
 | a published **address** does not validate | report `validation_errors[]` and stop: there is no source to explain, and the fix is upstream |
 | the verdict carries no `main_pipe` | say so, and which cause the tool's message points to: the method settles no entry pipe, the contract did not come back whole, or the workshop predates the field. Do not reconstruct a signature from the input template. |
-| the user wants the method changed, or a saved method's files on disk | route: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one, `/pipelex-catalog` to bring a saved method to disk |
+{% include "skills/pipelex-explain/parts/change-route.md.j2" %}
 
 ## References
 

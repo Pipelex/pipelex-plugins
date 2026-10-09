@@ -1,0 +1,10 @@
+{#- pipelex-explain's stop-table row for a change to the method or
+   its files on disk: where each is routed.
+
+   A per-skill partial: its own file so an outside target can replace this
+   table row alone, declared and pinned, and keep the rest of the skill
+   (docs/build-targets.md, "Per-skill partials"). Strips its own trailing
+   newline (the closing comment below), so the including template supplies the
+   line break. -#}
+| the user wants the method changed, or a saved method's files on disk | route: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one, `/pipelex-catalog` to bring a saved method to disk |
+{#- -#}

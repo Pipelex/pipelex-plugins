@@ -1,9 +1,10 @@
 {#- The one MTHDS language reference. `pipelex-design` reads it before every write, and
    `pipelex-edit`, `pipelex-explain`, `pipelex-inputs` and `pipelex-integrate` point at it for a
-   syntax question. It is rendered per target to `skills/shared/writing-mthds.md` and reads no
-   target variable: it is a template so that it includes the `PipeFunc` warning instead of
-   restating it. What must ship as literal Jinja — the shorthands' expansions, an
-   `expression_template` — sits inside raw blocks. -#}
+   syntax question. It is rendered per target to `skills/shared/writing-mthds.md`. It is a
+   template so that it includes the `PipeFunc` warning instead of restating it, and its
+   opening paragraph reads `platform` and `harness_name`, since an `agent-skills` target has
+   no validation hook to describe. What must ship as literal Jinja — the shorthands'
+   expansions, an `expression_template` — sits inside raw blocks. -#}
 # MTHDS Language Reference
 
 The reference for the MTHDS language, with copy-pasteable examples: read it before writing or editing a `.mthds` file, and for any syntax question while reading one.
