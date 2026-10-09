@@ -93,6 +93,8 @@ TemplateVarValue: TypeAlias = "str | bool | list[str] | dict[str, object]"
 TARGETS_DIR_NAME = "targets"
 DEFAULTS_FILE = "defaults.toml"
 TEMPLATES_DIR_NAME = "templates"
+# A repository's own directory, or a worktree's file naming it: never an output, wherever it sits.
+GIT_DIR_NAME = ".git"
 
 # The repository's own directories, relative to its root: the build's sources, the files it writes
 # outside any target (`.agents/`), and everything else that is nobody's output. The build prunes
@@ -104,7 +106,7 @@ REPOSITORY_OWN_PATHS = (
     ".claude",
     ".claude-plugin",
     ".codex-plugin",
-    ".git",
+    GIT_DIR_NAME,
     ".github",
     ".venv",
     "docs",
@@ -793,7 +795,8 @@ def orphaned_outputs(base_dir: Path, output_dir: Path, produced: set[Path], *, s
     A symlink counts as a file and is never followed, unless the build writes through it. A file git
     ignores is left out: it never ships, so it is neither the build's to delete nor the check's to
     report — a `.DS_Store` that Finder leaves behind is the usual one. A caller that decides about
-    ignored files itself, as the outside render does, passes `skip_ignored=False`.
+    ignored files itself, as the outside render does, passes `skip_ignored=False`. A `.git` is never
+    entered or listed, ignored or not: a repository's history is never the build's to delete.
     """
     if not output_dir.is_dir():
         return []
@@ -801,7 +804,8 @@ def orphaned_outputs(base_dir: Path, output_dir: Path, produced: set[Path], *, s
     candidates: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(output_dir):
         current = Path(dirpath)
-        candidates.extend(current / name for name in filenames if current / name not in produced)
+        dirnames[:] = [name for name in dirnames if name != GIT_DIR_NAME]
+        candidates.extend(current / name for name in filenames if name != GIT_DIR_NAME and current / name not in produced)
         # os.walk lists a symlink to a directory among the directories and never descends it.
         candidates.extend(current / name for name in dirnames if (current / name).is_symlink() and current / name not in produced_dirs)
     ignored = git_ignored(base_dir, candidates) if skip_ignored else set[Path]()

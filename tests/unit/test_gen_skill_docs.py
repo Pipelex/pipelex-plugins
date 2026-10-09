@@ -544,6 +544,19 @@ class TestCheckFreshness:
         assert not stray.exists()
         assert check_freshness(template_tree, "prod") == 0
 
+    def test_a_repository_inside_a_target_is_never_removed(self, template_tree: Path) -> None:
+        """A `.git` in an output is a repository's history, which no build prunes, whatever git ignores."""
+        git = shutil.which("git")
+        if git is None:
+            pytest.skip("no git on the PATH")
+        generate(template_tree, "prod")
+        repository = template_tree / "pipelex" / "skills"
+        subprocess.run([git, "init", "-q", str(repository)], check=True)
+        history = sorted(path for path in (repository / ".git").rglob("*") if path.is_file())
+        generate(template_tree, "prod")
+        assert history
+        assert all(path.is_file() for path in history), "the build deleted a repository's history"
+
 
 class TestCodexDiscoveryMarketplace:
     """Tests for the .agents/plugins/marketplace.json sync (the file Codex

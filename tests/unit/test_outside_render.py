@@ -433,7 +433,7 @@ class TestOutsideRender:
     @pytest.mark.parametrize(
         ("prepare", "refusal"),
         [
-            (_git_checkout, "rendered: holds files no render of this target wrote (rendered/.git/"),
+            (_git_checkout, "rendered/.git: a git repository inside the output, which the render owns whole"),
             (_another_target_s_output, f"rendered: its {OWNER_MARKER_NAME} names the outside target 'another-target', not 'outside-fixture'"),
         ],
     )
@@ -446,6 +446,26 @@ class TestOutsideRender:
         before = _snapshot(output)
         assert build(target) == 1
         assert refusal in capsys.readouterr().out
+        assert check(target) == 1
+        assert _snapshot(output) == before
+
+    @pytest.mark.parametrize("where", ["", "pipelex-edit"], ids=["top", "in-a-skill"])
+    def test_a_repository_made_in_a_rendered_output_is_refused_untouched(
+        self, tmp_path: Path, where: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The marker says the output is the render's, but a repository made in it afterwards is not: the pruning would
+        delete its history as files the render does not produce."""
+        target = load_outside_target(_fixture(tmp_path))
+        output = tmp_path / "rendered"
+        assert build(target) == 0
+        repository = output / where
+        subprocess.run(["git", "init", "--quiet", str(repository)], check=True)
+        subprocess.run(["git", "-C", str(repository), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(repository), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "publish"], check=True)
+        before = _snapshot(output)
+        capsys.readouterr()
+        assert build(target) == 1
+        assert f"{(repository / '.git').relative_to(tmp_path).as_posix()}: a git repository inside the output" in capsys.readouterr().out
         assert check(target) == 1
         assert _snapshot(output) == before
 

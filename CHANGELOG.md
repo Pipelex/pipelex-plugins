@@ -13,6 +13,7 @@
 ### Fixed
 
 - **`pipelex-integrate` gets a `python-structures` project its `pipelex_sdk`**: the call site imports `pipelex_sdk`, which a `python-structures` project gets from `pipelex` itself, so step 8 and refresh mode now raise a `pipelex` older than the first release that depends on `pipelex-sdk` as they raise the SDKs, without a question. The Python reference says to add no `pipelex-sdk` requirement of the project's own, since pipelex pins that one exactly, and to run `pipelex migrate --yes` when the raised runtime refuses a configuration written for a former release.
+- **`make build` never deletes a repository made inside a target's directory**: the pruning removed every file a target does not produce, a `.git` included, so `git init` inside `pipelex/`, `pipelex-codex/` or `pipelex-vibe/` lost its history at the next build. The build now never enters or lists a `.git`.
 
 ## [0.11.0] - 2026-10-08
 

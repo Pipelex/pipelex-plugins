@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import cast
 
 from scripts.gen_skill_docs import (
+    GIT_DIR_NAME,
     STATIC_ASSET_DIRS,
     TARGETS_DIR_NAME,
     TEMPLATES_DIR_NAME,
@@ -534,8 +535,10 @@ def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> 
     The render removes everything in its output that it does not produce, so it writes only into a
     directory that is new or empty, or that carries the owner marker an earlier render of this same
     target left: a directory holding anything else is somebody else's, a checkout's `.git/` or a
-    harness's other skills. And it writes through no symbolic link: a link on the path of a file it
-    produces would carry the write outside the output, where the link points.
+    harness's other skills. A `.git` at any depth is refused even under the marker, since a repository
+    made in the output after a render is not the render's either. And it writes through no symbolic
+    link: a link on the path of a file it produces would carry the write outside the output, where
+    the link points.
     """
     output_dir = target.output_dir
     if not output_dir.exists():
@@ -558,6 +561,11 @@ def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> 
                 f"{label}: holds files no render of this target wrote ({named}), and the render removes what it does not produce; "
                 "name a new or empty directory as the output, or delete this one if it is an earlier rendering"
             )
+    errors.extend(
+        f"{_label(target, repository)}: a git repository inside the output, which the render owns whole; "
+        "keep the repository outside the output, or render into a directory of its own and copy the skills in"
+        for repository in _repositories(output_dir)
+    )
     links: set[Path] = set()
     for rel in files:
         parts = rel.split("/")
@@ -571,6 +579,16 @@ def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> 
         for link in sorted(links)
     )
     return errors
+
+
+def _repositories(output_dir: Path) -> list[Path]:
+    """Every `.git` in the output, a repository's own directory or a worktree's file, at any depth and never entered."""
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in output_dir.walk():
+        if GIT_DIR_NAME in dirnames or GIT_DIR_NAME in filenames:
+            found.append(dirpath / GIT_DIR_NAME)
+        dirnames[:] = [name for name in dirnames if name != GIT_DIR_NAME]
+    return sorted(found)
 
 
 def link_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
