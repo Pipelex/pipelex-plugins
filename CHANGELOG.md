@@ -5,6 +5,7 @@
 ### Added
 
 - **Outside targets render the skills from another repository's templates**: the `pipelex-plugins-render <target file> [--check]` command, run with `uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref>` and carrying the templates of that ref, renders this plugin's skills for a target file kept in another repository, on a new `agent-skills` platform with no hooks, manifest or MCP declaration, from that repository's own skills and overlays and its replacements of upstream files, each declared and pinned by SHA-256 so that an upstream change to one stops the render. The sentences a consumer is expected to replace have partials of their own under `templates/skills/<skill>/parts/`, so replacing one does not fork its skill. The render owns its output directory, marked with `.pipelex-plugins-render.toml`, refuses one it does not own and writes nothing when a link breaks, and `--check` compares without writing; `docs/build-targets.md`, "Outside targets", has the rules.
+- **Each release is tagged `vX.Y.Z` on its merge to `main`**: a new workflow, `release-tag.yml`, pushes the annotated tag when the version in `targets/prod.toml` is not tagged yet, so an outside target can pin the render to a release with `uvx --from git+https://github.com/Pipelex/pipelex-plugins@vX.Y.Z`.
 
 ### Changed
 

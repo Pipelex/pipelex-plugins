@@ -1,0 +1,74 @@
+# Tags a release when its merge lands on `main`: the annotated tag `vX.Y.Z`, read from
+# `targets/prod.toml`'s `[plugin].version`, on the merge commit. The marketplace still serves
+# `main` itself; the tag is the pin an outside target renders the skills at
+# (`uvx --from git+https://github.com/Pipelex/pipelex-plugins@vX.Y.Z pipelex-plugins-render`),
+# and the release skill's "What ships" section names this workflow and the tag, which
+# `/ledger-land` reads to verify a release.
+#
+# Follows the workspace meta-repo's github-release.yml, with three departures. It creates no
+# GitHub Release, since nothing but the tag is published. It runs on the push to `main` alone,
+# with no `workflow_dispatch`, so it can never tag another branch's commit; a failed run is
+# re-run from the Actions page, which repeats the same push. And the version is validated
+# before it reaches a pattern or a tag name, as `changelog-check.yml` does.
+#
+# A push to `main` that carries no version bump is normal, so the tag is created only when it
+# does not exist yet, and the changelog is checked first: a bump that landed without its entry
+# fails here instead of producing a tag.
+name: Release tag
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release-tag:
+    name: Release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # the organization's default token is read-only, and pushing a tag needs write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the tag list, to know what is already tagged
+
+      - name: Read the version from targets/prod.toml
+        run: |
+          VERSION=$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("targets/prod.toml").read_text())["plugin"]["version"])')
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::targets/prod.toml [plugin].version is not an X.Y.Z version: $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Version on main: $VERSION"
+
+      - name: Check whether the tag exists
+        run: |
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "TAG_EXISTS=1" >> "$GITHUB_ENV"
+            echo "v$VERSION already exists, at $(git rev-list -n 1 "v$VERSION"): this push carried no version bump."
+          fi
+
+      - name: Verify the changelog entry
+        if: env.TAG_EXISTS != '1'
+        run: |
+          # This repo's changelog headings carry no `v`: `## [X.Y.Z] - YYYY-MM-DD`.
+          if ! grep -qE "^## \[${VERSION//./\\.}\] - " CHANGELOG.md; then
+            echo "::error::No changelog entry for $VERSION in CHANGELOG.md; refusing to tag."
+            exit 1
+          fi
+
+      - name: Create and push the annotated tag
+        if: env.TAG_EXISTS != '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+          echo "Tagged $(git rev-parse --short HEAD) as v$VERSION"

@@ -1,6 +1,6 @@
 # Continuous integration
 
-Everything this repo runs on GitHub lives in `.github/workflows/`. Some of it runs on every pull request, some only on a release-shaped one, and the recipe suite stays off the ordinary pull request because it needs network and minutes. The table says which is which; the sections below say why.
+Everything this repo runs on GitHub lives in `.github/workflows/`. Most of it runs on pull requests, some of it only on a release-shaped one, the recipe suite stays off the ordinary pull request because it needs network and minutes, and one workflow runs on the merge to `main`, to tag the release. The table says which is which; the sections below say why.
 
 | Workflow | Status check | Runs on | What it runs |
 | --- | --- | --- | --- |
@@ -10,6 +10,7 @@ Everything this repo runs on GitHub lives in `.github/workflows/`. Some of it ru
 | `changelog-check.yml` | `Changelog entry` | a pull request into `main` | `CHANGELOG.md` carries the version being shipped |
 | `version-check.yml` | `Version check` | a pull request into `main` or into `release/vX.Y.Z` | the version in the files is the version in the branch name |
 | `recipes.yml` | `Recipes` | nightly, on demand, and on a pull request touching the recipe sources | `make test-recipes` |
+| `release-tag.yml` | `Release tag` | a push to `main` | the annotated tag `vX.Y.Z` on the merge commit, when it does not exist yet |
 
 The status check column is the name GitHub reports, which is the job's name and not the workflow's — that is the string a branch ruleset has to name to make a gate blocking.
 
@@ -63,6 +64,8 @@ It also warns of the other direction, and two of the checks here walk straight i
 
 The opposite trap is just as quiet. A job that GitHub *skips* because its `if:` was false counts as satisfying a required check, and each `Gate *` job is gated on the base branch — so requiring `Gate main` on `dev` would pass every pull request without testing anything. Require `Gate dev` on `dev`, `Gate main` on `main`, `Gate release` on `release/v*`, and no other pairing.
 
-## Nothing deploys
+## The merge to `main` tags the release
 
-There is no publish workflow and no tag. The repository is the artifact: on Claude and Codex install is `plugin marketplace add Pipelex/pipelex-plugins`, which serves the default branch, so the merge to `main` is the publish. Nothing runs on that merge.
+The repository is the artifact: on Claude and Codex install is `plugin marketplace add Pipelex/pipelex-plugins`, which serves the default branch, so the merge to `main` is the publish, and nothing is deployed or sent to a registry. What runs on that merge is `release-tag.yml`. It reads `targets/prod.toml`'s `[plugin].version`, and when the tag `vX.Y.Z` does not exist yet it checks that `CHANGELOG.md` carries the version's `## [X.Y.Z] - ` heading and pushes the annotated tag on the merge commit. A push to `main` that carries no version bump finds the tag already there and tags nothing. It runs on that push alone, with no manual trigger, so it can never tag another branch's commit, and its job asks for `contents: write`, since the organization's default token is read-only.
+
+The tag is the pin an outside target renders the skills at, `uvx --from git+https://github.com/Pipelex/pipelex-plugins@vX.Y.Z pipelex-plugins-render` ([development.md](development.md), "Rendering for an outside target"), and the release skill's **What ships** section names the workflow and the tag, which `/ledger-land` reads to verify a release. No GitHub Release is made.
