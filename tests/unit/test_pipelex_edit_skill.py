@@ -62,7 +62,8 @@ class TestPipelexEditSkill:
         """A stop by the read-before-act test, as for `pipelex-design`: the hook's block names the syntax
         error, and the harness refuses an edit to a file changed since it was read."""
         assert "**Formatting is automatic.**" not in self.render(target_name)
-        assert 'include "skills/shared/formatting-hook.md.j2"' not in self.TEMPLATE.read_text(encoding="utf-8")
+        for source in (self.TEMPLATE, *sorted((self.TEMPLATE.parent / "parts").glob("*.md.j2"))):
+            assert 'include "skills/shared/formatting-hook.md.j2"' not in source.read_text(encoding="utf-8"), source.name
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_authoring_reference_is_pointed_at_where_edits_are_made(self, target_name: str) -> None:

@@ -2384,7 +2384,7 @@ class TestPipelexExplainSkill:
     )
 
     def body(self) -> str:
-        return self.TEMPLATE.read_text(encoding="utf-8")
+        return _skill_source(self.TEMPLATE.parent)
 
     @pytest.mark.parametrize("pipe_type", PIPE_TYPES)
     def test_every_pipe_type_is_named(self, pipe_type: str) -> None:
