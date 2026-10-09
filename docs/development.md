@@ -96,7 +96,7 @@ uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref> pipelex-plugins-
 uvx --from git+https://github.com/Pipelex/pipelex-plugins@<ref> pipelex-plugins-render path/to/target.toml --check   # compare the output with a fresh rendering; write nothing
 ```
 
-The ref is the pin: the package carries the templates, static assets and targets of that commit inside itself, so the consumer's rendering changes only when it moves the ref. Pin a full commit SHA; a branch such as `@dev` moves under the consumer, and is for trying a change before it is released. Run it through `uvx` rather than installing it into a project's environment: the package installs a top-level `scripts` package, a name another distribution may also use ([decisions.md](decisions.md), "The outside render ships in the tooling package").
+The ref is the pin: the package carries the templates, static assets and targets of that commit inside itself, so the consumer's rendering changes only when it moves the ref. Pin a release tag, `@vX.Y.Z`, which CI pushes on the merge of each release to `main` ([ci.md](ci.md), "The merge to `main` tags the release"), or a full commit SHA; a branch such as `@dev` moves under the consumer, and is for trying a change before it is released. Run it through `uvx` rather than installing it into a project's environment: the package installs a top-level `scripts` package, a name another distribution may also use ([decisions.md](decisions.md), "The outside render ships in the tooling package").
 
 **A declaration's hash** is the SHA-256 of the upstream file's bytes at the pin, written `sha256:` and the 64 hex digits. Compute it from a checkout of this repository at that ref, or straight from GitHub:
 
