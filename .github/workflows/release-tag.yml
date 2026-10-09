@@ -11,12 +11,15 @@
 # re-run from the Actions page, which repeats the same push. It validates the version as an
 # `X.Y.Z` before it reaches a pattern or a tag name, as `changelog-check.yml` does. And a missing
 # changelog heading is a warning rather than a refusal: the merge has already published the
-# version to the marketplace, a refusal would leave that version untagged with no re-run able to
-# cure it, and the `Changelog entry` check on the release pull request is the gate for it.
+# version to the marketplace, and a refusal would leave that version untagged with no re-run able
+# to cure it. What stops a release for a missing entry is the release skill, which reads the
+# `Changelog entry` check on the release pull request and stops on a red one; no ruleset requires
+# that check.
 #
-# Only the push that changes the version tags, and only when the tag does not exist yet. A push
-# that leaves the version alone tags nothing, even when the tag is missing, so a later commit can
-# never take a release's tag; the release's own run, re-run, is what tags it. There is no
+# Only the push that raises the version tags, and only when the tag does not exist yet. A push
+# that leaves the version alone, or lowers it, tags nothing, even when the tag is missing, so a
+# later commit or a revert can never take a release's tag; the release's own run, re-run, is what
+# tags it. There is no
 # concurrency group, since GitHub cancels a pending run that a newer one supersedes in a group,
 # which could cancel the release's run.
 name: Release tag
@@ -58,8 +61,8 @@ jobs:
             exit 0
           fi
           PREVIOUS=$(git show "$BEFORE:targets/prod.toml" | python3 -c 'import sys,tomllib;print(tomllib.loads(sys.stdin.read())["plugin"]["version"])')
-          if [ "$PREVIOUS" = "$VERSION" ]; then
-            echo "::warning::v$VERSION is not tagged, and this push left the version at $VERSION, so it tags nothing: re-run the run of the push that released $VERSION."
+          if ! python3 -c 'import sys; before, after = (tuple(int(part) for part in v.split(".")) for v in sys.argv[1:]); sys.exit(after <= before)' "$PREVIOUS" "$VERSION"; then
+            echo "::warning::v$VERSION is not tagged, and this push did not raise the version (it was $PREVIOUS), so it tags nothing: only the run of the push that raised the version to $VERSION tags it, and a re-run of that run does."
             exit 0
           fi
           echo "RELEASE=1" >> "$GITHUB_ENV"
