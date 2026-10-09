@@ -1057,7 +1057,7 @@ class TestSharedSkillIncludes:
         is pinned here."""
         include = "skills/shared/graph-page.md.j2"
         carriers = sorted(
-            path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in path.read_text(encoding="utf-8")
+            path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in _skill_source(path.parent)
         )
         assert carriers == ["pipelex-design", "pipelex-explain", "pipelex-run"]
 
@@ -1094,7 +1094,7 @@ class TestSharedSkillIncludes:
         offenders = [
             f"{path.relative_to(self.REPO_TEMPLATES)}:{number}"
             for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
-            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+            for number, line in enumerate(_skill_source(path.parent).splitlines(), start=1)
             if "PipeFunc" in line and "sandbox" in line
         ]
         assert offenders == [], f"the sandbox fact reaches a skill through the include or not at all: {offenders}"
@@ -1120,7 +1120,7 @@ class TestSharedSkillIncludes:
         offenders = [
             str(path.relative_to(self.REPO_TEMPLATES))
             for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2"))
-            if "check-ignore" in path.read_text(encoding="utf-8")
+            if "check-ignore" in _skill_source(path.parent)
         ]
         assert offenders == [], f"the ignore check reaches a skill through skills/shared/git-ignore.md.j2 alone: {offenders}"
 
@@ -1138,7 +1138,7 @@ class TestSharedSkillIncludes:
         includers = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
-            if 'include "skills/shared/validate-call.md.j2"' in path.read_text(encoding="utf-8")
+            if 'include "skills/shared/validate-call.md.j2"' in _skill_source(path.parent)
         )
         assert "pipelex-catalog" in includers
         repo_root = self.REPO_TEMPLATES.parent
