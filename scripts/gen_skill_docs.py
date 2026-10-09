@@ -792,8 +792,8 @@ def orphaned_outputs(base_dir: Path, output_dir: Path, produced: set[Path], *, s
 
     A symlink counts as a file and is never followed, unless the build writes through it. A file git
     ignores is left out: it never ships, so it is neither the build's to delete nor the check's to
-    report — a `.DS_Store` that Finder leaves behind is the usual one. A caller whose output git
-    ignores as a whole passes `skip_ignored=False`, since there what git ignores is what ships.
+    report — a `.DS_Store` that Finder leaves behind is the usual one. A caller that decides about
+    ignored files itself, as the outside render does, passes `skip_ignored=False`.
     """
     if not output_dir.is_dir():
         return []
@@ -834,16 +834,23 @@ def git_ignored(base_dir: Path, paths: list[Path]) -> set[Path]:
     return {by_rel[item] for item in completed.stdout.split("\0") if item in by_rel}
 
 
-def prune_orphans(base_dir: Path, output_dir: Path, produced: set[Path], *, skip_ignored: bool = True) -> list[Path]:
+def prune_orphans(base_dir: Path, output_dir: Path, produced: set[Path]) -> list[Path]:
     """Remove every orphaned output of a target (see `orphaned_outputs`) and return what went.
+
+    The caller has checked the directory is one the build owns (`check_output_dir`).
+    """
+    return remove_orphans(output_dir, orphaned_outputs(base_dir, output_dir, produced))
+
+
+def remove_orphans(output_dir: Path, orphans: list[Path]) -> list[Path]:
+    """Remove the orphans a build found under its output directory, and return what went.
 
     A `.j2` file is left where it is: a template is a source, never an output, and one that
     leaked into a target may be somebody's work written in the wrong place, so `--check` names
     it for its author to move. A directory goes only when removing an orphan left it empty; a
-    symlink is unlinked, never followed. The caller has checked the directory is one the build
-    owns (`check_output_dir`).
+    symlink is unlinked, never followed.
     """
-    removed = [path for path in orphaned_outputs(base_dir, output_dir, produced, skip_ignored=skip_ignored) if not _is_template(path)]
+    removed = [path for path in orphans if not _is_template(path)]
     for path in removed:
         path.unlink()
     for path in removed:

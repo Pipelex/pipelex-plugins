@@ -53,7 +53,7 @@ from scripts.gen_skill_docs import (
     load_defaults,
     merge_template_vars,
     orphaned_outputs,
-    prune_orphans,
+    remove_orphans,
     render_templates,
     skill_template_names,
 )
@@ -464,35 +464,68 @@ def render_outside(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -
             for skill in skills:
                 own = {rel: file for rel, file in files.items() if rel.startswith(f"{skill}/")}
                 files.update(_shared_closure(own, f"{skill}/{SHARED_DIR_NAME}", shared))
-    files[OWNER_MARKER_NAME] = OutputFile(_owner_marker(target.name).encode("utf-8"))
+    files[OWNER_MARKER_NAME] = OutputFile(_owner_marker(target.name, sorted(files)).encode("utf-8"))
     return dict(sorted(files.items()))
 
 
-def _owner_marker(name: str) -> str:
+def _owner_marker(name: str, written: Sequence[str]) -> str:
+    listed = "".join(f"    {json.dumps(rel)},\n" for rel in written)
     return (
         "# The output of pipelex-plugins' outside render for this target, which owns the directory: each render\n"
         "# rewrites it and removes whatever it no longer produces. Delete the whole directory to take it back.\n"
         f"target = {json.dumps(name)}\n"
+        f"files = [\n{listed}]\n"
     )
+
+
+def _marker_table(marker: Path) -> dict[str, object]:
+    """What an owner marker says, or nothing when it cannot be read."""
+    try:
+        return tomllib.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
+        return {}
 
 
 def _marker_owner(marker: Path) -> str | None:
     """The target an owner marker names, or None when it names none."""
-    try:
-        owner = tomllib.loads(marker.read_text(encoding="utf-8")).get("target")
-    except (tomllib.TOMLDecodeError, UnicodeDecodeError):
-        return None
+    owner = _marker_table(marker).get("target")
     return owner if isinstance(owner, str) else None
 
 
-def _litter_is_ignored(target: OutsideTarget, files: Mapping[str, OutputFile]) -> bool:
-    """Whether a file git ignores in the output is litter the render leaves alone, as the in-repo build does.
+def _written_before(target: OutsideTarget) -> set[Path]:
+    """The files the last render of this target wrote, as its owner marker lists them; none without a marker."""
+    marker = target.output_dir / OWNER_MARKER_NAME
+    if not marker.is_file() or marker.is_symlink():
+        return set()
+    listed = _marker_table(marker).get("files")
+    if not isinstance(listed, list):
+        return set()
+    return {target.output_dir / rel for rel in cast(list[object], listed) if isinstance(rel, str)}
 
-    Only when git ignores none of the files the render produces: a consumer that ignores its output
-    as a whole ignores what ships, so there every file counts, for the ownership check, the pruning
-    and `--check` alike, or an ignored directory of somebody else's skills would look empty.
+
+def _litter_is_ignored(target: OutsideTarget, files: Mapping[str, OutputFile]) -> bool:
+    """Whether a file git ignores in an unmarked output is litter the render may write beside, as the in-repo build does.
+
+    Only when git ignores none of the files the render produces. Where it ignores some of them, an
+    ignored file there may be somebody else's at a path the render writes; where it ignores the
+    output as a whole, an ignored directory of somebody else's skills would look empty. Either way
+    an unmarked directory must hold nothing at all.
     """
     return not git_ignored(target.output_dir, [target.output_dir / rel for rel in files])
+
+
+def _orphans(target: OutsideTarget, files: Mapping[str, OutputFile], written: set[Path]) -> list[Path]:
+    """What the output holds that the render does not produce and removes: each file git does not ignore, and each one it wrote.
+
+    A file git ignores that no render wrote is litter, a Finder `.DS_Store` the usual one, and stays,
+    however much of the output the consumer ignores; the marker's list is what tells a skill the
+    target stopped rendering, ignored with the rest, from that litter. The walk never descends a
+    symbolic link, so nothing the list names beyond one is reached.
+    """
+    output_dir = target.output_dir
+    candidates = orphaned_outputs(output_dir, output_dir, {output_dir / rel for rel in files}, skip_ignored=False)
+    ignored = git_ignored(output_dir, candidates)
+    return [path for path in candidates if path not in ignored or path in written]
 
 
 def ownership_errors(target: OutsideTarget, files: Mapping[str, OutputFile]) -> list[str]:
@@ -586,10 +619,10 @@ def build(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
     problems = ownership_errors(target, files)
     if problems:
         return _fail(problems, "The output directory is not this render's to write; nothing was written.")
+    written = _written_before(target)
     target.output_dir.mkdir(parents=True, exist_ok=True)
     _write_files(target.output_dir, files)
-    produced = {target.output_dir / rel for rel in files}
-    for removed in prune_orphans(target.output_dir, target.output_dir, produced, skip_ignored=_litter_is_ignored(target, files)):
+    for removed in remove_orphans(target.output_dir, _orphans(target, files, written)):
         print(f"  Removed {_label(target, removed)} (the render no longer produces it)")
     print(f"  [{target.name}] Rendered {len(files)} files into {target.output_dir}.")
     return 0
@@ -614,8 +647,7 @@ def check(target: OutsideTarget, upstream_root: Path = UPSTREAM_ROOT) -> int:
             findings.append(f"STALE: {label}")
         elif bool(path.stat().st_mode & stat.S_IXUSR) != file.executable:
             findings.append(f"MODE: {label} (executable bit differs from its source)")
-    produced = {target.output_dir / rel for rel in files}
-    for orphan in orphaned_outputs(target.output_dir, target.output_dir, produced, skip_ignored=_litter_is_ignored(target, files)):
+    for orphan in _orphans(target, files, _written_before(target)):
         label = _label(target, orphan)
         if orphan.suffix == ".j2":
             findings.append(f"LEAKED TEMPLATE: {label} (a template belongs under the source root's templates/: move it there, or delete it)")

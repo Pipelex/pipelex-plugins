@@ -14,6 +14,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -257,8 +258,9 @@ class TestOutsideRender:
         for skill_md in output.glob("*/SKILL.md"):
             assert _frontmatter_keys(skill_md) == {"name", "description"}, skill_md
         assert not [path for path in output.rglob("*") if path.name in {"hooks", "mcp", ".claude-plugin", ".codex-plugin"}]
-        # The marker at the top names the target whose output this is.
-        assert (output / OWNER_MARKER_NAME).read_text().endswith('target = "outside-fixture"\n')
+        # The marker at the top names the target whose output this is, and lists every other file the render wrote.
+        written = sorted(path.relative_to(output).as_posix() for path in output.rglob("*") if path.is_file() and path.name != OWNER_MARKER_NAME)
+        assert tomllib.loads((output / OWNER_MARKER_NAME).read_text()) == {"target": "outside-fixture", "files": written}
         assert check(target) == 0
 
     @pytest.mark.parametrize(
@@ -492,4 +494,26 @@ class TestOutsideRender:
         assert "ORPHAN: rendered/house-notes/SKILL.md" in capsys.readouterr().out
         assert build(target) == 0
         assert not (output / "house-notes").exists()
+        assert check(target) == 0
+
+    @pytest.mark.parametrize("ignored", ["rendered/\n", ".DS_Store\nrendered/house-notes/\n"], ids=["whole", "in-part"])
+    def test_in_an_ignored_output_litter_stays_and_a_skill_no_longer_rendered_goes(
+        self, tmp_path: Path, ignored: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The marker lists what each render wrote, so in an output git ignores, in part or as a whole, a skill the target
+        stops rendering is reported and removed, while a `.DS_Store` no render wrote is neither."""
+        subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+        _write(tmp_path / ".gitignore", ignored)
+        target_file = _fixture(tmp_path)
+        output = tmp_path / "rendered"
+        assert build(load_outside_target(target_file)) == 0
+        litter = [_write(output / ".DS_Store", ""), _write(output / "pipelex-edit" / ".DS_Store", "")]
+        assert check(load_outside_target(target_file)) == 0
+        target = load_outside_target(_edit(target_file, ', "house-notes"]', "]"))
+        capsys.readouterr()
+        assert check(target) == 1
+        assert "ORPHAN: rendered/house-notes/SKILL.md" in capsys.readouterr().out
+        assert build(target) == 0
+        assert not (output / "house-notes").exists()
+        assert all(path.exists() for path in litter)
         assert check(target) == 0
