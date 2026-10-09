@@ -9,6 +9,7 @@
 
 ### Changed
 
+- **The validation hook embeds `@pipelex/sdk` 0.37.0**: the `check.mjs` bundle every target runs on a `.mthds` edit embedded `@pipelex/sdk` 0.35.1 and now embeds 0.37.0, built in the `js/` directory of `Pipelex/pipelex-sdk`, and names that version in its validate stage's `User-Agent`; nothing else the hook does changes, and its local lint and format still run on `@pipelex/tools-wasm` 0.4.0.
 - **The credentials reference says a `pipelex login` key does not reach the plugin**: the shared reference the MCP-backed skills read on a key error, and the install page, say that the key the pipelex CLI's `pipelex login` saves in `~/.pipelex/.env`, or under `PIPELEX_HOME`, reaches neither the Pipelex tools nor the hook, and where to give the plugin a key instead.
 
 ### Fixed
