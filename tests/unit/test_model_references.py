@@ -46,7 +46,8 @@ class TestModelReferences:
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_section_teaches_the_lookup(self, target_name: str) -> None:
         """The lookup replaced "offer a preset or ask which model": each case the user can ask for is met
-        by a call, and the check's three answers are each read."""
+        by a call, and every field of the check's answer is read. The runner's check answers `resolved` or
+        `not_found` and nothing else, so the workshop's retired `unconfirmed` must not come back."""
         section = model_section(target_name)
         assert "**Look a reference up before writing it**, with the `mthds_models` tool." in section
         for case in (
@@ -56,8 +57,9 @@ class TestModelReferences:
             "- **A setting but no model**:",
         ):
             assert case in section, f"{target_name}: the section lost the case {case!r}"
-        for answer in ("`resolved`", "`not_found`", "`unconfirmed`", "`suggestions`", "`other_kinds`", "`other_categories`"):
+        for answer in ("`resolved`", "`resolves_to`", "`not_found`", "`suggestions`", "`other_kinds`", "`other_categories`"):
             assert answer in section, f"{target_name}: the section does not read {answer}"
+        assert "unconfirmed" not in section, f"{target_name}: the section reads an answer the check no longer gives"
         assert "offer a preset or ask which model, never invent a handle" not in section
 
     @pytest.mark.parametrize("target_name", TARGETS)
@@ -79,32 +81,44 @@ class TestModelReferences:
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_check_is_read_in_one_order(self, target_name: str) -> None:
-        """An unresolved answer can carry a hint: `best-gpt` came back `unconfirmed` with `@best-gpt` in
-        `other_kinds`, `$best-gpt` would be `not_found` with the same, and `gpt-image-2` checked as `llm`
-        comes back `unconfirmed` with `img_gen` in `other_categories`. The hints come before the
-        resolution's own branch, and one order says so, since two rules on one answer contradict."""
+        """A `not_found` answer can carry a hint: on the dev API on 2026-10-10, `$best-gpt` came back
+        `not_found` with `@best-gpt` in `other_kinds`, and `gpt-image-2` checked as `llm` came back `not_found`
+        with `img_gen` in `other_categories` and two language models as its suggestions. The hints come
+        before the resolution's own branch, and one order says so, since two rules on one answer contradict."""
         section = model_section(target_name)
         bullet = next(line for line in section.splitlines() if line.startswith("- **A model or a reference the user typed**"))
         assert "act on the first of these that fits the answer" in bullet
         steps = (
-            "On `resolved`, write it.",
+            "On `resolved`, write it, unless its match",
             "When `other_kinds` holds the same name under another sigil",
             "When `other_categories` is non-empty, the reference serves another kind of pipe",
             "On `not_found`, offer the `suggestions`",
-            "On `unconfirmed`, a handle the deck does not name, write it only as a pipe's `model` string",
         )
         positions = [bullet.index(step) for step in steps]
         assert positions == sorted(positions), f"{target_name}: the check's answers are out of order"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_model_and_a_setting_never_write_an_unchecked_table(self, target_name: str) -> None:
-        """A temperature lives only in an inline table, which validation never reads: an unconfirmed
-        handle there fails at run time, so the user chooses between the model and the setting."""
+        """A temperature lives only in an inline table, which validation never reads: a reference there that
+        does not resolve, or reaches no model, fails at run time, so the user chooses between the model and
+        the setting."""
         section = model_section(target_name)
         bullet = next(line for line in section.splitlines() if line.startswith("- **A model and a setting**"))
-        assert "whose model must answer `resolved` and must not be a preset" in bullet
-        assert "the setting on an alias the deck lists and the model without the setting" in bullet
-        assert "a handle `unconfirmed` with neither hint as a plain `model` string, and anything else only as the bullet above allows" in bullet
+        assert "whose model must answer `resolved`, reach a model and not be a preset" in bullet
+        assert "the setting on an alias the deck lists and the model without the setting, written as the bullet above allows" in bullet
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_resolved_reference_that_reaches_no_model_is_written_only_on_request(self, target_name: str) -> None:
+        """A check can answer `resolved` for a reference that reaches no model the runner can call: on the
+        dev API on 2026-10-10, `@default-judgment` in `judgment` resolved to the target `jev-1.13.0` with a
+        `null` `resolves_to`. Validation accepts such a reference and a run through it fails at the pipe, so
+        the `resolved` case says so and leaves the choice to the user, and an inline table never holds one."""
+        section = model_section(target_name)
+        bullet = next(line for line in section.splitlines() if line.startswith("- **A model or a reference the user typed**"))
+        resolved = bullet[bullet.index("On `resolved`") : bullet.index("When `other_kinds`")]
+        assert "unless its match in that category has a `null` `resolves_to`" in resolved
+        assert "so a run through it fails after validation passes, and write it only if the user still wants it" in resolved
+        assert "answers `resolved` for a reference that is not a preset and reaches a model" in section
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_resolved_preset_never_goes_in_an_inline_table(self, target_name: str) -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`pipelex-design` and `pipelex-edit` read the runner's model check**: a model check now answers `resolved` or `not_found`, so the MTHDS reference drops its rule for the retired `unconfirmed` and a bare model handle is checked like any other reference, which lets one that resolves carry a setting such as a temperature. A reference that resolves but reaches no model the runner can call now is reported, and written only on your word, since a run through it would fail after validation passes.
+
 ## [0.12.0] - 2026-10-09
 
 ### Added
