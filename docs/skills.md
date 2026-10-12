@@ -52,7 +52,7 @@ The tools reach the Pipelex API with your key, the same one the hook uses. Each 
 
 - **`mthds_validate`** validates a method. Its verdict carries the main pipe's signature, from which `/pipelex-integrate` types a call site.
 - **`mthds_inputs_template`** returns the input template of a pipe.
-- **`mthds_models`** lists the model deck, the presets, aliases and waterfalls a pipe's `model` field can name, by category, or checks one reference and suggests the nearest names when it does not resolve. `/pipelex-design` and `/pipelex-edit` call it before they write a model you asked for. The deck is what the runner can serve, not what your account may use, so a listed model can still be refused when a run starts.
+- **`mthds_models`** lists the model deck, the presets, aliases and waterfalls a pipe's `model` field can name, by category, or has the runner check one reference, which answers as a validation of it would, says which model a run through it calls now, and suggests the nearest names when it does not resolve. `/pipelex-design` and `/pipelex-edit` call it before they write a model you asked for, and tell you when a reference resolves but reaches no model the runner can call. The deck is what the runner can serve, not what your account may use, so a listed model can still be refused when a run starts.
 - **`mthds_codegen`** turns a method's concepts into typed code (`ts-zod`, `python-pydantic` or `python-structures`) and, given an `output_dir`, writes the tree to disk.
 - **`mthds_prepare_inputs`** uploads the file values of a filled template to Pipelex storage, so a run can reach them.
 - **`mthds_run`** starts a run, and **`mthds_run_status`**, **`mthds_run_results`** and the tools beside them follow it to its status, its results and its files.
