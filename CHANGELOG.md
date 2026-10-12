@@ -5,6 +5,8 @@
 ### Changed
 
 - **`pipelex-design` and `pipelex-edit` read the runner's model check**: a model check now answers `resolved` or `not_found`, so the MTHDS reference drops its rule for the retired `unconfirmed` and a bare model handle is checked like any other reference, which lets one that resolves carry a setting such as a temperature. A reference that resolves but reaches no model the runner can call now is reported, and written only on your word, since a run through it would fail after validation passes.
+- **The validation hook lints against the MTHDS 5.0.0 schema (Breaking)**: the `check.mjs` bundle every target runs on a `.mthds` edit is rebuilt on `@pipelex/tools-wasm` 0.5.0 and `@pipelex/sdk` 0.38.0, so it now accepts the 5.0.0 `PipeJudge`, an evidence `prompt` beside a `question` or a `questions` table with labelled rating levels, which it used to block offline, and blocks a `PipeJudge` lacking either its `prompt` or a question. It also blocks a name that a batch hands each item to, or that a step or a branch stores its result under, when it is not a plain input name.
+- **The hook's corpus sweep runs over the MTHDS Test Corpus of pipelex v0.83.0**: the sweep gains the multi-question and labelled-level `PipeJudge` entries and the entries whose batch or result name is not a plain input name, and its judge entries take the 5.0.0 form.
 
 ## [0.12.0] - 2026-10-09
 
