@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The MTHDS reference teaches `PipeDocGen`**: `pipelex-design` and `pipelex-edit` can now write a step that prints a method's results as a PDF, an Excel workbook, a Word document or a PowerPoint deck, with no model. The reference gives its `format`, `template`, `template_file`, `filename` and `model` fields and its `Document` output, says that a PDF without a template is laid out from the step's inputs, so a report an LLM writes for one is declared `Markdown`, that a template file sits beside the bundle and travels with it, and that a format whose engine the runner lacks is refused by the validation, after which the skill offers the PDF laid out from the inputs. `pipelex-explain` names the step as one that calls no model, and the fit check lists producing a PDF or an Office file among what a method does.
+- **The MTHDS reference teaches the `Markdown`, `Choice` and `Rating` natives**: the natives table names them, with `YesNo`'s `probability`, and says that a concept of a native's name is refused, and the native content types reference gives each its attributes, how a prompt renders it and its input form, a `Rating`'s `label` included. `pipelex-inputs` writes a `Choice` or `Rating` input as an object and matches a Markdown file to a `Markdown` input.
+
+### Fixed
+
+- **The native content types reference lets a `PipeLLM` read a `Document`**: it said a document could never be sent to a model and must be extracted first, which contradicted the MTHDS reference's own `PipeLLM` example. It now says that a `PipeLLM` whose prompt names a document sends it to its model, which must read the document's format, that extraction is the way otherwise, and that a document made during the run, such as a printed file, is refused only when its step runs, after earlier steps may have spent credit.
+
 ## [0.13.0] - 2026-10-12
 
 ### Changed

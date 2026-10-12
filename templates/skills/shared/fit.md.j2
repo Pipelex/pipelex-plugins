@@ -34,10 +34,11 @@ Each row names the pipe that does it, whose section of the MTHDS reference is th
 | Understand, decide, extract fields, write | `PipeLLM` | It reads text and images and produces text or structured fields that the method defines. |
 | Search the web | `PipeSearch` | It returns an answer with its sources: a title, a URL and a snippet for each. |
 | Generate images | `PipeImgGen` | It makes images from a prompt. These are the dearest runs. |
+| Produce a PDF, Excel, Word or PowerPoint file | `PipeDocGen` | It prints what earlier steps produced as one file, with no model. A PDF laid out from those results needs only the built-in engine; a PDF from a template and an Office file need an engine the runner may lack, which validation reports before any run. |
 | Run over a list | `PipeBatch` | It applies one step to every item of a list, such as every receipt or every clause. |
 | Route a case by a condition | `PipeCondition` | It sends each case down the branch its condition selects. |
 | Do several things at once | `PipeParallel` | It runs independent steps side by side. |
-| Fill a template | `PipeCompose` | It assembles a document or a message from the values earlier steps produced. |
+| Fill a template | `PipeCompose` | It assembles a message, a text or an HTML page from the values earlier steps produced; a file is `PipeDocGen`'s. |
 | Run custom Python | `PipeFunc` | It is experimental on the hosted platform, where it runs with no network, so a first candidate does without it. |
 
 **What the table does not name, a method does not do.** A connection to the builder's own systems, memory from one run to the next, a schedule, or an action such as sending an email belongs to a carrier, below.
@@ -61,7 +62,7 @@ The test is whether the method can be stated as "given X in hand, produce Y". If
 | **A method and its carriers** | A transformation with a trigger, a source, a destination or an action around it | Build the method, name the carrier, and offer to wire it with what already exists |
 | **Mostly plumbing** | Moving, copying, syncing or notifying, with no judgement | Say in one sentence that an automation platform or a connector hub does this, and offer the judgement if there is one, such as naming and filing each document by what it is |
 | **Agent work** | Initiative, conversation, memory, open-ended exploration | Say that the assistant the user is talking to does this, and offer a method for the procedural core if it recurs |
-| **Beyond the runtime today** | Audio or video in, a Word or PDF file out, retrieval over a large corpus | Name the workaround (the recording platform's transcript, a PDF export, a result rendered from HTML, a batch over a modest pile) and name the gap |
+| **Beyond the runtime today** | Audio or video in, retrieval over a large corpus | Name the workaround (the recording platform's transcript, a batch over a modest pile) and name the gap |
 
 ## The carriers
 

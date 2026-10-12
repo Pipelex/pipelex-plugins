@@ -19,7 +19,7 @@ A path never goes into an input name: an input is a plain name holding one whole
 | `Number` | NumberContent | `number` |
 | `YesNo` | YesNoContent | `yes_no`, `probability` (only when the producer reports one) |
 | `Choice` | ChoiceContent | `choice`, `confidence`, `probabilities` |
-| `Rating` | RatingContent | `level`, `confidence`, `probabilities`, `position` |
+| `Rating` | RatingContent | `level`, `label` (only when the scale declares labels), `confidence`, `probabilities`, `position` |
 | `Date` | DateContent | `date`, `time` (only when the source states one) |
 | `Time` | TimeContent | `time` |
 | `Image` | ImageContent | `url`, `filename`, `caption`, `mime_type`, `width`, `height` |
@@ -47,6 +47,20 @@ A path never goes into an input name: an input is a plain name holding one whole
 
 ---
 
+### Markdown — `MarkdownContent`
+
+A text written in Markdown. `Markdown` refines `Text` and keeps its one field.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `text` | `str` | The Markdown source |
+
+A `Markdown` value goes wherever a `Text` does, and a pipe taking `Text` receives its source; a `Text` is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. What sets it apart is how it is shown: an HTML template and a PDF a `PipeDocGen` lays out format it, with its headings, lists, tables and links, where a `Text` prints as it is.
+
+{% raw %}**Access**: `$var` or `$var.text` in prompts, both the source as it is. Inside an HTML template, `{{ var }}` and `$var` print it converted to HTML, with no filter, and `{{ var.text }}` prints the source, escaped.{% endraw %}
+
+---
+
 ### Number — `NumberContent`
 
 | Attribute | Type | Description |
@@ -65,6 +79,38 @@ A path never goes into an input name: an input is a plain name holding one whole
 | `probability` | `float` or `None` | The probability that the answer is yes, from 0 to 1, when the producer reports one |
 
 **Access**: `$var.yes_no` in prompts.
+
+---
+
+### Choice — `ChoiceContent`
+
+One option picked out of a set.
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `choice` | `str` | yes | The key of the selected option |
+| `confidence` | `float \| None` | no | The producer's confidence in the choice, from 0 to 1, when it reports one |
+| `probabilities` | `dict[str, float] \| None` | no | The probability of each option, keyed by option key, when the producer measures a distribution |
+
+**Access**: `$var` renders the key alone, as does `$var.choice`. A `PipeCondition` routes by it with `expression = "team.choice"`.
+
+---
+
+### Rating — `RatingContent`
+
+A position on an ordered scale of described levels.
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `level` | `int` | yes | The index of the selected level, 0 being the first level declared |
+| `label` | `str \| None` | no | The selected level's label, when the scale declares labels |
+| `confidence` | `float \| None` | no | The producer's confidence in the level, from 0 to 1, when it reports one |
+| `probabilities` | `dict[str, float] \| None` | no | The probability of each level, keyed by the level's index written as text (`"0"`, `"1"`, …), when the producer measures a distribution |
+| `position` | `float \| None` | no | A continuous position on the scale, from 0 to the last level's index, when the producer measures one |
+
+**Access**: `$var` renders the label when there is one and the level otherwise; `$var.level` is always the index. A `PipeCondition` branches on the level, which every rating has: `expression = "'severe' if severity.level >= 2 else 'mild'"`.
+
+**`YesNo`, `Choice` and `Rating` are verdicts, and each requires its verdict and nothing else**: the boolean, the key, the level. Every measure beside it is optional, and a producer that measures nothing leaves it absent, never at 1. A `PipeLLM` whose output is one of them may fill the measures with its own estimate. A condition that gates on a measure guards against its absence, as in `approved.probability is not none and approved.probability >= 0.8`.
 
 ---
 
@@ -118,7 +164,9 @@ A path never goes into an input name: an input is a plain name holding one whole
 | `title` | `str \| None` | no | Title of the document or source |
 | `snippet` | `str \| None` | no | Text snippet or excerpt from the document |
 
-**Access**: `$document.filename`, `$document.url` in prompts. Documents cannot be sent directly to LLMs — use PipeExtract first to get Page[] content. For web page URLs, use PipeExtract with `@default-extract-web-page` model.
+**Access**: `$document.filename`, `$document.url` in prompts. A PipeLLM whose prompt names the document (`@document` or `$document`) sends it to its model, which must read the document's format; for a model that does not, extract it first with PipeExtract, which gives `Page[]`. A document the run is given is checked before the run starts, when it is certain to reach that step. A document made during the run, such as the file a PipeDocGen prints, or one that reaches the step only through a condition or a step that may be skipped, is refused only when that step runs, after the steps before it may have spent credit, so make sure, when writing the method, that the step's model reads that format. For web page URLs, use PipeExtract with the `@default-extract-web-page` model.
+
+**Produced by PipeDocGen**, whose output is the file it printed: a PDF, an Excel workbook, a Word document or a PowerPoint deck, its `filename` carrying the suffix.
 
 ---
 
@@ -338,8 +386,11 @@ page_text = { from = "page.text_and_images.text.text" }
 ```json
 {
   "my_text": {"concept": "native.Text", "content": {"text": "Hello"}},
+  "my_markdown": {"concept": "native.Markdown", "content": {"text": "# Roof\n\n- two cracked tiles"}},
   "my_number": {"concept": "native.Number", "content": {"number": 42}},
   "my_yes_no": {"concept": "native.YesNo", "content": {"yes_no": true}},
+  "my_choice": {"concept": "native.Choice", "content": {"choice": "billing"}},
+  "my_rating": {"concept": "native.Rating", "content": {"level": 2}},
   "my_date": {"concept": "native.Date", "content": {"date": "2026-07-07"}},
   "my_time": {"concept": "native.Time", "content": {"time": "15:40:00"}},
   "my_image": {"concept": "native.Image", "content": {"url": "/path/to/img.jpg", "mime_type": "image/jpeg"}},
@@ -348,3 +399,5 @@ page_text = { from = "page.text_and_images.text.text" }
   "my_search_result": {"concept": "native.SearchResult", "content": {"answer": "The answer text", "sources": [{"url": "https://example.com", "title": "Source 1", "snippet": "Relevant excerpt"}]}}
 }
 ```
+
+A `Choice` or `Rating` input is always an object, never a bare value: a bare `"billing"` would read as a text.

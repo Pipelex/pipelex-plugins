@@ -148,13 +148,16 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 | Code | When to use |
 |------|-------------|
 | `Text` | A string. |
+| `Markdown` | A text written in Markdown, which refines `Text` (`text`, the source). Declare an LLM's output `Markdown` when the text is to be read formatted, in a PDF or an HTML page: a `Text` prints its `#` and `**` as they are. A `Markdown` value goes wherever a `Text` does, never the reverse. |
 | `Image` | A binary image (JPEG, PNG, ...). |
-| `Document` | A document file or a web page URL. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them. See its section before designing over Office files. |
+| `Document` | A document file or a web page URL, and the file a `PipeDocGen` prints. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them. See its section before designing over Office files. |
 | `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF). |
 | `Html` | HTML content. |
 | `TextAndImages` | Mixed text + images. |
 | `Number` | A numeric value. |
-| `YesNo` | A yes/no answer (`yes_no`). |
+| `YesNo` | A yes/no answer (`yes_no`, and `probability` when its producer reports one). |
+| `Choice` | One option picked out of a set (`choice`, the option's key, and `confidence` and `probabilities` when reported). A `PipeLLM` whose output is `Choice` writes whatever key it chooses, since no option set is declared behind it: when the options must be enforced, give a structured concept a field with `choices` (2f) instead. |
+| `Rating` | A level on an ordered scale (`level`, its index from 0, and `label`, `confidence`, `probabilities` and `position` when reported). |
 | `Date` | A calendar date with optional time (`date`, `time`). |
 | `Time` | A time of day with an optional UTC offset (`time`). |
 | `JSON` | A JSON value. |
@@ -164,6 +167,8 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 | `Composite` | Named components, usually from PipeParallel. |
 
 > File formats like "PDF" or "JPEG" are NOT concepts. Use `Document` and `Image` respectively.
+
+**A concept of your own never takes a native's code.** `Markdown`, `Choice` and `Rating` are natives too, so a bundle declaring a concept of one of those names is refused as `native_concept_redeclaration`: use the native, or give your concept a name of its own, such as `SeverityLevel`.
 
 Each native concept has a content class with its own attributes: an `Image` has `url`, `filename` and `caption`, a `Page` has `text_and_images` and `page_view`. [Native Content Types](native-content-types.md) lists them all, for writing `$var.field` in a prompt or `from = "input.field"` in a construct.
 
@@ -225,7 +230,7 @@ Summarize the following document:
 
 ### Model references
 
-Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeJudge`) takes a reference of one of four kinds, told apart by its sigil:
+Every pipe with a `model` field (`PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeJudge`, `PipeDocGen`) takes a reference of one of four kinds, told apart by its sigil:
 
 | Kind | Sigil | Example | What it names |
 |---|---|---|---|
@@ -240,7 +245,7 @@ On a `PipeLLM`, `model` may instead be an inline table of settings, whose `tempe
 
 **A pipe whose input the default model cannot read names the model that can**, whether or not the user asked: a `PipeExtract` over a web page sets `model = "@default-extract-web-page"`, as its section says. Validation cannot see this one either, since it never knows what a `Document` will hold.
 
-**Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen`, `search` for a `PipeSearch` and `judgment` for a `PipeJudge`. It spends no credit.
+**Look a reference up before writing it**, with the `mthds_models` tool. It reads the deck, the presets, aliases and waterfalls the runner serves, by category: `llm` for a `PipeLLM`, `extract` for a `PipeExtract`, `img_gen` for a `PipeImgGen`, `search` for a `PipeSearch` and `judgment` for a `PipeJudge`. A `PipeDocGen`'s document engine is only ever checked, with `doc_gen`, since the listing holds no document engines. It spends no credit.
 
 - **A kind of behaviour**: list the pipe's category and write the preset whose name fits it, saying which one you chose.
 - **A model or a reference the user typed**: check it, passing it as `reference` with the pipe's `category`, and act on the first of these that fits the answer. On `resolved`, write it, unless its match in that category has a `null` `resolves_to`: say that it reaches no model the runner can call now, so a run through it fails after validation passes, and write it only if the user still wants it. When `other_kinds` holds the same name under another sigil (`$best-gpt` exists as `@best-gpt`), write that one and say so. When `other_categories` is non-empty, the reference serves another kind of pipe: say so rather than write it on this one. On `not_found`, offer the `suggestions` and write only what the user picks.
@@ -616,6 +621,73 @@ Each referenced image is injected as an `[Image N]` token (reference image), bou
 
 Aspect-ratio support is model-dependent, and only `square` works on every model. The newest models cover the full range: `gpt-image-2` supports all of them, `nano-banana-2` nearly all. The older `gpt-image-1` and `gpt-image-1.5` accept only `square`, `landscape_3_2` and `portrait_2_3`. For a specific shape such as `landscape_16_9` or `portrait_9_16`, choose a model that supports it rather than assuming the default does.
 
+### PipeDocGen — print a document file
+
+**It calls no model.** It prints what earlier steps produced as one file, a PDF, an Excel workbook, a Word document or a PowerPoint deck, by laying its inputs out or by filling a template with them, so it spends no inference and prints the same file from the same inputs. The model work, such as writing the report or extracting an invoice's fields, is done by the steps before it. Its output is a `Document`: the stored file, whose URL ends in the file's name.
+
+```toml
+[pipe.write_report]
+type        = "PipeLLM"
+description = "Write site notes up as an inspection report"
+inputs      = { notes = "Text" }
+output      = "Markdown"
+prompt      = """
+Write these site notes up as an inspection report in Markdown, with a heading for each area inspected.
+
+@notes
+"""
+
+[pipe.print_report]
+type        = "PipeDocGen"
+description = "Print the inspection report as a PDF"
+inputs      = { report = "Markdown" }
+output      = "Document"
+format      = "pdf"
+filename    = "inspection-report"
+```
+
+**Required:** `format`, one of `pdf`, `xlsx`, `docx` or `pptx`, which sets the file's type and suffix. **Output** MUST be `Document` or a concept refining it, and one file: no `[]` or `[N]`.
+
+**Optional fields:**
+
+| Field | What it does |
+|-------|--------------|
+| `template` | An inline HTML template, for `pdf` only (below). |
+| `template_file` | A template file beside the bundle, its path relative to the `.mthds` file that names it and inside the bundle's directory: an `.html` file for `pdf`, and the `.xlsx`, `.docx` or `.pptx` file itself for the other formats. Never together with `template`. `pptx` requires one. |
+| `filename` | The file's name without its suffix, a Jinja expression over the inputs such as `"invoice-{{ invoice.invoice_number }}"`. Omitted, it is the pipe's code. |
+| `model` | The document engine that prints the file. Omit it: the deck's default engine for the format, with or without a template, prints it. A reference the user asks for is checked with `doc_gen`, as "Model references" says. |
+
+**Without a template, the step lays its inputs out itself**, for `pdf`, `xlsx` and `docx`; `pptx` has no layout of its own and always takes a `template_file`. A single input is the document itself, and several inputs each get a section, in the order `inputs` declares them. In a PDF, a structure's scalar fields make a grid of labels and values, a list of a declared structure whose fields are all flat makes a table, and a nested structure makes a section; a `Text` prints as plain paragraphs and a `Markdown` formatted, with its headings, lists, tables and links; an `Image` prints as a picture with its caption, an `Html` as its text with the tags removed, and a `YesNo`, `Choice` or `Rating` as its verdict alone. **So the report an LLM writes for a document is declared `Markdown`**, as in the example: declared `Text`, it prints its `#` and `**` as they are.
+
+**A `pdf` template is HTML**, inline in `template` or in an `.html` `template_file`, rendered as a `PipeCompose` template of the `html` category is: `$var` and `@var`, the `format` and `tag` filters, autoescaping. A fragment is wrapped in a print stylesheet with a running header and page numbers; a whole HTML document prints as written, with its own CSS page setup.
+
+```toml
+[pipe.print_invoice]
+type        = "PipeDocGen"
+description = "Print the invoice from an HTML template"
+inputs      = { invoice = "Invoice" }
+output      = "Document"
+format      = "pdf"
+filename    = "invoice-{{ invoice.invoice_number }}"
+template    = """
+<h1>Invoice $invoice.invoice_number</h1>
+<p>From $invoice.vendor_name. Total due: {{ '%.2f' % invoice.total_amount }}.</p>
+"""
+```
+
+- **It renders strictly.** Every field a template or a `filename` reads, `invoice.vendor_name`, or `line.amount` inside `{% for line in invoice.lines %}`, must exist on its input's concept, which validation checks, and a value missing at run time fails the step rather than printing as empty text. An optional input is read only under a guard, `{% if notes %}…{% endif %}`.
+- A `Markdown` input prints formatted with no filter; Markdown held in a plain text field takes the `markdown` filter, `{{ invoice.notes | markdown }}`.
+- Format a number as `{{ '%.2f' % invoice.total_amount }}`: the `format` filter is the template's own, not Jinja's.
+- Unlike a prompt, a template need not read every declared input.
+
+**An office template file is filled from the inputs as plain data**: no sigils and no filters, and a verdict is its value alone (a `YesNo` its boolean, a `Choice` its key, a `Rating` its level). Its placeholders follow its engine's conventions, which this reference does not teach, so name one only when the user supplies the file; otherwise print a format the step lays out itself.
+
+**A template file travels with the bundle**, as its `.mthds` files do: a runner that receives the bundle without it refuses the step when the method loads. When validation says template files are not supported there, write an inline `template` for a `pdf`, or none for the layout, in its place.
+
+**What a runner prints depends on its document engines.** A `pdf` laid out from its inputs prints on the built-in engine. A `pdf` from a template, and an `xlsx`, a `docx` or a `pptx`, need engines a runner may not have: a step whose engine the runner lacks is refused when the method loads, naming the engine, so `mthds_validate` reports it before any run spends credit. Tell the user, and offer the PDF laid out from the inputs rather than changing the format in silence.
+
+A dry run composes the document for real against mock inputs, which checks the template and the file name, prints nothing and outputs a mock `Document`.
+
 ### PipeFunc — call a registered Python function
 
 ```toml
@@ -652,7 +724,7 @@ signature_for = "PipeLLM"   # optional hint: the intended implementation type
 - `signature_for` records the *intended* next-level type. It is a **hint, not a binding contract** — the implementation may override it. It may **not** be `"PipeSignature"`. Omit it if unsure.
 
 **`signature_for` → operator or controller** (the next-level decision when you expand a signature):
-- **Operator (leaf)** — a single step: `PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeCompose`, `PipeFunc`. Replace the signature with the concrete operator; that branch is done.
+- **Operator (leaf)** — a single step: `PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeDocGen`, `PipeCompose`, `PipeFunc`. Replace the signature with the concrete operator; that branch is done.
 - **Controller (composite)** — multiple steps, iteration, branching, or parallelism: `PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`. Replace the signature with the controller, wire its sub-pipes, and forward-declare each not-yet-built sub-pipe as its own `PipeSignature`.
 
 **Header ↔ definition contract.** A concrete pipe satisfies a signature of the same code when their `inputs`/`output` match **by concept identity** — bare↔qualified (`Brief` ≡ `thisdomain.Brief`) and native (`Text` ≡ `native.Text`) spellings are equivalent, multiplicity compared structurally. Spelling need not be byte-identical, but both sides must declare `inputs`/`output` explicitly. A definition whose contract differs from its header is a hard error.
@@ -661,7 +733,7 @@ signature_for = "PipeLLM"   # optional hint: the intended implementation type
 
 ## 7. Prompt Template Shorthands
 
-Applies to: `prompt` (PipeLLM, PipeImgGen, PipeSearch), `system_prompt` (PipeLLM), `template` (PipeCompose), and `{ template = "..." }` in construct fields.
+Applies to: `prompt` (PipeLLM, PipeImgGen, PipeSearch), `system_prompt` (PipeLLM), `template` (PipeCompose, and PipeDocGen's HTML template), and `{ template = "..." }` in construct fields.
 
 | Shorthand | Expands to | Use |
 |-----------|-----------|-----|
@@ -716,6 +788,11 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 - ❌ Wrapping a construct literal in `{ value = ... }` — assign it directly.
 - ❌ Writing a `dict` field — outside the authoring subset.
 - ❌ Writing a `PipeStructure` — outside the authoring subset; use `PipeLLM` with a structured output concept instead.
+- ❌ Declaring a concept named `Markdown`, `Choice`, `Rating` or any other native — refused as `native_concept_redeclaration`.
+- ❌ An LLM report bound for a `PipeDocGen` declared `Text` — it prints its Markdown marks as they are; declare it `Markdown`.
+- ❌ An inline `template` on an `xlsx`, `docx` or `pptx`, or `template` and `template_file` together — the inline template is HTML, for a `pdf` only.
+- ❌ A `pptx` without `template_file` — it has no layout of its own.
+- ❌ A `PipeDocGen` output with `[]` or `[N]`, or of a concept that does not refine `Document` — the step prints one file.
 - ❌ `default_value` on `concept`- or `list`-typed fields — not allowed.
 - ❌ Referencing a variable in a prompt without declaring it in `inputs` — validation will fail.
 - ❌ Declaring an `input` that no prompt references — also rejected.
