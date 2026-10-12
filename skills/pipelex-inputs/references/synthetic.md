@@ -11,8 +11,10 @@ The light value to produce, by declared concept:
 | Concept | Light value | How to make it |
 |---|---|---|
 | `native.Text` | bare string | realistic text matching the method's purpose: invoice-like text for a method that processes invoices, report-style content for one that analyzes reports, at the expected length (a short prompt is not a long document) |
+| `native.Markdown` | bare string | text written in Markdown, with the headings, lists or tables the method's output is meant to show |
 | `native.Number` | bare number | a sensible value within the range the method's context implies |
 | `native.YesNo` | bare boolean | a `true` or `false` answer |
+| `native.Choice`, `native.Rating` | the content dict the template gives, never a bare value | the verdict alone: a `choice` key from the options the method names, or a `level` index from 0 on its scale |
 | `native.Date` | bare ISO 8601 date string | a date or time value; never an epoch number |
 | `native.Image` | bare URL-or-path string | the file factory, below |
 | `native.Document` | bare URL-or-path string | the file factory, below |

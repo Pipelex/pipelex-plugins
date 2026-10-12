@@ -16,7 +16,7 @@ Collect every file the user has provided: explicit paths, folders, and files men
 | `.pptx`, `.ppt` | presentation | `native.Document`, exported to PDF first (below) |
 | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.svg`, `.tiff`, `.tif`, `.bmp` | image | `native.Image` |
 | `.txt` | plain text | `native.Text`, the file's content read in |
-| `.md` | Markdown text | `native.Text`, the file's content read in |
+| `.md` | Markdown text | `native.Markdown` or `native.Text`, whichever the input declares, the file's content read in |
 | `.json` | JSON data | `native.JSON` or a custom structured concept |
 | `.csv` | CSV data | `native.Text` read as text, or `native.JSON` parsed into objects |
 | `.html`, `.htm` | HTML | `native.Html` |
