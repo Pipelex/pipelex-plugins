@@ -2,11 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The MTHDS reference teaches `PipeDocGen`**: `pipelex-design` and `pipelex-edit` can now write a step that prints a method's results as a PDF, an Excel workbook, a Word document or a PowerPoint deck, with no model. The reference gives its `format`, `template`, `template_file`, `filename` and `model` fields and its `Document` output, says that a PDF without a template is laid out from the step's inputs, so a report an LLM writes for one is declared `Markdown`, that a template file sits beside the bundle and travels with it, and that a format whose engine the runner lacks is refused by the validation, after which the skill offers the PDF laid out from the inputs. `pipelex-explain` names the step as one that calls no model, and the fit check lists producing a PDF or an Office file among what a method does.
+- **The MTHDS reference teaches the `Markdown`, `Choice` and `Rating` natives**: the natives table names them, with `YesNo`'s `probability`, and says that a concept of a native's name is refused, and the native content types reference gives each its attributes, how a prompt renders it and its input form, a `Rating`'s `label` included. `pipelex-inputs` writes a `Choice` or `Rating` input as an object and matches a Markdown file to a `Markdown` input.
+
 ### Changed
 
 - **`pipelex-design` and `pipelex-edit` read the runner's model check**: a model check now answers `resolved` or `not_found`, so the MTHDS reference drops its rule for the retired `unconfirmed` and a bare model handle is checked like any other reference, which lets one that resolves carry a setting such as a temperature. A reference that resolves but reaches no model the runner can call now is reported, and written only on your word, since a run through it would fail after validation passes.
 - **The validation hook lints against the MTHDS 5.0.0 schema (Breaking)**: the `check.mjs` bundle every target runs on a `.mthds` edit is rebuilt on `@pipelex/tools-wasm` 0.5.0 and `@pipelex/sdk` 0.38.0, so it now accepts the 5.0.0 `PipeJudge`, an evidence `prompt` beside a `question` or a `questions` table with labelled rating levels, which it used to block offline, and blocks a `PipeJudge` lacking either its `prompt` or a question. It also blocks a name that a batch hands each item to, or that a step or a branch stores its result under, when it is not a plain input name.
 - **The hook's corpus sweep runs over the MTHDS Test Corpus of pipelex v0.83.0**: the sweep gains the multi-question and labelled-level `PipeJudge` entries and the entries whose batch or result name is not a plain input name, and its judge entries take the 5.0.0 form.
+
+### Fixed
+
+- **The native content types reference lets a `PipeLLM` read a `Document`**: it said a document could never be sent to a model and must be extracted first, which contradicted the MTHDS reference's own `PipeLLM` example. It now says that a `PipeLLM` whose prompt names a document sends it to its model, which must read the document's format, and that extraction is the way otherwise.
 
 ## [0.12.0] - 2026-10-09
 
