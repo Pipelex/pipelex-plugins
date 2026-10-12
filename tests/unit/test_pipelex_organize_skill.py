@@ -98,11 +98,32 @@ class TestPipelexOrganizeSkill:
         assert not (self.REPO_ROOT / "skills" / "pipelex-organize").exists()
 
     @pytest.mark.parametrize("target_name", TARGETS)
-    def test_a_templated_bundle_is_proven_on_disk(self, target_name: str) -> None:
-        """Step 3 validates the composed candidate inline, and a template file travels only as a path beside
-        `.mthds` files read from disk, so a bundle whose `PipeDocGen` steps name template files would answer that
-        the step's file was not supplied and never match its baseline. It skips the in-memory proof, and the
-        confirmation on disk, with its rollback, proves the new layout instead."""
-        step_3 = self.section(self.render(target_name), "### Step 3 — Prove equivalence before touching disk")
-        assert "**A bundle whose `PipeDocGen` steps name template files skips this proof**" in step_3
-        assert "Step 4's confirmation, with its rollback, proves the layout instead." in step_3
+    def test_a_moved_step_keeps_its_template_and_the_bundle_is_proven_on_disk(self, target_name: str) -> None:
+        """A `template_file` resolves from the directory of the `.mthds` file holding its step, so moving a step
+        from `sub/report.mthds` into the root module points it at a missing file, or silently at another template
+        under the same relative path, which no verdict sees. So the plan records each template's real path,
+        rewrites a moved step's `template_file` to reach the same file, which the guard calls layout, keeps a step
+        whose template only `..` would reach where it is, and the swap is confirmed against those real paths and
+        rolled back otherwise. Step 3's inline proof is skipped for such a bundle, since a template file travels
+        only beside `.mthds` files read from disk."""
+        body = self.render(target_name)
+        guard = self.section(body, "## Guards")
+        assert "a `PipeDocGen` step moved to another directory has its `template_file` rewritten to reach the same file, which is layout too" in guard
+        plan = self.section(body, "### Step 2 — Plan the layout, compose the files")
+        assert (
+            "**A `PipeDocGen` step's template is the file its `template_file` reaches from the directory of the `.mthds` file holding the step**"
+            in plan
+        )
+        assert "record each one's real path (`realpath`) before composing, and never move or rename a template file" in plan
+        assert "its `template_file` becomes the forward-slash path that reaches the same file from there" in plan
+        assert "when only a path through `..` would, which the runner refuses, that step does not move" in plan
+        proof = self.section(body, "### Step 3 — Prove equivalence before touching disk")
+        assert "**A bundle whose `PipeDocGen` steps name template files skips this proof**" in proof
+        assert "Step 4's confirmation, with its rollback, proves the layout instead." in proof
+        swap = self.section(body, "### Step 4 — Swap the layout")
+        assert (
+            "check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2"
+            in swap
+        )
+        assert "A valid verdict cannot see a step that now reaches another template under the same name." in swap
+        assert "a verdict that differs from the baseline or a template that differs from Step 2's" in swap

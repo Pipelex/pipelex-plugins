@@ -29,7 +29,7 @@ This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and
 
 ### 1. The target and the pipe
 
-The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`: read [by-id.md](references/by-id.md) before the first call; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. Every call in this skill takes the form settled here. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
+The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`: read [by-id.md](references/by-id.md) before the first call; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
 
 The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, the code qualified by its own file's domain.
 
@@ -92,7 +92,7 @@ Give `failure_message` **verbatim** first, then read [failed-run.md](references/
 
 ## Follow a run
 
-A run id alone, with no method and no inputs: nothing is validated or prepared.
+A run id alone: nothing is validated or prepared.
 
 - **"how is run X going"** → `mthds_run_status`. Report the state and, while it runs, the retry hint, never a guessed duration. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.

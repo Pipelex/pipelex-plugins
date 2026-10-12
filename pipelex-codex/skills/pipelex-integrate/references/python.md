@@ -2,6 +2,8 @@
 
 Companion to `/pipelex-integrate` for a project that has a `pyproject.toml` (or `setup.py` / `requirements.txt`). The SDK facts were checked against `pipelex-sdk` as of 2026-09 and move only when that package does.
 
+**A bundle whose `PipeDocGen` steps name template files stops the integration**, the skill's stop for a Python target. A bundle sent as content has no directory, so the runner loads it only with the template files its steps name, sent beside it, and `pipelex-sdk` sends none yet. A module written now would type-check and pass the gate, and every call would be refused, the step's template file not supplied, so generate nothing and write no module. Tell the user the integration waits on a `pipelex-sdk` release that sends a bundle's template files, and that until then the method runs through `/pipelex-run`, which submits the bundle with them, or from a TypeScript project. On a refresh, regenerate nothing either, and say that the module already there fails on every call until that release.
+
 ## Detecting the project
 
 | Question | Signals, in order | When inconclusive |
@@ -141,8 +143,6 @@ return ExtractInvoicesRun(output=output, results=results)
 ```
 
 Codegen emits a model per concept and no wrapper for the envelope, so nothing in the generated tree names it. `main_stuff` is `Any`, so the type checker does not catch a wrong narrowing either. For `fixed`, the declared `item_count` is not checked unless you check it, and the report says so.
-
-**A bundle whose `PipeDocGen` steps name template files does not run through this call site yet.** A bundle sent as content has no directory, so the runner loads it only with the template files its steps name, and `pipelex-sdk` sends none yet: every run is refused, the step's template file not supplied. Generate the types and write the module all the same, since a template file changes what the run prints and never the types, and say in the report that the call site waits on a `pipelex-sdk` release that sends a bundle's template files. Until then the method runs through `/pipelex-run`, which submits the bundle with them.
 
 Follow the project's conventions where you can see them — module style, quoting, error handling — and the SDK's defaults where you cannot.
 

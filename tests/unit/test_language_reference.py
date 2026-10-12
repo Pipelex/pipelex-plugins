@@ -133,10 +133,25 @@ class TestLanguageReference:
         assert "sends the template files its steps name beside its `.mthds` files, each as a `{path}` item, never inline" in docgen
         assert "the `method-graph.html` page `mthds_validate` writes beside the bundle" in docgen
         assert "about 7.4 MiB beside a small bundle" in docgen
+        assert "The limits are the workshop's and the runner's today" in docgen
+        assert "its `.html` templates at most 512 KiB in all, which the runner refuses past that as too large" in docgen
         assert "**A workshop older than template files refuses one** as *Path is not a .mthds file*" in docgen
         assert "refresh with `npx -y @pipelex/mcp@latest`" in docgen
         assert "Never rewrite the step to do without its template to get past it." in docgen
         assert "write an inline `template` for a `pdf`, or none for the layout, in its place" not in docgen
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_a_template_is_written_before_the_step_that_names_it(self, target_name: str) -> None:
+        """The edit hook sends no template it cannot find, so the API refuses a step whose template is not written
+        yet and blocks the edit, and writing the template afterwards runs no hook. The order is said, and the cure
+        when the block came first, which is a save of the `.mthds` file again, never an edit of the step."""
+        docgen = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeDocGen — ")
+        assert "**Write the template file before the `.mthds` file that names it.**" in docgen
+        assert "writing the template afterwards does not run the hook again" in docgen
+        assert "save the `.mthds` file again once the template exists; never edit the step to get past it." in docgen
+        source = (REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2").read_text(encoding="utf-8")
+        branch = source[: source.index("**Write the template file before")]
+        assert branch.rstrip().endswith('{% if platform != "agent-skills" %}'), "an outside target has no hook, so it has no such block"
 
     def test_the_catalog_and_the_template_check_are_said_where_template_files_are(self) -> None:
         """`mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template

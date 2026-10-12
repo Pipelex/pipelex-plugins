@@ -104,10 +104,11 @@ return { output, results };
 
 Codegen emits a parser per concept and no wrapper type for the envelope, so nothing in the generated tree names it. `main_stuff` is `unknown`, so the type checker does not catch a wrong narrowing either. For `fixed`, the declared `item_count` is not checked unless you check it, and the report says so.
 
-**A bundle whose `PipeDocGen` steps name template files sends them with every run.** A bundle sent as content has no directory, so the runner loads it only with those files, sent as `resources`: each keyed by the step's `template_file` exactly as written, and read from beside the `.mthds` file holding that step. Without them every run is refused, the step's template file not supplied. `resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it. List the files beside `BUNDLE_DIR`, the key first and the path under `BUNDLE_DIR` second, which differ only when the step's file sits in a subdirectory of the bundle:
+**A bundle whose `PipeDocGen` steps name template files sends them with every run.** A bundle sent as content has no directory, so the runner loads it only with those files, sent as `resources`: each keyed by the step's `template_file` exactly as written, and read from beside the `.mthds` file holding that step. Without them every run is refused, the step's template file not supplied. `resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it. **Write the map from the sidecar's `templates`, entry for entry**: the key is the step's `template_file` and the path is the recorded `path` with the `bundle_dir` prefix taken off, the two differing only when the step's file sits in a subdirectory of the bundle. `@pipelex/sdk` exports nothing that reads the steps, so the map is written down rather than derived at call time:
 
 ```ts
-/** The template files the bundle's `PipeDocGen` steps name: each step's `template_file`, and where the file is under BUNDLE_DIR. */
+/** Written from sources.json's `templates`, and rewritten by /pipelex-integrate's refresh: each `PipeDocGen` step's
+ *  `template_file`, and where its file is under BUNDLE_DIR. */
 const TEMPLATE_FILES: Record<string, string> = { "templates/invoice.xlsx": "templates/invoice.xlsx" };
 
 async function readTemplates(): Promise<Record<string, Uint8Array>> {
@@ -126,7 +127,7 @@ const results: RunResults = await getPipelexClient().startAndWaitForResult({
 });
 ```
 
-The same `resources` go to a `prepareInputs` call over the bundle's `files`, the one the module's docstring names. The generated types and the drift gate read the `.mthds` files alone: a template file changes what the run prints, never the types.
+The same `resources` go to a `prepareInputs` call over the bundle's `files`, the one the module's docstring names. The generated types read the `.mthds` files alone, since a template file changes what a run prints and never the types, but the map cannot be left to drift: a renamed `template_file` changes a `.mthds` file the sidecar hashes and a moved or edited template changes one it records in `templates`, so the drift gate fails on either, and refresh rewrites the map from the steps before it rewrites the sidecar. A call site written before the skill sent template files has no map and sends no `resources`, and refresh gives it both.
 
 Follow the project's conventions where you can see them — module style, quoting, error handling — and the SDK's defaults where you cannot.
 

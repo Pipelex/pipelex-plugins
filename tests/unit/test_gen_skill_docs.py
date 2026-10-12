@@ -1020,7 +1020,7 @@ class TestSharedSkillIncludes:
         "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
         "give the page's `path` before the text flow": "skills/shared/graph-page.md.j2",
         "**Report a valid verdict's `warnings`**": "skills/shared/validate-warnings.md.j2",
-        "and no template file, which the catalog does not store yet": "skills/shared/saved-copy-notice.md.j2",
+        "say the catalog stores no template file yet: the draft reports it missing": "skills/shared/template-not-stored.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -1140,9 +1140,15 @@ class TestSharedSkillIncludes:
 
         The file set carries the template files a `PipeDocGen` step names, which the
         runner needs to load a bundle sent as content and which travel only as paths, so
-        the inline fallback is one for a bundle with no template file. The catalog's save
-        sends none, since `mthds_save_method` takes `.mthds` and `.py` files alone, and
-        integrate states its own set."""
+        the inline fallback is one for a bundle with no template file: a templated bundle
+        the workshop cannot read by path is a stop and the relaunch, since inline it would
+        answer that the template was not supplied. The catalog's save sends none, since
+        `mthds_save_method` takes `.mthds` and `.py` files alone, and integrate states its
+        own set.
+
+        The workshop reads every `{ path }` item from at or under the directory of the first
+        one, so the root `.mthds` file goes first; the catalog states that order at its own
+        save step, with the listed description as a second reason."""
         includers = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1152,8 +1158,9 @@ class TestSharedSkillIncludes:
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
-        fallback = "is the fallback for a bundle with no template file."
+        fallback = "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**."
         template_files = "and every template file a `PipeDocGen` step names"
+        root_first = "**the root `.mthds` file first**, as nothing above its directory is read"
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
@@ -1163,10 +1170,35 @@ class TestSharedSkillIncludes:
             if skill == "pipelex-catalog":
                 assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
                 assert template_files not in body, "the catalog stores no template file, and the save refuses one"
+                assert root_first not in body, "the catalog states the order at its save step, with its own reason"
+                assert "with the **root file first**" in body and "the workshop reads nothing above its directory" in body
             else:
                 assert fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                assert root_first in body, f"{target_name}/{skill}: the root file no longer goes first"
                 if skill != "pipelex-integrate":
                     assert template_files in body, f"{target_name}/{skill}: the file set leaves the template files behind"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_every_save_says_the_catalog_keeps_no_template_file(self, target_name: str) -> None:
+        """Design, edit and organize end by saving the linked draft without the bundle's template files, which
+        `mthds_save_method` does not take, so the saved draft reports its template missing. The catalog's save says
+        so before its call; the linked save said nothing, so its report now carries the same sentence, from one
+        partial both include."""
+        sentence = (
+            "With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory."
+        )
+        notice = (self.REPO_TEMPLATES / "skills" / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
+        assert 'include "skills/shared/template-not-stored.md.j2"' in notice
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        savers = ["pipelex-design", "pipelex-edit", "pipelex-organize", "pipelex-catalog"]
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=savers, target_name=config.name)
+        for skill in savers:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert body.count(sentence) == 1, f"{target_name}/{skill}: the save does not say what it leaves out, once"
+            if skill != "pipelex-catalog":
+                save = next(line for line in body.splitlines() if "**Save the linked method's draft.**" in line)
+                assert sentence in save and "and no template file —" in save, f"{target_name}/{skill}: the sentence is not at the save"
 
     def test_a_valid_verdicts_warnings_are_read_where_a_skill_reports_the_verdict(self) -> None:
         """`mthds_validate` relays a valid verdict's advisory `warnings`, a `PipeDocGen` step's template check

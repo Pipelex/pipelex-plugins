@@ -26,8 +26,16 @@
 
    The local workshop resolves a `{ path }` item against its own working
    directory and refuses one that resolves outside it (`pipelex-mcp`,
-   `src/local/files.ts`), an absolute path included, so the sentence names the
-   refusal and its cure rather than promising that any absolute path works.
+   `src/files.ts`), an absolute path included, so the sentence names the
+   refusal and its cure rather than promising that any absolute path works. It
+   also reads every `{ path }` item from at or under the directory of the first
+   one (SPEC.md, "Path trust boundary"), so the root `.mthds` file goes first,
+   before any file or template in a subdirectory. `validate_call_root_first` is
+   false in `pipelex-catalog` alone, whose save step states the same order with
+   its own reason, the listed description the platform takes from the first
+   file. And since a template file has no inline form, a templated bundle the
+   workshop cannot read by path is a stop and the relaunch, never the inline
+   fallback, which would answer that the template was not supplied.
 
    `validate_call_inline` is what the last sentence says of the inline form,
    after the form itself. Every skill but `pipelex-catalog` leaves it to its
@@ -37,5 +45,5 @@
    that leaves a new method unlinked, or an updated one's link behind the
    catalog. -#}
 {% set validate_call_with_templates = validate_call_templates | default(true) %}
-{%- if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file.") }}
+{%- if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path>}`{% if validate_call_root_first | default(true) %}, **the root `.mthds` file first**, as nothing above its directory is read{% endif %}. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.") }}
 {#- -#}

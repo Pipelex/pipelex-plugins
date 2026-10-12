@@ -56,6 +56,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "restore the retained baseline contents and report the failure",
         "give the page's `path` before the text flow",
         "**Report a valid verdict's `warnings`**",
+        "With a `template_file`, say the catalog stores no template file yet",
     ),
     "pipelex-explain": (
         "Accept it, and say so in one line.",
@@ -93,6 +94,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "never retry with a token or inline",
         "Never write or edit `pipelex-method.json`",
         "**Report a valid verdict's `warnings`**",
+        "With a `template_file`, say the catalog stores no template file yet",
     ),
     "pipelex-organize": (
         "this skill never reorganizes without proving the verdict is preserved",
@@ -112,6 +114,9 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "never retry with a token or inline",
         "Never write or edit `pipelex-method.json`",
         "**A bundle whose `PipeDocGen` steps name template files skips this proof**",
+        "With a `template_file`, say the catalog stores no template file yet",
+        "when only a path through `..` would, which the runner refuses, that step does not move",
+        "the real path recorded for it in Step 2",
     ),
     "pipelex-integrate": (
         "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
@@ -215,6 +220,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**does not retry.**",
         "only on an explicit yes call again with `overwrite: true`",
         "With a `template_file`, say the catalog stores no template file yet",
+        "**Never route it to editing**",
     ),
     "pipelex-run": (
         "**A dry run is this step, shown.**",

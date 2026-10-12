@@ -165,3 +165,17 @@ class TestPipelexCatalogSkillShape:
             "With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory."
             in say
         )
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_templated_bundles_invalid_verdict_is_never_routed_to_editing(self, target_name: str) -> None:
+        """A templated bundle's save and publish always answer `is_valid: false`, the template not supplied, since
+        the save sends none. The row every other invalid verdict takes sends it to `/pipelex-edit` or
+        `/pipelex-design`, which loops, or tempts removing the template, so the templated verdict has its own row,
+        first, which says why and routes nowhere."""
+        body = self.render(target_name)
+        templated = self.the_line(body, "| a templated bundle answers `is_valid: false`, its template *not supplied with its bundle* |")
+        assert "the draft runs only from its directory and cannot be published to run by id" in templated
+        assert "**Never route it to editing**" in templated
+        assert "/pipelex-edit" not in templated and "/pipelex-design" not in templated
+        invalid = self.the_line(body, "| a save or a publish answers `is_valid: false` |")
+        assert body.index(templated) < body.index(invalid), "the templated row is read before the general one"

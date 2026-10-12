@@ -23,7 +23,7 @@ It is a **content-preserving transformation**: the method's semantics never chan
 
 ## Guards
 
-- **Change the layout, never the method.** A declaration may move to another file and be reordered, a non-root file may be renamed, a `PipeSignature` header whose code has a concrete definition anywhere in the library is dropped, and per-file `domain = "..."` lines are absorbed into the files that survive. Nothing else changes: pipe and concept codes, the `domain`, `main_pipe`, `description`, `system_prompt`; any pipe's `inputs`/`output`, `type`, prompts, steps, branches, outcomes or other body field; any concept's `description`, `refines` or structure fields.
+- **Change the layout, never the method.** A declaration may move to another file and be reordered, a non-root file may be renamed, a `PipeSignature` header whose code has a concrete definition anywhere in the library is dropped, per-file `domain = "..."` lines are absorbed into the files that survive, and a `PipeDocGen` step moved to another directory has its `template_file` rewritten to reach the same file, which is layout too. Nothing else changes: pipe and concept codes, the `domain`, `main_pipe`, `description`, `system_prompt`; any pipe's `inputs`/`output`, `type`, prompts, steps, branches, outcomes or other body field; any concept's `description`, `refines` or structure fields.
 - **An unsatisfied signature** — a `PipeSignature` with no concrete definition, a scaffold's backlog — **is kept**, deduplicated to one header per code, never dropped.
 - **Keep every original file's content until the new layout is confirmed on disk.**
 
@@ -46,6 +46,8 @@ Map the structure from the main pipe down: the subtrees, the pipes and concepts 
 - **Progressive discovery is the test**: the root plus one module file holds everything relevant to one step.
 - A still-pending signature sits in the module of the controller that wires it.
 
+**A `PipeDocGen` step's template is the file its `template_file` reaches from the directory of the `.mthds` file holding the step**: record each one's real path (`realpath`) before composing, and never move or rename a template file. When the plan moves a step to a file in another directory, its `template_file` becomes the forward-slash path that reaches the same file from there; when only a path through `..` would, which the runner refuses, that step does not move.
+
 State the plan in one line (`main.mthds + extract.mthds + report.mthds`) and proceed; never ask. Compose every file in memory, **copying each declaration verbatim** into its file, one declaration per concept and one entry per pipe, top-down within each file.
 
 ### Step 3 — Prove equivalence before touching disk
@@ -56,8 +58,8 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 
 1. Write every file of the new layout; a new file may reuse an old file's name.
 2. Delete every `.mthds` file that is not part of the new layout. **Delete only `.mthds` files, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
-3. **Confirm on disk**: validate the bundle once more, gathered as in Step 1{% if platform != "agent-skills" %}, since the hook may have reformatted what was written{% endif %}.
-4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"` or a verdict that differs from the baseline, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
+3. **Confirm on disk**: validate the bundle once more, gathered as in Step 1{% if platform != "agent-skills" %}, since the hook may have reformatted what was written{% endif %}, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
+4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"`, a verdict that differs from the baseline or a template that differs from Step 2's, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
 

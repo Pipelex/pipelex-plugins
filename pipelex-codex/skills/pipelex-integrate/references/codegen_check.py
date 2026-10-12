@@ -11,7 +11,8 @@ For each directory it (1) runs `pipelex-sdk`'s `run_codegen_check` over the stam
 compares the SHA-256 recorded for each .mthds source in `sources.json` against the file on disk, and the
 recorded sources against every .mthds file under the sidecar's `bundle_dir`, which is what the call site
 loads, so a bundle changed without a regeneration — a file edited, removed or added — is caught as
-`stale-source`.
+`stale-source`; and (3) hashes each template file the sidecar's `templates` records, the files a call site sends
+beside the bundle, so one moved, removed or edited since the call site was written is caught the same way.
 
 Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, a malformed or unreadable lock
 or tree, a symlink at the generated directory or on an artifact's path, a check that raises, `pipelex-sdk`
@@ -30,6 +31,7 @@ import io
 import json
 import os
 import posixpath
+import re
 import stat
 import sys
 from collections.abc import Callable
@@ -67,6 +69,9 @@ EXIT_NO_VERDICT = 2
 LOCK_FILENAME = "codegen.lock"
 SIDECAR_FILENAME = "sources.json"
 NO_SOURCES_LINE = f"  {SIDECAR_FILENAME} records no sources — a by-ref or by-id integration; source staleness does not apply"
+# A `template_file` key at the start of a line of a .mthds file: how a bundle file names a template, read only for a
+# sidecar written before the skill recorded `templates`, where it says the call site may not send that file.
+TEMPLATE_FILE_KEY = re.compile(r"""^\s*["']?template_file["']?\s*=""", re.MULTILINE)
 
 
 class Outcome(NamedTuple):
@@ -77,10 +82,13 @@ class Outcome(NamedTuple):
 
 
 class Recorded(NamedTuple):
-    """What a sidecar recorded about a local bundle: its sources as sorted pairs, and the directory the call site loads."""
+    """What a sidecar recorded about a local bundle: its sources as sorted pairs, the directory the call site loads,
+    and its `templates` as the sidecar holds them, `has_templates` telling an absent field from any value."""
 
     sources: list[tuple[str, object]]
     bundle_dir: str
+    has_templates: bool
+    templates: object
 
 
 class Bundle(NamedTuple):
@@ -193,7 +201,7 @@ def _recorded_sources(*, sidecar: object) -> Recorded | Outcome:
         return Outcome(
             code=EXIT_DRIFT, lines=(f"  stale-source: {SIDECAR_FILENAME} — `bundle_dir` is not a non-empty string, so staleness cannot be ruled out",)
         )
-    return Recorded(sources=recorded_sources, bundle_dir=bundle_dir)
+    return Recorded(sources=recorded_sources, bundle_dir=bundle_dir, has_templates="templates" in fields, templates=fields.get("templates"))
 
 
 def _normalized(path: Path) -> Path:
@@ -228,7 +236,57 @@ def _compare_sources(*, recorded: Recorded) -> Outcome:
         for resolved, shown in bundle.paths.items():
             if resolved not in recorded_paths:
                 stale_lines.append(f"  stale-source: {shown} — added to the bundle since the types were generated")
+    stale_lines.extend(_check_templates(recorded=recorded, bundle=bundle, project_root=project_root))
     return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines))
+
+
+def _check_templates(*, recorded: Recorded, bundle: Bundle, project_root: Path) -> list[str]:
+    """Hash each template file the sidecar's `templates` records against the file at its path.
+
+    The map is `{"<template_file>": {"path": ..., "sha256": ...}}`. A renamed or added `template_file` needs no check
+    here, since it edits a .mthds file the sources hash. A sidecar written before the skill recorded `templates` has
+    none, and then a bundle file naming a `template_file` is stale: its call site may send no template at all.
+    """
+    stale_lines: list[str] = []
+    if not recorded.has_templates:
+        if bundle.paths is None:
+            return stale_lines
+        for resolved, shown in bundle.paths.items():
+            try:
+                text = resolved.read_text(encoding="utf-8")
+            except (OSError, ValueError):
+                continue  # the source comparison already reports a recorded file it cannot read, and an added one as added
+            if TEMPLATE_FILE_KEY.search(text):
+                stale_lines.append(
+                    f"  stale-source: {shown} — names a `template_file`, and {SIDECAR_FILENAME} records no `templates`, "
+                    "so the call site may not send it"
+                )
+        return stale_lines
+    # The same fail-closed reading as `sources`: a `templates` coerced to {} would check nothing and exit 0.
+    templates = recorded.templates
+    if not isinstance(templates, dict):
+        return [f"  stale-source: {SIDECAR_FILENAME} — `templates` is not an object, so staleness cannot be ruled out"]
+    for key, entry in sorted(cast("dict[str, object]", templates).items(), key=lambda item: item[0]):
+        fields = cast("dict[str, object]", entry) if isinstance(entry, dict) else None
+        entry_path = fields.get("path") if fields is not None else None
+        entry_hash = fields.get("sha256") if fields is not None else None
+        if not isinstance(entry_path, str) or not entry_path or not isinstance(entry_hash, str):
+            stale_lines.append(
+                f"  stale-source: {SIDECAR_FILENAME} — the `templates` entry for {key} is not a {{ path, sha256 }} object, "
+                "so staleness cannot be ruled out"
+            )
+            continue
+        try:
+            on_disk = hashlib.sha256(_normalized(project_root / entry_path).read_bytes()).hexdigest()
+        except FileNotFoundError:
+            stale_lines.append(f"  stale-source: {entry_path} — recorded as a template file but no longer on disk")
+            continue
+        except (OSError, ValueError) as exc:
+            stale_lines.append(f"  stale-source: {entry_path} — recorded as a template file but unreadable ({exc})")
+            continue
+        if on_disk != entry_hash:
+            stale_lines.append(f"  stale-source: {entry_path} — template file edited since the call site was written")
+    return stale_lines
 
 
 def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
