@@ -1122,6 +1122,26 @@ class TestPipelexIntegrateSkill:
         typescript_paths = [line.strip().split(" — ")[0] for line in typescript.stderr.splitlines() if line.strip().startswith("stale-source: ")]
         assert python_paths == typescript_paths, f"python: {python.stderr}\ntypescript: {typescript.stderr}"
 
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_a_bundles_template_files_are_passed_and_sent_but_never_hashed(self, target_name: str) -> None:
+        """A bundle sent as content loads only with the template files its `PipeDocGen` steps name, so the skill
+        passes them to the workshop and the TypeScript call site sends them as `resources`; `pipelex-sdk` sends none
+        yet, so the Python reference says the call site waits for it. A template file never moves the types, so the
+        sidecar and the gate keep hashing the `.mthds` files alone, and refresh mode re-reads the same set."""
+        body = self.render(target_name)
+        file_set = self.the_line(body, "- **Local files**:")
+        assert "is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name." in file_set
+        assert "is the fallback for a bundle with no template file." in file_set
+        assert "with the template files its steps name, or running the recorded selector." in self.the_line(body, "One module per method")
+        typescript = self.reference("typescript.md")
+        assert "**A bundle whose `PipeDocGen` steps name template files sends them with every run.**" in typescript
+        assert "resources: await readTemplates()," in typescript
+        assert "The generated types and the drift gate read the `.mthds` files alone" in typescript
+        python = self.reference("python.md")
+        assert "**A bundle whose `PipeDocGen` steps name template files does not run through this call site yet.**" in python
+        assert "`pipelex-sdk` sends none yet" in python
+        assert "passed with the template files its `PipeDocGen` steps name" in self.refresh_cells(self.reference("refresh.md"))["taken from disk"]
+
     def test_the_sidecar_records_the_bundle_directory_and_every_reader_uses_it(self) -> None:
         """The gates can list the bundle only because step 7 records its directory, and the gates are not the only
         readers the fix had to reach. Refresh mode took its file set from `method.files`, so it regenerated from the
@@ -1445,11 +1465,15 @@ class TestPipelexIntegrateSkill:
         assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
+        # The one exception is the template files' own minimum, the release that sends `resources`, which only a
+        # bundle whose `PipeDocGen` steps name a template file needs, and which the reference raises to there.
         regions: dict[str, str] = {}
         typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        template_minimum = "`resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it."
+        assert typescript.count(template_minimum) == 1, "the template files' SDK minimum is stated once"
         for index_line, line in enumerate(typescript.splitlines()):
-            if "@pipelex/sdk" in line and self.VERSION.search(line):
-                regions[f"typescript.md line {index_line + 1}"] = line
+            if "@pipelex/sdk" in line and self.VERSION.search(line.replace(template_minimum, "")):
+                regions[f"typescript.md line {index_line + 1}"] = line.replace(template_minimum, "")
         assert len(regions) >= 2, "typescript.md should name the floor in its header and its offline gate section"
         for where, text in regions.items():
             assert set(self.VERSION.findall(text)) == {self.TYPESCRIPT_SDK_FLOOR}, f"{where} names {self.VERSION.findall(text)}"

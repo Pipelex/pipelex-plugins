@@ -44,7 +44,7 @@ Automatic unless the user asks to be walked through it, which confirms dependenc
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you pass, record and hash. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: every `.mthds` file beneath the bundle directory, at any depth, is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file. A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes; the number is the user's, or the latest `/pipelex-catalog` reports. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -113,7 +113,7 @@ With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-
 
 ### 9. The call site
 
-One module per method from the language reference's template, in the project's service layer, loading **every `.mthds` file under `bundle_dir`** at call time, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**; the wrong narrowing type-checks, passes the gate and fails only on a real run. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
+One module per method from the language reference's template, in the project's service layer, loading **every `.mthds` file under `bundle_dir`** at call time, with the template files its steps name, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
 
 ### 10. The offline gate
 

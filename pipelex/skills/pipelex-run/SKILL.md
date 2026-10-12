@@ -19,7 +19,7 @@ allowed-tools:
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone, which outlives the session that started it; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
 
 ## Requirements
 
@@ -38,11 +38,11 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over the file set step 5 submits. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback. For an **`mt_…` id**, the same call with `method_id` in place of `files`, and for an address with `method_ref`.
+For a **bundle directory**, one `mthds_validate` call over the file set step 5 submits. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, and every template file a `PipeDocGen` step names. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file. For an **`mt_…` id**, the same call with `method_id` in place of `files`, and for an address with `method_ref`.
 
-The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass.
+The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
-**A dry run is this step, shown.** The workshop has no mock-inference mode, so for a dry run, or anything "before spending credit", this call is it (a run on test files is a real run). **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**: it opens in a browser and draws the whole method. When a summary called the page new, pass on its note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
+**A dry run is this step, shown.** The workshop has no mock-inference mode, and a run on test files is a real run. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. When a summary called the page new, pass on its note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
 ### 3. The inputs
 
@@ -97,7 +97,7 @@ A run id alone, with no method and no inputs: nothing is validated or prepared.
 
 - **"how is run X going"** → `mthds_run_status`. Report the state and, while it runs, the retry hint, never a guessed duration. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
-- **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says; it works days after the run. Saving a run twice adds copies.
+- **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says. Saving a run twice adds copies.
 
 An unknown run id is reported in the tool's own words.
 

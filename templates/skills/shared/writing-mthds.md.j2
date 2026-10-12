@@ -690,11 +690,19 @@ template    = """
 
 **An office template file is filled from the inputs as plain data**: no sigils and no filters, and a verdict is its value alone (a `YesNo` its boolean, a `Choice` its key, a `Rating` its level). Its placeholders follow its engine's conventions, which this reference does not teach, so name one only when the user supplies the file; otherwise print a format the step lays out itself.
 
-**A template file travels with the bundle**, as its `.mthds` files do: a runner that receives the bundle without it refuses the step when the method loads. When validation says template files are not supported there, write an inline `template` for a `pdf`, or none for the layout, in its place.
-
 **What a runner prints depends on its document engines.** A `pdf` laid out from its inputs prints on the built-in engine. A `pdf` from a template, and an `xlsx`, a `docx` or a `pptx`, need engines a runner may not have: a step whose engine the runner lacks is refused when the method loads, naming the engine, so `mthds_validate` reports it before any run spends credit. Tell the user, and offer the PDF laid out from the inputs rather than changing the format in silence.
 
 A dry run composes the document for real against mock inputs, which checks the template and the file name, prints nothing and outputs a mock `Document`.
+
+#### Template files
+
+**A template file travels with the bundle**, as its `.mthds` files do: a runner that receives the bundle without it refuses the step when the method loads. So every submission of a local bundle to the workshop sends the template files its steps name beside its `.mthds` files, each as a `{path}` item, never inline, and the workshop keys each by the `template_file` of the step naming it, read from the directory of that step's `.mthds` file. Before sending anything, it refuses a template file no step names, which catches a misspelled `template_file` and the `method-graph.html` page `mthds_validate` writes beside the bundle; one a step reaches through a link out of its file's directory; and one path naming a different file beside each of two `.mthds` files. A request carries at most 32 template files of at most 5 MiB each, and the hosted gateway's limit binds their total first, at about 7.4 MiB beside a small bundle.
+
+**A workshop older than template files refuses one** as *Path is not a .mthds file*: it is a cached release to refresh with `npx -y @pipelex/mcp@latest`, which takes effect once the host restarts the server and reloads its tools. Never rewrite the step to do without its template to get past it.
+
+**The catalog stores no template file yet**: `mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template file does not load by its id, while its directory still validates and runs as `files`.
+
+**A `template_check_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, located by its `pipe_code`, `template_file` and `template_location`, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
 
 ### PipeFunc — call a registered Python function
 

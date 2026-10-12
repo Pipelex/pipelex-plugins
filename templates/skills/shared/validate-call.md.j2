@@ -4,12 +4,25 @@
 
    The first sentence is the shared submission convention's file set: every
    `.mthds` file beneath the bundle directory except `runs/`, where
-   `/pipelex-run` saves a completed run's artifacts. `pipelex-integrate` sets
+   `/pipelex-run` saves a completed run's artifacts, and every template file a
+   `PipeDocGen` step names in its `template_file`, which the runner needs to load
+   a bundle sent as content (`pipelex-mcp`, SPEC.md, "Template files"). The
+   workshop keys each template by the step naming it and refuses one no step
+   names, which is why the set is the named files and not a glob of template
+   suffixes: a glob would sweep in the `method-graph.html` page `mthds_validate`
+   writes beside the bundle. `pipelex-integrate` sets
    `validate_call_file_set = false` and states its own set, because the set it
    submits is the set its generated call site loads at runtime, and that is
    the call site's to define. Why `runs/` is excluded — a method that emits or
    echoes a `.mthds` file would otherwise submit its own output as source — is
    rationale, and lives in `docs/decisions.md` beside the artifact `dir`.
+
+   `validate_call_templates` is false in `pipelex-catalog` alone: the catalog
+   stores `.mthds` and `.py` files only, so `mthds_save_method` takes no template
+   file, and the catalog says so at its save step. Everywhere else a template file
+   goes as a path, since it has no inline form: the workshop refuses one inline,
+   and one beside a bundle given inline, which is also why the inline fallback
+   is a fallback only for a bundle whose steps name no template file.
 
    The local workshop resolves a `{ path }` item against its own working
    directory and refuses one that resolves outside it (`pipelex-mcp`,
@@ -23,5 +36,6 @@
    only beside a `{ path }` root file: for a save, the inline form is the one
    that leaves a new method unlinked, or an updated one's link behind the
    catalog. -#}
-{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback.") }}
+{% set validate_call_with_templates = validate_call_templates | default(true) %}
+{%- if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file.") }}
 {#- -#}

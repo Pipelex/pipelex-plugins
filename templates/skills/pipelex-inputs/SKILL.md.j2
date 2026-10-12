@@ -46,7 +46,7 @@ The target takes three forms, and every call takes exactly one selector.
 
 ### 2. The template
 
-Call **`mthds_inputs_template`** with the selector and **`explicit: false`**: the tool defaults to the `{concept, content}` envelope; this skill works in the light shape. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
+Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, bare values, not the `{concept, content}` envelope. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
 
 ### 3. The strategy
 

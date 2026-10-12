@@ -42,13 +42,13 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 The target takes three forms, and every call takes exactly one selector.
 
-- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, where `/pipelex-run` saves a completed run's artifacts. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback.
+- **A local bundle**, the usual case, as `files`: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, and every template file a `PipeDocGen` step names. Prefer the path form `{path: <absolute path to the file>}`. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content: <file content>, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file.
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`, which needs the API key: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `method_not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 
 ### 2. The template
 
-Call **`mthds_inputs_template`** with the selector and **`explicit: false`**: the tool defaults to the `{concept, content}` envelope; this skill works in the light shape. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
+Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, bare values, not the `{concept, content}` envelope. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
 
 ### 3. The strategy
 

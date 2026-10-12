@@ -104,6 +104,30 @@ return { output, results };
 
 Codegen emits a parser per concept and no wrapper type for the envelope, so nothing in the generated tree names it. `main_stuff` is `unknown`, so the type checker does not catch a wrong narrowing either. For `fixed`, the declared `item_count` is not checked unless you check it, and the report says so.
 
+**A bundle whose `PipeDocGen` steps name template files sends them with every run.** A bundle sent as content has no directory, so the runner loads it only with those files, sent as `resources`: each keyed by the step's `template_file` exactly as written, and read from beside the `.mthds` file holding that step. Without them every run is refused, the step's template file not supplied. `resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it. List the files beside `BUNDLE_DIR`, the key first and the path under `BUNDLE_DIR` second, which differ only when the step's file sits in a subdirectory of the bundle:
+
+```ts
+/** The template files the bundle's `PipeDocGen` steps name: each step's `template_file`, and where the file is under BUNDLE_DIR. */
+const TEMPLATE_FILES: Record<string, string> = { "templates/invoice.xlsx": "templates/invoice.xlsx" };
+
+async function readTemplates(): Promise<Record<string, Uint8Array>> {
+  const entries = await Promise.all(
+    Object.entries(TEMPLATE_FILES).map(async ([key, file]) => [key, await readFile(path.join(BUNDLE_DIR, file))] as const),
+  );
+  return Object.fromEntries(entries);
+}
+
+// In the exported function, beside `mthds_contents`:
+const results: RunResults = await getPipelexClient().startAndWaitForResult({
+  pipe_code: PIPE_CODE,
+  mthds_contents: await readBundle(),
+  resources: await readTemplates(),
+  inputs,
+});
+```
+
+The same `resources` go to a `prepareInputs` call over the bundle's `files`, the one the module's docstring names. The generated types and the drift gate read the `.mthds` files alone: a template file changes what the run prints, never the types.
+
 Follow the project's conventions where you can see them — module style, quoting, error handling — and the SDK's defaults where you cannot.
 
 Variants by selector, replacing the `mthds_contents` line and dropping `BUNDLE_DIR` and `readBundle`:

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import os
 import shutil
+import threading
+from collections.abc import Iterator
 
 import pytest
+
+from tests.unit.stub_api import StubApiServer
 
 
 @pytest.fixture(scope="session")
@@ -19,3 +23,17 @@ def node() -> str:
             pytest.fail("no node on the PATH under CI: the hook tests must run there, and tests.yml installs Node for them")
         pytest.skip("no node on the PATH")
     return found
+
+
+@pytest.fixture
+def stub_api() -> Iterator[StubApiServer]:
+    """A stand-in Pipelex API, serving from a thread for the length of one test."""
+    server = StubApiServer()
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

@@ -50,7 +50,7 @@ State the plan in one line (`main.mthds + extract.mthds + report.mthds`) and pro
 
 ### Step 3 — Prove equivalence before touching disk
 
-Call `mthds_validate` with **the composed candidate set** alone, inline, since nothing is written yet. The verdict must match the baseline exactly: `is_valid: true`, the same `is_runnable`, and an identical `pending_signatures` set. A mismatch means the composition dropped or duplicated something: fix the composition, never the semantics, and re-validate.
+Call `mthds_validate` with **the composed candidate set** alone, inline, since nothing is written yet. The verdict must match the baseline exactly: `is_valid: true`, the same `is_runnable`, and an identical `pending_signatures` set. A mismatch means the composition dropped or duplicated something: fix the composition, never the semantics, and re-validate. **A bundle whose `PipeDocGen` steps name template files skips this proof**: a template file travels only beside `.mthds` files read from disk, so Step 4's confirmation, with its rollback, proves the layout instead.
 
 ### Step 4 — Swap the layout
 

@@ -96,3 +96,13 @@ class TestPipelexOrganizeSkill:
         installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-organize"
         assert not (installed / "references").exists(), f"{target_name}: organize grew a references directory"
         assert not (self.REPO_ROOT / "skills" / "pipelex-organize").exists()
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_templated_bundle_is_proven_on_disk(self, target_name: str) -> None:
+        """Step 3 validates the composed candidate inline, and a template file travels only as a path beside
+        `.mthds` files read from disk, so a bundle whose `PipeDocGen` steps name template files would answer that
+        the step's file was not supplied and never match its baseline. It skips the in-memory proof, and the
+        confirmation on disk, with its rollback, proves the new layout instead."""
+        step_3 = self.section(self.render(target_name), "### Step 3 — Prove equivalence before touching disk")
+        assert "**A bundle whose `PipeDocGen` steps name template files skips this proof**" in step_3
+        assert "Step 4's confirmation, with its rollback, proves the layout instead." in step_3

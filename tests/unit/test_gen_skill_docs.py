@@ -1019,6 +1019,8 @@ class TestSharedSkillIncludes:
         "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
         "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
         "give the page's `path` before the text flow": "skills/shared/graph-page.md.j2",
+        "**Report a valid verdict's `warnings`**": "skills/shared/validate-warnings.md.j2",
+        "and no template file, which the catalog does not store yet": "skills/shared/saved-copy-notice.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
@@ -1134,7 +1136,13 @@ class TestSharedSkillIncludes:
         and the relaunch that cures it. All but the catalog keep the inline fallback: a
         save is the one submission the inline form leaves unlinked. The fallback no
         longer claims to be the one form the hosted console accepts: the console's
-        tools are `pipelex_*` and take no files at all."""
+        tools are `pipelex_*` and take no files at all.
+
+        The file set carries the template files a `PipeDocGen` step names, which the
+        runner needs to load a bundle sent as content and which travel only as paths, so
+        the inline fallback is one for a bundle with no template file. The catalog's save
+        sends none, since `mthds_save_method` takes `.mthds` and `.py` files alone, and
+        integrate states its own set."""
         includers = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1144,7 +1152,8 @@ class TestSharedSkillIncludes:
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
-        fallback = "is the fallback."
+        fallback = "is the fallback for a bundle with no template file."
+        template_files = "and every template file a `PipeDocGen` step names"
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
@@ -1153,8 +1162,25 @@ class TestSharedSkillIncludes:
             assert "hosted console" not in body, f"{target_name}/{skill}: the console takes no files, so it has no say in how a bundle is submitted"
             if skill == "pipelex-catalog":
                 assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
+                assert template_files not in body, "the catalog stores no template file, and the save refuses one"
             else:
                 assert fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                if skill != "pipelex-integrate":
+                    assert template_files in body, f"{target_name}/{skill}: the file set leaves the template files behind"
+
+    def test_a_valid_verdicts_warnings_are_read_where_a_skill_reports_the_verdict(self) -> None:
+        """`mthds_validate` relays a valid verdict's advisory `warnings`, a `PipeDocGen` step's template check
+        among them. The skills that report a verdict read them: design and edit, which fix what they wrote,
+        explain's verdict line and run's proof before spending credit. Integrate's validation is a gate it
+        reports nothing of, and the save, the inputs template and organize's proof carry no such verdict, so the
+        roster is pinned here, with the pointer to where a `template_check_warning` is read."""
+        include = "skills/shared/validate-warnings.md.j2"
+        carriers = sorted(
+            path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in _skill_source(path.parent)
+        )
+        assert carriers == ["pipelex-design", "pipelex-edit", "pipelex-explain", "pipelex-run"]
+        partial = (self.REPO_TEMPLATES / "skills" / "shared" / include.rsplit("/", 1)[1]).read_text(encoding="utf-8")
+        assert "({{ shared_dir }}/writing-mthds.md#template-files) before acting on a `template_check_warning`" in partial
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:

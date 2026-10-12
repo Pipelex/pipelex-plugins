@@ -122,11 +122,32 @@ class TestLanguageReference:
 
     def test_a_template_file_sits_beside_the_bundle_and_travels_with_it(self) -> None:
         """A bundle loaded from a string, as a runner receiving submitted files does, has no directory to find a
-        template file in, so the step is refused at load; the section names the cure rather than a retry."""
+        template file in, so every submission sends the template files beside the `.mthds` files, as paths, and the
+        workshop keys each by the step naming it. The section used to fall back to an inline template when the
+        runner refused the file; the workshop now takes it, so a refusal names an older workshop and its refresh,
+        never a rewrite of the step."""
         docgen = section(rendered_shared("prod", "writing-mthds.md"), "### PipeDocGen — ")
         assert "A template file beside the bundle, its path relative to the `.mthds` file that names it" in docgen
+        assert "#### Template files" in docgen
         assert "**A template file travels with the bundle**" in docgen
-        assert "write an inline `template` for a `pdf`, or none for the layout, in its place" in docgen
+        assert "sends the template files its steps name beside its `.mthds` files, each as a `{path}` item, never inline" in docgen
+        assert "the `method-graph.html` page `mthds_validate` writes beside the bundle" in docgen
+        assert "about 7.4 MiB beside a small bundle" in docgen
+        assert "**A workshop older than template files refuses one** as *Path is not a .mthds file*" in docgen
+        assert "refresh with `npx -y @pipelex/mcp@latest`" in docgen
+        assert "Never rewrite the step to do without its template to get past it." in docgen
+        assert "write an inline `template` for a `pdf`, or none for the layout, in its place" not in docgen
+
+    def test_the_catalog_and_the_template_check_are_said_where_template_files_are(self) -> None:
+        """`mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template
+        file does not load by its id; and a valid verdict's `template_check_warning` is acted on by whoever wrote
+        the template, which the skills that report a verdict point at."""
+        docgen = section(rendered_shared("prod", "writing-mthds.md"), "### PipeDocGen — ")
+        assert "**The catalog stores no template file yet**" in docgen
+        assert "does not load by its id, while its directory still validates and runs as `files`" in docgen
+        assert "**A `template_check_warning` in a valid verdict's `warnings`**" in docgen
+        assert "It never changes `is_valid`, but the printed file may show it." in docgen
+        assert "a template the user supplied is theirs, so name the finding and ask before changing it" in docgen
 
     def test_a_missing_engine_is_reported_by_validation_and_told(self) -> None:
         """On the hosted plane on 2026-10-12 a templated `pdf` validated as refused at load, naming its engine;

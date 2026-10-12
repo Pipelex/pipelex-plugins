@@ -1,0 +1,16 @@
+{#- What a skill does with the advisory `warnings` a valid `mthds_validate`
+   verdict carries (`pipelex-mcp`, SPEC.md, the validate output): they never
+   change `is_valid`, so the skill reports them, and a `template_check_warning`,
+   a `PipeDocGen` step's template check finding something in the template file
+   it was sent, is acted on as the MTHDS reference's "Template files" says,
+   which tells a skill that writes the method from one that only reads or runs
+   it. Included where a skill reads a validation verdict it reports: design's
+   validation, edit's re-validation, explain's verdict line and run's proof
+   before spending credit. Integrate's validation is a gate it reports nothing
+   of, and the catalog's save, organize's equivalence proof and the inputs
+   template carry no such verdict.
+
+   Strips its own trailing newline (the closing comment below), so it can be
+   included mid-paragraph. -#}
+**Report a valid verdict's `warnings`**, and read [template files]({{ shared_dir }}/writing-mthds.md#template-files) before acting on a `template_check_warning`.
+{#- -#}

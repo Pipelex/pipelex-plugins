@@ -55,6 +55,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Retain the original contents until the final verdict is restored.**",
         "restore the retained baseline contents and report the failure",
         "give the page's `path` before the text flow",
+        "**Report a valid verdict's `warnings`**",
     ),
     "pipelex-explain": (
         "Accept it, and say so in one line.",
@@ -77,6 +78,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "whether it is **complete** or a **scaffold with a backlog**",
         "Never describe a withheld file's pipes as absent.",
         "Do not reconstruct a signature from the input template.",
+        "**Report a valid verdict's `warnings`**",
     ),
     "pipelex-edit": (
         "Never attempt a partial structural edit here.",
@@ -90,6 +92,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**no `name`, no `expected_updated_at`, no `python`, no `link_dir`**",
         "never retry with a token or inline",
         "Never write or edit `pipelex-method.json`",
+        "**Report a valid verdict's `warnings`**",
     ),
     "pipelex-organize": (
         "this skill never reorganizes without proving the verdict is preserved",
@@ -108,6 +111,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**no `name`, no `expected_updated_at`, no `python`, no `link_dir`**",
         "never retry with a token or inline",
         "Never write or edit `pipelex-method.json`",
+        "**A bundle whose `PipeDocGen` steps name template files skips this proof**",
     ),
     "pipelex-integrate": (
         "**writes no client for another service before reading [fit.md](../shared/fit.md)**",
@@ -210,6 +214,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "A dead link is removed only on the user's yes",
         "**does not retry.**",
         "only on an explicit yes call again with `overwrite: true`",
+        "With a `template_file`, say the catalog stores no template file yet",
     ),
     "pipelex-run": (
         "**A dry run is this step, shown.**",
@@ -242,6 +247,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "When the method holds a `PipeFunc`, name it as a suspect",
         "Per-pipe bisection is not this skill's.",
         "Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.",
+        "**Report a valid verdict's `warnings`**",
     ),
     "pipelex-scaffold": (
         "**writes no client for another service before reading [fit.md](../shared/fit.md)**",

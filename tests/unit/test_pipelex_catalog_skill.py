@@ -152,3 +152,16 @@ class TestPipelexCatalogSkillShape:
         assert "{{" not in body
         if target_name != "prod":
             assert "mcp__" not in body
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_save_sends_no_template_file_and_says_so(self, target_name: str) -> None:
+        """`mthds_save_method` takes `.mthds` and `.py` files alone, the catalog storing no template file yet, so
+        the save's file set leaves out the template files every other submission carries, and the line before
+        the call says what that leaves: a draft that reports the file missing and runs only from the directory."""
+        body = self.render(target_name)
+        assert "and every template file a `PipeDocGen` step names" not in body
+        say = self.the_line(body, "4. **Say what is about to happen, in one line**")
+        assert (
+            "With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory."
+            in say
+        )
