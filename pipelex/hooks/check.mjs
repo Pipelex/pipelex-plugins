@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.38.0 (6badf04) + @pipelex/tools-wasm 0.5.0 (npm)
+// Provenance: @pipelex/sdk 0.40.0 (137e918) + @pipelex/tools-wasm 0.5.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2015,67 +2015,652 @@ function encodeOutcome(outcome, platform = "claude") {
 }
 
 // src/hooks/bundle-gather.ts
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve as resolve2 } from "node:path";
-var EXCLUDED_DIRS = /* @__PURE__ */ new Set([
-  "venv",
-  "env",
-  "virtualenv",
-  "__pycache__",
-  "node_modules",
-  "results"
-]);
-var DEFAULT_GATHER_CAPS = {
-  maxFiles: 50,
-  maxTotalBytes: 2 * 1024 * 1024
-};
-function walkMthdsFiles(dir, collected) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith(".") || EXCLUDED_DIRS.has(entry.name)) {
-      continue;
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve as resolve2, sep } from "node:path";
+
+// node_modules/smol-toml/dist/date.js
+var DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})?[T ]?(?:(\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?)?(Z|[-+]\d{2}:\d{2})?$/i;
+var TomlDate = class _TomlDate extends Date {
+  #hasDate = false;
+  #hasTime = false;
+  #offset = null;
+  constructor(date) {
+    let hasDate = true;
+    let hasTime = true;
+    let offset = "Z";
+    if (typeof date === "string") {
+      let match = date.match(DATE_TIME_RE);
+      if (match) {
+        if (!match[1]) {
+          hasDate = false;
+          date = `0000-01-01T${date}`;
+        }
+        hasTime = !!match[2];
+        hasTime && date[10] === " " && (date = date.replace(" ", "T"));
+        if (match[2] && +match[2] > 23) {
+          date = "";
+        } else {
+          offset = match[3] || null;
+          date = date.toUpperCase();
+          if (!offset && hasTime)
+            date += "Z";
+        }
+      } else {
+        date = "";
+      }
     }
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkMthdsFiles(full, collected);
-    } else if (entry.isFile() && entry.name.endsWith(".mthds")) {
-      collected.push(full);
+    super(date);
+    if (!isNaN(this.getTime())) {
+      this.#hasDate = hasDate;
+      this.#hasTime = hasTime;
+      this.#offset = offset;
+    }
+  }
+  isDateTime() {
+    return this.#hasDate && this.#hasTime;
+  }
+  isLocal() {
+    return !this.#hasDate || !this.#hasTime || !this.#offset;
+  }
+  isDate() {
+    return this.#hasDate && !this.#hasTime;
+  }
+  isTime() {
+    return this.#hasTime && !this.#hasDate;
+  }
+  isValid() {
+    return this.#hasDate || this.#hasTime;
+  }
+  toISOString() {
+    let iso = super.toISOString();
+    if (this.isDate())
+      return iso.slice(0, 10);
+    if (this.isTime())
+      return iso.slice(11, 23);
+    if (this.#offset === null)
+      return iso.slice(0, -1);
+    if (this.#offset === "Z")
+      return iso;
+    let offset = +this.#offset.slice(1, 3) * 60 + +this.#offset.slice(4, 6);
+    offset = this.#offset[0] === "-" ? offset : -offset;
+    let offsetDate = new Date(this.getTime() - offset * 6e4);
+    return offsetDate.toISOString().slice(0, -1) + this.#offset;
+  }
+  static wrapAsOffsetDateTime(jsDate, offset = "Z") {
+    let date = new _TomlDate(jsDate);
+    date.#offset = offset;
+    return date;
+  }
+  static wrapAsLocalDateTime(jsDate) {
+    let date = new _TomlDate(jsDate);
+    date.#offset = null;
+    return date;
+  }
+  static wrapAsLocalDate(jsDate) {
+    let date = new _TomlDate(jsDate);
+    date.#hasTime = false;
+    date.#offset = null;
+    return date;
+  }
+  static wrapAsLocalTime(jsDate) {
+    let date = new _TomlDate(jsDate);
+    date.#hasDate = false;
+    date.#offset = null;
+    return date;
+  }
+};
+
+// node_modules/smol-toml/dist/error.js
+function getLineColFromPtr(string, ptr) {
+  let lines = string.slice(0, ptr).split(/\r\n|\n|\r/g);
+  return [lines.length, lines.pop().length + 1];
+}
+function makeCodeBlock(string, line, column) {
+  let lines = string.split(/\r\n|\n|\r/g);
+  let codeblock = "";
+  let numberLen = (Math.log10(line + 1) | 0) + 1;
+  for (let i = line - 1; i <= line + 1; i++) {
+    let l = lines[i - 1];
+    if (!l)
+      continue;
+    codeblock += i.toString().padEnd(numberLen, " ");
+    codeblock += ":  ";
+    codeblock += l;
+    codeblock += "\n";
+    if (i === line) {
+      codeblock += " ".repeat(numberLen + column + 2);
+      codeblock += "^\n";
+    }
+  }
+  return codeblock;
+}
+var TomlError = class extends Error {
+  line;
+  column;
+  codeblock;
+  constructor(message, options) {
+    const [line, column] = getLineColFromPtr(options.toml, options.ptr);
+    const codeblock = makeCodeBlock(options.toml, line, column);
+    super(`Invalid TOML document: ${message}
+
+${codeblock}`, options);
+    this.line = line;
+    this.column = column;
+    this.codeblock = codeblock;
+  }
+};
+
+// node_modules/smol-toml/dist/util.js
+function indexOfNewline(str, start = 0) {
+  let idx = str.indexOf("\n", start);
+  if (str.charCodeAt(idx - 1) === 13)
+    idx--;
+  return idx;
+}
+function skipComment(ctx) {
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    let c = ctx.s.charCodeAt(ctx.p);
+    if (c === 10)
+      break;
+    if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10) {
+      ctx.p++;
+      break;
+    }
+    if (c < 32 && c !== 9 || c === 127) {
+      throw new TomlError("control characters are not allowed in comments", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
     }
   }
 }
-function gatherBundle(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
-  const editedAbs = resolve2(editedFilePath);
-  const parentDir = dirname(editedAbs);
-  const paths = [];
-  try {
-    walkMthdsFiles(parentDir, paths);
-  } catch {
-    return { ok: false, reason: "unreadable" };
+function skipVoid(ctx, banNewLines, banComments) {
+  let c;
+  while (1) {
+    while ((c = ctx.s.charCodeAt(ctx.p)) === 32 || c === 9 || !banNewLines && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10))
+      ctx.p++;
+    if (banComments || c !== 35)
+      break;
+    skipComment(ctx);
   }
-  const ordered = [editedAbs, ...paths.filter((path) => resolve2(path) !== editedAbs)];
-  if (ordered.length > caps.maxFiles) {
-    return { ok: false, reason: "overflow" };
+}
+function skipUntil(ctx, sep2, end) {
+  let ptr = ctx.p;
+  if (!end) {
+    ptr = indexOfNewline(ctx.s, ptr);
+    ctx.p = ptr < 0 ? ctx.s.length : ptr;
+    return;
   }
-  let totalBytes = 0;
-  for (const path of ordered) {
-    try {
-      totalBytes += statSync(path).size;
-    } catch {
-      return { ok: false, reason: "unreadable" };
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    let c = ctx.s.charCodeAt(ctx.p);
+    if (c === 35) {
+      skipComment(ctx);
+    } else if (c === end || c === sep2) {
+      return;
     }
   }
-  if (totalBytes > caps.maxTotalBytes) {
-    return { ok: false, reason: "overflow" };
+  throw new TomlError("cannot find end of structure", {
+    toml: ctx.s,
+    ptr
+  });
+}
+
+// node_modules/smol-toml/dist/primitive.js
+var INT_REGEX = /^((0x[0-9a-fA-F](_?[0-9a-fA-F])*)|(([+-]|0[ob])?\d(_?\d)*))$/;
+var FLOAT_REGEX = /^[+-]?\d(_?\d)*(\.\d(_?\d)*)?([eE][+-]?\d(_?\d)*)?$/;
+var LEADING_ZERO = /^[+-]?0[0-9_]/;
+function parseString(ctx) {
+  let start = ctx.p;
+  let c = ctx.s.charCodeAt(ctx.p++);
+  let first = c;
+  let isLiteral = c === 39;
+  let isMultiline = c === ctx.s.charCodeAt(ctx.p) && c === ctx.s.charCodeAt(ctx.p + 1);
+  if (isMultiline) {
+    if ((c = ctx.s.charCodeAt(ctx.p += 2)) === 10)
+      ctx.p++;
+    else if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)
+      ctx.p += 2;
   }
-  const files = [];
-  for (const path of ordered) {
-    try {
-      files.push({ content: readFileSync(path, "utf-8"), uri: relative(parentDir, path) });
-    } catch {
-      return { ok: false, reason: "unreadable" };
+  let parsed = "";
+  let sliceStart = ctx.p;
+  let state = 0;
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    c = ctx.s.charCodeAt(ctx.p);
+    if (isMultiline && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)) {
+      state = state && 3;
+    } else if (c < 32 && c !== 9 || c === 127) {
+      throw new TomlError("control characters are not allowed in strings", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
+    } else if ((!state || state === 3) && c === first && (!isMultiline || ctx.s.charCodeAt(ctx.p + 1) === first && ctx.s.charCodeAt(ctx.p + 2) === first)) {
+      if (isMultiline) {
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+      }
+      if (!state)
+        parsed += ctx.s.slice(sliceStart, ctx.p);
+      ctx.p += isMultiline ? 3 : 1;
+      return parsed;
+    } else if (!state) {
+      if (!isLiteral && c === 92) {
+        parsed += ctx.s.slice(sliceStart, sliceStart = ctx.p);
+        state = 1;
+      }
+    } else if (state === 1) {
+      if (c === 120 || c === 117 || c === 85) {
+        let value = 0;
+        let len = c === 120 ? 2 : c === 117 ? 4 : 8;
+        for (let j = 0; j < len; j++, ctx.p++) {
+          let hex = ctx.s.charCodeAt(ctx.p + 1);
+          let digit = (
+            /* 0-9 */
+            hex >= 48 && hex <= 57 ? hex - 48 : (
+              /* A-F */
+              hex >= 65 && hex <= 70 ? hex - 65 + 10 : (
+                /* a-f */
+                hex >= 97 && hex <= 102 ? hex - 97 + 10 : -1
+              )
+            )
+          );
+          if (digit < 0)
+            throw new TomlError("invalid non-hex character in unicode escape", { toml: ctx.s, ptr: ctx.p + 1 });
+          value = value << 4 | digit;
+        }
+        if (value < 0 || value > 1114111 || value >= 55296 && value <= 57343) {
+          throw new TomlError("invalid unicode escape", { toml: ctx.s, ptr: ctx.p });
+        }
+        parsed += String.fromCodePoint(value);
+        sliceStart = ctx.p + 1;
+        state = 0;
+      } else if (c === 32 || c === 9) {
+        state = 2;
+      } else {
+        if (c === 98)
+          parsed += "\b";
+        else if (c === 116)
+          parsed += "	";
+        else if (c === 110)
+          parsed += "\n";
+        else if (c === 102)
+          parsed += "\f";
+        else if (c === 114)
+          parsed += "\r";
+        else if (c === 101)
+          parsed += "\x1B";
+        else if (c === 34)
+          parsed += '"';
+        else if (c === 92)
+          parsed += "\\";
+        else
+          throw new TomlError("unrecognized escape sequence", { toml: ctx.s, ptr: ctx.p });
+        sliceStart = ctx.p + 1;
+        state = 0;
+      }
+    } else if (c !== 32 && c !== 9) {
+      if (state === 2) {
+        throw new TomlError("invalid escape: only line-ending whitespace may be escaped", {
+          toml: ctx.s,
+          ptr: sliceStart
+        });
+      }
+      state = !isLiteral && c === 92 ? 1 : 0;
+      sliceStart = ctx.p;
     }
   }
-  return { ok: true, files };
+  throw new TomlError("unfinished string", { toml: ctx.s, ptr: start });
+}
+function sliceAndTrimEndOf(ctx, start, end) {
+  let value = ctx.s.slice(start, end);
+  let commentIdx = value.indexOf("#");
+  if (commentIdx > 0) {
+    skipComment({ s: value, p: commentIdx, d: 0 });
+    value = value.slice(0, commentIdx);
+  }
+  return value.trimEnd();
+}
+function parseValue(ctx, integersAsBigInt, end) {
+  let ptr = ctx.p;
+  let err = { toml: ctx.s, ptr };
+  skipUntil(ctx, 44, end);
+  let value = sliceAndTrimEndOf(ctx, ptr, ctx.p);
+  if (!value)
+    throw new TomlError("incomplete declaration: value expected", err);
+  if (value === "-inf")
+    return -Infinity;
+  if (value === "inf" || value === "+inf")
+    return Infinity;
+  if (value === "nan" || value === "+nan" || value === "-nan")
+    return NaN;
+  if (value === "-0")
+    return integersAsBigInt ? 0n : 0;
+  let isInt = INT_REGEX.test(value);
+  if (isInt || FLOAT_REGEX.test(value)) {
+    if (LEADING_ZERO.test(value)) {
+      throw new TomlError("leading zeroes are not allowed", err);
+    }
+    value = value.replace(/_/g, "");
+    let numeric = +value;
+    if (isNaN(numeric)) {
+      throw new TomlError("invalid number", err);
+    }
+    if (isInt) {
+      if ((isInt = !Number.isSafeInteger(numeric)) && !integersAsBigInt) {
+        throw new TomlError("integer value cannot be represented losslessly", err);
+      }
+      if (isInt || integersAsBigInt === true)
+        numeric = BigInt(value);
+    }
+    return numeric;
+  }
+  const date = new TomlDate(value);
+  if (!date.isValid())
+    throw new TomlError("invalid value", err);
+  return date;
+}
+
+// node_modules/smol-toml/dist/extract.js
+function extractValue(ctx, end, integersAsBigInt) {
+  let ptr = ctx.p;
+  let c = ctx.s.charCodeAt(ptr);
+  if (c === 91 || c === 123) {
+    if (!ctx.d--) {
+      throw new TomlError("document contains excessively nested structures. aborting.", {
+        toml: ctx.s,
+        ptr
+      });
+    }
+    let value = c === 91 ? parseArray(ctx, integersAsBigInt) : parseInlineTable(ctx, integersAsBigInt);
+    ctx.d++;
+    return value;
+  }
+  if (c === 34 || c === 39) {
+    return parseString(ctx);
+  }
+  if (c === 116) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 114 || ctx.s.charCodeAt(++ctx.p) !== 117 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      throw new TomlError("invalid value", { toml: ctx.s, ptr });
+    ctx.p++;
+    return true;
+  }
+  if (c === 102) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 97 || ctx.s.charCodeAt(++ctx.p) !== 108 || ctx.s.charCodeAt(++ctx.p) !== 115 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      throw new TomlError("invalid value", { toml: ctx.s, ptr });
+    ctx.p++;
+    return false;
+  }
+  return parseValue(ctx, integersAsBigInt, end);
+}
+
+// node_modules/smol-toml/dist/struct.js
+var KEY_PART_RE = /^[a-zA-Z0-9-_]+[ \t]*$/;
+function parseKey(ctx, end = "=") {
+  let start = ctx.p;
+  let dot = start - 1;
+  let parsed = [];
+  let endPtr = ctx.s.indexOf(end, start);
+  if (endPtr < 0) {
+    throw new TomlError("incomplete key-value: cannot find end of key", {
+      toml: ctx.s,
+      ptr: start
+    });
+  }
+  do {
+    let c = ctx.s.charCodeAt(ctx.p = ++dot);
+    if (c !== 32 && c !== 9) {
+      if (c === 34 || c === 39) {
+        if (c === ctx.s.charCodeAt(ctx.p + 1) && c === ctx.s.charCodeAt(ctx.p + 2)) {
+          throw new TomlError("multiline strings are not allowed in keys", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        let part = parseString(ctx);
+        dot = ctx.s.indexOf(".", ctx.p);
+        let strEnd = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
+        let newLine = indexOfNewline(strEnd);
+        if (newLine > -1) {
+          throw new TomlError("newlines are not allowed in keys", {
+            toml: ctx.s,
+            ptr: newLine
+          });
+        }
+        if (strEnd.trimStart()) {
+          throw new TomlError("found extra tokens after the string part", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        if (endPtr < ctx.p) {
+          endPtr = ctx.s.indexOf(end, ctx.p);
+          if (endPtr < 0) {
+            throw new TomlError("incomplete key-value: cannot find end of key", {
+              toml: ctx.s,
+              ptr: start
+            });
+          }
+        }
+        parsed.push(part);
+      } else {
+        dot = ctx.s.indexOf(".", ctx.p);
+        let part = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
+        if (!KEY_PART_RE.test(part)) {
+          throw new TomlError("only letter, numbers, dashes and underscores are allowed in keys", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        parsed.push(part.trimEnd());
+      }
+    }
+  } while (dot + 1 && dot < endPtr);
+  ctx.p = endPtr + 1;
+  skipVoid(ctx, true, true);
+  return parsed;
+}
+function parseInlineTable(ctx, integersAsBigInt) {
+  let res = {};
+  let seen = /* @__PURE__ */ new Set();
+  let c;
+  ctx.p++;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 125) {
+      ctx.p++;
+      return res;
+    }
+    let k;
+    let t = res;
+    let hasOwn = false;
+    let p = ctx.p;
+    let key = parseKey(ctx);
+    for (let i = 0; i < key.length; i++) {
+      if (i)
+        t = hasOwn ? t[k] : t[k] = {};
+      k = key[i];
+      if ((hasOwn = Object.hasOwn(t, k)) && (typeof t[k] !== "object" || seen.has(t[k]))) {
+        throw new TomlError("trying to redefine an already defined value", {
+          toml: ctx.s,
+          ptr: p
+        });
+      }
+      if (!hasOwn && k === "__proto__") {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+      }
+    }
+    if (hasOwn) {
+      throw new TomlError("trying to redefine an already defined value", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
+    }
+    let value = extractValue(ctx, 125, integersAsBigInt);
+    seen.add(t[k] = value);
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 125) {
+      return res;
+    }
+    if (c !== 44) {
+      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
+    }
+  }
+  throw new TomlError("unfinished table encountered", {
+    toml: ctx.s,
+    ptr: ctx.p
+  });
+}
+function parseArray(ctx, integersAsBigInt) {
+  let res = [];
+  let c;
+  ctx.p++;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 93) {
+      ctx.p++;
+      return res;
+    }
+    res.push(extractValue(ctx, 93, integersAsBigInt));
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 93) {
+      return res;
+    }
+    if (c !== 44) {
+      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
+    }
+  }
+  throw new TomlError("unfinished array encountered", {
+    toml: ctx.s,
+    ptr: ctx.p
+  });
+}
+
+// node_modules/smol-toml/dist/parse.js
+function peekTable(key, table, meta, type) {
+  let t = table;
+  let m = meta;
+  let k;
+  let hasOwn = false;
+  let state;
+  for (let i = 0; i < key.length; i++) {
+    if (i) {
+      t = hasOwn ? t[k] : t[k] = {};
+      m = (state = m[k]).c;
+      if (type === 0 && (state.t === 1 || state.t === 2)) {
+        return null;
+      }
+      if (state.t === 2) {
+        let l = t.length - 1;
+        t = t[l];
+        m = m[l].c;
+      }
+    }
+    k = key[i];
+    if ((hasOwn = Object.hasOwn(t, k)) && m[k]?.t === 0 && m[k]?.d) {
+      return null;
+    }
+    if (!hasOwn) {
+      if (k === "__proto__") {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+        Object.defineProperty(m, k, { enumerable: true, configurable: true, writable: true });
+      }
+      m[k] = {
+        t: i < key.length - 1 && type === 2 ? 3 : type,
+        d: false,
+        i: 0,
+        c: {}
+      };
+    }
+  }
+  state = m[k];
+  if (state.t !== type && !(type === 1 && state.t === 3)) {
+    return null;
+  }
+  if (type === 2) {
+    if (!state.d) {
+      state.d = true;
+      t[k] = [];
+    }
+    t[k].push(t = {});
+    state.c[state.i++] = state = { t: 1, d: false, i: 0, c: {} };
+  }
+  if (state.d) {
+    return null;
+  }
+  state.d = true;
+  if (type === 1) {
+    t = hasOwn ? t[k] : t[k] = {};
+  } else if (type === 0 && hasOwn) {
+    return null;
+  }
+  return [k, t, state.c];
+}
+function parse(toml, { maxDepth = 1e3, integersAsBigInt } = {}) {
+  let ctx = { s: toml, p: 0, d: maxDepth };
+  let res = {};
+  let meta = {};
+  let tmp;
+  let tbl = res;
+  let m = meta;
+  skipVoid(ctx);
+  while (ctx.p < toml.length) {
+    if (toml.charCodeAt(ctx.p) === 91) {
+      let isTableArray = toml.charCodeAt(++ctx.p) === 91;
+      tmp = ctx.p += +isTableArray;
+      let k = parseKey(ctx, "]");
+      if (isTableArray) {
+        if (toml.charCodeAt(ctx.p - 1) !== 93) {
+          throw new TomlError("expected end of table declaration", {
+            toml,
+            ptr: ctx.p - 1
+          });
+        }
+        ctx.p++;
+      }
+      let p = peekTable(
+        k,
+        res,
+        meta,
+        isTableArray ? 2 : 1
+        /* Type.EXPLICIT */
+      );
+      if (!p) {
+        throw new TomlError("trying to redefine an already defined table or value", {
+          toml,
+          ptr: tmp
+        });
+      }
+      m = p[2];
+      tbl = p[1];
+    } else {
+      tmp = ctx.p;
+      let k = parseKey(ctx);
+      let p = peekTable(
+        k,
+        tbl,
+        m,
+        0
+        /* Type.DOTTED */
+      );
+      if (!p) {
+        throw new TomlError("trying to redefine an already defined table or value", {
+          toml,
+          ptr: tmp
+        });
+      }
+      p[1][p[0]] = extractValue(ctx, void 0, integersAsBigInt);
+    }
+    skipVoid(ctx, true);
+    if (ctx.p < toml.length && (tmp = toml.charCodeAt(ctx.p)) !== 10 && tmp !== 13) {
+      throw new TomlError("each key-value declaration must be followed by an end-of-line", {
+        toml,
+        ptr: ctx.p
+      });
+    }
+    skipVoid(ctx);
+  }
+  return res;
 }
 
 // node_modules/mthds/dist/protocol/exceptions.js
@@ -2303,9 +2888,13 @@ var InvalidLocalSourceError = class extends InputPreparationError {
   }
 };
 var InvalidInputValueError = class extends InputPreparationError {
-  constructor(message, options) {
+  inputName;
+  inputPath;
+  constructor(message, details, options) {
     super(message, options);
     this.name = "InvalidInputValueError";
+    this.inputName = details.inputName;
+    this.inputPath = details.inputPath;
   }
 };
 var UPLOAD_NOT_ALLOWED_KIND_WORDS = {
@@ -2895,151 +3484,6 @@ function sleep(ms, signal) {
   });
 }
 
-// src/method-source.ts
-function methodSourceToContents(mthds) {
-  if (!mthds) {
-    return [];
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(mthds);
-  } catch {
-    return rawBundle(mthds);
-  }
-  if (Array.isArray(parsed)) {
-    if (parsed.length === 0) {
-      return [];
-    }
-    if (parsed.every(isFileEntry)) {
-      return parsed.map((entry) => entry.content).filter(
-        (content) => typeof content === "string" && content.trim() !== ""
-      );
-    }
-  }
-  return rawBundle(mthds);
-}
-function rawBundle(mthds) {
-  return mthds.trim() === "" ? [] : [mthds];
-}
-function isFileEntry(entry) {
-  return typeof entry === "object" && entry !== null && "name" in entry && "content" in entry;
-}
-
-// src/version.ts
-var SDK_VERSION = "0.38.0";
-
-// src/user-agent.ts
-var SDK_TOKEN_NAME = "pipelex-sdk-js";
-var MAX_USER_AGENT_LENGTH = 512;
-var TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-var DETAIL_VALUE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+)?$/;
-var COMMENT_URL = /^[!-~]+$/;
-var COMMENT_BREAKERS = /[()\\;]/;
-function isToken(value) {
-  return TOKEN.test(value);
-}
-function isDetail(detail) {
-  const eq = detail.indexOf("=");
-  if (eq === -1) return isToken(detail);
-  return isToken(detail.slice(0, eq)) && DETAIL_VALUE.test(detail.slice(eq + 1));
-}
-function validateAppInfo(appInfo) {
-  if (typeof appInfo !== "object" || appInfo === null) {
-    throw new TypeError("appInfo must be an object with at least a `name`.");
-  }
-  if (typeof appInfo.name !== "string" || !isToken(appInfo.name)) {
-    throw new TypeError(
-      `appInfo.name ${JSON.stringify(appInfo.name)} is not an RFC 9110 token (letters, digits and !#$%&'*+-.^_\`|~ only, non-empty).`
-    );
-  }
-  if (appInfo.version !== void 0 && appInfo.version !== "") {
-    if (typeof appInfo.version !== "string" || !isToken(appInfo.version)) {
-      throw new TypeError(
-        `appInfo.version ${JSON.stringify(appInfo.version)} is not an RFC 9110 token.`
-      );
-    }
-  }
-  if (appInfo.url !== void 0 && appInfo.url !== "") {
-    if (typeof appInfo.url !== "string" || !COMMENT_URL.test(appInfo.url) || COMMENT_BREAKERS.test(appInfo.url)) {
-      throw new TypeError(
-        `appInfo.url ${JSON.stringify(appInfo.url)} cannot sit in a User-Agent comment (visible ASCII only, no whitespace, parentheses, backslash or semicolon).`
-      );
-    }
-  }
-  if (appInfo.details !== void 0) {
-    if (!Array.isArray(appInfo.details)) {
-      throw new TypeError("appInfo.details must be an array of strings.");
-    }
-    for (const detail of appInfo.details) {
-      if (typeof detail !== "string" || !isDetail(detail)) {
-        throw new TypeError(
-          `appInfo.details entry ${JSON.stringify(detail)} is neither a token nor token=value.`
-        );
-      }
-    }
-  }
-}
-function renderAppInfo(appInfo) {
-  let product = appInfo.name;
-  if (appInfo.version) product += `/${appInfo.version}`;
-  const params = [...appInfo.details ?? []];
-  if (appInfo.url) params.push(`+${appInfo.url}`);
-  return params.length > 0 ? `${product} (${params.join("; ")})` : product;
-}
-function detectRuntime(scope = globalThis) {
-  const win = scope["window"];
-  if (win !== void 0 && win !== null && win.document !== void 0 || typeof scope["importScripts"] === "function") {
-    return { kind: "browser" };
-  }
-  const deno = scope["Deno"];
-  if (deno?.version?.deno) {
-    return {
-      kind: "server",
-      name: "deno",
-      version: deno.version.deno,
-      os: deno.build?.os,
-      arch: deno.build?.arch
-    };
-  }
-  const proc = scope["process"];
-  const bun = proc?.versions?.["bun"];
-  if (bun) {
-    return { kind: "server", name: "bun", version: bun, os: proc.platform, arch: proc.arch };
-  }
-  const node = proc?.versions?.["node"];
-  if (node) {
-    return { kind: "server", name: "node", version: node, os: proc.platform, arch: proc.arch };
-  }
-  return { kind: "server" };
-}
-function renderRuntime(runtime) {
-  if (!runtime.name || !isToken(runtime.name)) return void 0;
-  if (!runtime.version || !isToken(runtime.version)) return void 0;
-  const token = `${runtime.name}/${runtime.version}`;
-  const platform = [runtime.os, runtime.arch].filter(
-    (part) => typeof part === "string" && isToken(part)
-  );
-  return platform.length > 0 ? `${token} (${platform.join("; ")})` : token;
-}
-function buildUserAgent(appInfo, runtime = detectRuntime()) {
-  if (appInfo !== void 0) validateAppInfo(appInfo);
-  const parts = [];
-  if (appInfo !== void 0) parts.push(renderAppInfo(appInfo));
-  parts.push(`${SDK_TOKEN_NAME}/${SDK_VERSION}`);
-  if (runtime.kind === "server") {
-    const runtimePart = renderRuntime(runtime);
-    if (runtimePart) parts.push(runtimePart);
-  }
-  const value = parts.join(" ");
-  if (value.length > MAX_USER_AGENT_LENGTH) {
-    throw new RangeError(
-      `The User-Agent built from appInfo is ${value.length} characters; the ceiling is ${MAX_USER_AGENT_LENGTH}. Shorten appInfo.details or appInfo.url.`
-    );
-  }
-  if (runtime.kind === "browser") return void 0;
-  return value;
-}
-
 // src/upload.ts
 var DEFAULT_CONTENT_TYPE = "application/octet-stream";
 var DEFAULT_FILENAME = "upload.bin";
@@ -3196,9 +3640,449 @@ function mapUploadError(error, filename) {
   });
 }
 
+// src/bundle-resources.ts
+function isResourceMap(resources) {
+  if (typeof resources !== "object" || resources === null) return false;
+  const prototype = Object.getPrototypeOf(resources);
+  return prototype === Object.prototype || prototype === null;
+}
+function hasBundleResources(resources) {
+  return isResourceMap(resources) && Object.keys(resources).length > 0;
+}
+var PYTHON_WHITESPACE = /* @__PURE__ */ new Set([
+  9,
+  10,
+  11,
+  12,
+  13,
+  28,
+  29,
+  30,
+  31,
+  32,
+  133,
+  160,
+  5760,
+  8192,
+  8193,
+  8194,
+  8195,
+  8196,
+  8197,
+  8198,
+  8199,
+  8200,
+  8201,
+  8202,
+  8232,
+  8233,
+  8239,
+  8287,
+  12288
+]);
+function isBlankForPython(path) {
+  for (const character of path) {
+    if (!PYTHON_WHITESPACE.has(character.codePointAt(0))) return false;
+  }
+  return true;
+}
+function bundleResourcePathRefusal(path) {
+  if (isBlankForPython(path)) return "it is empty";
+  if (path.includes("\\")) return "it holds a backslash; write the path with forward slashes";
+  if (path.includes(":")) return "it holds a colon";
+  if (path.includes("\0")) return "it holds a NUL character";
+  if (path.startsWith("/")) return "it is absolute; write it relative to the bundle";
+  const segments = pathSegments(path);
+  if (segments.includes("..")) return "it leaves the bundle through a '..' segment";
+  if (segments.length === 0) return "it names no file";
+  return void 0;
+}
+function canonicalBundleResourcePath(path) {
+  return pathSegments(path).join("/");
+}
+function pathSegments(path) {
+  return path.split("/").filter((segment) => segment !== "" && segment !== ".");
+}
+async function encodeBundleResources(resources) {
+  if (resources === void 0 || resources === null) return void 0;
+  if (!isResourceMap(resources)) {
+    throw new RequestArgumentError(
+      `resources must be a plain object mapping each file's path, as the step names it, to the file's bytes; got ${describeValue(resources)}.`
+    );
+  }
+  const entries = Object.entries(resources);
+  if (entries.length === 0) return void 0;
+  const pathByCanonical = /* @__PURE__ */ new Map();
+  for (const [path] of entries) {
+    const refusal = bundleResourcePathRefusal(path);
+    if (refusal !== void 0) {
+      throw new RequestArgumentError(
+        `resources key ${JSON.stringify(path)} cannot name a file inside the bundle: ${refusal}.`
+      );
+    }
+    const canonical = canonicalBundleResourcePath(path);
+    const first = pathByCanonical.get(canonical);
+    if (first !== void 0) {
+      throw new RequestArgumentError(
+        `resources keys ${JSON.stringify(first)} and ${JSON.stringify(path)} name the same file "${canonical}": send it once.`
+      );
+    }
+    pathByCanonical.set(canonical, path);
+  }
+  const wire = /* @__PURE__ */ Object.create(null);
+  for (const [path, value] of entries) {
+    wire[path] = bytesToBase64(await resourceBytes(path, value));
+  }
+  return wire;
+}
+async function resourceBytes(path, value) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return new Uint8Array(await value.arrayBuffer());
+  }
+  throw new RequestArgumentError(
+    `resources[${JSON.stringify(path)}] must be the file's bytes (a Uint8Array, an ArrayBuffer or a Blob); got ${describeValue(value)}.` + (typeof value === "string" ? " A string is read neither as a path nor as base64: read the file and pass its bytes." : "")
+  );
+}
+function describeValue(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  if (value instanceof Map) return "a Map; pass Object.fromEntries(map)";
+  if (typeof value === "string") return "a string";
+  if (typeof value === "object") {
+    const name = Object.getPrototypeOf(value)?.constructor?.name;
+    return typeof name === "string" && name !== "" ? `an instance of ${name}` : "an object";
+  }
+  return `a value of type ${typeof value}`;
+}
+
+// src/hooks/bundle-gather.ts
+var EXCLUDED_DIRS = /* @__PURE__ */ new Set([
+  "venv",
+  "env",
+  "virtualenv",
+  "__pycache__",
+  "node_modules",
+  "results"
+]);
+var DEFAULT_MAX_RESOURCE_FILES = 32;
+var DEFAULT_MAX_RESOURCE_FILE_BYTES = 5 * 1024 * 1024;
+var DEFAULT_MAX_RESOURCE_BYTES = 10 * 1024 * 1024;
+var DEFAULT_GATHER_CAPS = {
+  maxFiles: 50,
+  maxTotalBytes: 2 * 1024 * 1024,
+  maxResourceFiles: DEFAULT_MAX_RESOURCE_FILES,
+  maxResourceFileBytes: DEFAULT_MAX_RESOURCE_FILE_BYTES,
+  maxResourceBytes: DEFAULT_MAX_RESOURCE_BYTES
+};
+function walkMthdsFiles(dir, collected) {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name.startsWith(".") || EXCLUDED_DIRS.has(entry.name)) {
+      continue;
+    }
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkMthdsFiles(full, collected);
+    } else if (entry.isFile() && entry.name.endsWith(".mthds")) {
+      collected.push(full);
+    }
+  }
+}
+function gatherBundle(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
+  const editedAbs = resolve2(editedFilePath);
+  const parentDir = dirname(editedAbs);
+  const paths = [];
+  try {
+    walkMthdsFiles(parentDir, paths);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  const ordered = [editedAbs, ...paths.filter((path) => resolve2(path) !== editedAbs)];
+  if (ordered.length > caps.maxFiles) {
+    return { ok: false, reason: "overflow" };
+  }
+  let totalBytes = 0;
+  for (const path of ordered) {
+    try {
+      totalBytes += statSync(path).size;
+    } catch {
+      return { ok: false, reason: "unreadable" };
+    }
+  }
+  if (totalBytes > caps.maxTotalBytes) {
+    return { ok: false, reason: "overflow" };
+  }
+  const files = [];
+  for (const path of ordered) {
+    try {
+      files.push({ content: readFileSync(path, "utf-8"), uri: relative(parentDir, path) });
+    } catch {
+      return { ok: false, reason: "unreadable" };
+    }
+  }
+  const gathered = gatherTemplateFiles(parentDir, ordered, files, caps);
+  if (!gathered.ok) return gathered;
+  return { ok: true, files, resources: gathered.resources };
+}
+function templateFilesNamedBy(mthdsContent) {
+  let document;
+  try {
+    document = parse(mthdsContent);
+  } catch {
+    return [];
+  }
+  const pipes = isRecord(document) ? document["pipe"] : void 0;
+  if (!isRecord(pipes)) return [];
+  const named = [];
+  for (const pipe of Object.values(pipes)) {
+    if (isRecord(pipe) && pipe["type"] === "PipeDocGen" && typeof pipe["template_file"] === "string") {
+      named.push(pipe["template_file"]);
+    }
+  }
+  return named;
+}
+function gatherTemplateFiles(parentDir, paths, files, caps) {
+  const maxFiles = caps.maxResourceFiles ?? DEFAULT_MAX_RESOURCE_FILES;
+  const maxFileBytes = caps.maxResourceFileBytes ?? DEFAULT_MAX_RESOURCE_FILE_BYTES;
+  const maxBytes = caps.maxResourceBytes ?? DEFAULT_MAX_RESOURCE_BYTES;
+  let root;
+  try {
+    root = realpathSync(parentDir);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  const located = /* @__PURE__ */ new Map();
+  let fileCount = 0;
+  let totalBytes = 0;
+  for (const [index, mthdsPath] of paths.entries()) {
+    for (const named of templateFilesNamedBy(files[index].content)) {
+      if (bundleResourcePathRefusal(named) !== void 0) continue;
+      const key = canonicalBundleResourcePath(named);
+      const found = locateRegularFile(join(dirname(mthdsPath), key));
+      if (found !== null) {
+        if (!found.real.startsWith(root + sep)) return { ok: false, reason: "unreadable" };
+        if (found.size > maxFileBytes) return { ok: false, reason: "overflow" };
+      }
+      if (!located.has(key)) {
+        located.set(key, found);
+        if (found === null) continue;
+        fileCount += 1;
+        if (fileCount > maxFiles) return { ok: false, reason: "overflow" };
+        totalBytes += found.size;
+        if (totalBytes > maxBytes) return { ok: false, reason: "overflow" };
+        continue;
+      }
+      const known = located.get(key);
+      if (known === null || found === null) {
+        if (known !== found) return { ok: false, reason: "conflict" };
+        continue;
+      }
+      if (!sameFileContent(known, found)) return { ok: false, reason: "conflict" };
+    }
+  }
+  const resources = /* @__PURE__ */ Object.create(null);
+  let readBytes = 0;
+  for (const [key, found] of located) {
+    if (found === null) continue;
+    try {
+      const bytes = readFileSync(found.real);
+      readBytes += bytes.length;
+      if (bytes.length > maxFileBytes || readBytes > maxBytes) {
+        return { ok: false, reason: "overflow" };
+      }
+      resources[key] = bytes;
+    } catch {
+      return { ok: false, reason: "unreadable" };
+    }
+  }
+  return { ok: true, resources };
+}
+function locateRegularFile(path) {
+  try {
+    const real = realpathSync(path);
+    const stats = statSync(real);
+    return stats.isFile() ? { real, size: stats.size } : null;
+  } catch {
+    return null;
+  }
+}
+function sameFileContent(left, right) {
+  if (left.real === right.real) return true;
+  if (left.size !== right.size) return false;
+  try {
+    return Buffer.compare(readFileSync(left.real), readFileSync(right.real)) === 0;
+  } catch {
+    return false;
+  }
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// src/method-source.ts
+function methodSourceToContents(mthds) {
+  if (!mthds) {
+    return [];
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(mthds);
+  } catch {
+    return rawBundle(mthds);
+  }
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) {
+      return [];
+    }
+    if (parsed.every(isFileEntry)) {
+      return parsed.map((entry) => entry.content).filter(
+        (content) => typeof content === "string" && content.trim() !== ""
+      );
+    }
+  }
+  return rawBundle(mthds);
+}
+function rawBundle(mthds) {
+  return mthds.trim() === "" ? [] : [mthds];
+}
+function isFileEntry(entry) {
+  return typeof entry === "object" && entry !== null && "name" in entry && "content" in entry;
+}
+
+// src/version.ts
+var SDK_VERSION = "0.40.0";
+
+// src/user-agent.ts
+var SDK_TOKEN_NAME = "pipelex-sdk-js";
+var MAX_USER_AGENT_LENGTH = 512;
+var TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+var DETAIL_VALUE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+)?$/;
+var COMMENT_URL = /^[!-~]+$/;
+var COMMENT_BREAKERS = /[()\\;]/;
+function isToken(value) {
+  return TOKEN.test(value);
+}
+function isDetail(detail) {
+  const eq = detail.indexOf("=");
+  if (eq === -1) return isToken(detail);
+  return isToken(detail.slice(0, eq)) && DETAIL_VALUE.test(detail.slice(eq + 1));
+}
+function validateAppInfo(appInfo) {
+  if (typeof appInfo !== "object" || appInfo === null) {
+    throw new TypeError("appInfo must be an object with at least a `name`.");
+  }
+  if (typeof appInfo.name !== "string" || !isToken(appInfo.name)) {
+    throw new TypeError(
+      `appInfo.name ${JSON.stringify(appInfo.name)} is not an RFC 9110 token (letters, digits and !#$%&'*+-.^_\`|~ only, non-empty).`
+    );
+  }
+  if (appInfo.version !== void 0 && appInfo.version !== "") {
+    if (typeof appInfo.version !== "string" || !isToken(appInfo.version)) {
+      throw new TypeError(
+        `appInfo.version ${JSON.stringify(appInfo.version)} is not an RFC 9110 token.`
+      );
+    }
+  }
+  if (appInfo.url !== void 0 && appInfo.url !== "") {
+    if (typeof appInfo.url !== "string" || !COMMENT_URL.test(appInfo.url) || COMMENT_BREAKERS.test(appInfo.url)) {
+      throw new TypeError(
+        `appInfo.url ${JSON.stringify(appInfo.url)} cannot sit in a User-Agent comment (visible ASCII only, no whitespace, parentheses, backslash or semicolon).`
+      );
+    }
+  }
+  if (appInfo.details !== void 0) {
+    if (!Array.isArray(appInfo.details)) {
+      throw new TypeError("appInfo.details must be an array of strings.");
+    }
+    for (const detail of appInfo.details) {
+      if (typeof detail !== "string" || !isDetail(detail)) {
+        throw new TypeError(
+          `appInfo.details entry ${JSON.stringify(detail)} is neither a token nor token=value.`
+        );
+      }
+    }
+  }
+}
+function renderAppInfo(appInfo) {
+  let product = appInfo.name;
+  if (appInfo.version) product += `/${appInfo.version}`;
+  const params = [...appInfo.details ?? []];
+  if (appInfo.url) params.push(`+${appInfo.url}`);
+  return params.length > 0 ? `${product} (${params.join("; ")})` : product;
+}
+function detectRuntime(scope = globalThis) {
+  const win = scope["window"];
+  if (win !== void 0 && win !== null && win.document !== void 0 || typeof scope["importScripts"] === "function") {
+    return { kind: "browser" };
+  }
+  const deno = scope["Deno"];
+  if (deno?.version?.deno) {
+    return {
+      kind: "server",
+      name: "deno",
+      version: deno.version.deno,
+      os: deno.build?.os,
+      arch: deno.build?.arch
+    };
+  }
+  const proc = scope["process"];
+  const bun = proc?.versions?.["bun"];
+  if (bun) {
+    return { kind: "server", name: "bun", version: bun, os: proc.platform, arch: proc.arch };
+  }
+  const node = proc?.versions?.["node"];
+  if (node) {
+    return { kind: "server", name: "node", version: node, os: proc.platform, arch: proc.arch };
+  }
+  return { kind: "server" };
+}
+function renderRuntime(runtime) {
+  if (!runtime.name || !isToken(runtime.name)) return void 0;
+  if (!runtime.version || !isToken(runtime.version)) return void 0;
+  const token = `${runtime.name}/${runtime.version}`;
+  const platform = [runtime.os, runtime.arch].filter(
+    (part) => typeof part === "string" && isToken(part)
+  );
+  return platform.length > 0 ? `${token} (${platform.join("; ")})` : token;
+}
+function buildUserAgent(appInfo, runtime = detectRuntime()) {
+  if (appInfo !== void 0) validateAppInfo(appInfo);
+  const parts = [];
+  if (appInfo !== void 0) parts.push(renderAppInfo(appInfo));
+  parts.push(`${SDK_TOKEN_NAME}/${SDK_VERSION}`);
+  if (runtime.kind === "server") {
+    const runtimePart = renderRuntime(runtime);
+    if (runtimePart) parts.push(runtimePart);
+  }
+  const value = parts.join(" ");
+  if (value.length > MAX_USER_AGENT_LENGTH) {
+    throw new RangeError(
+      `The User-Agent built from appInfo is ${value.length} characters; the ceiling is ${MAX_USER_AGENT_LENGTH}. Shorten appInfo.details or appInfo.url.`
+    );
+  }
+  if (runtime.kind === "browser") return void 0;
+  return value;
+}
+
 // src/prepare-inputs.ts
 var PIPELEX_STORAGE_SCHEME = "pipelex-storage://";
 var HTTP_URL_RE = /^https?:\/\//i;
+var WALKED_KINDS = {
+  text: true,
+  prose: true,
+  date: true,
+  number: true,
+  boolean: true,
+  enum: true,
+  document: true,
+  image: true,
+  object: true,
+  list: true,
+  unknown: true
+};
+var KNOWN_KINDS = new Set(Object.keys(WALKED_KINDS));
 var PIPE_SELECTION_ERROR_TYPES = /* @__PURE__ */ new Set([
   "EntryPipeNotFoundError",
   "EntryPipeAmbiguousError"
@@ -3219,12 +4103,13 @@ function isExplicitEnvelope(value) {
   const keys = Object.keys(value);
   return keys.length === 2 && "concept" in value && "content" in value;
 }
-function decodeDataUrl(dataUrl) {
+function invalidValueAt(at, message, options) {
+  return new InvalidInputValueError(message, { inputName: at.name, inputPath: at.path }, options);
+}
+function decodeDataUrl(dataUrl, at) {
   const comma = dataUrl.indexOf(",");
   if (comma < 0) {
-    throw new InvalidInputValueError(
-      `Malformed data URL (no comma separator): ${dataUrl.slice(0, 32)}\u2026`
-    );
+    throw invalidValueAt(at, `Input "${at.path}" holds a malformed data URL (no comma separator).`);
   }
   const header = dataUrl.slice(5, comma);
   const payload = dataUrl.slice(comma + 1);
@@ -3237,8 +4122,9 @@ function decodeDataUrl(dataUrl) {
     const text = decodeURIComponent(payload);
     return { bytes: new TextEncoder().encode(text), contentType };
   } catch (cause) {
-    throw new InvalidInputValueError(
-      `Malformed data URL payload (${isBase64 ? "invalid base64" : "invalid percent-encoding"}): ${dataUrl.slice(0, 32)}\u2026`,
+    throw invalidValueAt(
+      at,
+      `Input "${at.path}" holds a malformed data URL (${isBase64 ? "invalid base64" : "invalid percent-encoding"}).`,
       { cause }
     );
   }
@@ -3262,20 +4148,20 @@ function classifySource(source) {
   }
   return { kind: "unsupported", value: source };
 }
-function resolveSource(ctx, source) {
+function resolveSource(ctx, source, at) {
   const cached = ctx.dedup.get(source.value);
   if (cached !== void 0) return cached;
-  const pending = doResolveSource(ctx, source);
+  const pending = doResolveSource(ctx, source, at);
   ctx.dedup.set(source.value, pending);
   return pending;
 }
-async function doResolveSource(ctx, source) {
+async function doResolveSource(ctx, source, at) {
   switch (source.kind) {
     case "reference":
       return source.value;
     // already prepared, or a reachable URL — pass through
     case "data_url": {
-      const { bytes, contentType } = decodeDataUrl(source.value);
+      const { bytes, contentType } = decodeDataUrl(source.value, at);
       throwIfAborted(ctx.signal);
       const record = await uploadFile(ctx.client, bytes, { contentType, signal: ctx.signal });
       ctx.uploads.push(record);
@@ -3288,23 +4174,36 @@ async function doResolveSource(ctx, source) {
       ctx.uploads.push(record);
       return record.uri;
     }
-    case "unsupported":
-      throw new InvalidInputValueError(
-        `Unsupported value at a file input: expected a path string, bytes (Blob/File/ArrayBuffer/Uint8Array), a data URL, an http(s)/pipelex-storage:// URL, or canonical {url} content; got ${typeof source.value}.`
-      );
   }
 }
+function describeUnsupported(value) {
+  if (value === null) return "null";
+  if (value === void 0) return "undefined";
+  if (Array.isArray(value)) return "an array";
+  if (isPlainObject2(value)) return "url" in value ? "{url} content" : 'an object with no "url" key';
+  if (typeof value === "object") return "an object that is neither bytes nor {url} content";
+  return `a ${typeof value}`;
+}
+var FILE_FORMS_WITH_UPLOADS = ": pass a local path, bytes (a Blob, File, ArrayBuffer or Uint8Array), a data: URL, an http(s) URL or a pipelex-storage:// reference, bare or as the url of {url} content.";
+var FILE_FORMS_WITHOUT_UPLOADS = ", and this preparation uploads nothing: pass an http(s) URL or a pipelex-storage:// reference instead.";
 async function resolveFilePosition(ctx, callerValue, at) {
   const fileContent = isFileContent(callerValue);
   const source = classifySource(fileContent ? callerValue.url : callerValue);
-  if (!ctx.allowUploads && source.kind !== "reference" && source.kind !== "unsupported") {
+  if (source.kind === "unsupported") {
+    const unsupported = describeUnsupported(source.value);
+    throw invalidValueAt(
+      at,
+      `Input "${at.path}" holds ${fileContent ? `{url} content whose url is ${unsupported}` : unsupported}, which no file input takes` + (ctx.allowUploads ? FILE_FORMS_WITH_UPLOADS : FILE_FORMS_WITHOUT_UPLOADS)
+    );
+  }
+  if (!ctx.allowUploads && source.kind !== "reference") {
     throw new UploadNotAllowedError({
       inputName: at.name,
       inputPath: at.path,
       valueKind: source.kind
     });
   }
-  const resolved = await resolveSource(ctx, source);
+  const resolved = await resolveSource(ctx, source, at);
   return fileContent ? { ...callerValue, url: resolved } : { url: resolved };
 }
 async function resolveNode(ctx, node, callerValue, at) {
@@ -3333,15 +4232,33 @@ async function resolveNode(ctx, node, callerValue, at) {
         )
       );
     }
-    default:
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum":
+    case "unknown":
       return callerValue;
+    default: {
+      const unwalked = node;
+      throw new InputPreparationError(
+        `Cannot prepare inputs: the walk has no arm for the kind ${described(unwalked.kind)}.`,
+        { verdict: { errorDomain: "runtime", retryable: false } }
+      );
+    }
   }
+}
+function isEmptyResourceMap(resources) {
+  return isResourceMap(resources) && !hasBundleResources(resources);
 }
 function resolveSelector(request) {
   const raw = request;
   const files = Array.isArray(raw["files"]) && raw["files"].length > 0 ? raw["files"] : void 0;
   const methodRef = nonEmptyString(raw["method_ref"]);
   const methodId = nonEmptyString(raw["method_id"]);
+  const rawResources = raw["resources"];
+  const resources = rawResources === void 0 || rawResources === null ? void 0 : rawResources;
   const given = [];
   if (files !== void 0) given.push("`files`");
   if (methodRef !== void 0) given.push("`method_ref`");
@@ -3356,7 +4273,12 @@ function resolveSelector(request) {
       `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 \`files\`, \`method_ref\` or \`method_id\`.`
     );
   }
-  if (files !== void 0) return { files };
+  if (files !== void 0) return resources === void 0 ? { files } : { files, resources };
+  if (resources !== void 0 && !isEmptyResourceMap(resources)) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`resources\` accompany inline \`files\`; a ${methodRef !== void 0 ? "published" : "stored"} method's files are its own.`
+    );
+  }
   if (methodRef !== void 0) return { method_ref: methodRef };
   return { method_id: methodId };
 }
@@ -3423,13 +4345,82 @@ function selectedDescriptor(report) {
   const pipeRef = nonEmptyString(report.pipe_ref);
   const inputForm = report.input_form;
   if (pipeRef === void 0 || !isPlainObject2(inputForm) || !Object.hasOwn(inputForm, pipeRef)) {
-    const described = isPlainObject2(inputForm) ? Object.keys(inputForm).join(", ") || "none" : "none";
+    const describedPipes = isPlainObject2(inputForm) ? Object.keys(inputForm).join(", ") || "none" : "none";
     throw new InputPreparationError(
-      `Cannot prepare inputs: the pipe I/O answer selected ${pipeRef === void 0 ? "no pipe" : `"${pipeRef}"`}, but its \`input_form\` does not describe it (it describes: ${described}).`,
+      `Cannot prepare inputs: the pipe I/O answer selected ${pipeRef === void 0 ? "no pipe" : `"${pipeRef}"`}, but its \`input_form\` does not describe it (it describes: ${describedPipes}).`,
       { verdict: { errorDomain: "runtime", retryable: false } }
     );
   }
-  return inputForm[pipeRef];
+  return checkedDescriptor(pipeRef, inputForm[pipeRef]);
+}
+function checkedDescriptor(pipeRef, entry) {
+  const found = inputFormFault(entry);
+  if (found !== void 0) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: the pipe I/O answer's \`input_form\` for "${pipeRef}" is ${found.message}.`,
+      { verdict: { errorDomain: "runtime", retryable: false } }
+    );
+  }
+  return entry;
+}
+function inputFormFault(entry) {
+  if (!isPlainObject2(entry)) {
+    return fault("", `expected an object with a list of fields, got ${described(entry)}`);
+  }
+  return fieldsFault(entry.fields, "fields");
+}
+function fault(path, problem) {
+  return {
+    path,
+    problem,
+    message: `malformed${path === "" ? "" : ` at ${path}`}: ${problem}`
+  };
+}
+function fieldsFault(fields, path) {
+  if (!Array.isArray(fields)) {
+    return fault(path, `expected a list of fields, got ${described(fields)}`);
+  }
+  for (const [index, field] of fields.entries()) {
+    const at = `${path}[${index}]`;
+    if (!isPlainObject2(field)) {
+      return fault(at, `expected a field with a string name and kind, got ${described(field)}`);
+    }
+    if (typeof field.name !== "string") {
+      return fault(`${at}.name`, `expected a string, got ${described(field.name)}`);
+    }
+    const found = nodeFault(field, at);
+    if (found !== void 0) return found;
+  }
+  return void 0;
+}
+function nodeFault(node, path) {
+  if (!isPlainObject2(node)) {
+    return fault(path, `expected a node with a string kind, got ${described(node)}`);
+  }
+  const kind = node.kind;
+  if (typeof kind !== "string") {
+    return fault(`${path}.kind`, `expected a string, got ${described(kind)}`);
+  }
+  if (!KNOWN_KINDS.has(kind)) {
+    return fault(
+      `${path}.kind`,
+      `${described(kind)} is not a kind this version of @pipelex/sdk knows (${[...KNOWN_KINDS].join(", ")}); a newer API may need a newer SDK`
+    );
+  }
+  if (kind === "object") return fieldsFault(node.fields, `${path}.fields`);
+  if (kind === "list") return nodeFault(node.item, `${path}.item`);
+  return void 0;
+}
+function described(value) {
+  if (value === null) return "null";
+  if (value === void 0) return "nothing";
+  if (typeof value === "string") {
+    return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}\u2026` : value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return "a list";
+  if (isPlainObject2(value)) return "an object";
+  return typeof value;
 }
 async function prepareInputs(client, request) {
   const selector = resolveSelector(request);
@@ -4789,6 +5780,8 @@ var PipelexApiClient = class {
     assertRunSourcesExclusive(options);
     assertMethodRefPairsWithNothing(options);
     assertLinkageMethodIdIsBare(options);
+    assertResourcesAccompanyABundle(options);
+    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
     const request = {
       pipe_code: options.pipe_code,
       mthds_contents: options.mthds_contents,
@@ -4798,6 +5791,7 @@ var PipelexApiClient = class {
       dynamic_output_concept_ref: options.dynamic_output_concept_ref,
       files: nonEmptyFiles(options.files),
       bundle_b64: nonEmptyString2(options.bundle_b64),
+      resources,
       ...api,
       ...hosted,
       ...extensions
@@ -4863,6 +5857,8 @@ var PipelexApiClient = class {
     assertRunSourcesExclusive(options);
     assertMethodRefPairsWithNothing(options);
     assertLinkageMethodIdIsBare(options);
+    assertResourcesAccompanyABundle(options);
+    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
     const request = {
       pipe_code: options.pipe_code ?? void 0,
       mthds_contents: options.mthds_contents ?? void 0,
@@ -4872,12 +5868,13 @@ var PipelexApiClient = class {
       dynamic_output_concept_ref: options.dynamic_output_concept_ref ?? void 0,
       files: nonEmptyFiles(options.files),
       bundle_b64: nonEmptyString2(options.bundle_b64),
+      resources,
       ...api,
       ...hosted,
       ...extensions
     };
     const url = this.url("start");
-    const needsLongCeiling = hasBundlePayload(options) || (options.mthds_contents?.length ?? 0) > 0 || nonEmptyString2(options.method_ref) !== void 0;
+    const needsLongCeiling = hasBundlePayload(options) || (options.mthds_contents?.length ?? 0) > 0 || resources !== void 0 || nonEmptyString2(options.method_ref) !== void 0;
     const res = await this.requestRaw("POST", url, {
       body: request,
       timeoutMs: needsLongCeiling ? DEFAULT_REQUEST_TIMEOUT_MS : POLL_REQUEST_TIMEOUT_MS,
@@ -4959,6 +5956,15 @@ var PipelexApiClient = class {
    * the field regardless — which is why `PipelexValidationReport.input_form` is typed
    * optional rather than required.
    *
+   * `options.resources` sends the files the bundle's steps read, such as a
+   * `PipeDocGen` step's `template_file`, keyed by the path the step names, each as
+   * its bytes (see {@link ValidateOptions}). A step whose template file was not sent
+   * is an `is_valid: false` verdict saying so, and a template check's findings in an
+   * office template file ride the valid arm's `warnings`. A key no step names, or
+   * files over the server's limits, are no-verdict refusals: a `422`
+   * `BundleResourceNotNamedError`, a `413` `PayloadTooLarge` or
+   * `BundleResourcesTooLargeError`.
+   *
    * A `{ method_ref }` source makes the server clone a repository before it
    * validates anything, and it needs no special budget here: this route already
    * defaults to the 20-minute execute ceiling, which clears the internal
@@ -4994,12 +6000,21 @@ var PipelexApiClient = class {
           "mthds_sources labels inline mthds_contents; a method_ref / method_id validation gets its source labels from the package's (or the stored method's) real file names."
         );
       }
+      if (methodRef !== void 0 && hasBundleResources(options.resources)) {
+        throw new RequestArgumentError(
+          "resources accompany inline mthds_contents; a method_ref's files are the package's own."
+        );
+      }
       if (methodRef !== void 0) body.method_ref = methodRef;
       if (methodId !== void 0) body.method_id = methodId;
     }
     body.render = withValidateMarkdownRender(render);
     if (views !== void 0) {
       body.views = views;
+    }
+    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
+    if (resources !== void 0) {
+      body.resources = resources;
     }
     const res = await this.requestRaw("POST", this.url("validate"), {
       body,
@@ -5035,6 +6050,7 @@ var PipelexApiClient = class {
       options.render,
       options.views,
       {
+        resources: options.resources,
         timeoutMs: options.timeoutMs,
         signal: options.signal
       }
@@ -5110,10 +6126,11 @@ var PipelexApiClient = class {
    * never on a message.
    *
    * All of these are static and inference-free, so they default to the management-call
-   * timeout. The one internal raise is the fetch-sized budget `crateRequestTimeoutMs`
-   * gives a crate route whose closure is a `method_ref`, because the server may clone a
-   * repository before it answers; it is matched to what the server does, not a
-   * caller-facing parameter.
+   * timeout. The internal raises are `crateRequestTimeoutMs`'s: the fetch-sized budget a
+   * crate route gets when its closure is a `method_ref`, because the server may clone a
+   * repository before it answers, and the execute ceiling it gets when the request
+   * carries `resources`, whose upload alone can outlast the default. Each is matched to
+   * what the request costs, not a caller-facing parameter.
    *
    * **These routes deliberately expose no `timeoutMs` / `signal`, and that is not an
    * oversight to be "fixed" per route.** Automated reviewers have proposed adding them
@@ -5124,8 +6141,11 @@ var PipelexApiClient = class {
    *    ceiling and takes caller transport options; every extension route rides the
    *    static core. Giving one static route an override while its siblings lack one is
    *    the inconsistency.
-   * 2. The input is **bounded server-side** — the runner's `pipelex_api/limits.py` caps a request
-   *    at 16 `.mthds` files of 1 MiB each — and none of these routes runs inference.
+   * 2. The input is **bounded server-side** — the runner's `pipelex_api/limits.py` caps the
+   *    `.mthds` files of a request and the files sent with them in `resources`, each by a
+   *    count, a size per file and, for `resources`, a total, all configurable per
+   *    deployment — and none of these routes runs inference. The upload those limits allow
+   *    is what `crateRequestTimeoutMs` budgets for, not the server's work.
    * 3. On the hosted path an override would be **inert**: the gateway caps responses at
    *    ~30s (see `POLL_REQUEST_TIMEOUT_MS` above), so raising `timeoutMs` would still be
    *    cut off upstream, just with a less honest error.
@@ -5247,7 +6267,7 @@ var PipelexApiClient = class {
    * see {@link PipelexHostedToolingExtensions}).
    */
   async resolve(request) {
-    return this.requestExtension("resolve", request, {
+    return this.requestExtension("resolve", await wireCrateRequest(request), {
       timeoutMs: crateRequestTimeoutMs(request)
     });
   }
@@ -5267,7 +6287,7 @@ var PipelexApiClient = class {
    * a malformed selector is a 422; a registry-form `method_ref` is a `501`.
    */
   async codegen(request) {
-    return this.requestExtension("codegen", request, {
+    return this.requestExtension("codegen", await wireCrateRequest(request), {
       timeoutMs: crateRequestTimeoutMs(request)
     });
   }
@@ -5287,8 +6307,14 @@ var PipelexApiClient = class {
    * describes every pipe instead, and never refuses for want of an entry pipe.
    * `include_files: true` echoes the resolved closure's `.mthds` files as `files`.
    *
+   * Beside inline `files`, `resources` sends the files the closure's steps read, such as a
+   * `PipeDocGen` step's `template_file`, keyed by the path the step names, each as its bytes;
+   * a step whose template file was not sent makes the closure invalid. `resolve` and `codegen`
+   * take it too (see {@link CrateRequestBase}).
+   *
    * Same 200-verdict discipline and same three-form closure selector as {@link resolve}
-   * (the request is posted verbatim, and the selector XOR is the server's to enforce).
+   * (the request is posted as given, its `resources` encoded to base64, and the selector XOR
+   * and the `resources` pairing are the server's to enforce).
    * Only a no-verdict condition throws `ApiResponseError`: a malformed selector and an
    * over-limit file are `ValidationError` `422`s; a selection the route refuses is a
    * `422` whose `errorType` is `EntryPipeNotFoundError` (an unknown `pipe_ref`, no entry
@@ -5296,13 +6322,14 @@ var PipelexApiClient = class {
    * candidates in its `serverMessage`; a registry-form `method_ref` is a `501`; a pipe
    * whose artifacts cannot be derived is a `500`.
    *
-   * A `method_ref` gets the fetch-sized budget, as on the other crate routes. On the
-   * hosted API the gateway caps a request at about 30 seconds whatever the client
-   * allows, so a cold `method_ref` clone can answer a `502` that a retry clears once the
-   * runner has cached the clone.
+   * A `method_ref` gets the fetch-sized budget, as on the other crate routes, and a
+   * request carrying `resources` the execute ceiling, since their upload alone can
+   * outlast the default. On the hosted API the gateway caps a request at about 30
+   * seconds whatever the client allows, so a cold `method_ref` clone can answer a `502`
+   * that a retry clears once the runner has cached the clone.
    */
   async pipeIo(request) {
-    return this.requestExtension("pipe-io", request, {
+    return this.requestExtension("pipe-io", await wireCrateRequest(request), {
       timeoutMs: crateRequestTimeoutMs(request)
     });
   }
@@ -5957,7 +6984,8 @@ var PipelexApiClient = class {
    * Name the method exactly one of three ways, all server-resolved through the
    * one `pipeIo` call this composes:
    *
-   * - `files` — the inline MTHDS closure;
+   * - `files` — the inline MTHDS closure, with the `resources` its steps read
+   *   (a `PipeDocGen` step's `template_file`), keyed by the path a step names;
    * - `method_ref` — a published method's address, fetched by the runner;
    * - `method_id` — a stored method's catalog id, resolved by the platform
    *   (hosted only; requires an API key).
@@ -5968,8 +6996,11 @@ var PipelexApiClient = class {
    * position is a fact of the method, never a guess from the value's shape. It
    * needs an API serving `POST /v1/pipe-io`. See `docs/input-preparation.md`.
    *
-   * With `allowUploads: false` it uploads nothing and reads no file: a value that
-   * would need an upload throws `UploadNotAllowedError`, naming the input.
+   * A value at a file input that cannot be a file, such as a number or a
+   * `data:` URL that does not decode, throws `InvalidInputValueError`, naming the
+   * input. With `allowUploads: false` it uploads nothing and reads no file: a
+   * value that would need an upload throws `UploadNotAllowedError`, naming the
+   * input too.
    */
   async prepareInputs(request) {
     return prepareInputs(this, request);
@@ -6085,6 +7116,8 @@ var PipelexApiClient = class {
       // this path runs the same method as the durable one, or it runs nothing.
       files: options.files ?? void 0,
       bundle_b64: options.bundle_b64 ?? void 0,
+      // And so must the files its steps read, or the same method fails to load here.
+      resources: options.resources ?? void 0,
       method_ref: options.method_ref ?? void 0,
       method_id: options.method_id ?? void 0,
       extra: options.extra ?? void 0
@@ -6134,7 +7167,7 @@ var PROTOCOL_REQUEST_KEYS = [
   "files",
   "bundle_b64"
 ];
-var PIPELEX_API_REQUEST_KEYS = ["method_ref"];
+var PIPELEX_API_REQUEST_KEYS = ["method_ref", "resources"];
 var HOSTED_REQUEST_KEYS = ["method_id"];
 var RESERVED_EXTRA_KEYS = /* @__PURE__ */ new Set([
   ...PROTOCOL_REQUEST_KEYS,
@@ -6160,6 +7193,7 @@ function buildExtensions(extra) {
 }
 var METHOD_REF_FETCH_TIMEOUT_MS = 18e4;
 function crateRequestTimeoutMs(request) {
+  if (hasBundleResources(request.resources)) return DEFAULT_REQUEST_TIMEOUT_MS;
   return nonEmptyString2(request.method_ref) !== void 0 ? METHOD_REF_FETCH_TIMEOUT_MS : void 0;
 }
 function buildApiRunExtensions(options) {
@@ -6206,6 +7240,28 @@ function assertLinkageMethodIdIsBare(options) {
   throw new RequestArgumentError(
     `method_id "${methodId}" beside an inline source is run-history linkage and must be a bare catalog id: the inline source is what runs, so a version suffix would claim a version that did not. Send the bare id (parseMethodSelector(...).method_id), or drop the inline source to run the version the selector names.`
   );
+}
+function assertResourcesAccompanyABundle(options) {
+  if (!hasBundleResources(options.resources)) return;
+  if (nonEmptyString2(options.method_ref) !== void 0) {
+    throw new RequestArgumentError(
+      "resources accompany inline mthds_contents or a method bundle; a method_ref's files are the package's own."
+    );
+  }
+  const hasInlineSource = options.mthds_contents != null && options.mthds_contents.length > 0 || hasBundlePayload(options);
+  if (!hasInlineSource && nonEmptyString2(options.method_id) === void 0) {
+    throw new RequestArgumentError(
+      "resources accompany the bundle whose steps read them: send them with mthds_contents or a method bundle."
+    );
+  }
+}
+async function wireCrateRequest(request) {
+  if (typeof request !== "object" || request === null || !("resources" in request)) {
+    return request;
+  }
+  const { resources, ...rest } = request;
+  const encoded = await encodeBundleResources(resources);
+  return encoded === void 0 ? rest : { ...rest, resources: encoded };
 }
 function nonEmptyFiles(files) {
   return files != null && Object.keys(files).length > 0 ? files : void 0;
@@ -6449,6 +7505,7 @@ async function runValidateStage(filePath) {
     const client = createHookClient();
     const result = await client.validateFiles(gathered.files, {
       allowSignatures: true,
+      resources: gathered.resources,
       timeoutMs: VALIDATE_TIMEOUT_MS
     });
     if (result.is_valid === true) {

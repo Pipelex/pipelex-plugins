@@ -1122,6 +1122,138 @@ class TestPipelexIntegrateSkill:
         typescript_paths = [line.strip().split(" — ")[0] for line in typescript.stderr.splitlines() if line.strip().startswith("stale-source: ")]
         assert python_paths == typescript_paths, f"python: {python.stderr}\ntypescript: {typescript.stderr}"
 
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_a_bundles_template_files_are_passed_sent_and_recorded(self, target_name: str) -> None:
+        """A bundle sent as content loads only with the template files its `PipeDocGen` steps name, so the skill
+        passes them to the workshop and the TypeScript call site sends them as `resources`. `@pipelex/sdk` exports
+        nothing that reads the steps, so the call site's map is written from the sidecar's `templates`, which the
+        drift gate hashes and refresh rewrites: a map written once went stale on the first renamed `template_file`
+        and failed every run behind a green gate. `pipelex-sdk` sends no template file yet, so a Python target over
+        such a bundle stops rather than ship a module whose every call fails."""
+        body = self.render(target_name)
+        file_set = self.the_line(body, "- **Local files**:")
+        assert "is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name." in file_set
+        assert "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**." in file_set
+        assert "**the root `.mthds` file first**, as nothing above its directory is read" in file_set
+        assert "with the template files its steps name, or running the recorded selector." in self.the_line(body, "One module per method")
+        assert '  "templates": {}\n}' in body
+        sidecar_rule = '`templates` maps each step\'s `template_file` to its file\'s `{ "path", "sha256" }`, `{}` for none'
+        assert f"{sidecar_rule}; the call site's map is written from it." in body
+        stop = self.the_line(body, "| a Python target over a bundle naming template files |")
+        assert "STOP, nothing generated, as [python.md](references/python.md) says" in stop
+
+        typescript = self.reference("typescript.md")
+        assert "**A bundle whose `PipeDocGen` steps name template files sends them with every run.**" in typescript
+        assert "**Write the map from the sidecar's `templates`, entry for entry**" in typescript
+        assert "`@pipelex/sdk` exports nothing that reads the steps" in typescript
+        assert "resources: await readTemplates()," in typescript
+        assert "refresh rewrites the map from the steps before it rewrites the sidecar" in typescript
+        python = self.reference("python.md")
+        stop_paragraph = self.the_line(python, "**A bundle whose `PipeDocGen` steps name template files stops the integration**")
+        assert python.index(stop_paragraph) < python.index("## Detecting the project"), "the stop is read at step 1, before anything else"
+        assert "generate nothing and write no module" in stop_paragraph
+        assert "On a refresh, regenerate nothing either" in stop_paragraph
+
+        refresh = self.reference("refresh.md")
+        cells = self.refresh_cells(refresh)
+        assert "passed with the template files its `PipeDocGen` steps name" in cells["taken from disk"]
+        assert "**the template map re-derived from those steps**" in cells["taken from disk"]
+        assert "the template files' hashes against the sidecar's `templates`" in cells["re-checked"]
+        trigger = self.the_line(
+            refresh, "**A TypeScript call site's `TEMPLATE_FILES` is rewritten whenever it differs from the re-derived template map**"
+        )
+        assert "gains the map, `readTemplates` and the `resources` argument" in trigger
+        assert "with `templates` recording the template map it derived, `{}` for none." in refresh
+
+    TEMPLATE_KEY = "templates/notice.html"
+    TEMPLATE_PATH = "methods/summarize/templates/notice.html"
+
+    @pytest.mark.parametrize(
+        ("change", "expected_lines"),
+        [
+            pytest.param("record the template", (), id="current"),
+            pytest.param(
+                "edit the recorded template",
+                ("stale-source: methods/summarize/templates/notice.html — template file edited since the call site was written",),
+                id="template-edited",
+            ),
+            pytest.param(
+                "remove the recorded template",
+                ("stale-source: methods/summarize/templates/notice.html — recorded as a template file but no longer on disk",),
+                id="template-gone",
+            ),
+            pytest.param(
+                "record templates as a list",
+                ("stale-source: sources.json — `templates` is not an object, so staleness cannot be ruled out",),
+                id="templates-not-an-object",
+            ),
+            pytest.param(
+                "record a template entry as a bare hash",
+                (
+                    "stale-source: sources.json — the `templates` entry for templates/notice.html is not a { path, sha256 } object, "
+                    "so staleness cannot be ruled out",
+                ),
+                id="entry-malformed",
+            ),
+            pytest.param(
+                "name a template in a sidecar written before templates were recorded",
+                (
+                    "stale-source: methods/summarize/main.mthds — names a `template_file`, and sources.json records no `templates`, "
+                    "so the call site may not send it",
+                ),
+                id="no-templates-recorded",
+            ),
+            pytest.param("record no template for a bundle naming none", (), id="current-none"),
+        ],
+    )
+    def test_both_gates_check_the_template_files_the_call_site_sends(self, change: str, expected_lines: tuple[str, ...], tmp_path: Path) -> None:
+        """The TypeScript call site sends the template files its map lists, written from the sidecar's `templates`,
+        so a template moved, removed or edited since then is as stale as an edited `.mthds` file, and both gates
+        hash each recorded one. A renamed `template_file` edits a `.mthds` file the sources already hash. A sidecar
+        written before the skill recorded `templates` says nothing of them, so a bundle naming a `template_file`
+        there fails too, which is what sends a call site that sends no template to refresh."""
+        tree = self.write_python_project(tmp_path)
+        bundle = tmp_path / "methods" / "summarize"
+        template = tmp_path / self.TEMPLATE_PATH
+        template.parent.mkdir(parents=True)
+        template.write_text("<h1>$notice.title</h1>\n", encoding="utf-8")
+        recorded = {self.TEMPLATE_KEY: {"path": self.TEMPLATE_PATH, "sha256": hashlib.sha256(template.read_bytes()).hexdigest()}}
+        match change:
+            case "record the template":
+                self.record_in_sidecar(tree, templates=recorded)
+            case "edit the recorded template":
+                self.record_in_sidecar(tree, templates=recorded)
+                template.write_text("<h1>$notice.title, edited</h1>\n", encoding="utf-8")
+            case "remove the recorded template":
+                self.record_in_sidecar(tree, templates=recorded)
+                template.unlink()
+            case "record templates as a list":
+                self.record_in_sidecar(tree, templates=[recorded])
+            case "record a template entry as a bare hash":
+                self.record_in_sidecar(tree, templates={self.TEMPLATE_KEY: recorded[self.TEMPLATE_KEY]["sha256"]})
+            case "name a template in a sidecar written before templates were recorded":
+                main = bundle / "main.mthds"
+                main.write_text(
+                    f'domain = "summarize"\n\n[pipe.print_notice]\ntype = "PipeDocGen"\ntemplate_file = "{self.TEMPLATE_KEY}"\n', encoding="utf-8"
+                )
+                self.record_in_sidecar(tree, sources={"methods/summarize/main.mthds": hashlib.sha256(main.read_bytes()).hexdigest()})
+            case "record no template for a bundle naming none":
+                self.record_in_sidecar(tree, templates={})
+            case _:
+                pytest.fail(f"unknown change {change!r}")
+
+        python = self.run_python_gate(tmp_path, "generated/summarize")
+        typescript = self.run_typescript_gate(tmp_path, "generated/summarize", sdk_index=self.STUB_SDK_THAT_CAN_CRASH)
+        for name, result in (("python", python), ("typescript", typescript)):
+            reported = [line.strip() for line in result.stderr.splitlines() if line.strip().startswith("stale-source: ")]
+            if not expected_lines:
+                assert result.returncode == 0, f"{name}: {self.explain(result)}"
+                assert reported == [], f"{name}: {self.explain(result)}"
+                continue
+            assert result.returncode == 1, f"{name}: {self.explain(result)}"
+            assert reported == list(expected_lines), f"{name}: {self.explain(result)}"
+            assert result.stdout.endswith("codegen-check: drift\n"), f"{name}: {self.explain(result)}"
+
     def test_the_sidecar_records_the_bundle_directory_and_every_reader_uses_it(self) -> None:
         """The gates can list the bundle only because step 7 records its directory, and the gates are not the only
         readers the fix had to reach. Refresh mode took its file set from `method.files`, so it regenerated from the
@@ -1445,11 +1577,15 @@ class TestPipelexIntegrateSkill:
         assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
+        # The one exception is the template files' own minimum, the release that sends `resources`, which only a
+        # bundle whose `PipeDocGen` steps name a template file needs, and which the reference raises to there.
         regions: dict[str, str] = {}
         typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
+        template_minimum = "`resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it."
+        assert typescript.count(template_minimum) == 1, "the template files' SDK minimum is stated once"
         for index_line, line in enumerate(typescript.splitlines()):
-            if "@pipelex/sdk" in line and self.VERSION.search(line):
-                regions[f"typescript.md line {index_line + 1}"] = line
+            if "@pipelex/sdk" in line and self.VERSION.search(line.replace(template_minimum, "")):
+                regions[f"typescript.md line {index_line + 1}"] = line.replace(template_minimum, "")
         assert len(regions) >= 2, "typescript.md should name the floor in its header and its offline gate section"
         for where, text in regions.items():
             assert set(self.VERSION.findall(text)) == {self.TYPESCRIPT_SDK_FLOOR}, f"{where} names {self.VERSION.findall(text)}"

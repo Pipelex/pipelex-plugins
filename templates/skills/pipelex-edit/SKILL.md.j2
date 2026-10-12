@@ -66,7 +66,7 @@ Before editing a construct you have not touched recently, read [the MTHDS refere
 
 ### Step 5: Re-validate
 
-Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable or scaffold state unchanged (a renamed pending signature renames its backlog entry; nothing else in the pending set moves). On `is_valid: false` the failure is in your edit: use the summary's locators, fix, re-validate. On `status: "error"` the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1, or to retry once the server is reachable again.
+Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable or scaffold state unchanged (a renamed pending signature renames its backlog entry; nothing else in the pending set moves). {% include "skills/shared/validate-warnings.md.j2" %} On `is_valid: false` the failure is in your edit: use the summary's locators, fix, re-validate. On `status: "error"` the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1, or to retry once the server is reachable again.
 
 ### Step 6: Inputs refresh check
 

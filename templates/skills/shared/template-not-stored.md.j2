@@ -1,0 +1,13 @@
+{#- What a save leaves out of a bundle whose `PipeDocGen` steps name template
+   files, said to the user in one line. `mthds_save_method` takes `.mthds` and
+   `.py` files alone, since the catalog stores no template file yet, so the
+   saved draft reports its template missing, cannot run by id and cannot be
+   published to, while its directory still validates and runs as `files`.
+   Included by `pipelex-catalog`'s save, before the call, and by
+   `saved-copy-notice.md.j2`, the linked save design, edit and organize end
+   with, so the user hears the same sentence whichever skill saved.
+
+   Strips its own trailing newline (the closing comment below), so it can be
+   included mid-paragraph. -#}
+With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory.
+{#- -#}

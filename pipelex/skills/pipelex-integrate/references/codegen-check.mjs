@@ -12,7 +12,9 @@
 // the SHA-256 recorded for each .mthds source in sources.json against the file on disk, and
 // the recorded sources against every .mthds file under the sidecar's `bundle_dir`, which is
 // what the call site loads, so a bundle changed without a regeneration — a file edited,
-// removed or added — is caught as `stale-source`.
+// removed or added — is caught as `stale-source`; and (3) hashes each template file the sidecar's
+// `templates` records, the files the call site sends beside the bundle, so one moved, removed or
+// edited since the call site was written is caught the same way.
 //
 // Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, an unreadable
 // file, a symlink in the tree, a check that throws, @pipelex/sdk not importable). Precedence
@@ -41,6 +43,9 @@ const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".n
 // call site the skill writes uses. Naming the older release that first carried the exports would send the
 // user through a second upgrade.
 const SDK_EXPORTS = ["CodegenLockError", "isStampableArtifactPath", "runCodegenCheck"];
+// A `template_file` key at the start of a line of a .mthds file: how a bundle file names a template, read only for
+// a sidecar written before the skill recorded `templates`, where it says the call site may not send that file.
+const TEMPLATE_FILE_KEY = /^\s*["']?template_file["']?\s*=/m;
 const SDK_MINIMUM = "0.18.0";
 
 // `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
@@ -230,7 +235,56 @@ async function checkSources(dir) {
       if (!recordedPaths.has(resolved)) lines.push(`  stale-source: ${shown} — added to the bundle since the types were generated`);
     }
   }
+  lines.push(...(await checkTemplates(sidecar, loaded)));
   return { code: lines.length ? EXIT_DRIFT : EXIT_CURRENT, lines };
+}
+
+/**
+ * The template files the call site sends beside the bundle, recorded in the sidecar's `templates` as
+ * `{ "<template_file>": { path, sha256 } }`: each is hashed against the file at its path. A renamed or added
+ * `template_file` needs no check here, since it edits a .mthds file the sources above hash. A sidecar written
+ * before the skill recorded `templates` has none, and then a bundle file naming a `template_file` is stale: its
+ * call site may send no template at all. Returns the lines to report.
+ */
+async function checkTemplates(sidecar, loaded) {
+  const templates = sidecar.templates;
+  const lines = [];
+  if (templates === undefined) {
+    if (loaded.paths === null) return lines;
+    for (const [resolved, shown] of loaded.paths) {
+      let text;
+      try {
+        text = await readFile(resolved, "utf8");
+      } catch {
+        continue; // the source comparison already reports a recorded file it cannot read, and an added one as added
+      }
+      if (TEMPLATE_FILE_KEY.test(text)) {
+        lines.push(`  stale-source: ${shown} — names a \`template_file\`, and ${SIDECAR_FILENAME} records no \`templates\`, so the call site may not send it`);
+      }
+    }
+    return lines;
+  }
+  // The same fail-closed reading as `sources`: a `templates` coerced to {} would check nothing and exit 0.
+  if (typeof templates !== "object" || templates === null || Array.isArray(templates)) {
+    return [`  stale-source: ${SIDECAR_FILENAME} — \`templates\` is not an object, so staleness cannot be ruled out`];
+  }
+  for (const [key, entry] of Object.entries(templates).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    const wellFormed =
+      typeof entry === "object" && entry !== null && !Array.isArray(entry) && typeof entry.path === "string" && entry.path !== "" && typeof entry.sha256 === "string";
+    if (!wellFormed) {
+      lines.push(`  stale-source: ${SIDECAR_FILENAME} — the \`templates\` entry for ${key} is not a { path, sha256 } object, so staleness cannot be ruled out`);
+      continue;
+    }
+    let onDisk;
+    try {
+      onDisk = sha256(await readFile(path.resolve(process.cwd(), entry.path)));
+    } catch (error) {
+      lines.push(`  stale-source: ${entry.path} — recorded as a template file but ${error.code === "ENOENT" ? "no longer on disk" : `unreadable (${error.message})`}`);
+      continue;
+    }
+    if (onDisk !== entry.sha256) lines.push(`  stale-source: ${entry.path} — template file edited since the call site was written`);
+  }
+  return lines;
 }
 
 /**
