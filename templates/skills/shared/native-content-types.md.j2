@@ -164,7 +164,7 @@ A position on an ordered scale of described levels.
 | `title` | `str \| None` | no | Title of the document or source |
 | `snippet` | `str \| None` | no | Text snippet or excerpt from the document |
 
-**Access**: `$document.filename`, `$document.url` in prompts. A PipeLLM whose prompt names the document (`@document` or `$document`) sends it to its model, which must read the document's format: a run whose document reaches a model that cannot read it is refused before it starts. Otherwise extract it first with PipeExtract, which gives `Page[]`. For web page URLs, use PipeExtract with the `@default-extract-web-page` model.
+**Access**: `$document.filename`, `$document.url` in prompts. A PipeLLM whose prompt names the document (`@document` or `$document`) sends it to its model, which must read the document's format; for a model that does not, extract it first with PipeExtract, which gives `Page[]`. A document the run is given is checked before the run starts, when it is certain to reach that step. A document made during the run, such as the file a PipeDocGen prints, or one that reaches the step only through a condition or a step that may be skipped, is refused only when that step runs, after the steps before it may have spent credit, so make sure, when writing the method, that the step's model reads that format. For web page URLs, use PipeExtract with the `@default-extract-web-page` model.
 
 **Produced by PipeDocGen**, whose output is the file it printed: a PDF, an Excel workbook, a Word document or a PowerPoint deck, its `filename` carrying the suffix.
 

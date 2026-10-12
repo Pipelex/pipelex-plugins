@@ -93,6 +93,9 @@ class TestLanguageReference:
         assert "Documents cannot be sent directly to LLMs" not in content_types
         document = section(content_types, "### Document — `DocumentContent`")
         assert "A PipeLLM whose prompt names the document" in document
+        assert "is refused only when that step runs, after the steps before it may have spent credit" in document, (
+            "the pre-run format check walks the entry pipe's inputs alone, so a document made mid-run is refused at its step"
+        )
         assert "**Produced by PipeDocGen**" in document
 
     @pytest.mark.parametrize("target_name", TARGETS)

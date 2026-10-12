@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- **The native content types reference lets a `PipeLLM` read a `Document`**: it said a document could never be sent to a model and must be extracted first, which contradicted the MTHDS reference's own `PipeLLM` example. It now says that a `PipeLLM` whose prompt names a document sends it to its model, which must read the document's format, and that extraction is the way otherwise.
+- **The native content types reference lets a `PipeLLM` read a `Document`**: it said a document could never be sent to a model and must be extracted first, which contradicted the MTHDS reference's own `PipeLLM` example. It now says that a `PipeLLM` whose prompt names a document sends it to its model, which must read the document's format, that extraction is the way otherwise, and that a document made during the run, such as a printed file, is refused only when its step runs, after earlier steps may have spent credit.
 
 ## [0.13.0] - 2026-10-12
 
