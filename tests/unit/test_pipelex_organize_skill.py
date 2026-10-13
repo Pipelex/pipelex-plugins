@@ -62,15 +62,31 @@ class TestPipelexOrganizeSkill:
         that states it. Step 1 now passes the bundle directory as `method_dir`, so the workshop's
         folder rule decides what is sent, a saved run kept out by the `.gitignore` in its `runs/`,
         and the step reads the files the call sent; the on-disk confirmation validates as step 1
-        did. The deletion keeps its own `runs/` rule, since what it deletes is not what a call
-        sends."""
+        did. The include's inline fallback names the exclusion once, for the files it lists. The
+        deletion keeps its own `runs/` rule, since a `runs/` saved into before the workshop marked
+        it may still be sent."""
         body = self.render(target_name)
         assert "except anything under a `runs/` directory" not in body
         assert "none under a `runs/` directory" not in body
-        assert "outside `runs/`" not in body
+        assert body.count("outside `runs/`") == 1, "only the include's inline fallback names the exclusion"
         assert "Read every `.mthds` file the call sent" in body
         assert "validate the bundle once more, as in Step 1" in body
         assert "never one under a `runs/` directory" in body
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_swap_touches_only_the_files_the_call_sent(self, target_name: str) -> None:
+        """Step 1 reads the `.mthds` files the folder call sent, so the swap deletes only those: a
+        `.mthds` file the folder rule leaves out (under a dot directory, a nested repository, a
+        virtual environment or `node_modules/`, or excluded by a `.gitignore`) was never read, and
+        deleting it would lose it unseen, with no copy for the rollback to restore. For the same
+        reason a new file never lands on the path of an existing file outside that set."""
+        steps = self.section(self.render(target_name), "### Step 4 — Swap the layout")
+        write, delete = steps.strip().split("\n")[:2]
+        assert write.startswith("1. Write every file of the new layout.")
+        assert "may take the path of a `.mthds` file Step 1's call sent, never that of any other existing file" in write
+        assert delete.startswith("2. Delete every `.mthds` file Step 1's call sent (`files_sent`) that is not part of the new layout.")
+        assert "**Delete no other file," in delete
+        assert "Delete every `.mthds` file that is not part of the new layout" not in steps
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_formatting_note_is_not_an_organize_step(self, target_name: str) -> None:

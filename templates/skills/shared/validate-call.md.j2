@@ -47,7 +47,12 @@
    rather than promising that any absolute path works. And both name the same
    fallback: a bundle the workshop cannot read goes inline as `files`, which a
    templated one cannot, since a template file has no inline form, so a
-   templated bundle out of reach is a stop and the relaunch.
+   templated bundle out of reach is a stop and the relaunch. The folder form
+   says which files go inline, since no folder rule picks them there: the
+   listing's set, the `.mthds` files outside `runs/`, root file first, each
+   `uri` its path in the bundle. It does not call `method_dir` absolute: a
+   relative one resolves against the workshop's working directory, as a
+   `{ path }` does.
 
    The folder form's last sentence is the pointer to the language reference's
    fallback for a workshop older than the folder form, which strips an argument
@@ -56,6 +61,6 @@
    forbids live in the reference, read before the next call. Why the folder,
    and why the `.gitignore` in `runs/`, is rationale and lives in
    `docs/decisions.md`. -#}
-{%- if validate_call_folder | default(true) %}Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference]({{ shared_dir }}/writing-mthds.md#template-files) first.
+{%- if validate_call_folder | default(true) %}Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference]({{ shared_dir }}/writing-mthds.md#template-files) first.
 {%- else %}{% set validate_call_with_templates = validate_call_templates | default(true) %}{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path>}`{% if validate_call_root_first | default(true) %}, **the root `.mthds` file first**, as nothing above its directory is read{% endif %}. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.") }}{% endif %}
 {#- -#}

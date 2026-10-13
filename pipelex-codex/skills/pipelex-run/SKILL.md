@@ -24,7 +24,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` of saved runs in it lacking one**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`, and for an address with `method_ref`.
+For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`, and for an address with `method_ref`.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
@@ -55,7 +55,7 @@ The user asking for the run is the consent; there is no second confirmation. **N
 
 ### 5. `mthds_run`, and the run id first
 
-Call `mthds_run` with the same target — `method_dir`, `method_id` or `method_ref` — and, as `inputs`, the values step 3 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
+Call `mthds_run` with the same target and, as `inputs`, the values step 3 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
 
 When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside `method_dir`: the folder runs, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 

@@ -36,7 +36,7 @@ It is a **content-preserving transformation**: the method's semantics never chan
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-Call `mthds_validate` on the bundle directory. Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. Read every `.mthds` file the call sent, and record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set. `is_valid: true` proceeds, runnable or scaffold.
+Call `mthds_validate` on the bundle directory. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. Read every `.mthds` file the call sent, and record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set. `is_valid: true` proceeds, runnable or scaffold.
 
 ### Step 2 — Plan the layout, compose the files
 
@@ -59,8 +59,8 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 
 ### Step 4 — Swap the layout
 
-1. Write every file of the new layout; a new file may reuse an old file's name.
-2. Delete every `.mthds` file that is not part of the new layout. **Delete only `.mthds` files, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
+1. Write every file of the new layout. **A new file may take the path of a `.mthds` file Step 1's call sent, never that of any other existing file**: name it otherwise.
+2. Delete every `.mthds` file Step 1's call sent (`files_sent`) that is not part of the new layout. **Delete no other file, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
 3. **Confirm on disk**: validate the bundle once more, as in Step 1, since the hook may have reformatted what was written, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
 4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"`, a verdict that differs from the baseline or a template that differs from Step 2's, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 

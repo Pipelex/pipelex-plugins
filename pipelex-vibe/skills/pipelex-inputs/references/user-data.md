@@ -39,7 +39,7 @@ For each input variable of the template, apply these rules in order:
 
 ## Copy
 
-Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. **Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input, each named by its position in the list with its original extension (`inputs/images/1.jpg`, `inputs/images/2.png`): no two positions share a name, and a single input's copy never lands in a list's directory, so no copy overwrites another's. Create `inputs/` only when there is a file to copy.
+Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained. **Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link. A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name, saying so. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input, each named by its position in the list with its original extension (`inputs/images/1.jpg`, `inputs/images/2.png`): no two positions share a name, and a single input's copy never lands in a list's directory, so no copy overwrites another's. Create `inputs/` only when there is a file to copy.
 
 ## Fill
 

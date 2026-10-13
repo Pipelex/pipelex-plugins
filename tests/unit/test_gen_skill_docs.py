@@ -1172,11 +1172,12 @@ class TestSharedSkillIncludes:
         cure = "relaunching the harness from a directory holding the bundle cures that"
         templated_stop = "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**."
         folder = (
-            "Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files"
+            "Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files"
             " and the templates their steps name, listed in `files_sent`."
         )
         folder_fallback = (
-            "Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file;"
+            "Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`)"
+            " are the fallback for a bundle with no template file;"
             " **for a templated one, stop and ask for that relaunch**."
         )
         older = (
@@ -1229,6 +1230,37 @@ class TestSharedSkillIncludes:
             text = reference.read_text(encoding="utf-8")
             for listing in listings:
                 assert listing not in text, f"{reference.relative_to(references)} still lists the bundle's files: {listing!r}"
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_a_folder_form_skill_names_files_only_where_the_folder_cannot_go(self, target_name: str) -> None:
+        """The structural half of the sweep above, which a rewording cannot slip past: in every skill
+        that passes the folder, `files` is named only where the folder cannot go. That is the
+        include's inline fallback in every one of them, explain's single file, whose folder may hold
+        other methods, and in inputs the stop row of a workshop that answers a prepare at `files`.
+        Every other mention would be a listing the folder replaced."""
+        folder_form = sorted(
+            path.parent.name
+            for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
+            if 'include "skills/shared/validate-call.md.j2"' in _skill_source(path.parent)
+            and "{% set validate_call_folder = false %}" not in _skill_source(path.parent)
+        )
+        assert {"pipelex-design", "pipelex-edit", "pipelex-explain", "pipelex-inputs", "pipelex-organize", "pipelex-run"} <= set(folder_form)
+        everywhere = "Inline `files` ("
+        exceptions = {
+            "pipelex-explain": "**A single file goes as `files` instead**",
+            "pipelex-inputs": "`input_domain` at `files`",
+        }
+        repo_root = self.REPO_TEMPLATES.parent
+        config = load_target_config(repo_root / "targets", target_name)
+        rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=folder_form, target_name=config.name)
+        for skill in folder_form:
+            body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
+            assert body.count(everywhere) == 1, f"{target_name}/{skill}: the inline fallback is not named once"
+            allowed = body.count(everywhere)
+            if skill in exceptions:
+                assert body.count(exceptions[skill]) == 1, f"{target_name}/{skill}: its own use of `files` is gone"
+                allowed += 1
+            assert body.count("`files`") == allowed, f"{target_name}/{skill} names `files` outside the inline fallback and its known exception"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_save_says_the_catalog_keeps_no_template_file(self, target_name: str) -> None:
@@ -1350,7 +1382,7 @@ class TestPipelexRunSkill:
         assert 'include "skills/shared/validate-call.md.j2"' in body
         assert "validate_call_folder" not in body, "run passes the folder"
         mark = (
-            "**first write a `.gitignore` holding `*` into each `runs/` of saved runs in it lacking one**,"
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**,"
             " saying so, then one `mthds_validate` call on it."
         )
         step_2 = body[body.index("### 2. Prove the target before spending credit") : body.index("### 3. The inputs")]
@@ -1488,13 +1520,15 @@ class TestPipelexRunSkill:
         `method_dir`, and the workshop refuses a folder holding a symbolic link its rule does not
         exclude (`pipelex-mcp`, SPEC.md, "The method folder"). The reference used to offer a
         symlink beside the copy, which made every later submission of the bundle refuse it, and the
-        prepare reads the copy by the bundle's folder too."""
+        prepare reads the copy by the bundle's folder too. A link that offer already left behind would
+        keep refusing the folder, so the next preparation replaces it with a copy of its target."""
         user_data = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
         assert "or symlink" not in user_data
         assert (
             "**Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link."
             in user_data
         )
+        assert "A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name" in user_data
         assert "calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`" in user_data
 
     def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
