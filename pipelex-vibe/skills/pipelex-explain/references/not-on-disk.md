@@ -2,7 +2,7 @@
 
 Read this when the target is a registered method's catalog id (`mt_…`) or a published address, before the first call on it. It says how each is read and what the workshop's answers mean for the explanation. The skill's guards hold throughout, and so do its steps wherever a source comes back.
 
-The two targets part company on ownership rather than convenience. **A catalog id names the user's own organization's method**, so its source is theirs to read and the skill reads it. **A published address names somebody else's package**, and its internals ride a channel only views see, so it is described by its contract alone. Exactly one selector per call: files, an address, or an id, never two.
+The two targets part company on ownership rather than convenience. **A catalog id names the user's own organization's method**, so its source is theirs to read and the skill reads it. **A published address names somebody else's package**, and its internals ride a channel only views see, so it is described by its contract alone. Exactly one selector per call: a folder, files, an address or an id, never two.
 
 ## A catalog id: read it in full
 
@@ -22,7 +22,7 @@ When the other tools answer and `mthds_get_method` does not, read the id at cont
 
 ## A published address: its contract
 
-- `mthds_validate` with `method_ref` in place of `files` gives the verdict and, **when the verdict carries one**, the `main_pipe` signature.
+- `mthds_validate` with `method_ref` in place of `method_dir` gives the verdict and, **when the verdict carries one**, the `main_pipe` signature.
 - `mthds_inputs_template` with the same selector and `explicit: true` gives the input shapes.
 - Say plainly that the internals are not readable from here, so that the user knows they are getting the contract rather than a walkthrough and can ask the publisher for the bundle if they need one.
 

@@ -1138,45 +1138,97 @@ class TestSharedSkillIncludes:
         longer claims to be the one form the hosted console accepts: the console's
         tools are `pipelex_*` and take no files at all.
 
-        The file set carries the template files a `PipeDocGen` step names, which the
-        runner needs to load a bundle sent as content and which travel only as paths, so
-        the inline fallback is one for a bundle with no template file: a templated bundle
-        the workshop cannot read by path is a stop and the relaunch, since inline it would
-        answer that the template was not supplied. The catalog's save sends none, since
-        `mthds_save_method` takes `.mthds` and `.py` files alone, and integrate states its
-        own set.
+        Every skill but two passes the bundle directory as `method_dir`, and the workshop
+        finds the `.mthds` files and the template files their `PipeDocGen` steps name, lists
+        what it sent in `files_sent`, and keeps out what a `.gitignore` inside the folder
+        excludes, which is how a saved run stays out of the method (`pipelex-mcp`, SPEC.md,
+        "The method folder"). Its sentence ends on the pointer to the language reference's
+        fallback for a workshop older than the folder form, which lists the files instead.
+        The catalog's save and integrate keep the listing form: `mthds_save_method` takes no
+        folder, and integrate submits the set its call site loads. A template file travels
+        only from disk, so in both forms the inline fallback is one for a bundle with no
+        template file, and a templated bundle out of the workshop's reach is a stop and the
+        relaunch. The catalog's save sends no template file, since `mthds_save_method` takes
+        `.mthds` and `.py` files alone, and integrate states its own set.
 
-        The workshop reads every `{ path }` item from at or under the directory of the first
-        one, so the root `.mthds` file goes first; the catalog states that order at its own
-        save step, with the listed description as a second reason."""
+        In the listing form the workshop reads every `{ path }` item from at or under the
+        directory of the first one, so the root `.mthds` file goes first; the catalog states
+        that order at its own save step, with the listed description as a second reason."""
         includers = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
             if 'include "skills/shared/validate-call.md.j2"' in _skill_source(path.parent)
         )
-        assert "pipelex-catalog" in includers
+        listing = sorted(
+            path.parent.name
+            for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
+            if "{% set validate_call_folder = false %}" in _skill_source(path.parent)
+        )
+        assert listing == ["pipelex-catalog", "pipelex-integrate"], "only the catalog's save and integrate list the files"
+        assert set(listing) < set(includers)
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=includers, target_name=config.name)
-        fallback = "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**."
+        cure = "relaunching the harness from a directory holding the bundle cures that"
+        templated_stop = "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**."
+        folder = (
+            "Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files"
+            " and the templates their steps name, listed in `files_sent`."
+        )
+        folder_fallback = (
+            "Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file;"
+            " **for a templated one, stop and ask for that relaunch**."
+        )
+        older = (
+            "A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older:"
+            " read [the reference](../shared/writing-mthds.md#template-files) first."
+        )
         template_files = "and every template file a `PipeDocGen` step names"
         root_first = "**the root `.mthds` file first**, as nothing above its directory is read"
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
-            assert "relaunching the harness from a directory holding the bundle cures that" in body, f"{target_name}/{skill}: the cure is unnamed"
+            assert cure in body, f"{target_name}/{skill}: the cure is unnamed"
             assert "pass an absolute one" not in body, f"{target_name}/{skill}: an absolute path outside the workshop is refused too"
             assert "hosted console" not in body, f"{target_name}/{skill}: the console takes no files, so it has no say in how a bundle is submitted"
+            if skill in listing:
+                assert "The workshop refuses a path outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
+                assert folder not in body and older not in body, f"{target_name}/{skill}: the listing form names no folder"
+            else:
+                assert body.count(folder) == 1, f"{target_name}/{skill}: the bundle directory is not passed as method_dir"
+                assert "It refuses one outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
+                assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                assert "Prefer the path form" not in body and template_files not in body, f"{target_name}/{skill}: the folder form lists no file"
             if skill == "pipelex-catalog":
-                assert fallback not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
+                assert templated_stop not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
                 assert template_files not in body, "the catalog stores no template file, and the save refuses one"
                 assert root_first not in body, "the catalog states the order at its save step, with its own reason"
                 assert "with the **root file first**" in body and "the workshop reads nothing above its directory" in body
-            else:
-                assert fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+            elif skill == "pipelex-integrate":
+                assert templated_stop in body, f"{target_name}/{skill}: the inline fallback is gone"
                 assert root_first in body, f"{target_name}/{skill}: the root file no longer goes first"
-                if skill != "pipelex-integrate":
-                    assert template_files in body, f"{target_name}/{skill}: the file set leaves the template files behind"
+                assert template_files not in body, "integrate states the set its call site loads"
+
+    def test_no_skill_that_passes_the_folder_lists_the_bundle_s_files_elsewhere(self) -> None:
+        """A skill that passes the bundle directory as `method_dir` to one call and lists its files to
+        the next sends two different sets, the folder's rule and a hand-made list, and loses the
+        template files the folder finds. So a skill in the folder form names `method_dir` wherever it
+        calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save
+        and integrate, which set the include's listing form."""
+        listings = ("whole-bundle `files`", "with `files` for every file", "the same files", "the file set step 5 submits", "bundle `files`")
+        for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")):
+            body = _skill_source(path.parent)
+            if 'include "skills/shared/validate-call.md.j2"' not in body or "{% set validate_call_folder = false %}" in body:
+                continue
+            for listing in listings:
+                assert listing not in body, f"{path.parent.name} still lists the bundle's files: {listing!r}"
+        references = Path(__file__).parents[2] / "skills"
+        for reference in sorted(references.glob("*/references/*.md")):
+            if reference.parent.parent.name in ("pipelex-catalog", "pipelex-integrate"):
+                continue
+            text = reference.read_text(encoding="utf-8")
+            for listing in listings:
+                assert listing not in text, f"{reference.relative_to(references)} still lists the bundle's files: {listing!r}"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_every_save_says_the_catalog_keeps_no_template_file(self, target_name: str) -> None:
@@ -1267,7 +1319,7 @@ class TestPipelexRunSkill:
         body = self.run_skill
         assert "Prove the target before spending credit" in body
         assert "Never run a method that did not pass." in body
-        assert "the same call with `method_id` in place of `files`" in body
+        assert "the same call with `method_id` in place of `method_dir`" in body
         assert "does not stand in for it" not in body
 
     def test_validation_comes_before_the_inputs(self) -> None:
@@ -1289,13 +1341,21 @@ class TestPipelexRunSkill:
 
     def test_the_bundle_sweep_excludes_the_artifact_tree(self) -> None:
         """Step 7 saves under `runs/`, an artifact keeps its filename extension, and
-        the submission gathers every `.mthds` file beneath the bundle — so without an
-        exclusion a method that emits or echoes one submits its own output as source."""
+        the folder sends every `.mthds` file beneath the bundle that its `.gitignore`
+        files leave in — so a method that emits or echoes one would submit its own output
+        as source. The workshop writes a `.gitignore` of `*` into a `runs/` it creates; a
+        `runs/` saved into before it did carries none, so step 2 writes one before the
+        first call that reads the folder."""
         body = self.run_skill
         assert 'include "skills/shared/validate-call.md.j2"' in body
-        assert "validate_call_file_set" not in body, "run submits the shared file set, runs/ exclusion included"
-        partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
-        assert "except anything under a `runs/` directory" in partial
+        assert "validate_call_folder" not in body, "run passes the folder"
+        mark = (
+            "**first write a `.gitignore` holding `*` into each `runs/` of saved runs in it lacking one**,"
+            " saying so, then one `mthds_validate` call on it."
+        )
+        step_2 = body[body.index("### 2. Prove the target before spending credit") : body.index("### 3. The inputs")]
+        assert mark in step_2
+        assert step_2.index(mark) < step_2.index('include "skills/shared/validate-call.md.j2"'), "the mark comes before the folder is read"
 
     def test_a_refused_dir_is_retried_into_the_default_folder(self) -> None:
         """`dir` is relative to the workshop's own working directory and an absolute
@@ -1422,6 +1482,20 @@ class TestPipelexRunSkill:
         for text in (user_data, synthetic):
             assert "`<input_variable>_1.<ext>`" not in text
             assert not re.search(r"\[\s*\"inputs/[^/\"]+\"", text), "a list example puts its files flat under inputs/"
+
+    def test_a_user_s_file_is_copied_into_the_bundle_never_linked(self) -> None:
+        """For a local bundle `<output_dir>` is the bundle directory, which the skills pass as
+        `method_dir`, and the workshop refuses a folder holding a symbolic link its rule does not
+        exclude (`pipelex-mcp`, SPEC.md, "The method folder"). The reference used to offer a
+        symlink beside the copy, which made every later submission of the bundle refuse it, and the
+        prepare reads the copy by the bundle's folder too."""
+        user_data = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
+        assert "or symlink" not in user_data
+        assert (
+            "**Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link."
+            in user_data
+        )
+        assert "calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`" in user_data
 
     def test_the_offer_names_whichever_file_the_run_reads(self) -> None:
         """No prepared file is written when nothing needed uploading, so an offer that
@@ -1583,6 +1657,7 @@ class TestPipelexCatalogSkill:
         have its own output saved to the catalog as part of its source."""
         body = self.catalog_skill
         assert 'include "skills/shared/validate-call.md.j2"' in body
+        assert "{% set validate_call_folder = false %}" in body, "the save takes no folder, so the catalog lists the files"
         assert "validate_call_file_set" not in body, "catalog submits the shared file set, runs/ exclusion included"
         partial = (self.REPO_ROOT / "templates" / "skills" / "shared" / "validate-call.md.j2").read_text(encoding="utf-8")
         assert "except anything under a `runs/` directory" in partial
@@ -3224,12 +3299,12 @@ class TestCatalogIdInEverySkill:
         assert "**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries both notices)" in body
 
     def test_a_linked_run_sends_the_id_beside_the_files(self) -> None:
-        """Box A step 5. `files` + `method_id` is the one legal selector pair
-        (`pipelex-mcp/SPEC.md`'s Method Selectors): the files run and the id is
+        """Box A step 5. A folder or files + `method_id` is the one legal selector pair
+        (`pipelex-mcp/SPEC.md`'s Method Selectors): the folder runs and the id is
         run-history linkage."""
         body = self.skill("pipelex-run")
         assert "pipelex-method.json" in body
-        assert "the files are what run" in body
+        assert "send its `method_id` beside `method_dir`: the folder runs" in body
         assert "filed under that method" in body
 
     def test_a_linked_run_does_not_read_as_the_saved_method_having_run(self) -> None:
@@ -3257,18 +3332,20 @@ class TestCatalogIdInEverySkill:
         """Verified in `pipelex-server`: a caller-supplied source takes
         precedence and the stored method is resolved only when no files were
         sent at all, so the assembled `.mthds` + `.py` run bundle is reached on
-        the id-only path alone. A `files` submission is `.mthds`-only, so a
-        custom `PipeFunc` has no channel on any files run — the skill has to say
-        so, or it routes a user to bisect a failure whose cause is structural.
-        It is acted on only when a `files` run fails, so the failure reference says it."""
+        the id-only path alone. A folder, like listed files, sends no `.py`, so a
+        custom `PipeFunc` has no channel on any run of the directory — the skill has
+        to say so, or it routes a user to bisect a failure whose cause is structural.
+        It is acted on only when such a run fails, so the failure reference says it."""
         body = self.run_reference("failed-run.md")
-        assert "no channel for its Python on any files run" in body
+        assert "no channel for its Python on any run of the directory" in body
+        assert "never a `.py` file" in body
         assert "assembled into the run bundle server-side" in body
 
     def test_an_unknown_linkage_id_is_read_off_a_location_that_discriminates(self) -> None:
         """`RUN_START_MIXED_ERROR_OPTIONS` splits the locations deliberately: a
-        rejected payload and a refused execution locus land at `files`, and only
-        the unknown-method arm lands at `method_id`. That is the opposite of
+        rejected payload and a refused execution locus land at `files`, which the
+        workshop relocates to `method_dir` for a folder, and only the unknown-method
+        arm lands at `method_id`. That is the opposite of
         `/pipelex-catalog`'s save, where one location carries several causes —
         so the reason is stated, and an agent does not carry either rule to the
         other place. The reading is `linked-run.md`'s, which the stop table's row

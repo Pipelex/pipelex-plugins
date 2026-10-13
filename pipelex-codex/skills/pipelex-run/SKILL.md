@@ -18,17 +18,17 @@ This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and
 
 ### 1. The target and the pipe
 
-The target is a **bundle directory**, submitted as `files`; a registered method's **`mt_…` id**, as `method_id`: read [by-id.md](references/by-id.md) before the first call; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit, then carrying the returned id; without that tool, ask for it. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
+The target is a **bundle directory**, submitted as `method_dir`; a registered method's **`mt_…` id**, as `method_id`: read [by-id.md](references/by-id.md) before the first call; or a **published method's address**, `github.com/<owner>/<repo>[/<selector>][@<tag>]`, as `method_ref`: read [published-address.md](references/published-address.md) before the first call. A saved method named without its id is resolved through `mthds_list_methods`, choosing by name and description and asking when several fit; without that tool, ask for it. **When an address and another target are both in hand, ask which one is meant; never pick one yourself**: a run is paid.
 
 The pipe is the declared main pipe unless the user named another: **carry its `pipe_ref` through every call**, the code qualified by its own file's domain.
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, one `mthds_validate` call over the file set step 5 submits. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, and every template file a `PipeDocGen` step names. Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**, as nothing above its directory is read. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. For an **`mt_…` id**, the same call with `method_id` in place of `files`, and for an address with `method_ref`.
+For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` of saved runs in it lacking one**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`, and for an address with `method_ref`.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
-**A dry run is this step, shown.** The workshop has no mock-inference mode, and a run on test files is a real run. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
+**A dry run is this step, shown.** A run on test files is a real run. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
 ### 3. The inputs
 
@@ -49,15 +49,15 @@ One line before the call: the target, the pipe, where the inputs came from and w
 
 > Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
-**When a `files` target holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
+**When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
 
 The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A `/pipelex-lab` case is the exception: its runs wait for the user's go on its keys, even when the request asked for them.
 
 ### 5. `mthds_run`, and the run id first
 
-Call `mthds_run` with the same target — the whole-bundle `files` submission, `method_id` or `method_ref` — and, as `inputs`, the values step 3 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
+Call `mthds_run` with the same target — `method_dir`, `method_id` or `method_ref` — and, as `inputs`, the values step 3 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
 
-When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside the `files`: the files are what run, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
+When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside `method_dir`: the folder runs, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
 The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an id, say which version ran** (`method_version`); **for an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 

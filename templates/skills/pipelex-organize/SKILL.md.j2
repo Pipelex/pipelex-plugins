@@ -33,7 +33,7 @@ It is a **content-preserving transformation**: the method's semantics never chan
 
 {% include "skills/shared/catalog-id-pointer.md.j2" %}
 
-Gather the bundle's files as the convention below says, read each, and call `mthds_validate` with `files` for every file. {% include "skills/shared/validate-call.md.j2" %} Record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set. `is_valid: true` proceeds, runnable or scaffold.
+Call `mthds_validate` on the bundle directory. {% include "skills/shared/validate-call.md.j2" %} Read every `.mthds` file the call sent, and record the **baseline**: `is_valid`, `is_runnable`, and the exact `pending_signatures` set. `is_valid: true` proceeds, runnable or scaffold.
 
 ### Step 2 — Plan the layout, compose the files
 
@@ -58,7 +58,7 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 
 1. Write every file of the new layout; a new file may reuse an old file's name.
 2. Delete every `.mthds` file that is not part of the new layout. **Delete only `.mthds` files, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
-3. **Confirm on disk**: validate the bundle once more, gathered as in Step 1{% if platform != "agent-skills" %}, since the hook may have reformatted what was written{% endif %}, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
+3. **Confirm on disk**: validate the bundle once more, as in Step 1{% if platform != "agent-skills" %}, since the hook may have reformatted what was written{% endif %}, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
 4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"`, a verdict that differs from the baseline or a template that differs from Step 2's, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report

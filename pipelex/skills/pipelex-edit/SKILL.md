@@ -54,7 +54,7 @@ Check the requested change against the scope split at the top. Structural or con
 
 ### Step 3: Baseline verdict
 
-Validate the whole bundle **before editing**: call `mthds_validate` with `files` for every file, and branch on the structured verdict, never on transport. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, and every template file a `PipeDocGen` step names. Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**, as nothing above its directory is read. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.
+Validate the whole bundle **before editing**: call `mthds_validate` on the bundle directory, and branch on the structured verdict, never on transport. Pass the bundle directory as `method_dir`, absolute: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `files` (`{content, uri: <path in the bundle>}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
 - `is_valid: false` → the bundle is broken **before** your change: surface the `validation_errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
@@ -75,7 +75,7 @@ Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline ver
 
 ### Step 6: Inputs refresh check
 
-When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with the whole-bundle `files` and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. Otherwise skip this step.
+When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with the same `method_dir` and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. Otherwise skip this step.
 
 ### Step 7: Report
 

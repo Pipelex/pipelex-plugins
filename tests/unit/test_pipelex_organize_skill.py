@@ -50,23 +50,26 @@ class TestPipelexOrganizeSkill:
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_catalog_id_pointer_opens_step_1(self, target_name: str) -> None:
         """The shared reference sends the model back "just after its pointer to this file", so the
-        pointer is step 1's first paragraph and the gather is what follows it — the step the inline
-        bridge used to resume at."""
+        pointer is step 1's first paragraph and the baseline call is what follows it — the step the
+        inline bridge used to resume at."""
         paragraphs = self.section(self.render(target_name), "### Step 1 — Baseline verdict").strip().split("\n\n")
         assert paragraphs[0].startswith("**For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference]")
-        assert paragraphs[1].startswith("Gather the bundle's files as the convention below says")
+        assert paragraphs[1].startswith("Call `mthds_validate` on the bundle directory.")
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_runs_exclusion_is_stated_once(self, target_name: str) -> None:
         """Phase 1's review found step 1 restating the exclusion beside the `validate-call` include
-        that states it; the step now defers to the convention, as `pipelex-catalog` and
-        `pipelex-design` do, and the on-disk confirmation gathers as step 1 did. The deletion keeps
-        its own `runs/` rule, since what it deletes is not what the convention submits."""
+        that states it. Step 1 now passes the bundle directory as `method_dir`, so the workshop's
+        folder rule decides what is sent, a saved run kept out by the `.gitignore` in its `runs/`,
+        and the step reads the files the call sent; the on-disk confirmation validates as step 1
+        did. The deletion keeps its own `runs/` rule, since what it deletes is not what a call
+        sends."""
         body = self.render(target_name)
-        assert body.count("except anything under a `runs/` directory") == 1
+        assert "except anything under a `runs/` directory" not in body
         assert "none under a `runs/` directory" not in body
         assert "outside `runs/`" not in body
-        assert "validate the bundle once more, gathered as in Step 1" in body
+        assert "Read every `.mthds` file the call sent" in body
+        assert "validate the bundle once more, as in Step 1" in body
         assert "never one under a `runs/` directory" in body
 
     @pytest.mark.parametrize("target_name", TARGETS)
