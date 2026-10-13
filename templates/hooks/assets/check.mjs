@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.42.0 (c44bec8) + @pipelex/tools-wasm 0.5.0 (npm)
+// Provenance: @pipelex/sdk 0.43.0 (898b33d) + @pipelex/tools-wasm 0.5.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -3987,7 +3987,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.42.0";
+var SDK_VERSION = "0.43.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -5358,6 +5358,60 @@ function resultsFromExecute(response) {
   };
 }
 
+// src/exact-json.ts
+var INTEGER_TOKEN = /^-?\d+$/;
+var LONG_DIGIT_RUN = /\d{16}/;
+var JSON_WITH_RAW = JSON;
+var ExactJsonUnsupportedError = class extends Error {
+  /** Whether asking again can succeed: never, on this runtime. */
+  retryable = false;
+  /** Who can fix it: the environment, by moving to a runtime the package supports. */
+  errorDomain = "config";
+  /** Reading JSON starts no run. */
+  runMayHaveStarted = false;
+  constructor(message) {
+    super(message);
+    this.name = "ExactJsonUnsupportedError";
+  }
+};
+function parseExactJson(text) {
+  return LONG_DIGIT_RUN.test(text) ? JSON.parse(text, readIntegerExactly) : JSON.parse(text);
+}
+function stringifyExactJson(value, space) {
+  const bigIntHasToJson = typeof BigInt.prototype.toJSON === "function";
+  return JSON.stringify(
+    value,
+    function writeBigIntExactly(key, item) {
+      if (typeof item === "bigint") return rawBigInt(item);
+      if (!bigIntHasToJson) return item;
+      const held = ownDataValue(this, key);
+      return typeof held === "bigint" ? rawBigInt(held) : item;
+    },
+    space
+  );
+}
+function readIntegerExactly(_key, value, context) {
+  if (typeof value !== "number" || Number.isSafeInteger(value)) return value;
+  const source = context?.source;
+  if (typeof source === "string") return INTEGER_TOKEN.test(source) ? BigInt(source) : value;
+  if (Number.isFinite(value) && !Number.isInteger(value)) return value;
+  throw new ExactJsonUnsupportedError(
+    `This runtime's JSON.parse gives a reviver no source text, so the number read as ${value} cannot be read exactly.`
+  );
+}
+function rawBigInt(value) {
+  if (typeof JSON_WITH_RAW.rawJSON !== "function") {
+    throw new TypeError(
+      `This runtime has no JSON.rawJSON, so the bigint ${value.toString()} cannot be written as its exact digits.`
+    );
+  }
+  return JSON_WITH_RAW.rawJSON(value.toString());
+}
+function ownDataValue(holder, key) {
+  if (typeof holder !== "object" || holder === null) return void 0;
+  return Object.getOwnPropertyDescriptor(holder, key)?.value;
+}
+
 // src/client.ts
 var MAX_PAGES = 1e4;
 async function* followCursor(route, readPage) {
@@ -5380,6 +5434,7 @@ async function* followCursor(route, readPage) {
 }
 var STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
 var LENIENT_UTF8 = new TextDecoder("utf-8");
+var readJson = (text) => JSON.parse(text);
 var STARTS_RUN = Object.freeze({ mayStartRun: true });
 var DEFAULT_API_BASE_URL = "https://api.pipelex.com";
 var API_PREFIX = "v1";
@@ -5402,14 +5457,94 @@ function withWirePython(input) {
   const { python, ...rest } = input;
   return python === void 0 ? rest : { ...rest, python: serializeMethodFiles(python) };
 }
-function methodPath(methodId) {
-  if (typeof methodId === "string" && methodId.includes("@")) {
+function requestBodyText(method, url, body) {
+  try {
+    return stringifyExactJson(body);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new RequestArgumentError(
+      `The body of ${method} ${new URL(url).pathname} cannot be written as JSON, so nothing was sent: ${reason}`,
+      { cause: err }
+    );
+  }
+}
+function productQuery(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === void 0) continue;
+    if (typeof value === "object") for (const item of value) search.append(key, item);
+    else search.set(key, String(value));
+  }
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+function inWords(items, conjunction) {
+  if (items.length < 2) return items.join("");
+  return `${items.slice(0, -1).join(", ")} ${conjunction} ${items[items.length - 1]}`;
+}
+var METHOD_ID_ARGUMENT = "a method id, the method's non-empty bare catalog id";
+var EXAMPLE_ID_ARGUMENT = "an example id, the example's non-empty `example_id`";
+var RUN_ID_ARGUMENT = "a run id, the run's non-empty `pipeline_run_id`";
+var ORG_ID_ARGUMENT = "an organization id, the organization's non-empty `org_id`";
+var API_KEY_ID_ARGUMENT = "an API key id, the key's non-empty `id`";
+var CREATE_RUN_ID_ARGUMENT = "a run_id naming a run of this method that used these inputs, a non-empty string, or none";
+var RECORD_RUN_ID_ARGUMENT = "a run_id naming a run of this method that used the example's inputs, a non-empty string";
+function argumentRefusal(call, what, got, cause) {
+  const message = `${call}() takes ${what}; got ${got}.`;
+  return new RequestArgumentError(message, cause === void 0 ? void 0 : { cause });
+}
+function requireNonEmptyId(value, call, what) {
+  if (typeof value === "string" && value !== "") return value;
+  let got;
+  if (typeof value === "string") got = "an empty string";
+  else got = value === null ? "null" : typeof value;
+  throw argumentRefusal(call, what, got);
+}
+function describeNumberArgument(value) {
+  if (typeof value === "number") return String(value);
+  return value === null ? "null" : typeof value;
+}
+function idPathSegment(value, call, what) {
+  const id = requireNonEmptyId(value, call, what);
+  if (id === "." || id === "..") {
+    throw argumentRefusal(
+      call,
+      what,
+      `"${id}", a dot segment, which the URL would resolve into another route's path`
+    );
+  }
+  try {
+    return encodeURIComponent(id);
+  } catch (err) {
+    const got = "a string holding a lone surrogate, which a URL cannot carry";
+    throw argumentRefusal(call, what, got, err);
+  }
+}
+function methodPath(methodId, call) {
+  const segment = idPathSegment(methodId, call, METHOD_ID_ARGUMENT);
+  if (methodId.includes("@")) {
     throw new RequestArgumentError(
       `"${methodId}" carries a version suffix, and the method routes take a bare catalog id: they address the method itself, never one of its versions. Strip the suffix with parseMethodSelector, and read a published version with getMethodVersion.`
     );
   }
-  return `methods/${encodeURIComponent(methodId)}`;
+  return `methods/${segment}`;
 }
+function methodExamplePath(methodId, exampleId, call) {
+  const path = methodPath(methodId, call);
+  return `${path}/examples/${idPathSegment(exampleId, call, EXAMPLE_ID_ARGUMENT)}`;
+}
+var isString2 = (value) => typeof value === "string";
+var METHOD_EXAMPLE_FIELDS = {
+  example_id: ["a string", isString2],
+  method_id: ["a string", isString2],
+  name: ["a string", isString2],
+  inputs: ["an object", isPlainObject],
+  input_revision: ["an integer", (value) => Number.isSafeInteger(value)],
+  latest_run_id: ["a string or null", (value) => value === null || isString2(value)],
+  created_by_user_id: ["a string", isString2],
+  created_at: ["a string", isString2],
+  updated_at: ["a string", isString2]
+};
 var PipelexApiClient = class {
   apiKey;
   baseUrl;
@@ -5474,6 +5609,7 @@ var PipelexApiClient = class {
    */
   async requestRaw(method, url, options = {}) {
     const hasBody = options.body !== void 0;
+    const bodyText = hasBody ? requestBodyText(method, url, options.body) : void 0;
     const headers = this.requestHeaders(hasBody, options.idempotencyKey);
     const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     if (!isTimerDelay(timeoutMs)) {
@@ -5498,7 +5634,7 @@ var PipelexApiClient = class {
       response = await fetch(url, {
         method,
         headers,
-        body: hasBody ? JSON.stringify(options.body) : void 0,
+        body: bodyText,
         signal: controller.signal
       });
       bytes = new Uint8Array(await response.arrayBuffer());
@@ -5595,16 +5731,71 @@ var PipelexApiClient = class {
     );
   }
   /**
-   * One page of a cursor-paged product route (`listMethods`, `listMethodVersions`, `listRuns`),
-   * read as the platform always serializes it: `items` an array, `next_cursor` a string or
-   * `null`. A page breaking either is an answer the SDK cannot read, so it throws the
-   * `ApiResponseError` `unreadableAnswer` builds, `runtime` and not retryable, rather than
-   * handing the iterators a page they cannot walk: `items` that is not iterable, or a missing
-   * cursor that is neither the end nor a next page, which `iterateRuns` would follow forever.
+   * A verdict, the `200` a route answers discriminated on `outcome` with the object the verdict
+   * is about as one `member`: `publishMethod`'s `method`, `recordMethodExampleLatestRun`'s
+   * `example`. The answer is read as `readObjectAnswer` reads it, then an `outcome` that is none
+   * of `outcomes` is an answer the SDK cannot read, and so is a `member` that is not an object,
+   * the check `readObjectAnswerAt` holds a route's whole answer to: each throws the
+   * `ApiResponseError` `unreadableAnswer` builds, `verdict` naming the answer in the message.
+   * A route whose member has a reader of its own passes it as `readMember`, which then checks the
+   * member in place of that object check, so the member is checked once. `parse` reads the
+   * answer's text, `readJson` unless the route names another. Returns the answer, its `outcome`
+   * and the member as `subject`, for the route to read further.
    */
-  async requestPage(endpoint) {
+  readVerdict(method, endpoint, res, shape) {
+    const answer = this.readObjectAnswer(
+      method,
+      endpoint,
+      res,
+      {},
+      shape.parse
+    );
+    const outcome = answer.outcome;
+    const subject = answer[shape.member];
+    if (!shape.outcomes.includes(outcome)) {
+      const expected = inWords(
+        shape.outcomes.map((name) => `\`${name}\``),
+        "or"
+      );
+      throw this.unreadableAnswer(
+        method,
+        `/${API_PREFIX}/${endpoint}`,
+        res,
+        `${shape.verdict} whose \`outcome\` is not ${expected}`
+      );
+    }
+    if (shape.readMember !== void 0) {
+      return { answer, outcome, subject: shape.readMember(subject) };
+    }
+    if (!isPlainObject(subject)) {
+      throw this.unreadableAnswer(
+        method,
+        `/${API_PREFIX}/${endpoint}`,
+        res,
+        `${shape.verdict} whose \`${shape.member}\` is not an object`
+      );
+    }
+    return { answer, outcome, subject };
+  }
+  /**
+   * One page of a cursor-paged product route (`listMethods`, `listMethodVersions`,
+   * `listMethodExamples`, `listRuns`), read as the platform always serializes it: `items` an
+   * array, `next_cursor` a string or `null`. A page breaking either is an answer the SDK cannot
+   * read, so it throws the `ApiResponseError` `unreadableAnswer` builds, `runtime` and not
+   * retryable, rather than handing the iterators a page they cannot walk: `items` that is not
+   * iterable, or a missing cursor that is neither the end nor a next page, which `iterateRuns`
+   * would follow forever. A route reading its rows itself passes `rows`: `parse` reads the page's
+   * text, and `item` reads each row, throwing as `unreadableAnswer` does for one it cannot read.
+   */
+  async requestPage(endpoint, rows) {
     const res = await this.requestProductAnswer("GET", endpoint, void 0);
-    const page = this.readObjectAnswer("GET", endpoint, res);
+    const page = this.readObjectAnswer(
+      "GET",
+      endpoint,
+      res,
+      {},
+      rows?.parse
+    );
     const { items, next_cursor: nextCursor } = page;
     if (!Array.isArray(items)) {
       throw this.unreadableAnswer(
@@ -5622,7 +5813,50 @@ var PipelexApiClient = class {
         "a page whose `next_cursor` is neither a string nor null"
       );
     }
-    return { items, nextCursor };
+    if (rows === void 0) return { items, nextCursor };
+    return { items: items.map((row) => rows.item(row, res)), nextCursor };
+  }
+  /**
+   * A route answering one method example (`createMethodExample`, `getMethodExample`,
+   * `updateMethodExample`), its answer read with `parseExactJson`, so an integer past the safe
+   * range in the inputs is a `bigint` holding its exact digits, and checked by
+   * `readMethodExample`.
+   */
+  async requestMethodExample(method, endpoint, body) {
+    const res = await this.requestProductAnswer(method, endpoint, body);
+    const answer = this.readObjectAnswer(
+      method,
+      endpoint,
+      res,
+      {},
+      parseExactJson
+    );
+    return this.readMethodExample(method, endpoint, res, answer, "an example");
+  }
+  /**
+   * A method example as `res` carried it, checked against `METHOD_EXAMPLE_FIELDS`: a value that
+   * is not an object, or that misses a field the Python SDK's model requires or holds one of
+   * another type, is an answer the SDK cannot read, thrown as the `ApiResponseError`
+   * `unreadableAnswer` builds, `where` naming the example's place in the answer in the message.
+   * Every route answering an example reads it here, the page rows and the latest-run verdict's
+   * member included.
+   */
+  readMethodExample(method, endpoint, res, value, where) {
+    const path = `/${API_PREFIX}/${endpoint}`;
+    if (!isPlainObject(value)) {
+      throw this.unreadableAnswer(method, path, res, `${where} that is not an object`);
+    }
+    for (const [field, [expected, fits]] of Object.entries(METHOD_EXAMPLE_FIELDS)) {
+      if (!fits(value[field])) {
+        throw this.unreadableAnswer(
+          method,
+          path,
+          res,
+          `${where} whose \`${field}\` is not ${expected}`
+        );
+      }
+    }
+    return value;
   }
   /** Issue a product request and return its 2xx answer, a non-2xx thrown as `ApiResponseError`. */
   async requestProductAnswer(method, endpoint, body, options = {}) {
@@ -5644,31 +5878,30 @@ var PipelexApiClient = class {
     return this.readAnswerAt(method, `/${API_PREFIX}/${endpoint}`, res);
   }
   /** The JSON object body of a `/v1` route's 2xx answer; see `readObjectAnswerAt`. */
-  readObjectAnswer(method, endpoint, res, run = {}) {
-    return this.readObjectAnswerAt(method, `/${API_PREFIX}/${endpoint}`, res, run);
+  readObjectAnswer(method, endpoint, res, run = {}, parse2 = readJson) {
+    return this.readObjectAnswerAt(method, `/${API_PREFIX}/${endpoint}`, res, run, parse2);
   }
   /**
    * The JSON body of a 2xx answer, naming the route by its `path` from the origin as a refusal
-   * does. A body that is not UTF-8, or not JSON, an empty one included, is an answer the SDK
-   * cannot read, so it throws the `ApiResponseError` `unreadableAnswer` builds, with the parse
-   * failure as `cause`.
+   * does, its text read by `parse`: `JSON.parse`, or `parseExactJson` for an answer carrying a
+   * person's data. A body that is not UTF-8, or not JSON, an empty one included, is an answer the
+   * SDK cannot read, so it throws the `ApiResponseError` `unreadableAnswer` builds, with the parse
+   * failure as `cause`; so is a body holding a number `parseExactJson` cannot read exactly on this
+   * runtime (`ExactJsonUnsupportedError`), rather than read rounded.
    * The one place a success body is parsed.
    */
-  readAnswerAt(method, path, res, run = {}) {
+  readAnswerAt(method, path, res, run = {}, parse2 = readJson) {
     if (!res.utf8) {
       throw this.unreadableAnswer(method, path, res, "a body that is not UTF-8", void 0, run);
     }
     try {
-      return JSON.parse(res.body);
+      return parse2(res.body);
     } catch (err) {
-      throw this.unreadableAnswer(
-        method,
-        path,
-        res,
-        res.body ? "a body that is not JSON" : "an empty body where JSON was expected",
-        err,
-        run
-      );
+      let what;
+      if (err instanceof ExactJsonUnsupportedError) {
+        what = "a body holding a number past Number.MAX_SAFE_INTEGER, which this runtime cannot read exactly";
+      } else what = res.body ? "a body that is not JSON" : "an empty body where JSON was expected";
+      throw this.unreadableAnswer(method, path, res, what, err, run);
     }
   }
   /**
@@ -5676,8 +5909,8 @@ var PipelexApiClient = class {
    * reads it. A body that is JSON but not an object — `null`, a number, a string, an array — is
    * an answer the SDK cannot read either, and throws the same `ApiResponseError`, with no `cause`.
    */
-  readObjectAnswerAt(method, path, res, run = {}) {
-    const answer = this.readAnswerAt(method, path, res, run);
+  readObjectAnswerAt(method, path, res, run = {}, parse2 = readJson) {
+    const answer = this.readAnswerAt(method, path, res, run, parse2);
     if (!isPlainObject(answer)) {
       throw this.unreadableAnswer(
         method,
@@ -5825,6 +6058,9 @@ var PipelexApiClient = class {
    * that exceeds that surfaces as `PipelineExecuteTimeoutError` pointing at the
    * durable start+poll path. Throws `RunStillRunningError` on the protocol's
    * optional 202 degrade.
+   *
+   * The answer is read with `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in the
+   * working memory, the main output included, is a `bigint` holding its exact digits.
    */
   async execute(options) {
     const extensions = buildExtensions(options.extra);
@@ -5868,7 +6104,8 @@ var PipelexApiClient = class {
         "POST",
         "execute",
         res,
-        STARTS_RUN
+        STARTS_RUN,
+        parseExactJson
       );
       if (!isCompletedRunAnswer(answer)) {
         throw this.unreadableAnswer(
@@ -6418,7 +6655,7 @@ var PipelexApiClient = class {
    * lifecycle routes are absent (a bare runner).
    */
   async getRunStatus(runId, options = {}) {
-    const endpoint = `${RUNS}/${encodeURIComponent(runId)}/status`;
+    const endpoint = `${RUNS}/${idPathSegment(runId, "getRunStatus", RUN_ID_ARGUMENT)}/status`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
       timeoutMs: POLL_REQUEST_TIMEOUT_MS,
@@ -6453,12 +6690,17 @@ var PipelexApiClient = class {
    * before any request. `MissingMainStuffError` is thrown only for a read that asked
    * for `main_stuff` — no selection, or one naming it.
    *
+   * A completed result is read with `parseExactJson`, so an integer past
+   * `Number.MAX_SAFE_INTEGER` anywhere in it, the main output, the working memory and the graph
+   * included, is a `bigint` holding its exact digits, and an output passed back to `start` goes
+   * back as the run produced it.
+   *
    * Throws `RunLifecycleUnavailableError` when the lifecycle routes are absent
    * (a bare runner).
    */
   async getRunResult(runId, options = {}) {
     assertArtifactSelection(options.artifacts);
-    const base = `${RUNS}/${encodeURIComponent(runId)}/results`;
+    const base = `${RUNS}/${idPathSegment(runId, "getRunResult", RUN_ID_ARGUMENT)}/results`;
     const endpoint = options.artifacts === void 0 ? base : `${base}?artifacts=${[...new Set(options.artifacts)].join(",")}`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
@@ -6479,7 +6721,7 @@ var PipelexApiClient = class {
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("GET", endpoint, res);
     }
-    const result = this.readObjectAnswer("GET", endpoint, res);
+    const result = this.readObjectAnswer("GET", endpoint, res, {}, parseExactJson);
     if (selectionIncludesMainStuff(options.artifacts) && result.main_stuff == null) {
       throw new MissingMainStuffError(
         `Completed run '${runId}' returned no main stuff \u2014 a completed run always delivers a main stuff.`,
@@ -6609,13 +6851,13 @@ var PipelexApiClient = class {
    * come back empty and still carry a `nextCursor`: keep following it until it is `null`.
    */
   async listMethods(query = {}) {
-    const params = new URLSearchParams();
-    if (query.q !== void 0) params.set("q", query.q);
-    if (query.published !== void 0) params.set("published", String(query.published));
-    if (query.limit !== void 0) params.set("limit", String(query.limit));
-    if (query.cursor !== void 0) params.set("cursor", query.cursor);
-    const suffix = params.toString();
-    return this.requestPage(suffix ? `methods?${suffix}` : "methods");
+    const search = productQuery({
+      q: query.q,
+      published: query.published,
+      limit: query.limit,
+      cursor: query.cursor
+    });
+    return this.requestPage(`methods${search}`);
   }
   /**
    * Every method in the catalog, streamed — follows the cursor for you.
@@ -6653,10 +6895,12 @@ var PipelexApiClient = class {
    * Takes a bare catalog id: the method routes address the method itself, never a version of
    * it. A caller holding `mt_…@3` strips the suffix with `parseMethodSelector` and reads that
    * version with `getMethodVersion`. Every method route throws `RequestArgumentError` for a
-   * suffixed id, before any request, rather than read back the `404` the platform would answer.
+   * suffixed id, before any request, rather than read back the `404` the platform would answer,
+   * and for an id that is empty, `.` or `..`, which the URL would resolve into another route's
+   * path.
    */
   async getMethod(methodId) {
-    return this.requestMethodData("GET", methodPath(methodId));
+    return this.requestMethodData("GET", methodPath(methodId, "getMethod"));
   }
   /**
    * Resolve a stored method's id into the runnable MTHDS closure of its DRAFT — a
@@ -6723,7 +6967,11 @@ var PipelexApiClient = class {
    * write.
    */
   async writeDraft(methodId, input) {
-    return this.requestMethodData("PUT", `${methodPath(methodId)}/draft`, withWirePython(input));
+    return this.requestMethodData(
+      "PUT",
+      `${methodPath(methodId, "writeDraft")}/draft`,
+      withWirePython(input)
+    );
   }
   /**
    * Rename a method — `PATCH /v1/methods/{id}` — and return it. The name belongs to the method,
@@ -6738,7 +6986,7 @@ var PipelexApiClient = class {
    * writes kept landing under the rename.
    */
   async renameMethod(methodId, input) {
-    return this.requestMethodData("PATCH", methodPath(methodId), {
+    return this.requestMethodData("PATCH", methodPath(methodId, "renameMethod"), {
       name: input.name
     });
   }
@@ -6780,33 +7028,20 @@ var PipelexApiClient = class {
         "publishMethod() needs expected_draft_updated_at: the draft token (the method's updated_at) the caller last saw, so a publish never takes a draft it has not seen."
       );
     }
-    const endpoint = `${methodPath(methodId)}/publish`;
+    const endpoint = `${methodPath(methodId, "publishMethod")}/publish`;
     const res = await this.requestProductAnswer("POST", endpoint, {
       expected_draft_updated_at: token
     });
-    const answer = this.readObjectAnswer("POST", endpoint, res);
-    const { outcome, method: stored } = answer;
-    if (outcome !== "published" && outcome !== "unchanged" && outcome !== "refused") {
-      throw this.unreadableAnswer(
-        "POST",
-        `/${API_PREFIX}/${endpoint}`,
-        res,
-        "a publish result whose `outcome` is not `published`, `unchanged` or `refused`"
-      );
-    }
-    if (!isPlainObject(stored)) {
-      throw this.unreadableAnswer(
-        "POST",
-        `/${API_PREFIX}/${endpoint}`,
-        res,
-        "a publish result whose `method` is not an object"
-      );
-    }
+    const { answer, outcome, subject } = this.readVerdict("POST", endpoint, res, {
+      verdict: "a publish result",
+      outcomes: ["published", "unchanged", "refused"],
+      member: "method"
+    });
     const method = this.readStoredSources(
       "POST",
       endpoint,
       res,
-      stored,
+      subject,
       "a stored method"
     );
     return { ...answer, outcome, method };
@@ -6825,12 +7060,9 @@ var PipelexApiClient = class {
    * is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
    */
   async listMethodVersions(methodId, query = {}) {
-    const params = new URLSearchParams();
-    if (query.limit !== void 0) params.set("limit", String(query.limit));
-    if (query.cursor !== void 0) params.set("cursor", query.cursor);
-    const suffix = params.toString();
-    const endpoint = `${methodPath(methodId)}/versions`;
-    return this.requestPage(suffix ? `${endpoint}?${suffix}` : endpoint);
+    const search = productQuery({ limit: query.limit, cursor: query.cursor });
+    const endpoint = `${methodPath(methodId, "listMethodVersions")}/versions`;
+    return this.requestPage(`${endpoint}${search}`);
   }
   /**
    * One published version of a method, with its sources —
@@ -6844,11 +7076,13 @@ var PipelexApiClient = class {
    */
   async getMethodVersion(methodId, version) {
     if (!Number.isSafeInteger(version) || version < 1) {
-      throw new RequestArgumentError(
-        `getMethodVersion() takes a version number, a positive integer; got ${String(version)}.`
+      throw argumentRefusal(
+        "getMethodVersion",
+        "a version number, a positive integer",
+        describeNumberArgument(version)
       );
     }
-    const endpoint = `${methodPath(methodId)}/versions/${version}`;
+    const endpoint = `${methodPath(methodId, "getMethodVersion")}/versions/${version}`;
     const res = await this.requestProductAnswer("GET", endpoint, void 0);
     const wire = this.readObjectAnswer("GET", endpoint, res);
     return this.readStoredSources("GET", endpoint, res, wire, "a published version");
@@ -6872,7 +7106,215 @@ var PipelexApiClient = class {
    * as `getMethod` does: the whole method is erased, never one of its versions.
    */
   async deleteMethod(methodId) {
-    return this.requestProduct("DELETE", methodPath(methodId));
+    return this.requestProduct("DELETE", methodPath(methodId, "deleteMethod"));
+  }
+  // ── Method examples (`/v1/methods/{id}/examples`) ──────────────────────
+  //
+  // Every example route takes a bare catalog id, as `getMethod` does, and answers `404`
+  // `not_found` for an unknown method or example and `409` `method_being_deleted` while the
+  // method's erasure runs. The writes are `403` to a read-only key, which may still read.
+  //
+  // Every answer carrying an example is read with `parseExactJson`, so an integer past
+  // `Number.MAX_SAFE_INTEGER` in its inputs, which another client may have saved, is a `bigint`
+  // holding its exact digits, and every request body is written with `stringifyExactJson`, so
+  // such inputs go back digit for digit, to `updateMethodExample` or as a run's inputs. Each
+  // example is checked by `readMethodExample`: one missing a field the Python SDK's model
+  // requires, or holding one of another type, is an answer the SDK cannot read.
+  /**
+   * Save an example on a method — `POST /v1/methods/{id}/examples`: a named set of inputs, and
+   * with `run_id`, a run of this method that used exactly those inputs, recorded as its latest
+   * run. Answers the example as stored, at `input_revision` 1.
+   *
+   * Sends `name`, `inputs` and, when given, `run_id`, and nothing else: the route's body is
+   * closed, and a `null` `run_id` reads as not given. Throws `RequestArgumentError` before any
+   * request when `name` or `inputs` is not given (`null` counting as not given), and for a
+   * `run_id` that is given but is not a non-empty string. Throws `ApiResponseError`: `404`
+   * `run_not_found` for a `run_id` that is not one of this method's runs in the caller's
+   * organization, with nothing written; `413` `payload_too_large` for an example larger than one
+   * stored item holds; `422` for a name that is empty, blank or over 200 characters, or inputs
+   * that are not a JSON object; and the codes every example route answers.
+   */
+  async createMethodExample(methodId, input) {
+    const endpoint = `${methodPath(methodId, "createMethodExample")}/examples`;
+    const {
+      name,
+      inputs,
+      run_id: runId
+    } = input ?? {};
+    if (name == null || inputs == null) {
+      let got;
+      if (name == null && inputs == null) got = "neither";
+      else got = name == null ? "no name" : "no inputs";
+      throw new RequestArgumentError(
+        `createMethodExample() needs the example's name and its inputs; got ${got}.`
+      );
+    }
+    const body = { name, inputs };
+    if (runId != null) {
+      body.run_id = requireNonEmptyId(runId, "createMethodExample", CREATE_RUN_ID_ARGUMENT);
+    }
+    return this.requestMethodExample("POST", endpoint, body);
+  }
+  /**
+   * One page of a method's examples, oldest first, inputs included —
+   * `GET /v1/methods/{id}/examples`.
+   *
+   * Pass the page's `nextCursor` back as `cursor` to continue; `null` is the last page. A page
+   * may be short while `nextCursor` is set, because the platform reads examples whole and stops
+   * a read at 1 MB; `iterateMethodExamples` follows the cursor for a caller that wants them all.
+   *
+   * Throws `ApiResponseError`: `400` `malformed_request` for a cursor the listing did not issue
+   * for this method, `422` for a `limit` outside 1 to 100, and the codes every example route
+   * answers. A page whose `items` is not an array, whose `next_cursor` is neither a string nor
+   * `null`, or one of whose items is not an example `readMethodExample` can read, is an answer
+   * the SDK cannot read, thrown as an `ApiResponseError` too. An example whose inputs hold an
+   * integer past the safe range is read like any other, that integer as a `bigint`.
+   */
+  async listMethodExamples(methodId, query = {}) {
+    const search = productQuery({ limit: query.limit, cursor: query.cursor });
+    const endpoint = `${methodPath(methodId, "listMethodExamples")}/examples${search}`;
+    return this.requestPage(endpoint, {
+      parse: parseExactJson,
+      item: (row, res) => this.readMethodExample("GET", endpoint, res, row, "a page item")
+    });
+  }
+  /**
+   * Every example of a method, oldest first, streamed — follows the cursor of
+   * `listMethodExamples` for you.
+   *
+   * ```ts
+   * for await (const example of client.iterateMethodExamples(methodId)) {
+   *   rerun(example); // stop whenever you like
+   * }
+   * ```
+   *
+   * An iterator rather than an all-at-once list, for the reason `iterateMethods` is one: a
+   * helper returning an array needs a page cap, and a cap returns a truncated list with no
+   * error. It runs the same loop as `iterateMethods` and `iterateRuns`, so it keeps going through
+   * a short or empty page that carries a cursor, stops on a `null` cursor or on a cursor the
+   * server failed to advance, and throws `PagingNotTerminatingError` past the same page ceiling.
+   *
+   * Throws `RequestArgumentError` at the call, before the iterator is pulled or anything is sent,
+   * for a method id `listMethodExamples` refuses: a suffixed one, or one that is empty, `.` or `..`
+   * or holds a lone surrogate.
+   */
+  iterateMethodExamples(methodId, query = {}) {
+    methodPath(methodId, "iterateMethodExamples");
+    return followCursor(
+      "listMethodExamples",
+      (cursor) => this.listMethodExamples(methodId, { ...query, cursor })
+    );
+  }
+  /**
+   * One example of a method — `GET /v1/methods/{id}/examples/{example_id}`, read consistently,
+   * so an example saved a moment ago is found.
+   *
+   * Throws `RequestArgumentError` for an example id that is empty, `.` or `..`, or holds a lone
+   * surrogate, before any request. Throws `ApiResponseError`: `422` for an example id longer
+   * than one can be (64 characters), and the codes every example route answers.
+   */
+  async getMethodExample(methodId, exampleId) {
+    const endpoint = methodExamplePath(methodId, exampleId, "getMethodExample");
+    return this.requestMethodExample("GET", endpoint);
+  }
+  /**
+   * Rename an example, give it new inputs, or both —
+   * `PATCH /v1/methods/{id}/examples/{example_id}` — and return it as it now stands.
+   *
+   * **New inputs raise `input_revision` by one and clear `latest_run_id`**, since the run no
+   * longer shows what the inputs produce; inputs that are the same as the stored ones, their
+   * keys in another order included, change nothing, while `3` becoming `3.0` is a change. A
+   * rename alone keeps both. The edit takes no revision or token: the latest-run write is what
+   * the revision guards. Sends `name` and `inputs` when given, and nothing else; `null` reads as
+   * not given, as the platform reads it.
+   *
+   * **Send `inputs` only when they changed.** Inputs read from an example and sent back unchanged
+   * are a change for the platform when they hold a float with no fractional part, `3.0`, which
+   * JavaScript reads as `3` (see `MethodExample.inputs`): they raise the revision and clear the
+   * latest run. A rename sent alone never does. An integer past `Number.MAX_SAFE_INTEGER` is no
+   * such case: it reads as a `bigint` and is sent back as its exact digits.
+   *
+   * Throws `RequestArgumentError` before any request for an example id that is empty, `.` or
+   * `..`, or when neither `name` nor `inputs` is given. Throws `ApiResponseError`: `413`
+   * `payload_too_large` for inputs larger than one stored item holds, `422` for a name that is
+   * empty, blank or over 200 characters, or inputs that are not a JSON object, a `503` that wrote
+   * nothing, safe to retry, when concurrent edits kept landing under the write, and the codes
+   * every example route answers.
+   */
+  async updateMethodExample(methodId, exampleId, input) {
+    const endpoint = methodExamplePath(methodId, exampleId, "updateMethodExample");
+    const { name, inputs } = input ?? {};
+    const body = {};
+    if (name != null) body.name = name;
+    if (inputs != null) body.inputs = inputs;
+    if (Object.keys(body).length === 0) {
+      throw new RequestArgumentError(
+        "updateMethodExample() needs a new name, new inputs, or both; got neither."
+      );
+    }
+    return this.requestMethodExample("PATCH", endpoint, body);
+  }
+  /**
+   * Record a run as an example's latest —
+   * `PUT /v1/methods/{id}/examples/{example_id}/latest-run` — **only while the example still
+   * holds the revision whose inputs the run used**.
+   *
+   * `input_revision` is the example's `input_revision` the caller read when it started the run
+   * with the example's inputs; the platform trusts it and does not compare the run's own inputs.
+   * The answer is a `MethodExampleLatestRunResult` discriminated on `outcome` — branch on it:
+   * `recorded`, the run is now the example's latest; `stale`, the example's inputs were edited
+   * since and nothing was written. A stale run is the expected end of a run that outlasted an
+   * edit, so it is answered, never thrown. Both arms carry the `example` as it stands.
+   *
+   * Throws `RequestArgumentError` before any request, checking in this order: an example id that
+   * is empty, `.` or `..`, or holds a lone surrogate, a `run_id` that is not a non-empty string,
+   * and an `input_revision` that is not a positive integer. Throws `ApiResponseError` when no
+   * verdict was produced: `404` `not_found` for an example deleted since, `404` `run_not_found`
+   * for a run that is not one of this method's, with nothing written, and the codes every example
+   * route answers. An answer whose `outcome` is neither arm's, or whose `example` is not an
+   * example `readMethodExample` can read, is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` too, read as `publishMethod` reads its verdict.
+   */
+  async recordMethodExampleLatestRun(methodId, exampleId, input) {
+    const call = "recordMethodExampleLatestRun";
+    const endpoint = `${methodExamplePath(methodId, exampleId, call)}/latest-run`;
+    const { run_id: runId, input_revision: revision } = input ?? {};
+    const run = requireNonEmptyId(runId, call, RECORD_RUN_ID_ARGUMENT);
+    if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1) {
+      throw argumentRefusal(
+        call,
+        "an input_revision, the example's revision whose inputs the run used, a positive integer",
+        describeNumberArgument(revision)
+      );
+    }
+    const res = await this.requestProductAnswer("PUT", endpoint, {
+      run_id: run,
+      input_revision: revision
+    });
+    const { answer, outcome, subject } = this.readVerdict("PUT", endpoint, res, {
+      verdict: "a latest-run result",
+      outcomes: ["recorded", "stale"],
+      member: "example",
+      parse: parseExactJson,
+      // Checked once, by the check every example the client hands back goes through.
+      readMember: (value) => this.readMethodExample("PUT", endpoint, res, value, "a latest-run result's `example`")
+    });
+    return { ...answer, outcome, example: subject };
+  }
+  /**
+   * Delete an example — `DELETE /v1/methods/{id}/examples/{example_id}`. The platform answers
+   * `204`. Deleting the example leaves its latest run in the method's history.
+   *
+   * Throws `RequestArgumentError` for an example id that is empty, `.` or `..`, before any
+   * request: `..` would address the method, and its erasure would answer the delete. Throws
+   * `ApiResponseError`: `404` `not_found` when there is no such example, one already deleted
+   * included, and the codes every example route answers.
+   */
+  async deleteMethodExample(methodId, exampleId) {
+    await this.requestProduct(
+      "DELETE",
+      methodExamplePath(methodId, exampleId, "deleteMethodExample")
+    );
   }
   /** The caller's org memberships + active-org feature flags — `GET /v1/organizations/memberships`. */
   async listMemberships() {
@@ -6884,7 +7326,8 @@ var PipelexApiClient = class {
   }
   /** Rename an organization — `PATCH /v1/organizations/{org_id}`. */
   async renameOrganization(orgId, input) {
-    return this.requestProduct("PATCH", `organizations/${encodeURIComponent(orgId)}`, input);
+    const segment = idPathSegment(orgId, "renameOrganization", ORG_ID_ARGUMENT);
+    return this.requestProduct("PATCH", `organizations/${segment}`, input);
   }
   /** The active org's subscription state — `GET /v1/billing/subscription`. */
   async getSubscription() {
@@ -6931,14 +7374,16 @@ var PipelexApiClient = class {
   }
   /** Revoke a Pipelex API key — `DELETE /v1/pipelex-api-keys/{id}`. */
   async revokePipelexApiKey(id) {
-    await this.requestProduct("DELETE", `pipelex-api-keys/${encodeURIComponent(id)}`);
+    const segment = idPathSegment(id, "revokePipelexApiKey", API_KEY_ID_ARGUMENT);
+    await this.requestProduct("DELETE", `pipelex-api-keys/${segment}`);
   }
   /**
    * Rotate a Pipelex API key — `POST /v1/pipelex-api-keys/{id}/rotate` (no
    * body). Returns the new plaintext `api_key` once; the old key stops working.
    */
   async rotatePipelexApiKey(id) {
-    return this.requestProduct("POST", `pipelex-api-keys/${encodeURIComponent(id)}/rotate`);
+    const segment = idPathSegment(id, "rotatePipelexApiKey", API_KEY_ID_ARGUMENT);
+    return this.requestProduct("POST", `pipelex-api-keys/${segment}/rotate`);
   }
   /** Submit the onboarding questionnaire — `POST /v1/onboarding/submit`. */
   async submitOnboarding(input) {
@@ -7110,14 +7555,16 @@ var PipelexApiClient = class {
    * `method_version`.
    */
   async listRuns(methodId, query = {}) {
-    const params = new URLSearchParams({ method_id: methodId });
-    if (query.createdFrom !== void 0) params.set("created_from", query.createdFrom);
-    if (query.createdTo !== void 0) params.set("created_to", query.createdTo);
-    if (query.createdBy !== void 0) params.set("created_by", query.createdBy);
-    for (const status of runStatusFilter(query.status) ?? []) params.append("status", status);
-    if (query.limit !== void 0) params.set("limit", String(query.limit));
-    if (query.cursor !== void 0) params.set("cursor", query.cursor);
-    const page = await this.requestPage(`runs?${params.toString()}`);
+    const search = productQuery({
+      method_id: methodId,
+      created_from: query.createdFrom,
+      created_to: query.createdTo,
+      created_by: query.createdBy,
+      status: runStatusFilter(query.status),
+      limit: query.limit,
+      cursor: query.cursor
+    });
+    const page = await this.requestPage(`runs${search}`);
     return { items: page.items.map(withCheckedReport), nextCursor: page.nextCursor };
   }
   /**
@@ -7159,15 +7606,22 @@ var PipelexApiClient = class {
    * executed) and `inputs`. Kept off the status read, which pollers hit every
    * few seconds. A failed run's stored report, `error`, is checked field by
    * field (see `RunErrorReport`).
+   *
+   * Read with `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in the inputs is a
+   * `bigint` holding its exact digits, and the inputs passed back to `start` or saved as an
+   * example's go back as the run used them.
    */
   async getRunDetail(runId) {
+    const endpoint = `runs/${idPathSegment(runId, "getRunDetail", RUN_ID_ARGUMENT)}`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
     return withCheckedReport(
-      await this.requestProductObject("GET", `runs/${encodeURIComponent(runId)}`)
+      this.readObjectAnswer("GET", endpoint, res, {}, parseExactJson)
     );
   }
   /** Patch a run's status (admin/manual) — `PUT /v1/runs/{id}`. */
   async updateRun(runId, input) {
-    await this.requestProduct("PUT", `runs/${encodeURIComponent(runId)}`, input);
+    const segment = idPathSegment(runId, "updateRun", RUN_ID_ARGUMENT);
+    await this.requestProduct("PUT", `runs/${segment}`, input);
   }
   /**
    * Blocking `POST /v1/execute` adapted onto `RunResults` — the bare-runner
@@ -7230,8 +7684,7 @@ function describeRefusedBaseUrl(value) {
   if (parsed.hash) parts.push("a fragment");
   const shown = `"${parsed.protocol}//${parsed.host}"`;
   if (parts.length === 0) return shown;
-  const named = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-  return `${shown} with ${named} (not shown)`;
+  return `${shown} with ${inWords(parts, "and")} (not shown)`;
 }
 var PROTOCOL_REQUEST_KEYS = [
   "pipe_code",
