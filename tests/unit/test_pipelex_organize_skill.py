@@ -50,24 +50,58 @@ class TestPipelexOrganizeSkill:
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_catalog_id_pointer_opens_step_1(self, target_name: str) -> None:
         """The shared reference sends the model back "just after its pointer to this file", so the
-        pointer is step 1's first paragraph and the gather is what follows it — the step the inline
-        bridge used to resume at."""
+        pointer is step 1's first paragraph and the baseline call is what follows it — the step the
+        inline bridge used to resume at."""
         paragraphs = self.section(self.render(target_name), "### Step 1 — Baseline verdict").strip().split("\n\n")
         assert paragraphs[0].startswith("**For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference]")
-        assert paragraphs[1].startswith("Gather the bundle's files as the convention below says")
+        assert paragraphs[1].startswith("Call `mthds_validate` on the bundle directory.")
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_runs_exclusion_is_stated_once(self, target_name: str) -> None:
         """Phase 1's review found step 1 restating the exclusion beside the `validate-call` include
-        that states it; the step now defers to the convention, as `pipelex-catalog` and
-        `pipelex-design` do, and the on-disk confirmation gathers as step 1 did. The deletion keeps
-        its own `runs/` rule, since what it deletes is not what the convention submits."""
+        that states it. Step 1 now passes the bundle directory as `method_dir`, so the workshop's
+        folder rule decides what is sent, a saved run kept out by the `.gitignore` in its `runs/`,
+        and the step reads the files the call sent; the on-disk confirmation validates as step 1
+        did. The include's inline fallback names the exclusion once, for the files it lists. The
+        deletion keeps its own `runs/` rule, since a `runs/` saved into before the workshop marked
+        it may still be sent."""
         body = self.render(target_name)
-        assert body.count("except anything under a `runs/` directory") == 1
+        assert "except anything under a `runs/` directory" not in body
         assert "none under a `runs/` directory" not in body
-        assert "outside `runs/`" not in body
-        assert "validate the bundle once more, gathered as in Step 1" in body
+        assert body.count("outside `runs/`") == 1, "only the include's inline fallback names the exclusion"
+        assert "Read every `.mthds` file the call sent" in body
+        assert "validate the bundle once more, as in Step 1" in body
         assert "never one under a `runs/` directory" in body
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_swap_touches_only_the_files_the_call_sent(self, target_name: str) -> None:
+        """Step 1 reads the `.mthds` files the folder call sent, so the swap deletes only those: a
+        `.mthds` file the folder rule leaves out (under a dot directory, a nested repository, a
+        virtual environment or `node_modules/`, or excluded by a `.gitignore`) was never read, and
+        deleting it would lose it unseen, with no copy for the rollback to restore. For the same
+        reason a new file never lands on the path of an existing file outside that set."""
+        steps = self.section(self.render(target_name), "### Step 4 — Swap the layout")
+        write, delete = steps.strip().split("\n")[:2]
+        assert write.startswith("1. Write every file of the new layout.")
+        assert "may take the path of a `.mthds` file Step 1's call sent, never that of any other existing file" in write
+        assert delete.startswith(
+            "2. Delete every `.mthds` file Step 1's call sent (`files_sent`, or the files it listed) that is not part of the new layout."
+        )
+        assert "**Delete no other file," in delete
+        assert "Delete every `.mthds` file that is not part of the new layout" not in steps
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_new_layout_file_the_folder_leaves_out_rolls_the_swap_back(self, target_name: str) -> None:
+        """A new file the folder rule leaves out, one a `.gitignore` in the folder excludes, is
+        not validated by the confirmation, so an equal verdict would prove a layout that lost it.
+        The confirmation checks that the call sent every new-layout file, and a miss is a failure
+        that rolls the swap back."""
+        steps = self.section(self.render(target_name), "### Step 4 — Swap the layout")
+        confirm, rollback = steps.strip().split("\n")[2:4]
+        assert confirm.startswith("3. **Confirm on disk**")
+        assert "check that every new-layout file is among those it sent" in confirm
+        assert rollback.startswith("4. **If that confirmation fails, restore the original layout")
+        assert "a new-layout file the call did not send" in rollback
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_formatting_note_is_not_an_organize_step(self, target_name: str) -> None:
@@ -126,4 +160,4 @@ class TestPipelexOrganizeSkill:
             in swap
         )
         assert "A valid verdict cannot see a step that now reaches another template under the same name." in swap
-        assert "a verdict that differs from the baseline or a template that differs from Step 2's" in swap
+        assert "a verdict that differs from the baseline, a new-layout file the call did not send, or a template that differs from Step 2's" in swap

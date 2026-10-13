@@ -122,23 +122,65 @@ class TestLanguageReference:
 
     def test_a_template_file_sits_beside_the_bundle_and_travels_with_it(self) -> None:
         """A bundle loaded from a string, as a runner receiving submitted files does, has no directory to find a
-        template file in, so every submission sends the template files beside the `.mthds` files, as paths, and the
-        workshop keys each by the step naming it. The section used to fall back to an inline template when the
-        runner refused the file; the workshop now takes it, so a refusal names an older workshop and its refresh,
-        never a rewrite of the step."""
+        template file in, so every submission sends the template files beside the `.mthds` files. The skills pass the
+        bundle directory as `method_dir`, and the workshop finds each template from the step naming it, keyed by
+        that step, and lists what it sent; listed in `files`, a template goes as a path. The section used to fall
+        back to an inline template when the runner refused the file; the workshop now takes it, so a refusal names
+        an older workshop and its refresh, never a rewrite of the step."""
         docgen = section(rendered_shared("prod", "writing-mthds.md"), "### PipeDocGen — ")
         assert "A template file beside the bundle, its path relative to the `.mthds` file that names it" in docgen
         assert "#### Template files" in docgen
         assert "**A template file travels with the bundle**" in docgen
-        assert "sends the template files its steps name beside its `.mthds` files, each as a `{path}` item, never inline" in docgen
+        assert "**The workshop finds it**: given the bundle directory as `method_dir`" in docgen
+        assert "lists every file it sent in `files_sent`" in docgen
+        assert "**Listed in `files` instead**, a template file goes as a `{path}` item beside the `.mthds` files, never inline" in docgen
         assert "the `method-graph.html` page `mthds_validate` writes beside the bundle" in docgen
         assert "about 7.4 MiB beside a small bundle" in docgen
-        assert "The limits are the workshop's and the runner's today" in docgen
+        assert "**The limits are the workshop's and the runner's today**" in docgen
+        assert "at most 16 `.mthds` files of at most 1 MiB each, which a folder is held to before anything is sent" in docgen
         assert "its `.html` templates at most 512 KiB in all, which the runner refuses past that as too large" in docgen
         assert "**A workshop older than template files refuses one** as *Path is not a .mthds file*" in docgen
         assert "refresh with `npx -y @pipelex/mcp@latest`" in docgen
         assert "Never rewrite the step to do without its template to get past it." in docgen
         assert "write an inline `template` for a `pdf`, or none for the layout, in its place" not in docgen
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_what_belongs_to_the_folder_is_said_and_a_saved_run_is_kept_out(self, target_name: str) -> None:
+        """The workshop's membership rule decides what a `method_dir` sends, and it reads the `.gitignore` files
+        inside the folder, which is how a saved run is kept out of the method: `mthds_download_artifacts` writes a
+        `.gitignore` of `*` into a `runs/` it creates. A symbolic link refuses the folder, so a file is copied in.
+        The reference is rendered for an outside target too, which may not ship `/pipelex-run`, so the section
+        names no skill."""
+        docgen = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeDocGen — ")
+        assert "**What belongs to the folder**" in docgen
+        assert "a `.gitignore` inside the folder excludes, read as git reads it; a `.gitignore` above the folder does not count" in docgen
+        assert "A symbolic link the rule does not exclude refuses the folder, so a file is copied into it, never linked." in docgen
+        assert "`mthds_download_artifacts` writes one holding `*` into each `runs/` it creates" in docgen
+        assert "/pipelex-" not in section(docgen, "#### Template files")
+
+    @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
+    def test_an_older_workshop_is_refreshed_and_the_files_listed_meanwhile_said_aloud(self, target_name: str) -> None:
+        """A workshop older than the folder form drops `method_dir`, an argument it does not know, and answers that
+        no method was given. The cure is the cached release's refresh, which needs the host to restart the server;
+        until then the skills list the files, the convention the folder replaced, and say that they do. The listing
+        is the include's listing form, never a second copy of it, and a run never pairs the dropped folder with a
+        `method_id`, which would run the saved method instead."""
+        docgen = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeDocGen — ")
+        older = docgen[docgen.index("**A workshop older than the folder form does not take `method_dir`**") :]
+        older = older[: older.index("\n\n")]
+        assert "*Provide MTHDS files, a method_ref address, or a method_id.*" in older
+        assert "refresh with `npx -y @pipelex/mcp@latest`, which takes effect once the host restarts the server" in older
+        assert "Say so, and until then list the bundle's files, saying that you do." in older
+        listing = (
+            "Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**,"
+            " and every template file a `PipeDocGen` step names."
+        )
+        assert listing in older
+        assert "Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**" in older
+        assert "least of all beside a `method_id` on a run: it drops the folder and runs the saved method instead." in older
+        source = (REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2").read_text(encoding="utf-8")
+        assert '{% set validate_call_folder = false %}{% include "skills/shared/validate-call.md.j2" %}' in source
+        assert "Prefer the path form" not in source, "the listing reaches the reference through the include alone"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_a_template_is_written_before_the_step_that_names_it(self, target_name: str) -> None:
@@ -159,7 +201,7 @@ class TestLanguageReference:
         the template, which the skills that report a verdict point at."""
         docgen = section(rendered_shared("prod", "writing-mthds.md"), "### PipeDocGen — ")
         assert "**The catalog stores no template file yet**" in docgen
-        assert "does not load by its id, while its directory still validates and runs as `files`" in docgen
+        assert "does not load by its id, while its directory still validates and runs as `method_dir`" in docgen
         assert "**A `template_check_warning` in a valid verdict's `warnings`**" in docgen
         assert "It never changes `is_valid`, but the printed file may show it." in docgen
         assert "a template the user supplied is theirs, so name the finding and ask before changing it" in docgen
