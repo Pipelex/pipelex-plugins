@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.40.0 (137e918) + @pipelex/tools-wasm 0.5.0 (npm)
+// Provenance: @pipelex/sdk 0.42.0 (c44bec8) + @pipelex/tools-wasm 0.5.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2731,6 +2731,7 @@ var CONFIG = Object.freeze({ errorDomain: "config", retryable: false });
 var TRANSIENT = Object.freeze({ errorDomain: "runtime", retryable: true });
 var FAULT = Object.freeze({ errorDomain: "runtime", retryable: false });
 var API_KEY_LIMIT_CODE = "pipelex_api_key_limit_reached";
+var IDEMPOTENCY_KEY_IN_USE_CODE = "idempotency_key_in_use";
 function fallbackVerdict(status, code, named) {
   switch (status) {
     case 401:
@@ -2745,7 +2746,9 @@ function fallbackVerdict(status, code, named) {
     case 429:
       return TRANSIENT;
     case 409:
-      return code === API_KEY_LIMIT_CODE ? CONFIG : INPUT;
+      if (code === API_KEY_LIMIT_CODE) return CONFIG;
+      if (code === IDEMPOTENCY_KEY_IN_USE_CODE) return TRANSIENT;
+      return INPUT;
     case 501:
       return CONFIG;
   }
@@ -3161,7 +3164,8 @@ var ApiResponseError = class extends PipelexRequestError {
   /**
    * The platform's native code — a closed set (`conflict`, `not_found`, `run_not_found`,
    * `pipelex_api_key_limit_reached`, …), one-to-one with `type`; `MethodErrorCode` names the
-   * ones about a stored method and its versions. Finer than `errorDomain` and specific to the
+   * ones about a stored method and its versions, and `IdempotencyErrorCode` the one about a
+   * request's idempotency key. Finer than `errorDomain` and specific to the
    * platform: a runner's problem carries `errorType` instead. `undefined` for a body that
    * carries no `code`.
    */
@@ -3361,6 +3365,37 @@ function readNested(record, field, read) {
 }
 
 // src/runs.ts
+var RUN_STATUSES = [
+  "PENDING",
+  "STARTED",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "TERMINATED",
+  "TIMED_OUT"
+];
+function runStatusFilter(status) {
+  if (status === void 0) return void 0;
+  if (!Array.isArray(status)) {
+    throw new TypeError(
+      `"status" must be an array naming one or more of ${RUN_STATUSES.join(", ")}.`
+    );
+  }
+  if (status.length === 0) {
+    throw new RequestArgumentError(
+      `"status" must name one or more of ${RUN_STATUSES.join(", ")}; omit it to list every status.`
+    );
+  }
+  const known = RUN_STATUSES;
+  const unknown = status.filter((name) => !known.includes(name));
+  if (unknown.length > 0) {
+    throw new RequestArgumentError(
+      `Unknown run status(es) ${unknown.join(", ")}; valid statuses are: ${RUN_STATUSES.join(", ")}.`
+    );
+  }
+  return RUN_STATUSES.filter((name) => status.includes(name));
+}
 function readRunDegradation(value) {
   if (!isPlainObject(value) || typeof value.reason !== "string") return null;
   const degradation = { ...value };
@@ -3952,7 +3987,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.40.0";
+var SDK_VERSION = "0.42.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -5325,6 +5360,24 @@ function resultsFromExecute(response) {
 
 // src/client.ts
 var MAX_PAGES = 1e4;
+async function* followCursor(route, readPage) {
+  let cursor;
+  let pages = 0;
+  for (; ; ) {
+    const page = await readPage(cursor);
+    if (cursor !== void 0 && page.nextCursor === cursor) return;
+    for (const item of page.items) yield item;
+    if (page.nextCursor === null) return;
+    pages += 1;
+    if (pages >= MAX_PAGES) {
+      throw new PagingNotTerminatingError(
+        `${route} did not terminate after ${MAX_PAGES} pages; refusing to keep paging. This is a server-side fault, not a coverage limit.`,
+        MAX_PAGES
+      );
+    }
+    cursor = page.nextCursor;
+  }
+}
 var STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
 var LENIENT_UTF8 = new TextDecoder("utf-8");
 var STARTS_RUN = Object.freeze({ mayStartRun: true });
@@ -5393,7 +5446,7 @@ var PipelexApiClient = class {
    * no request path can miss the `User-Agent` or the bearer. Requests to third
    * parties (presigned object-store URLs) never go through here.
    */
-  requestHeaders(hasBody) {
+  requestHeaders(hasBody, idempotencyKey) {
     const headers = { Accept: "application/json" };
     if (this.userAgent !== void 0) {
       headers["User-Agent"] = this.userAgent;
@@ -5404,6 +5457,9 @@ var PipelexApiClient = class {
     if (hasBody) {
       headers["Content-Type"] = "application/json";
     }
+    if (idempotencyKey !== void 0) {
+      headers[IDEMPOTENCY_KEY_HEADER] = idempotencyKey;
+    }
     return headers;
   }
   /**
@@ -5413,10 +5469,12 @@ var PipelexApiClient = class {
    * cleanly. Non-2xx interpretation is left to the caller. `url` is a fully
    * resolved absolute URL. `mayStartRun` marks a request that may create a run,
    * whose `ApiUnreachableError` then says whether it may have (see `RunCreation`).
+   * `idempotencyKey`, already checked by `idempotencyKeyOf`, is sent as the
+   * `Idempotency-Key` header; only `start` passes one.
    */
   async requestRaw(method, url, options = {}) {
     const hasBody = options.body !== void 0;
-    const headers = this.requestHeaders(hasBody);
+    const headers = this.requestHeaders(hasBody, options.idempotencyKey);
     const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     if (!isTimerDelay(timeoutMs)) {
       throw new RangeError(
@@ -5844,8 +5902,16 @@ var PipelexApiClient = class {
    * durable — poll `getRunStatus` / `getRunResult`. A `method_ref` run's ack
    * additionally carries `method_provenance` — the address, the tag, and the
    * commit SHA that was actually fetched.
+   *
+   * `options.idempotencyKey` is sent as the `Idempotency-Key` header, and nothing
+   * is sent without it: the hosted API answers the same start sent again under the
+   * same key with the run the first one started, so a failure whose
+   * `runMayHaveStarted` is true can be retried unchanged (see
+   * `PipelexStartRequestOptions`). A malformed key is a `RequestArgumentError`
+   * before anything is sent.
    */
   async start(options) {
+    const idempotencyKey = idempotencyKeyOf(options);
     const extensions = buildExtensions(options.extra);
     const api = buildApiRunExtensions(options);
     const hosted = buildHostedRunExtensions(options);
@@ -5878,6 +5944,7 @@ var PipelexApiClient = class {
     const res = await this.requestRaw("POST", url, {
       body: request,
       timeoutMs: needsLongCeiling ? DEFAULT_REQUEST_TIMEOUT_MS : POLL_REQUEST_TIMEOUT_MS,
+      idempotencyKey,
       ...STARTS_RUN
     });
     this.throwIfLifecycleUnavailable(res, url);
@@ -6480,9 +6547,16 @@ var PipelexApiClient = class {
    * up in the run history first. An error from the wait, once `onStarted` has named the run,
    * started nothing, so its `runMayHaveStarted` is false, and its `retryable` is about waiting
    * again on that id with `waitForResult`, never about calling this method again.
+   *
+   * `options.idempotencyKey` rides the durable start, so a call that failed while its start may
+   * have created a run can be made again with the same options and the same key: the hosted API
+   * answers the start with the run the first call started, and the wait follows it. The blocking
+   * execute of a bare runner carries no key, a bare runner having no idempotency to honour it. A
+   * malformed key is refused before the version handshake.
    */
   async startAndWaitForResult(options, pollOptions) {
     assertWaitOptions(pollOptions);
+    idempotencyKeyOf(options);
     const { onStarted, onStarting, ...waitOptions } = pollOptions ?? {};
     const hosted = await this.supportsRunLifecycle();
     throwIfAborted(waitOptions.signal);
@@ -6528,11 +6602,16 @@ var PipelexApiClient = class {
    * Rows are `MethodSummary`: no `mthds`, no `python`, no `updated_at`. Reach
    * for `getMethod(id)` when you need a method's source.
    *
-   * `q` is applied server-side over the whole catalog, not over the page.
+   * `q` is applied server-side over the whole catalog, not over the page, and so is
+   * `published` (`true` for the methods with a published version, `false` for those never
+   * published). Each row carries the method's publish state (`latest_version`,
+   * `latest_published`, `draft_digest`). Both filters run after the index read, so a page can
+   * come back empty and still carry a `nextCursor`: keep following it until it is `null`.
    */
   async listMethods(query = {}) {
     const params = new URLSearchParams();
     if (query.q !== void 0) params.set("q", query.q);
+    if (query.published !== void 0) params.set("published", String(query.published));
     if (query.limit !== void 0) params.set("limit", String(query.limit));
     if (query.cursor !== void 0) params.set("cursor", query.cursor);
     const suffix = params.toString();
@@ -6556,24 +6635,14 @@ var PipelexApiClient = class {
    * TRUNCATED list with no error — precisely the bug paging was introduced to
    * remove. If you truly want an array, `Array.fromAsync` makes that your
    * explicit choice.
+   *
+   * It keeps going **through an empty page that carries a cursor**: under `q` or `published`
+   * such a page means "nothing matched in the slice just read", not "done". It stops on a
+   * `null` cursor or on a cursor the server failed to advance, and throws
+   * `PagingNotTerminatingError` past a page ceiling no real catalog reaches.
    */
   async *iterateMethods(query = {}) {
-    let cursor;
-    let pages = 0;
-    for (; ; ) {
-      const page = await this.listMethods({ ...query, cursor });
-      if (cursor !== void 0 && page.nextCursor === cursor) return;
-      for (const method of page.items) yield method;
-      if (page.nextCursor === null) return;
-      pages += 1;
-      if (pages >= MAX_PAGES) {
-        throw new PagingNotTerminatingError(
-          `listMethods did not terminate after ${MAX_PAGES} pages; refusing to keep paging. This is a server-side fault, not a coverage limit.`,
-          MAX_PAGES
-        );
-      }
-      cursor = page.nextCursor;
-    }
+    yield* followCursor("listMethods", (cursor) => this.listMethods({ ...query, cursor }));
   }
   /**
    * Read one method — `GET /v1/methods/{id}`: its identity, its draft (`mthds`, `python`,
@@ -7027,6 +7096,13 @@ var PipelexApiClient = class {
    * conditions, so a bounded page genuinely reads less. They are INSTANTS,
    * not days — see `ListRunsQuery`.
    *
+   * `createdBy: "me"` keeps the caller's own runs and `status` the runs in any of the given
+   * statuses, sent as `created_by=me` and one repeated `status=` parameter per status. Both are
+   * filters applied after the index read, so a filtered page can hold fewer runs than `limit`,
+   * or none, and still carry a `nextCursor`: an empty page is not the end, a `null` cursor is.
+   * An empty `status` list, or a name that is no `RunStatus`, is a `RequestArgumentError`
+   * before any request.
+   *
    * Takes a bare catalog id: the history files the runs of every version and
    * of the draft together under it, so `mt_…@3` names no history of its own
    * and the platform refuses it with a `400`. Strip a suffix with
@@ -7037,6 +7113,8 @@ var PipelexApiClient = class {
     const params = new URLSearchParams({ method_id: methodId });
     if (query.createdFrom !== void 0) params.set("created_from", query.createdFrom);
     if (query.createdTo !== void 0) params.set("created_to", query.createdTo);
+    if (query.createdBy !== void 0) params.set("created_by", query.createdBy);
+    for (const status of runStatusFilter(query.status) ?? []) params.append("status", status);
     if (query.limit !== void 0) params.set("limit", String(query.limit));
     if (query.cursor !== void 0) params.set("cursor", query.cursor);
     const page = await this.requestPage(`runs?${params.toString()}`);
@@ -7064,17 +7142,15 @@ var PipelexApiClient = class {
    * when to stop, and only one page is ever in memory. If you truly want an
    * array, `Array.fromAsync` makes that your explicit choice.
    *
+   * It keeps going **through an empty page that carries a cursor**: under `createdBy` or
+   * `status` such a page means "nothing matched in the slice just read", not "done". It stops on
+   * a `null` cursor or on a cursor the server failed to advance, and throws
+   * `PagingNotTerminatingError` past a page ceiling no real history reaches.
+   *
    * Takes a bare catalog id, as `listRuns` does.
    */
   async *iterateRuns(methodId, query = {}) {
-    let cursor;
-    for (; ; ) {
-      const page = await this.listRuns(methodId, { ...query, cursor });
-      if (cursor !== void 0 && page.nextCursor === cursor) return;
-      for (const run of page.items) yield run;
-      if (page.nextCursor === null || page.items.length === 0) return;
-      cursor = page.nextCursor;
-    }
+    yield* followCursor("listRuns", (cursor) => this.listRuns(methodId, { ...query, cursor }));
   }
   /**
    * The whole record for one run — `GET /v1/runs/{id}`.
@@ -7269,6 +7345,27 @@ function nonEmptyFiles(files) {
 function nonEmptyString2(value) {
   return value != null && value.length > 0 ? value : void 0;
 }
+var IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+var MAX_IDEMPOTENCY_KEY_LENGTH = 255;
+var VISIBLE_ASCII = /^[\x21-\x7E]+$/;
+function idempotencyKeyOf(options) {
+  const key = options.idempotencyKey;
+  if (key == null) return void 0;
+  const fault2 = idempotencyKeyFault(key);
+  if (fault2 !== void 0) {
+    throw new RequestArgumentError(
+      `The idempotency key must be 1 to ${MAX_IDEMPOTENCY_KEY_LENGTH} visible ASCII characters (\`!\` to \`~\`), and this one ${fault2}. Leave it out to start the run without one.`
+    );
+  }
+  return key;
+}
+function idempotencyKeyFault(key) {
+  if (typeof key !== "string") return "is not a string";
+  if (key.length === 0) return "is empty";
+  if (!VISIBLE_ASCII.test(key)) return "holds a character outside visible ASCII";
+  if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) return `is ${key.length} characters long`;
+  return void 0;
+}
 function withValidateMarkdownRender(render) {
   const formats = new Set(render ?? []);
   formats.add(VALIDATE_MARKDOWN_RENDER_FORMAT);
@@ -7321,16 +7418,6 @@ function parseRetryAfter(headers) {
   const seconds = Number(raw);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
-var KNOWN_RUN_STATUSES = [
-  "PENDING",
-  "STARTED",
-  "RUNNING",
-  "COMPLETED",
-  "FAILED",
-  "CANCELLED",
-  "TERMINATED",
-  "TIMED_OUT"
-];
 var REQUEST_ID_HEADER = "x-request-id";
 function runResultFailed(runId, body) {
   const { serverMessage, document } = parseErrorBody(body);
@@ -7352,7 +7439,7 @@ function withCheckedDegradation(run) {
   return { ...run, degradation: readRunDegradation(run.degradation) };
 }
 function knownRunStatus(value) {
-  return typeof value === "string" && KNOWN_RUN_STATUSES.includes(value) ? value : void 0;
+  return typeof value === "string" && RUN_STATUSES.includes(value) ? value : void 0;
 }
 function statusFromDetail(detail) {
   return knownRunStatus(/status\s+([A-Z_]+)/.exec(detail)?.[1]);
