@@ -1,49 +1,69 @@
-{#- How a bundle is handed to the workshop: which files go in, and in what
-   form. Included mid-sentence by every skill that submits a local bundle, so it
-   strips its own trailing newline (the closing comment below).
+{#- How a bundle is handed to the workshop. Included mid-sentence by every skill
+   that submits a local bundle, and whole by the language reference's "Template
+   files" section, so it strips its own trailing newline (the closing comment
+   below). It has a folder form and a listing form.
 
-   The first sentence is the shared submission convention's file set: every
+   The folder form, the default, passes the bundle directory as `method_dir`
+   (`pipelex-mcp`, SPEC.md, "The method folder"): the workshop reads the
+   folder's `.mthds` files and the template files their `PipeDocGen` steps name,
+   sends them as `files` would, and lists them in `files_sent`, so no template a
+   hand-made list forgets is left out and no file slips in unseen. Which files
+   belong to the folder is the workshop's rule, and it reads the `.gitignore`
+   files inside the folder, which is how a saved run stays out of the method:
+   `mthds_download_artifacts` writes a `.gitignore` of `*` into the topmost
+   directory it creates, and `/pipelex-run` writes one into a `runs/` made
+   before the workshop did. The folder is the one source on the tooling tools
+   and pairs with a bare `method_id` on `mthds_run`, as `files` did, so a skill
+   says `method_dir` where it said `files` and nothing else changes.
+
+   The listing form (`validate_call_folder = false`) is the convention the
+   folder replaced, kept where a skill states the file set itself:
+   `pipelex-catalog`, since `mthds_save_method` takes no folder, its `files` and
+   `python` being what the catalog stores; `pipelex-integrate`, since the set it
+   submits is the set its generated call site loads at runtime, which is the
+   call site's to define; and the language reference, whose fallback for a
+   workshop older than the folder form lists the files. The file set is every
    `.mthds` file beneath the bundle directory except `runs/`, where
    `/pipelex-run` saves a completed run's artifacts, and every template file a
-   `PipeDocGen` step names in its `template_file`, which the runner needs to load
-   a bundle sent as content (`pipelex-mcp`, SPEC.md, "Template files"). The
-   workshop keys each template by the step naming it and refuses one no step
-   names, which is why the set is the named files and not a glob of template
-   suffixes: a glob would sweep in the `method-graph.html` page `mthds_validate`
-   writes beside the bundle. `pipelex-integrate` sets
-   `validate_call_file_set = false` and states its own set, because the set it
-   submits is the set its generated call site loads at runtime, and that is
-   the call site's to define. Why `runs/` is excluded — a method that emits or
-   echoes a `.mthds` file would otherwise submit its own output as source — is
-   rationale, and lives in `docs/decisions.md` beside the artifact `dir`.
+   `PipeDocGen` step names in its `template_file`; the workshop keys each
+   template by the step naming it and refuses one no step names, which is why
+   the set is the named files and not a glob of template suffixes, which would
+   sweep in the `method-graph.html` page `mthds_validate` writes beside the
+   bundle. Its parameters apply to it alone. `validate_call_file_set` is false
+   in `pipelex-integrate`, which states its own set. `validate_call_templates`
+   is false in `pipelex-catalog`, since the catalog stores `.mthds` and `.py`
+   files only. `validate_call_root_first` is false in `pipelex-catalog`, whose
+   save step states the order with its own reason: the workshop reads every
+   `{ path }` item from at or under the directory of the first one (SPEC.md,
+   "Path trust boundary"), so the root `.mthds` file goes first.
+   `validate_call_inline` is what the last sentence says of the inline form;
+   the catalog sets it, because `mthds_save_method` writes `pipelex-method.json`
+   only beside a `{ path }` root file, so for a save the inline form is the one
+   that leaves a new method unlinked.
 
-   `validate_call_templates` is false in `pipelex-catalog` alone: the catalog
-   stores `.mthds` and `.py` files only, so `mthds_save_method` takes no template
-   file, and the catalog says so at its save step. Everywhere else a template file
-   goes as a path, since it has no inline form: the workshop refuses one inline,
-   and one beside a bundle given inline, which is also why the inline fallback
-   is a fallback only for a bundle whose steps name no template file.
+   Both forms name the same bound: the local workshop reads a folder or a
+   `{ path }` item only inside its own working directory, an absolute path
+   included (`src/files.ts`), so the sentence names the refusal and its cure
+   rather than promising that any absolute path works. And both name the same
+   fallback: a bundle the workshop cannot read goes inline as `files`, which a
+   templated one cannot, since a template file has no inline form, so a
+   templated bundle out of reach is a stop and the relaunch. The folder form
+   says which files go inline, since no folder rule picks them there: the
+   listing's set, the `.mthds` files outside `runs/`, root file first, as
+   `{content, uri}`, where an inline `uri` is a provenance label the workshop
+   reads nothing from, so the sentence leaves its value to the caller. The
+   listing form's `uri: <path relative to the bundle dir>` is that label's
+   convention. It does not call `method_dir` absolute: a
+   relative one resolves against the workshop's working directory, as a
+   `{ path }` does.
 
-   The local workshop resolves a `{ path }` item against its own working
-   directory and refuses one that resolves outside it (`pipelex-mcp`,
-   `src/files.ts`), an absolute path included, so the sentence names the
-   refusal and its cure rather than promising that any absolute path works. It
-   also reads every `{ path }` item from at or under the directory of the first
-   one (SPEC.md, "Path trust boundary"), so the root `.mthds` file goes first,
-   before any file or template in a subdirectory. `validate_call_root_first` is
-   false in `pipelex-catalog` alone, whose save step states the same order with
-   its own reason, the listed description the platform takes from the first
-   file. And since a template file has no inline form, a templated bundle the
-   workshop cannot read by path is a stop and the relaunch, never the inline
-   fallback, which would answer that the template was not supplied.
-
-   `validate_call_inline` is what the last sentence says of the inline form,
-   after the form itself. Every skill but `pipelex-catalog` leaves it to its
-   default, which calls it the fallback. The catalog sets it, because
-   `mthds_save_method` is the workshop's alone and writes `pipelex-method.json`
-   only beside a `{ path }` root file: for a save, the inline form is the one
-   that leaves a new method unlinked, or an updated one's link behind the
-   catalog. -#}
-{% set validate_call_with_templates = validate_call_templates | default(true) %}
-{%- if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path>}`{% if validate_call_root_first | default(true) %}, **the root `.mthds` file first**, as nothing above its directory is read{% endif %}. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.") }}
+   The folder form's last sentence is the pointer to the language reference's
+   fallback for a workshop older than the folder form, which strips an argument
+   it does not know and answers that no method was given: a branch, so the
+   listing it falls back to, the refresh it names and the run's pairing it
+   forbids live in the reference, read before the next call. Why the folder,
+   and why the `.gitignore` in `runs/`, is rationale and lives in
+   `docs/decisions.md`. -#}
+{%- if validate_call_folder | default(true) %}Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference]({{ shared_dir }}/writing-mthds.md#template-files) first.
+{%- else %}{% set validate_call_with_templates = validate_call_templates | default(true) %}{% if validate_call_file_set | default(true) %}Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**{% if validate_call_with_templates %}, and every template file a `PipeDocGen` step names{% endif %}. {% endif %}Prefer the path form `{path: <absolute path>}`{% if validate_call_root_first | default(true) %}, **the root `.mthds` file first**, as nothing above its directory is read{% endif %}. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` {{ validate_call_inline | default("is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.") }}{% endif %}
 {#- -#}

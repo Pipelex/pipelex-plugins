@@ -50,16 +50,16 @@ Design the whole graph in memory, then write `main.mthds` in the bundle home, to
 
 ### 5. Validate
 
-Call `mthds_validate`. Submit every `.mthds` file beneath the bundle directory **except anything under a `runs/` directory**, and every template file a `PipeDocGen` step names. Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**, as nothing above its directory is read. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**.
+Call `mthds_validate`. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first.
 
 Branch on the **structured verdict**, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `validation_errors[]` and the summary's locators, then re-validate. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
 ### 6. The runnable gate and delivery
 
-For a completed method, re-gather the whole bundle and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
+For a completed method, validate once more and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
-2. **Project the input schema**: `mthds_inputs_template` with the final whole-bundle `files` and `explicit: false`; show the compact template.
+2. **Project the input schema**: `mthds_inputs_template` with the gate's source and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
 5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.

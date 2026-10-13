@@ -42,7 +42,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name. {% set validate_call_file_set = false %}{% include "skills/shared/validate-call.md.j2" %} A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: every `.mthds` file beneath the bundle directory is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name. {% set validate_call_folder = false %}{% set validate_call_file_set = false %}{% include "skills/shared/validate-call.md.j2" %} A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 

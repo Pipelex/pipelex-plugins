@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The skills hand the Pipelex tools a method's folder instead of listing its files**: `pipelex-design`, `pipelex-edit`, `pipelex-explain`, `pipelex-inputs`, `pipelex-organize` and `pipelex-run` pass a bundle on disk as `method_dir`, and the tools send its `.mthds` files and the template files its `PipeDocGen` steps name, leave out what a `.gitignore` inside the folder excludes, and list every file they sent, so no template file is forgotten and none is sent unseen. A saved run stays out of the method through the `.gitignore` the tools write into a `runs/` they create, `pipelex-run` writes the same file into a `runs/` inside the bundle whose folders hold `main_stuff.json`, made before the tools did, and `pipelex-inputs` copies your files into the bundle rather than linking them, since the tools refuse a folder holding a link, and their refusal of a link an earlier preparation left names it and how to replace it. `pipelex-organize` deletes or replaces only the `.mthds` files the tools sent and rolls back a new layout they would not send whole, `pipelex-explain` explains the files the tools sent and still sends a single file as itself, a catalog save and `pipelex-integrate` still list the files, and with a version of the tools too old to take a folder the skills say so, name the restart that fetches the current one, and list the files until then.
+
 ## [0.14.0] - 2026-10-12
 
 ### Added
