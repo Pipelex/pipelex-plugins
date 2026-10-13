@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.42.0 (924c7f3) + @pipelex/tools-wasm 0.5.0 (npm)
+// Provenance: @pipelex/sdk 0.43.0 (898b33d) + @pipelex/tools-wasm 0.5.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -3987,7 +3987,7 @@ function isFileEntry(entry) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.42.0";
+var SDK_VERSION = "0.43.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
