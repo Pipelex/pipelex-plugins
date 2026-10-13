@@ -71,6 +71,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "Do not pass it, not even to a temporary directory.",
         "**pending only when no concrete pipe of the same code exists anywhere in the files you read.**",
         "**When the workshop answered, its `pending_signatures` is the authority**",
+        "**From a folder, explain the `.mthds` files in `files_sent`, naming any you read that it leaves out.**",
         "**A single file goes as `files` instead**",
         "explain from the source and **say the verdict was not checked**",
         "**and, when the verdict wrote the graph page, its path in the same opening lines, never at the end**",

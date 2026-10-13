@@ -1138,7 +1138,7 @@ class TestSharedSkillIncludes:
         longer claims to be the one form the hosted console accepts: the console's
         tools are `pipelex_*` and take no files at all.
 
-        Every skill but two passes the bundle directory as `method_dir`, and the workshop
+        Every skill but the catalog's save and integrate passes the bundle directory as `method_dir`, and the workshop
         finds the `.mthds` files and the template files their `PipeDocGen` steps name, lists
         what it sent in `files_sent`, and keeps out what a `.gitignore` inside the folder
         excludes, which is how a saved run stays out of the method (`pipelex-mcp`, SPEC.md,
@@ -1212,7 +1212,7 @@ class TestSharedSkillIncludes:
 
     def test_no_skill_that_passes_the_folder_lists_the_bundle_s_files_elsewhere(self) -> None:
         """A skill that passes the bundle directory as `method_dir` to one call and lists its files to
-        the next sends two different sets, the folder's rule and a hand-made list, and loses the
+        the next sends different sets, the folder's rule and a hand-made list, and loses the
         template files the folder finds. So a skill in the folder form names `method_dir` wherever it
         calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save
         and integrate, which set the include's listing form."""
@@ -3338,7 +3338,7 @@ class TestCatalogIdInEverySkill:
         run-history linkage."""
         body = self.skill("pipelex-run")
         assert "pipelex-method.json" in body
-        assert "send its `method_id` beside `method_dir`: the folder runs" in body
+        assert "send its `method_id` beside step 2's source: the bundle runs" in body
         assert "filed under that method" in body
 
     def test_a_linked_run_does_not_read_as_the_saved_method_having_run(self) -> None:

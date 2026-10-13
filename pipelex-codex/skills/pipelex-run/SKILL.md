@@ -57,7 +57,7 @@ The user asking for the run is the consent; there is no second confirmation. **N
 
 Call `mthds_run` with the same target and, as `inputs`, the values step 3 settled on, verbatim. Omit `pipe_code` to run the declared main pipe; for another pipe, pass step 1's `pipe_ref` as `pipe_code`.
 
-When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside `method_dir`: the folder runs, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
+When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside step 2's source: the bundle runs, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
 The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an id, say which version ran** (`method_version`); **for an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 

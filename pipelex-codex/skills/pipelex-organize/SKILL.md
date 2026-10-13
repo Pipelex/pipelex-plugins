@@ -51,9 +51,9 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 ### Step 4 — Swap the layout
 
 1. Write every file of the new layout. **A new file may take the path of a `.mthds` file Step 1's call sent, never that of any other existing file**: name it otherwise.
-2. Delete every `.mthds` file Step 1's call sent (`files_sent`) that is not part of the new layout. **Delete no other file, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
-3. **Confirm on disk**: validate the bundle once more, as in Step 1, since the hook may have reformatted what was written, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
-4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"`, a verdict that differs from the baseline or a template that differs from Step 2's, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
+2. Delete every `.mthds` file Step 1's call sent (`files_sent`, or the files it listed) that is not part of the new layout. **Delete no other file, and never one under a `runs/` directory; leave `inputs.json`, input files and anything else alone.**
+3. **Confirm on disk**: validate the bundle once more, as in Step 1, since the hook may have reformatted what was written, check that every new-layout file is among those it sent, and check that every `PipeDocGen` step's `template_file` reaches, from its new file's directory, the real path recorded for it in Step 2. A valid verdict cannot see a step that now reaches another template under the same name.
+4. **If that confirmation fails, restore the original layout — never leave the directory unconfirmed.** On `status: "error"`, a verdict that differs from the baseline, a new-layout file the call did not send, or a template that differs from Step 2's, rewrite the original files, delete the new-layout files that were not in the original set, and report the failure with the layout left as it was. The swap ends either proven equivalent or fully rolled back.
 
 ### Step 5 — Report
 

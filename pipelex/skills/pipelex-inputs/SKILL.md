@@ -102,7 +102,7 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 | Condition | Do this |
 |---|---|
 | template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`/pipelex-design` resumes it), then retried; a registered method through `/pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
-| template: `input_domain` | an unknown `pipe_ref` or unresolvable `main_pipe`: pass an explicit `pipe_ref`. At `method_id` or `method_ref`, report it in the tool's words; another organization's id reads as a miss |
+| template: `input_domain` | an unknown `pipe_ref` or unresolvable `main_pipe`: pass an explicit `pipe_ref`. At `method_dir`, `method_id` or `method_ref`, report it in the tool's words; another organization's id reads as a miss |
 | `runtime`, either call | report, and retry once |
 | the factory returns no path | leave that one input unfilled, carry on with the others; report the reason and ask for the user's own file. Never fabricate a value or abandon `inputs.json` |
 | prepare: `input_domain` at `inputs`, `pipe_ref`, `method_id` or `method_ref` | read [references/prepare-errors.md](references/prepare-errors.md) before replying or retrying; a storage size limit at `inputs` is terminal for this attempt |

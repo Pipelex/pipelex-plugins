@@ -84,9 +84,24 @@ class TestPipelexOrganizeSkill:
         write, delete = steps.strip().split("\n")[:2]
         assert write.startswith("1. Write every file of the new layout.")
         assert "may take the path of a `.mthds` file Step 1's call sent, never that of any other existing file" in write
-        assert delete.startswith("2. Delete every `.mthds` file Step 1's call sent (`files_sent`) that is not part of the new layout.")
+        assert delete.startswith(
+            "2. Delete every `.mthds` file Step 1's call sent (`files_sent`, or the files it listed) that is not part of the new layout."
+        )
         assert "**Delete no other file," in delete
         assert "Delete every `.mthds` file that is not part of the new layout" not in steps
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_new_layout_file_the_folder_leaves_out_rolls_the_swap_back(self, target_name: str) -> None:
+        """A new file the folder rule leaves out, one a `.gitignore` in the folder excludes, is
+        not validated by the confirmation, so an equal verdict would prove a layout that lost it.
+        The confirmation checks that the call sent every new-layout file, and a miss is a failure
+        that rolls the swap back."""
+        steps = self.section(self.render(target_name), "### Step 4 — Swap the layout")
+        confirm, rollback = steps.strip().split("\n")[2:4]
+        assert confirm.startswith("3. **Confirm on disk**")
+        assert "check that every new-layout file is among those it sent" in confirm
+        assert rollback.startswith("4. **If that confirmation fails, restore the original layout")
+        assert "a new-layout file the call did not send" in rollback
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_formatting_note_is_not_an_organize_step(self, target_name: str) -> None:
@@ -145,4 +160,4 @@ class TestPipelexOrganizeSkill:
             in swap
         )
         assert "A valid verdict cannot see a step that now reaches another template under the same name." in swap
-        assert "a verdict that differs from the baseline or a template that differs from Step 2's" in swap
+        assert "a verdict that differs from the baseline, a new-layout file the call did not send, or a template that differs from Step 2's" in swap

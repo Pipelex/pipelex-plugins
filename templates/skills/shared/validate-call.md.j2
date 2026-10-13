@@ -1,7 +1,7 @@
 {#- How a bundle is handed to the workshop. Included mid-sentence by every skill
    that submits a local bundle, and whole by the language reference's "Template
    files" section, so it strips its own trailing newline (the closing comment
-   below). It has two forms.
+   below). It has a folder form and a listing form.
 
    The folder form, the default, passes the bundle directory as `method_dir`
    (`pipelex-mcp`, SPEC.md, "The method folder"): the workshop reads the
@@ -49,8 +49,11 @@
    templated one cannot, since a template file has no inline form, so a
    templated bundle out of reach is a stop and the relaunch. The folder form
    says which files go inline, since no folder rule picks them there: the
-   listing's set, the `.mthds` files outside `runs/`, root file first, each
-   `uri` its path in the bundle. It does not call `method_dir` absolute: a
+   listing's set, the `.mthds` files outside `runs/`, root file first, as
+   `{content, uri}`, where an inline `uri` is a provenance label the workshop
+   reads nothing from, so the sentence leaves its value to the caller. The
+   listing form's `uri: <path relative to the bundle dir>` is that label's
+   convention. It does not call `method_dir` absolute: a
    relative one resolves against the workshop's working directory, as a
    `{ path }` does.
 

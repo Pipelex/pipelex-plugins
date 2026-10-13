@@ -59,7 +59,7 @@ Branch on the **structured verdict**, never on transport: `is_valid: true` is co
 For a completed method, validate once more and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. Then:
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
-2. **Project the input schema**: `mthds_inputs_template` with the same `method_dir` and `explicit: false`; show the compact template.
+2. **Project the input schema**: `mthds_inputs_template` with the gate's source and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
 5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
