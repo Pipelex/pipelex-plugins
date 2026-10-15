@@ -18,6 +18,15 @@ ROUTING_REFERENCES = {
     "pipelex-lab": ("frame.md", "which `/pipelex-scaffold` makes"),
 }
 
+# The lines of scaffold's and integrate's references that reach the user. The size ceiling leaves those
+# skills no room for the sentence, so each line names its skill in words and leaves the spelling to the
+# skill's own hand-offs, which carry the prefix.
+IN_WORDS = {
+    ("pipelex-scaffold", "version-managers.md"): "before the skill the usual hand-off names can run",
+    ("pipelex-scaffold", "initializers.md"): "when you hand a minimal TypeScript project to the integrate skill",
+    ("pipelex-integrate", "python.md"): "naming that skill to the user the way this skill's own hand-offs name a sibling",
+}
+
 
 class TestReferenceNames:
     """The references under `skills/` are copied verbatim, so they name a sibling skill by its bare
@@ -50,3 +59,10 @@ class TestReferenceNames:
         else:
             assert "These references name a skill" not in body
             assert "## References\n\n- [" in body
+
+    @pytest.mark.parametrize(("skill", "reference"), sorted(IN_WORDS))
+    def test_a_line_reaching_the_user_without_the_sentence_names_no_bare_skill(self, skill: str, reference: str) -> None:
+        lines = (REPO_ROOT / "skills" / skill / "references" / reference).read_text(encoding="utf-8").splitlines()
+        line = next((line for line in lines if IN_WORDS[(skill, reference)] in line), None)
+        assert line is not None, f"{skill}/{reference}: the hand-off names its skill in words"
+        assert "`/pipelex-" not in line, f"{skill}/{reference}: Mistral Vibe resolves no bare `/pipelex-<name>`"
