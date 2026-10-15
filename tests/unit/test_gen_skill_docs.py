@@ -2230,6 +2230,7 @@ class TestAdaptiveDesignSkill:
         )
         assert "A pipe contract change includes every parent controller" in body
         assert "A concept reshape includes its introducing declaration and every consumer that field-reads it" in body
+        assert "the bundle's own `description` when the main pipe's contract changed" in body
         assert "Keep or coherently edit the smallest unaffected concrete ancestor" in body
         assert "remove their old concrete definitions before validating" in body
         assert "each changed concept exactly once in the scaffold" in body
