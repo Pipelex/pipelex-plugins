@@ -67,7 +67,7 @@ Branch on the **structured verdict**, never on transport: `is_valid: true` is co
 
 ### 6. The runnable gate and delivery
 
-For a completed method, validate once more and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. A re-entry restores at least its baseline verdict instead. **It rewrites each stale `description`, the bundle's too.** Then:
+For a completed method, validate once more and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. **A re-entry rewrites each stale `description`, the bundle's too,** then restores at least its baseline verdict instead. Then:
 
 1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the gate's source and `explicit: false`; show the compact template.
