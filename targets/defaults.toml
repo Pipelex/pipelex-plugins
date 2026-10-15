@@ -110,8 +110,9 @@ pipelex = "0.79.0"
 #   project. mcp/vibe-mcp.toml renders command/args as the [[mcp_servers]]
 #   stdio entry the user appends to their Vibe configuration, which starts it
 #   in the project, with no `env` table: the workshop reads the key its own
-#   `login` saves in ~/.pipelex/.env, since Vibe passes HOME and no other shell
-#   variable into the spawn and expands none in its config.
+#   `login` saves in ~/.pipelex/.env, found through HOME, one of the few basic
+#   shell variables Vibe passes into the spawn, which leave out every PIPELEX_
+#   one, and Vibe expands none in its config.
 # Dev override: never an edit of this block. `make claude-local-mcp` and
 # `make codex-local-mcp` start Claude Code or Codex on another workshop, a
 # pipelex-mcp checkout (MCP=<path>) or a published version (MCP_VERSION=x.y.z),

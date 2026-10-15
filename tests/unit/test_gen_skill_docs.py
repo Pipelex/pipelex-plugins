@@ -986,7 +986,7 @@ class TestSkillFailureDiscipline:
         environment, and on Claude Desktop the only one, since a GUI launch
         carries no shell environment; on Codex the session's, forwarded by name;
         on Vibe none but an `env` table the user adds, since it passes a stdio
-        server no shell variable but `HOME`."""
+        server only a few basic shell variables, none of the `PIPELEX_` ones."""
         bodies, body = self._render_mcp_skills(target_name)
         for skill, skill_body in bodies.items():
             assert "(../shared/credentials.md#where-the-key-comes-from)" in skill_body, (
@@ -1009,7 +1009,10 @@ class TestSkillFailureDiscipline:
             assert "a `PIPELEX_API_KEY` exported in the shell Codex starts from, forwarded by name" in body
             assert "plugin configuration" not in body, f"{target_name}: Codex has no plugin configuration prompt"
         else:
-            assert "passes a stdio MCP server no variable of your shell but `HOME`" in body, f"{target_name}: Vibe passes the server no shell env"
+            assert (
+                "passes a stdio MCP server only a few basic variables of your shell, such as `HOME` and `PATH`, and none of your `PIPELEX_` ones"
+                in body
+            ), f"{target_name}: Vibe passes the server none of the PIPELEX_ variables"
             assert "exporting `PIPELEX_API_KEY` in the shell Mistral Vibe starts from restores that stage" in body
             assert "plugin configuration" not in body, f"{target_name}: Vibe has no plugin configuration prompt"
 

@@ -21,7 +21,8 @@
 #
 # The entry holds no key. The workshop reads the one that
 # `npx -y @pipelex/mcp@latest login` saves in ~/.pipelex/.env, which it finds
-# because {{ harness_name }} passes it HOME, though no other variable of your shell.
+# because {{ harness_name }} passes it HOME, one of the few basic variables of your
+# shell it passes, which leave out every PIPELEX_ one.
 # To hand the server a variable, such as HTTPS_PROXY behind a proxy, or
 # PIPELEX_HOME when you set it and the login saved the key there, add an
 # [mcp_servers.env] table right below the entry.
