@@ -32,7 +32,8 @@
       ],
       "env_vars": [
         "PIPELEX_API_KEY",
-        "PIPELEX_BASE_URL"
+        "PIPELEX_BASE_URL",
+        "PIPELEX_HOME"
       ]
     }
   }

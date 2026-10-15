@@ -1,6 +1,6 @@
 ---
 name: pipelex-edit
-description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
+description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex:pipelex-design.
 ---
 
 # Edit a MTHDS bundle
@@ -8,7 +8,7 @@ description: Edit an existing MTHDS method bundle (.mthds files). Use when the u
 Modify an existing MTHDS method bundle. There are two classes of change; this skill applies the first and routes the second:
 
 - **Contract-preserving edits** (this skill): prompt and instruction text, `description` and `system_prompt` wording, model references, operator settings, and mechanical renames of pipes, concepts or input variables. The method's structure — which pipes exist, how they wire, what each one takes and produces — stays the same.
-- **Structural or contract changes** (route to `/pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These are design work: say in one line which pipe(s) the change touches, then invoke `/pipelex-design`, which re-enters existing methods adaptively. Never attempt a partial structural edit here.
+- **Structural or contract changes** (route to `/pipelex:pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These are design work: say in one line which pipe(s) the change touches, then invoke `/pipelex:pipelex-design`, which re-enters existing methods adaptively. Never attempt a partial structural edit here.
 
 ## Requirements
 
@@ -25,8 +25,8 @@ Automatic for clear, specific changes: state the planned edits in one line and p
 |--------|------|
 | "Rename X to Y" | automatic |
 | "Update the prompt in pipe Z" with new text provided | automatic |
-| "Add a step to do X" (open-ended) | structural → route to `/pipelex-design` |
-| "Refactor this pipeline" (subjective) | structural → route to `/pipelex-design` |
+| "Add a step to do X" (open-ended) | structural → route to `/pipelex:pipelex-design` |
+| "Refactor this pipeline" (subjective) | structural → route to `/pipelex:pipelex-design` |
 | Multiple changes requested at once | interactive (confirm the plan first) |
 
 ## Process
@@ -39,7 +39,7 @@ Read **every** `.mthds` file of the bundle directory outside `runs/` — the roo
 
 ### Step 2: Classify the change
 
-Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
+Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex:pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
 
 ### Step 3: Baseline verdict
 
@@ -64,15 +64,15 @@ Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline ver
 
 ### Step 6: Inputs refresh check
 
-When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with Step 3's source and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. Otherwise skip this step.
+When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with Step 3's source and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `/pipelex:pipelex-inputs`. Otherwise skip this step.
 
 ### Step 7: Report
 
-State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex-inputs` when the user wants to prepare inputs, `/pipelex-run` when they want to run the method, and `/pipelex-catalog` to publish the draft once the closing save went through, when the user wants it published, or to save a directory with no link as a new method.
+State what changed (files and constructs), give the verdict line from the summary, and where the host renders MCP views, point to the method graph that accompanied the valid verdict. If inputs were refreshed or invalidated, say so. Suggest `/pipelex:pipelex-inputs` when the user wants to prepare inputs, `/pipelex:pipelex-run` when they want to run the method, and `/pipelex:pipelex-catalog` to publish the draft once the closing save went through, when the user wants it published, or to save a directory with no link as a new method.
 
-**Generated types may now be stale.** Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree, never beside the bundle. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, or whose `templates` name a template file it changed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
+**Generated types may now be stale.** Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree, never beside the bundle. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, or whose `templates` name a template file it changed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex:pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
-**Save the linked method's draft.** A `pipelex-method.json` beside the root `.mthds` file links this directory to a saved method, which lacks this change. Once this skill's own final verdict has proven the change, call `mthds_save_method` with the validated `.mthds` files as `{ path }`, root first, and the link's `method_id`, and nothing else: **no `name`, no `expected_updated_at`, no `python`, no `link_dir`**, and no template file — the workshop sends the link's token itself. Report it by name and id, with what the tool says `mt_…@draft` and the bare id now run, and its words on a link it could not write. With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory. **Never publish here: a publish is `/pipelex-catalog`'s, on the user's request.** Leave the save to `/pipelex-catalog`, saying the change is not saved, when the tool is absent or refuses, a `config`-class error included, when the workshop will not read the path, or when this work changed a `PipeFunc`'s Python; never retry with a token or inline. No link file means there is nothing to save to. Never write or edit `pipelex-method.json`: it is the workshop's.
+**Save the linked method's draft.** A `pipelex-method.json` beside the root `.mthds` file links this directory to a saved method, which lacks this change. Once this skill's own final verdict has proven the change, call `mthds_save_method` with the validated `.mthds` files as `{ path }`, root first, and the link's `method_id`, and nothing else: **no `name`, no `expected_updated_at`, no `python`, no `link_dir`**, and no template file — the workshop sends the link's token itself. Report it by name and id, with what the tool says `mt_…@draft` and the bare id now run, and its words on a link it could not write. With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory. **Never publish here: a publish is `/pipelex:pipelex-catalog`'s, on the user's request.** Leave the save to `/pipelex:pipelex-catalog`, saying the change is not saved, when the tool is absent or refuses, a `config`-class error included, when the workshop will not read the path, or when this work changed a `PipeFunc`'s Python; never retry with a token or inline. No link file means there is nothing to save to. Never write or edit `pipelex-method.json`: it is the workshop's.
 
 ## Stops
 

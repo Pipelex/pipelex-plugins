@@ -1,11 +1,11 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo, optional /selector and @tag), with run-ready inputs from /pipelex:pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 ---
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex:pipelex-inputs`) or repair a method (`/pipelex:pipelex-edit`, `/pipelex:pipelex-design`).
 
 ## Requirements
 
@@ -26,7 +26,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`, and for an address with `method_ref`.
 
-The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
+The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex:pipelex-design`, or to `/pipelex:pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
 **A dry run is this step, shown.** A run on test files is a real run. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
@@ -35,13 +35,13 @@ The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signature
 They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
 
 1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set.
-2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
+2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex:pipelex-inputs`.
 3. **An `inputs.json` holding no local file value**, every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference.
 4. **An empty object**, when the pipe declares no input at all.
 
 Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**: the key set, where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`, and per key the JSON kind and a structured value's field names. A `{concept, content}` envelope the template does not show is checked by its `content`, a one-field `{"text": …}` standing for a bare value, and a file input held as `{"url": "pipelex-storage://…"}` where the template shows a string is the prepare rewrite; neither is drift.
 
-Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a real drift — is not run-ready, and nothing is spent: name the input at fault and how, and hand to `/pipelex-inputs`; there is no cross-skill invocation on Mistral Vibe, so open that skill's `SKILL.md` beside this one and follow it. Do not prepare inputs here.
+Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a real drift — is not run-ready, and nothing is spent: name the input at fault and how, and hand to `/pipelex:pipelex-inputs`; there is no cross-skill invocation on Mistral Vibe, so open that skill's `SKILL.md` beside this one and follow it. Do not prepare inputs here.
 
 ### 4. Say what is about to run
 
@@ -49,9 +49,9 @@ One line before the call: the target, the pipe, where the inputs came from and w
 
 > Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
-**When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
+**When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex:pipelex-catalog` and run as `mt_…@draft` carries it.
 
-The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A `/pipelex-lab` case is the exception: its runs wait for the user's go on its keys, even when the request asked for them.
+The user asking for the run is the consent; there is no second confirmation. **Never start a run nobody asked for.** A `/pipelex:pipelex-lab` case is the exception: its runs wait for the user's go on its keys, even when the request asked for them.
 
 ### 5. `mthds_run`, and the run id first
 
@@ -71,7 +71,7 @@ The tool returns a durable `run_id` at once and never blocks. **Report that id t
 
 `mthds_run_results`, then report the main output, **with the inputs' source and the keys the request replaced**, and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the output as `main_stuff.json`, beside each stored file it references, into `runs/<run_id>/` under the workshop's working directory. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
 
-When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
+When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex:pipelex-lab` to score and log it.
 
 ### 8. A failed run is reported, then routed, never bisected
 
@@ -96,6 +96,8 @@ An unknown run id is reported in the tool's own words.
 | `mthds_download_artifacts` refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
 
 ## References
+
+These references name a skill by its bare `/pipelex-<name>`; to the user, write it `/pipelex:pipelex-<name>`, the only name Mistral Vibe resolves.
 
 - [by-id.md](references/by-id.md): an `mt_…` target, before the first call.
 - [published-address.md](references/published-address.md): a `method_ref` target, before the first call.

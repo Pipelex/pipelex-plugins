@@ -15,10 +15,10 @@ from scripts.check import (
     VERSION_FLOOR_STATIC_REFS,
     check_build_error_markers,
     check_codex_marketplace_plugins,
-    check_codex_no_claude_artifacts,
     check_credential_wiring,
     check_marketplace_plugins,
     check_matched_target_versions,
+    check_no_claude_artifacts,
     check_no_templates_in_output,
     check_shared_files_exist,
     check_skill_argument_placeholders,
@@ -143,13 +143,16 @@ class TestTargetPluginVersions:
         assert len(errors) == 1
         assert "not found" in errors[0]
 
-    def test_mistral_vibe_needs_no_plugin_json(self, tmp_path: Path) -> None:
-        """A Mistral Vibe target is manifestless — it must not require a plugin.json."""
+    def test_mistral_vibe_reads_its_plugin_json_at_the_plugin_root(self, tmp_path: Path) -> None:
+        """A Mistral Vibe target's Agent Plugins manifest sits at its output's root, not in a directory of its own."""
         _write_target_configs(tmp_path, {"prod": {"name": "pipelex", "version": "0.6.3", "source": "pipelex/"}})
         _write_plugin_json(tmp_path, "pipelex", "0.6.3", "pipelex")
         (tmp_path / "targets" / "mistral-vibe.toml").write_text(
-            '[plugin]\nname = "pipelex-vibe"\nversion = "0.6.3"\nsource = "pipelex-vibe/"\n\n[vars]\nplatform = "mistral-vibe"\n'
+            '[plugin]\nname = "pipelex"\nversion = "0.6.3"\nsource = "pipelex-vibe/"\n\n[vars]\nplatform = "mistral-vibe"\n'
         )
+        assert check_target_plugin_versions(tmp_path)[0] == ["[mistral-vibe] plugin.json not found at pipelex-vibe/plugin.json"]
+        (tmp_path / "pipelex-vibe").mkdir()
+        (tmp_path / "pipelex-vibe" / "plugin.json").write_text(PLUGIN_JSON_TEMPLATE.format(name="pipelex", version="0.6.3"))
         errors, versions = check_target_plugin_versions(tmp_path)
         assert errors == []
         assert versions == {"prod": "0.6.3", "mistral-vibe": "0.6.3"}
@@ -291,141 +294,215 @@ class TestCodexMarketplacePlugins:
         assert "expected './pipelex-codex'" in errors[0]
 
 
-class TestCodexNoClaudeArtifacts:
-    def _codex_output(self, tmp_path: Path) -> Path:
+class TestNoClaudeArtifacts:
+    @staticmethod
+    def _output(tmp_path: Path, platform: str) -> Path:
         _write_target_configs(
             tmp_path,
-            {"codex": {"name": "pipelex", "version": "0.1.0", "source": "pipelex-codex/"}},
-            defaults_vars={"marketplace_name": MARKETPLACE, "platform": "codex"},
+            {platform: {"name": "pipelex", "version": "0.1.0", "source": "pipelex-out/"}},
+            defaults_vars={"marketplace_name": MARKETPLACE, "platform": platform},
         )
-        skill_dir = tmp_path / "pipelex-codex" / "skills" / "pipelex-test"
+        skill_dir = tmp_path / "pipelex-out" / "skills" / "pipelex-test"
         skill_dir.mkdir(parents=True)
         return skill_dir
 
-    def test_clean_codex_output(self, tmp_path: Path) -> None:
-        skill_dir = self._codex_output(tmp_path)
+    @pytest.mark.parametrize("platform", ["codex", "mistral-vibe"])
+    def test_clean_output(self, tmp_path: Path, platform: str) -> None:
+        skill_dir = self._output(tmp_path, platform)
         (skill_dir / "SKILL.md").write_text(VALID_FRONTMATTER)
-        assert check_codex_no_claude_artifacts(tmp_path) == []
+        assert check_no_claude_artifacts(tmp_path) == []
 
-    def test_detects_claude_plugin_dir(self, tmp_path: Path) -> None:
-        self._codex_output(tmp_path)
-        (tmp_path / "pipelex-codex" / ".claude-plugin").mkdir(parents=True)
-        errors = check_codex_no_claude_artifacts(tmp_path)
-        assert any(".claude-plugin" in error for error in errors)
+    @pytest.mark.parametrize("platform", ["codex", "mistral-vibe"])
+    def test_detects_claude_plugin_dir(self, tmp_path: Path, platform: str) -> None:
+        self._output(tmp_path, platform)
+        (tmp_path / "pipelex-out" / ".claude-plugin").mkdir(parents=True)
+        assert check_no_claude_artifacts(tmp_path) == [f"[{platform}] .claude-plugin/ found in {platform} output pipelex-out/"]
 
-    def test_detects_allowed_tools_in_frontmatter(self, tmp_path: Path) -> None:
-        skill_dir = self._codex_output(tmp_path)
+    @pytest.mark.parametrize("platform", ["codex", "mistral-vibe"])
+    def test_detects_allowed_tools_in_frontmatter(self, tmp_path: Path, platform: str) -> None:
+        skill_dir = self._output(tmp_path, platform)
         (skill_dir / "SKILL.md").write_text("---\nname: t\nallowed-tools:\n  - Bash\n---\n\nBody.\n")
-        errors = check_codex_no_claude_artifacts(tmp_path)
-        assert any("allowed-tools" in error for error in errors)
+        assert check_no_claude_artifacts(tmp_path) == [
+            f"[{platform}] pipelex-out/skills/pipelex-test/SKILL.md: contains 'allowed-tools' (Claude Code only, not read on {platform})"
+        ]
+
+    def test_a_claude_target_may_carry_them(self, tmp_path: Path) -> None:
+        skill_dir = self._output(tmp_path, "claude")
+        (skill_dir / "SKILL.md").write_text("---\nname: t\nallowed-tools:\n  - Bash\n---\n\nBody.\n")
+        (tmp_path / "pipelex-out" / ".claude-plugin").mkdir(parents=True)
+        assert check_no_claude_artifacts(tmp_path) == []
 
 
 class TestVibeTargetArtifacts:
-    def _vibe_targets(self, tmp_path: Path) -> Path:
-        """Write a prod + Mistral Vibe target pair and return the Vibe hooks dir."""
+    """The Vibe build is the native plugin Vibe's resolver loads, its manifest and wrapper, with the hook entry and the fragment the user appends."""
+
+    REPO_ROOT = Path(__file__).parents[2]
+    VALID_MANIFEST: ClassVar[dict[str, object]] = {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+        "name": "pipelex",
+        "version": "0.1.0",
+        "author": {"name": "Pipelex staff", "email": "oss@pipelex.com"},
+    }
+    HOOK_COMMAND = '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
+    VALID_HOOKS = f'[[hooks]]\nname = "check-mthds"\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = \'{HOOK_COMMAND}\'\n'
+
+    VALID_MCP_FRAGMENT = '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = ["npx"]\nargs = ["-y", "@pipelex/mcp@latest"]\n'
+
+    def _vibe_target(self, tmp_path: Path, *, skill_prefix: str | None = "/pipelex:") -> Path:
+        """Write a prod + Mistral Vibe target pair with a valid native Vibe output, and return that output."""
         _write_target_configs(tmp_path, {"prod": {"name": "pipelex", "version": "0.1.0", "source": "pipelex/"}})
+        prefix_line = f'skill_prefix = "{skill_prefix}"\n' if skill_prefix is not None else ""
         (tmp_path / "targets" / "mistral-vibe.toml").write_text(
-            '[plugin]\nname = "pipelex-vibe"\nversion = "0.1.0"\nsource = "pipelex-vibe/"\n\n[vars]\nplatform = "mistral-vibe"\n'
+            f'[plugin]\nname = "pipelex"\nversion = "0.1.0"\nsource = "pipelex-vibe/"\n\n[vars]\nplatform = "mistral-vibe"\n{prefix_line}'
         )
-        hooks_dir = tmp_path / "pipelex-vibe" / "hooks"
-        hooks_dir.mkdir(parents=True)
-        return hooks_dir
-
-    VALID_MCP_FRAGMENT = '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = "npx"\nargs = ["-y", "@pipelex/mcp@latest"]\n'
-
-    def _write_valid_hooks(self, hooks_dir: Path) -> None:
-        (hooks_dir / "vibe-hooks.toml").write_text(
-            '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
-        )
-        hook_script = hooks_dir / "check-mthds-vibe.sh"
+        output = tmp_path / "pipelex-vibe"
+        (output / "hooks").mkdir(parents=True)
+        (output / "plugin.json").write_text(json.dumps(self.VALID_MANIFEST))
+        (output / "hooks" / "vibe-hooks.toml").write_text(self.VALID_HOOKS)
+        hook_script = output / "hooks" / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
         hook_script.chmod(0o755)
-        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT)
-
-    def _write_mcp_fragment(self, hooks_dir: Path, body: str) -> None:
-        mcp_dir = hooks_dir.parent / "mcp"
-        mcp_dir.mkdir(parents=True, exist_ok=True)
-        (mcp_dir / "vibe-mcp.toml").write_text(body)
+        (output / "mcp").mkdir()
+        (output / "mcp" / "vibe-mcp.toml").write_text(self.VALID_MCP_FRAGMENT)
+        return output
 
     def test_matching(self, tmp_path: Path) -> None:
-        self._write_valid_hooks(self._vibe_targets(tmp_path))
+        self._vibe_target(tmp_path)
         assert check_vibe_target_artifacts(tmp_path) == []
 
-    def test_rejects_plugin_manifest(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        (tmp_path / "pipelex-vibe" / ".claude-plugin").mkdir(parents=True)
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any(".claude-plugin" in error for error in errors)
+    def test_the_real_build_matches(self, tmp_path: Path) -> None:
+        """The repository's own Vibe target, rendered from its templates, passes the check it ships under."""
+        targets = tmp_path / "targets"
+        shutil.copytree(self.REPO_ROOT / "targets", targets)
+        config = load_target_config(targets, "mistral-vibe")
+        for path, content in build_target(self.REPO_ROOT, config, dry_run=True).files.items():
+            destination = tmp_path / path.relative_to(self.REPO_ROOT)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content, encoding="utf-8")
+            if destination.suffix == ".sh":
+                destination.chmod(0o755)
+        assert check_vibe_target_artifacts(tmp_path) == []
+        assert check_skill_frontmatter(tmp_path) == []
+        assert check_no_claude_artifacts(tmp_path) == []
 
-    def test_requires_post_tool_hook(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        (hooks_dir / "vibe-hooks.toml").write_text('[[hooks]]\ntype = "pre_tool"\n')
-        hook_script = hooks_dir / "check-mthds-vibe.sh"
-        hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
-        hook_script.chmod(0o755)
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any('type = "post_tool"' in error for error in errors)
+    @pytest.mark.parametrize("dirname", [".claude-plugin", ".codex-plugin"])
+    def test_rejects_another_harness_manifest(self, tmp_path: Path, dirname: str) -> None:
+        (self._vibe_target(tmp_path) / dirname).mkdir()
+        assert check_vibe_target_artifacts(tmp_path) == [
+            f"[mistral-vibe] {dirname}/ found in Vibe output pipelex-vibe/, which Vibe would refuse as ambiguous"
+        ]
 
-    def test_missing_hook_config(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        hook_script = hooks_dir / "check-mthds-vibe.sh"
-        hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
-        hook_script.chmod(0o755)
+    def test_rejects_an_mcp_json(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "mcp.json").write_text("{}")
+        assert check_vibe_target_artifacts(tmp_path) == [
+            "[mistral-vibe] mcp.json found in Vibe output pipelex-vibe/; it would start the workshop outside the project"
+        ]
+
+    @pytest.mark.parametrize(
+        ("field", "value", "expected"),
+        [
+            ("userConfig", {}, "plugin.json carries userConfig, which Vibe's manifest refuses"),
+            ("$schema", "https://example.com/plugin.schema.json", "plugin.json must declare $schema"),
+            ("name", "Pipelex", "plugin.json name 'Pipelex' is not a name Vibe accepts"),
+            ("name", "pipe--lex", "plugin.json name 'pipe--lex' is not a name Vibe accepts"),
+            ("name", "other", "plugin.json name is 'other', targets/mistral-vibe.toml has 'pipelex'"),
+            ("author", {"name": "Pipelex", "twitter": "@pipelex"}, "plugin.json author carries twitter"),
+            ("extensions", {"ai.mistral.vibe": "on"}, "extension must be an object"),
+            ("extensions", {"ai.mistral.vibe": {"schemaVersion": 2}}, "extension must set schemaVersion = 1"),
+            ("extensions", {"ai.mistral.vibe": {"schemaVersion": 1, "hooks": "x"}}, "extension carries hooks, which Vibe refuses"),
+        ],
+    )
+    def test_the_manifest_holds_to_vibe_fields(self, tmp_path: Path, field: str, value: object, expected: str) -> None:
+        output = self._vibe_target(tmp_path)
+        (output / "plugin.json").write_text(json.dumps({**self.VALID_MANIFEST, field: value}))
         errors = check_vibe_target_artifacts(tmp_path)
-        assert any("vibe-hooks.toml missing" in error for error in errors)
+        assert len(errors) == 1, errors
+        assert expected in errors[0]
+
+    def test_the_manifest_may_declare_the_vibe_extension(self, tmp_path: Path) -> None:
+        """The build declares no extension, but one held to Vibe's fields passes."""
+        output = self._vibe_target(tmp_path)
+        (output / "plugin.json").write_text(json.dumps({**self.VALID_MANIFEST, "extensions": {"ai.mistral.vibe": {"schemaVersion": 1}}}))
+        assert check_vibe_target_artifacts(tmp_path) == []
+
+    def test_a_missing_manifest_fails(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "plugin.json").unlink()
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] plugin.json is missing, not valid JSON, or not an object"]
+
+    @pytest.mark.parametrize(
+        ("old", "new", "expected"),
+        [
+            ('type = "post_tool"', 'type = "pre_tool"', 'must use type = "post_tool"'),
+            ("re:^(edit|write_file)$", "re:^write_file$", "must match re:^(edit|write_file)$"),
+            (HOOK_COMMAND, '"${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh', "command must be"),
+            (HOOK_COMMAND, "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh", "command must be"),
+            (HOOK_COMMAND, HOOK_COMMAND.replace("/pipelex/", "/other/"), "command must be"),
+            ("[[hooks]]", "[[hooks]\n", "not valid TOML"),
+        ],
+    )
+    def test_the_hook_entry_declares_the_one_hook(self, tmp_path: Path, old: str, new: str, expected: str) -> None:
+        hooks = self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml"
+        hooks.write_text(self.VALID_HOOKS.replace(old, new))
+        errors = check_vibe_target_artifacts(tmp_path)
+        assert len(errors) == 1, errors
+        assert expected in errors[0]
+
+    def test_the_hook_entry_declares_exactly_one_hook(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml").write_text(self.VALID_HOOKS * 2)
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/vibe-hooks.toml must declare exactly one [[hooks]] table"]
+
+    def test_a_missing_hook_entry_fails(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml").unlink()
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/vibe-hooks.toml missing"]
+
+    def test_rejects_a_plugin_hooks_file(self, tmp_path: Path) -> None:
+        """Vibe 2.26.1 lists the hooks a plugin declares and runs none, so a plugin hooks file would never check an edit."""
+        output = self._vibe_target(tmp_path)
+        (output / "ai.mistral.vibe").mkdir()
+        (output / "ai.mistral.vibe" / "hooks.toml").write_text(self.VALID_HOOKS)
+        assert check_vibe_target_artifacts(tmp_path) == [
+            "[mistral-vibe] ai.mistral.vibe/hooks.toml found in Vibe output pipelex-vibe/; Vibe 2.26.1 runs no hook a plugin declares, "
+            "so the hook ships as hooks/vibe-hooks.toml"
+        ]
 
     def test_non_executable_script(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        (hooks_dir / "vibe-hooks.toml").write_text(
-            '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n'
-        )
-        (hooks_dir / "check-mthds-vibe.sh").write_text("#!/usr/bin/env bash\n")
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any("not executable" in error for error in errors)
+        (self._vibe_target(tmp_path) / "hooks" / "check-mthds-vibe.sh").chmod(0o644)
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/check-mthds-vibe.sh is not executable"]
 
-    def test_rejects_claude_hook_artifact(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        (hooks_dir / "check-mthds.sh").write_text("#!/usr/bin/env bash\n")
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any("not a Vibe artifact" in error for error in errors)
+    @pytest.mark.parametrize("filename", ["check-mthds.sh", "hooks.json", "codex-hooks.json"])
+    def test_rejects_another_hook_artifact(self, tmp_path: Path, filename: str) -> None:
+        (self._vibe_target(tmp_path) / "hooks" / filename).write_text("")
+        assert check_vibe_target_artifacts(tmp_path) == [f"[mistral-vibe] hooks/{filename} is not an artifact of the native Vibe plugin"]
 
     def test_missing_mcp_fragment(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        (hooks_dir.parent / "mcp" / "vibe-mcp.toml").unlink()
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any("mcp/vibe-mcp.toml missing" in error for error in errors)
+        (self._vibe_target(tmp_path) / "mcp" / "vibe-mcp.toml").unlink()
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] mcp/vibe-mcp.toml missing"]
 
-    def test_mcp_fragment_must_be_stdio(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        self._write_mcp_fragment(hooks_dir, '[[mcp_servers]]\nname = "pipelex"\ntransport = "streamable-http"\nurl = "https://example.com/mcp"\n')
+    @pytest.mark.parametrize(
+        ("fragment", "expected"),
+        [
+            ('[[mcp_servers]]\nname = "pipelex"\ntransport = "streamable-http"\nurl = "https://example.com/mcp"\n', 'must use transport = "stdio"'),
+            (VALID_MCP_FRAGMENT.replace('"pipelex"', '"pipelex-local"'), 'must name the server "pipelex"'),
+            (VALID_MCP_FRAGMENT * 2, "exactly one [[mcp_servers]] entry"),
+            ("[[mcp_servers]\nname = \n", "not valid TOML"),
+            (VALID_MCP_FRAGMENT.replace('["npx"]', '"npx"'), "must set command as a one-element list"),
+            (VALID_MCP_FRAGMENT + '[mcp_servers.env]\nPIPELEX_API_KEY = ""\n', "carries an env table"),
+        ],
+    )
+    def test_the_mcp_fragment_is_the_keyless_stdio_entry(self, tmp_path: Path, fragment: str, expected: str) -> None:
+        (self._vibe_target(tmp_path) / "mcp" / "vibe-mcp.toml").write_text(fragment)
         errors = check_vibe_target_artifacts(tmp_path)
-        assert any('transport = "stdio"' in error for error in errors)
-        assert any("must set a command" in error for error in errors)
+        assert any(expected in error for error in errors), errors
 
-    def test_mcp_fragment_keeps_the_server_name(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT.replace('"pipelex"', '"pipelex-local"'))
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any('must name the server "pipelex"' in error for error in errors)
+    def test_the_skill_prefix_is_the_plugin_namespace(self, tmp_path: Path) -> None:
+        self._vibe_target(tmp_path, skill_prefix="/")
+        assert check_vibe_target_artifacts(tmp_path) == [
+            "[mistral-vibe] skill_prefix is '/', but Vibe names a plugin's skill /pipelex:<skill>, so a skill named another way is never found"
+        ]
 
-    def test_mcp_fragment_declares_exactly_one_server(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        self._write_mcp_fragment(hooks_dir, self.VALID_MCP_FRAGMENT * 2)
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any("exactly one [[mcp_servers]] entry" in error for error in errors)
-
-    def test_mcp_fragment_must_parse(self, tmp_path: Path) -> None:
-        hooks_dir = self._vibe_targets(tmp_path)
-        self._write_valid_hooks(hooks_dir)
-        self._write_mcp_fragment(hooks_dir, "[[mcp_servers]\nname = \n")
-        errors = check_vibe_target_artifacts(tmp_path)
-        assert any("not valid TOML" in error for error in errors)
+    def test_a_target_without_a_skill_prefix_fails(self, tmp_path: Path) -> None:
+        self._vibe_target(tmp_path, skill_prefix=None)
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] defines no skill_prefix, the prefix a skill names another skill by"]
 
 
 class TestCredentialWiring:
@@ -460,8 +537,8 @@ class TestCredentialWiring:
 
     def test_the_dev_override_on_every_target_keeps_the_wiring(self, tmp_path: Path) -> None:
         """A table override used to replace the defaults' whole: the Claude manifest lost its
-        `userConfig` and launcher, the Codex manifest its forwarded names, the Vibe fragment its
-        `env` keys, and the hook and launcher their promotions, with every check green."""
+        `userConfig` and launcher, the Codex manifest its forwarded names, and the hook and
+        launcher their promotions, with every check green."""
         assert check_credential_wiring(self._built_tree(tmp_path, self.DEV_OVERRIDE)) == []
 
     @pytest.mark.parametrize(
@@ -483,9 +560,13 @@ class TestCredentialWiring:
                 "if true; then",
                 "hooks/launch-pipelex-mcp.sh: does not promote PIPELEX_PLUGIN_API_KEY to PIPELEX_API_KEY when it is non-empty",
             ),
-            ("pipelex-codex/.codex-plugin/plugin.json", '"env_vars"', '"env_vars_gone"', "forwards no PIPELEX_API_KEY, PIPELEX_BASE_URL"),
-            ("pipelex-vibe/mcp/vibe-mcp.toml", 'PIPELEX_API_KEY = ""\n', "", "the env table has no `PIPELEX_API_KEY` key"),
-            ("pipelex-vibe/mcp/vibe-mcp.toml", 'PIPELEX_API_KEY = ""', 'PIPELEX_API_KEY = "sk-baked"', "ships a value for `PIPELEX_API_KEY`"),
+            (
+                "pipelex-codex/.codex-plugin/plugin.json",
+                '"env_vars"',
+                '"env_vars_gone"',
+                "forwards no PIPELEX_API_KEY, PIPELEX_BASE_URL, PIPELEX_HOME",
+            ),
+            ("pipelex-codex/.codex-plugin/plugin.json", ',\n        "PIPELEX_HOME"', "", "forwards no PIPELEX_HOME"),
         ],
     )
     def test_a_target_that_lost_its_wiring_fails(self, tmp_path: Path, generated: str, old: str, new: str, expected: str) -> None:
@@ -859,6 +940,16 @@ class TestSkillFrontmatter:
         skill_md.write_text("---\nname: pipelex-other\ndescription: A test.\n---\n")
         assert check_skill_frontmatter(skill_tree) == [
             "pipelex/skills/pipelex-test/SKILL.md: frontmatter `name` is 'pipelex-other', not the skill's directory 'pipelex-test'"
+        ]
+
+    @pytest.mark.parametrize("address", ["github.com/owner/repo[/selector]", "a [link] of some kind"])
+    def test_a_square_bracket_in_the_description_fails(self, skill_tree: Path, address: str) -> None:
+        """Vibe's slash completion renders a description as markup, where `[/selector]` closes no open tag and crashes it."""
+        skill_md = skill_tree / "pipelex" / "skills" / "pipelex-test" / "SKILL.md"
+        skill_md.write_text(f"---\nname: pipelex-test\ndescription: Run {address}.\n---\n")
+        assert check_skill_frontmatter(skill_tree) == [
+            "pipelex/skills/pipelex-test/SKILL.md: frontmatter `description` holds a square bracket, "
+            "which Mistral Vibe's slash completion reads as markup"
         ]
 
     def test_a_missing_description_or_block_fails(self, skill_tree: Path) -> None:

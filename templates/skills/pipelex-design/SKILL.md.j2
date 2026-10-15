@@ -12,7 +12,7 @@ description: Design a MTHDS method bundle (.mthds files) top-down, contract-firs
 
 # Design a MTHDS bundle top-down at the right depth
 
-Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method is a [re-entry](#re-entry); a contract-preserving tweak is `/pipelex-edit`'s.
+Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A structural change to an existing method is a [re-entry](#re-entry); a contract-preserving tweak is `{{ skill_prefix }}pipelex-edit`'s.
 
 ## Requirements
 
@@ -25,7 +25,7 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 ## Guards
 
 - **Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**
-- **Never write `inputs.json`.** When the user provides files or paths, or wants to run with real data, invoke `/pipelex-inputs`.
+- **Never write `inputs.json`.** When the user provides files or paths, or wants to run with real data, invoke `{{ skill_prefix }}pipelex-inputs`.
 - **This skill never runs a method**: a run needs inputs and spends inference credit.
 
 ## Process
@@ -67,7 +67,7 @@ Branch on the **structured verdict**, never on transport: `is_valid: true` is co
 
 For a completed method, validate once more and confirm **`is_valid: true`, `is_runnable: true`, and an empty `pending_signatures`**: this verdict is the runnable gate, so fix and re-validate until it passes. **A re-entry rewrites each stale `description`, the bundle's too,** then restores at least its baseline verdict instead. Then:
 
-1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `/pipelex-organize`; a result already coherent in either mode skips it.
+1. **Organize only when the layout needs it.** A converged stepwise construction or signature-driven re-entry normally invokes `{{ skill_prefix }}pipelex-organize`; a result already coherent in either mode skips it.
 2. **Project the input schema**: `mthds_inputs_template` with the gate's source and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. {% include "skills/shared/graph-page.md.j2" %}
 4. **Warn again for a `PipeFunc`**, naming its pipes: {% include "skills/shared/pipefunc-warning.md.j2" %}
@@ -92,7 +92,7 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 
 ## References
 
-- [writing-mthds.md]({{ shared_dir }}/writing-mthds.md): before writing any `.mthds` file.
+{% include 'skills/shared/reference-names.md.j2' %}- [writing-mthds.md]({{ shared_dir }}/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a re-entry.
 - [Native content types]({{ shared_dir }}/native-content-types.md): a native's fields, for `$var.field` and `from`.

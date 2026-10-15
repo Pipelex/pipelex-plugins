@@ -18,6 +18,9 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 # The placeholders a harness replaces with the plugin root. Codex honours the Claude spelling too.
 ROOT_PLACEHOLDERS = ("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
 SPACED_ROOT_NAME = "plug in"
+# Vibe's hook entry reaches the wrapper through the link the install makes in Vibe's home, not through a root it is handed.
+VIBE_HOME_EXPANSION = "${VIBE_HOME:-$HOME/.vibe}"
+VIBE_PLUGIN_NAME = "pipelex"
 STUB_MARKER = "hook started"
 HOOK_TIMEOUT_SECONDS = 60
 # What reaches the validate stage, and so the network: removed so that only the offline stages run.
@@ -64,11 +67,6 @@ def _shell_commands(hooks: dict[Path, str]) -> list[str]:
     return commands
 
 
-def _as_the_user_writes_it(command: str, plugin_root: Path) -> str:
-    """Vibe expands nothing, so the install page has the user write the script's absolute path in place of `./`."""
-    return command.replace("./hooks/", f"{plugin_root}/hooks/")
-
-
 def _substituted(command: str, plugin_root: Path) -> str:
     """The command after a textual substitution of the root, which is what Codex does before its shell runs it."""
     for placeholder in ROOT_PLACEHOLDERS:
@@ -76,12 +74,39 @@ def _substituted(command: str, plugin_root: Path) -> str:
     return command
 
 
-def _run_in_shell(command: str, *, plugin_root: Path, cwd: Path) -> subprocess.CompletedProcess[str]:
-    """Run `command` with `sh -c` from `cwd`, the plugin root exported the way Claude Code and Codex export it."""
+def _run_in_shell(command: str, *, plugin_root: Path, cwd: Path, overrides: dict[str, str | None] | None = None) -> subprocess.CompletedProcess[str]:
+    """Run `command` with `sh -c` from `cwd`, the plugin root exported the way Claude Code and Codex export it.
+
+    `overrides` sets a variable to a value, or removes it when the value is None.
+    """
     environment = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root), "PLUGIN_ROOT": str(plugin_root)}
+    for name, value in (overrides or {}).items():
+        if value is None:
+            environment.pop(name, None)
+        else:
+            environment[name] = value
     return subprocess.run(
         ["sh", "-c", command], input="{}", capture_output=True, text=True, cwd=cwd, env=environment, timeout=HOOK_TIMEOUT_SECONDS, check=False
     )
+
+
+def _linked_vibe_home(vibe_home: Path, plugin_root: Path) -> Path:
+    """A Vibe home whose plugins directory links to `plugin_root`, as the install page has the user make it."""
+    plugins = vibe_home / "plugins"
+    plugins.mkdir(parents=True)
+    (plugins / VIBE_PLUGIN_NAME).symlink_to(plugin_root, target_is_directory=True)
+    return vibe_home
+
+
+def _vibe_runs(command: str, *, plugin_root: Path, tmp_path: Path) -> dict[str, tuple[str, dict[str, str | None]]]:
+    """The Vibe entry run as Vibe's shell runs it: with VIBE_HOME set, and without it from a home holding a space."""
+    vibe_home = _linked_vibe_home(tmp_path / "vibe home", plugin_root)
+    home = tmp_path / "my home"
+    _linked_vibe_home(home / ".vibe", plugin_root)
+    return {
+        "VIBE_HOME set to a directory holding a space": (command, {"VIBE_HOME": str(vibe_home)}),
+        "VIBE_HOME unset, HOME holding a space": (command, {"VIBE_HOME": None, "HOME": str(home)}),
+    }
 
 
 def _stub_every_script(hooks: dict[Path, str]) -> None:
@@ -182,15 +207,17 @@ class TestHookCommands:
         _stub_every_script(hooks)
 
         for command in commands:
+            runs: dict[str, tuple[str, dict[str, str | None]]]
             if target_name == "mistral-vibe":
-                runs = {"the absolute path the user writes": _as_the_user_writes_it(command, plugin_root)}
+                assert VIBE_HOME_EXPANSION in command, f"{target_name}: {command!r} does not reach its script through Vibe's home"
+                runs = _vibe_runs(command, plugin_root=plugin_root, tmp_path=tmp_path)
             else:
                 assert any(placeholder in command for placeholder in ROOT_PLACEHOLDERS), (
                     f"{target_name}: {command!r} names its script by no plugin-root placeholder"
                 )
-                runs = {"the shell expanding the root": command, "the root substituted into the text": _substituted(command, plugin_root)}
-            for how, runnable in runs.items():
-                result = _run_in_shell(runnable, plugin_root=plugin_root, cwd=project)
+                runs = {"the shell expanding the root": (command, {}), "the root substituted into the text": (_substituted(command, plugin_root), {})}
+            for how, (runnable, overrides) in runs.items():
+                result = _run_in_shell(runnable, plugin_root=plugin_root, cwd=project, overrides=overrides)
                 assert result.returncode == 0 and result.stdout.strip() == STUB_MARKER, (
                     f"{target_name}: {command!r}, run through sh -c with {how}, did not start its script under a root holding a space "
                     f"(exit {result.returncode}, stderr {result.stderr.strip()!r}): wrap the root in double quotes"

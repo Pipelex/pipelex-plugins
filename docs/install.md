@@ -1,6 +1,6 @@
 # Install the plugin, agent by agent
 
-The README's quick start installs the Pipelex plugin in Claude Code and Codex in two commands. This page holds the rest: which Pipelex product each app takes, each agent's key and what the plugin starts there, the whole procedure for Mistral Vibe, and the Pipelex MCP that chatbots take instead.
+The README's quick start installs the Pipelex plugin in Claude Code and Codex in two commands. This page holds the rest: which Pipelex product each app takes, the key and where each agent takes it from, what the plugin starts there, the whole procedure for Mistral Vibe, and the Pipelex MCP that chatbots take instead.
 
 ## Which app takes what
 
@@ -16,7 +16,17 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 
 In every agent, the plugin needs Node.js on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The Pipelex MCP needs nothing on your machine.
 
-**A key from `pipelex login` does not reach the plugin.** The pipelex CLI's `pipelex login` saves its key in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set, a file only pipelex itself loads, when its Python package is imported: neither the hook nor the Pipelex tools look there. Give the plugin its key as your agent's section below says. `pipelex login` never prints the key it saves, so create another one in your console at [app.pipelex.com](https://app.pipelex.com), or copy the `PIPELEX_API_KEY` value from that file.
+### The key
+
+One command sets up the key for the Pipelex tools in every agent:
+
+```bash
+npx -y @pipelex/mcp@latest login
+```
+
+It opens [app.pipelex.com](https://app.pipelex.com) in your browser, creates a key for your account's current organization and saves it in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that is set. On a machine with no browser, `npx -y @pipelex/mcp@latest login --paste` reads a key you created in your console instead. The Pipelex tools read that file afresh on every call, so a key saved while a session runs is used from its next call. The pipelex CLI's `pipelex login` saves to the same file, so a key it saved works too.
+
+The tools take a key from the agent first, and the saved one only when the agent hands them none: a key you give the agent, as its section below describes, wins over the login's. **The hook reads no file.** It validates a method against the API only with a key the agent hands it, and without one it still lints and formats every edit on your machine.
 
 Cursor takes no plugin. Registering the Pipelex tools there by hand is described in [`pipelex-mcp`'s host registration page](https://github.com/Pipelex/pipelex-mcp/blob/main/docs/hosts.md#cursor).
 
@@ -40,17 +50,17 @@ claude plugin marketplace add Pipelex/pipelex-plugins
 claude plugin install pipelex@pipelex-plugins
 ```
 
-**The key.** When you enable the plugin, Claude Code opens the plugin configuration dialog and asks for an API key, which it stores in your OS keychain. Create the key in your console at [app.pipelex.com](https://app.pipelex.com). The dialog's optional base URL field is for a deployment other than the hosted API, which it defaults to. Both values reach the hook and the Pipelex tools.
+**The key.** Run the login, [above](#the-key), in a terminal. When you enable the plugin, Claude Code also opens the plugin configuration dialog, which asks for an API key and stores it in your OS keychain: leave the field empty to use the login's key, or fill it to give the plugin a key of its own, which then wins over the login's and reaches the hook too, so the hook validates as well as lints. The dialog's optional base URL field is for a deployment other than the hosted API, which it defaults to.
 
-Your session environment is the fallback:
+Your session environment is the last place the plugin looks before the login's file:
 
 ```bash
-export PIPELEX_API_KEY=plx_sk_...     # the plugin configuration dialog is preferred
+export PIPELEX_API_KEY=plx_sk_...
 ```
 
 `PIPELEX_BASE_URL` sets the base URL the same way and defaults to `https://api.pipelex.com`. A value set in the dialog wins over the environment, and an empty field leaves the environment in charge.
 
-**Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the plugin configuration dialog is the only way the key gets there. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
+**Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the tools find the login's key, and the hook validates only with a key in the plugin configuration dialog. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
 
 **What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, through `npx` and with the same key, so they need Node.js on your `PATH` too. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
 
@@ -58,14 +68,14 @@ export PIPELEX_API_KEY=plx_sk_...     # the plugin configuration dialog is prefe
 
 ```bash
 codex plugin marketplace add Pipelex/pipelex-plugins
-export PIPELEX_API_KEY=plx_sk_...     # create one in your console at app.pipelex.com
+npx -y @pipelex/mcp@latest login     # the key, saved for the Pipelex tools
 ```
 
-Restart Codex, run `/plugins` to install `pipelex`, then start Codex once more and trust the plugin hook when it asks. Requires Codex 0.141 or later. The hook and the Pipelex tools need Node.js on your `PATH`.
+Restart Codex, run `/plugins` to install `pipelex`, then start Codex once more and trust the plugin hook when it asks. Requires Codex 0.141 or later. The hook and the Pipelex tools need Node.js on your `PATH`. For the hook's validation, also export the key in the shell you start Codex from (`export PIPELEX_API_KEY=plx_sk_...`).
 
-**The hook.** The `hooks` feature is stable and on by default from Codex 0.141, so there is nothing to enable. The hook does not run in the session where `/plugins` installs the plugin, although the skills and the Pipelex tools work there at once: Codex asks you to trust it when the next session starts, keeps the trusted hashes under `[hooks.state]`, and runs it on every edit from then on. So start Codex once more after the install and trust the hook before your first method. The hook lints and formats locally and validates on the Pipelex API when `PIPELEX_API_KEY` is set; a network-sandboxed session skips the validation. See [the validation hook](hooks.md).
+**The hook.** The `hooks` feature is stable and on by default from Codex 0.141, so there is nothing to enable. The hook does not run in the session where `/plugins` installs the plugin, although the skills and the Pipelex tools work there at once: Codex asks you to trust it when the next session starts, keeps the trusted hashes under `[hooks.state]`, and runs it on every edit from then on. So start Codex once more after the install and trust the hook before your first method. The hook lints and formats locally and validates on the Pipelex API when `PIPELEX_API_KEY` is exported; a network-sandboxed session skips the validation. See [the validation hook](hooks.md).
 
-**The Pipelex tools.** Codex starts them on its own. They reach the model as `mcp__pipelex__mthds_validate`, `mcp__pipelex__mthds_inputs_template` and so on, and `codex mcp list` shows the `pipelex` entry. Codex starts an MCP server with a minimal environment and does not pass your shell's through, so the plugin forwards `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` by name: export them in the shell you start Codex from, as for the hook.
+**The Pipelex tools.** Codex starts them on its own. They reach the model as `mcp__pipelex__mthds_validate`, `mcp__pipelex__mthds_inputs_template` and so on, and `codex mcp list` shows the `pipelex` entry. Codex starts an MCP server with a minimal environment and does not pass your shell's through, so the plugin forwards `PIPELEX_API_KEY`, `PIPELEX_BASE_URL` and `PIPELEX_HOME` by name. A key exported in the shell you start Codex from wins over the login's; with none, the tools read the login's file, the one in `PIPELEX_HOME` when you set that.
 
 **Overriding the plugin's entry.** An entry of the same name in `~/.codex/config.toml` outranks the one the plugin declares. Use it to write the key into Codex's configuration rather than your shell, or to run the tools from a local build of [`pipelex-mcp`](https://github.com/Pipelex/pipelex-mcp):
 
@@ -79,75 +89,80 @@ args = ["/path/to/pipelex-mcp/dist/main.js"]   # e.g. a local checkout, built by
 PIPELEX_API_KEY = "plx_sk_..."
 ```
 
-An entry of your own replaces the plugin's whole, including the names it forwards, so it passes the key on only when it says so: with an `env` table as above, or with `env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]` to keep taking them from your shell. The same override works for one invocation, and needs the names just as much: `codex -c 'mcp_servers.pipelex.command="node"' -c 'mcp_servers.pipelex.args=["/path/to/pipelex-mcp/dist/main.js"]' -c 'mcp_servers.pipelex.env_vars=["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]'`. In a clone of this repository, `make codex-local-mcp` builds a local checkout's workshop and starts Codex that way; see [the development page](development.md#a-local-build-of-pipelex-mcp).
+An entry of your own replaces the plugin's whole, including the names it forwards, so it passes the key on only when it says so: with an `env` table as above, or with `env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL", "PIPELEX_HOME"]` to keep taking them from your shell. The same override works for one invocation, and needs the names just as much: `codex -c 'mcp_servers.pipelex.command="node"' -c 'mcp_servers.pipelex.args=["/path/to/pipelex-mcp/dist/main.js"]' -c 'mcp_servers.pipelex.env_vars=["PIPELEX_API_KEY", "PIPELEX_BASE_URL", "PIPELEX_HOME"]'`. In a clone of this repository, `make codex-local-mcp` builds a local checkout's workshop and starts Codex that way; see [the development page](development.md#a-local-build-of-pipelex-mcp).
 
 ## Mistral Vibe
 
-Mistral Vibe has no plugin marketplace, so it loads the plugin from a clone of this repository. Requires Mistral Vibe 2.21.0 or later, whose stable hooks API runs `post_tool` hooks with no opt-in flag. The hook and the Pipelex tools need Node.js on your `PATH`.
+Mistral Vibe loads the plugin from a clone of this repository, linked into its plugins directory, since it has no marketplace to install from. Requires Mistral Vibe 2.26.1 or later, the release the plugin is built and checked against. The hook and the Pipelex tools need Node.js on your `PATH`.
 
 ```bash
-git clone https://github.com/Pipelex/pipelex-plugins.git
+git clone https://github.com/Pipelex/pipelex-plugins.git ~/.local/share/pipelex-plugins
+mkdir -p "${VIBE_HOME:-$HOME/.vibe}/plugins"
+ln -s ~/.local/share/pipelex-plugins/pipelex-vibe "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex"
+npx -y @pipelex/mcp@latest login
 ```
 
-The paths below are under the clone's `pipelex-vibe/` directory. To take a new release of the plugin, pull the clone.
+That brings the skills, which Vibe names after the plugin (`/pipelex:pipelex-design`, `/pipelex:pipelex-run` and so on). `/plugins` lists what a session loads. Vibe reads its plugins when a session starts, so to take a new release, pull the clone, then start a new session or run `/reload-plugins` in an open one. The last line is the login, [above](#the-key).
 
-### The skills
+Two pieces the plugin cannot carry are entries in your own Vibe files, each shipped ready to append: the Pipelex tools and the hook. Keep the link named `pipelex`, since the hook's entry finds its script through it.
 
-Vibe loads skills through `skill_paths`. In `~/.vibe/config.toml`:
+### The Pipelex tools
+
+Vibe starts an MCP server that a plugin declares in the plugin's own directory, and the Pipelex tools read and write only inside the directory they start in, so a plugin-declared server would refuse every file of your project. The tools are therefore one entry in your Vibe configuration, which Vibe starts in your project, and the plugin ships that entry as `pipelex-vibe/mcp/vibe-mcp.toml`. Before appending it, open `~/.vibe/config.toml`, or `$VIBE_HOME/config.toml` when `VIBE_HOME` is set, and clear two things: delete the `mcp_servers = []` line that a new configuration holds, or rewrite a list of servers written on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables; and delete any `pipelex` server already there, such as the entry an earlier version of this page had you write. Then append the entry to the end of the file and start a new Vibe session:
+
+```bash
+cat ~/.local/share/pipelex-plugins/pipelex-vibe/mcp/vibe-mcp.toml >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"
+```
+
+The entry it adds:
 
 ```toml
-skill_paths = ["/absolute/path/to/pipelex-plugins/pipelex-vibe/skills"]
+[[mcp_servers]]
+name = "pipelex"
+transport = "stdio"
+command = ["npx"]
+args = ["-y", "@pipelex/mcp@latest"]
+startup_timeout_sec = 60.0
 ```
+
+Why each step matters:
+
+- **Both deletions matter**, because either leftover stops Vibe from starting: TOML cannot add a `[[mcp_servers]]` table to an array already written inline, and Vibe refuses two servers of the same name.
+- **The entry goes at the end** because a TOML table header claims every plain setting below it. Appended to the end, it stays after every top-level setting.
+- **One file is enough.** Vibe merges a trusted project's `.vibe/config.toml` with yours server by server, so the entry reaches every project.
+- **There is no key in it.** Vibe hands a stdio server only a few basic variables of your shell, such as `HOME` and `PATH`, none of your `PIPELEX_` ones, and expands no variable in its configuration, so the tools find the login's key through `HOME`. When you set `PIPELEX_HOME`, or need `HTTPS_PROXY` behind a proxy, add an `[mcp_servers.env]` table right below the entry holding it. A `PIPELEX_API_KEY` written there works too, and wins over the login's, but Vibe copies its configuration into its session logs under `~/.vibe/logs/session/`, so the login keeps the key out of them.
+- **`command` is a list**, which Vibe never splits, so a launcher path holding a space stays one word.
+- **The raised `startup_timeout_sec`** covers the first `npx` start, which fills the npm cache and outlasts Vibe's 10-second default.
+- **Keep the name `pipelex`**: it is the name the tools are grouped under.
+
+The skills that need the tools stop with this setup instruction when the tools are absent.
 
 ### The hook
 
-Wire the generated hook from `pipelex-vibe/hooks/vibe-hooks.toml` into `~/.vibe/hooks.toml`, or into a trusted project's `.vibe/hooks.toml`, where an entry overrides a user-level entry of the same `name`. Vibe runs a hook's command from the project directory, so a relative path resolves against the project rather than against `hooks.toml`: set the command to the script's absolute path. Vibe runs the command through a shell, so keep the path in double quotes inside the single-quoted TOML string, as below; without them, a path holding a space splits in two and the hook never starts.
+Vibe 2.26.1 does not yet run the hooks a plugin declares, so the hook that lints, formats and validates each `.mthds` file Vibe edits is one entry in your hooks file, and the plugin ships that entry as `pipelex-vibe/hooks/vibe-hooks.toml`. First delete any `check-mthds` hook already in that file, such as the entry an earlier version of this page had you write, since Vibe skips a second hook of the same name and would keep running the old one; and delete it from any trusted project's `.vibe/hooks.toml` that page let you put it in, where it overrides the entry in yours. Then append the entry and start a new Vibe session:
+
+```bash
+cat ~/.local/share/pipelex-plugins/pipelex-vibe/hooks/vibe-hooks.toml >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"
+```
+
+The entry it adds:
 
 ```toml
 [[hooks]]
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = '"/absolute/path/to/pipelex-plugins/pipelex-vibe/hooks/check-mthds-vibe.sh"'
+command = '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."
 ```
 
-The hook reads your shell's environment, so export `PIPELEX_API_KEY` there for its validation.
+Its command names no path of yours: Vibe runs a hook through the shell, which finds the script through the link you made, so a pull of the clone updates the hook with no edit here. The hook runs with Vibe's own environment, so it validates a method against the API only with `PIPELEX_API_KEY` exported in the shell you start Vibe from. Without it, it still lints and formats every edit.
 
-### The Pipelex tools
+### Leaving the setup of earlier releases
 
-Vibe has no plugin manifest, so the plugin ships the tools' entry as a config fragment, `pipelex-vibe/mcp/vibe-mcp.toml`. Install it in `~/.vibe/config.toml`, or in `$VIBE_HOME/config.toml` when you set `VIBE_HOME`:
-
-1. Delete the `mcp_servers = []` line that Vibe writes into a new config.
-2. Delete any `pipelex` server you registered by hand.
-3. Append the fragment's `[[mcp_servers]]` entry to the end of the file.
-4. Write your key into its `env` table.
-
-```toml
-[[mcp_servers]]
-name = "pipelex"
-transport = "stdio"
-command = "npx"
-args = ["-y", "@pipelex/mcp@latest"]
-startup_timeout_sec = 60.0
-
-[mcp_servers.env]
-PIPELEX_API_KEY = "plx_sk_..."
-PIPELEX_BASE_URL = ""                # optional — empty means the hosted API
-```
-
-Why each step matters:
-
-- **The key has to be written there.** Vibe starts an MCP server with a minimal environment and expands no variables in its config, so a `PIPELEX_API_KEY` exported in your shell never reaches the tools. The hook does read your shell, so keep exporting the key there as well. Add any other variable `npx` needs to the same table, such as `HTTPS_PROXY` behind a proxy.
-- **Both deletions matter**, because either leftover stops Vibe from starting: TOML cannot add a `[[mcp_servers]]` table after `mcp_servers = []`, and Vibe refuses two servers of the same name.
-- **The entry goes at the end** because a TOML table header claims every plain setting below it. Pasted above `skill_paths`, the `[mcp_servers.env]` header would turn that setting into an environment variable of the tools.
-- **Vibe records its whole configuration in every session log** under `~/.vibe/logs/session/`, this `env` table included, so redact the key before you share a session log.
-- **The raised `startup_timeout_sec`** covers the first `npx` start, which fills the npm cache and outlasts Vibe's 10-second default.
-- **Keep the name `pipelex`**, so the tools reach the model as `pipelex_mthds_validate`, `pipelex_mthds_inputs_template` and so on.
-
-The skills that need the tools stop with a setup instruction when the tools are absent.
+Earlier releases had you make three hand edits instead. Remove the `skill_paths` entry naming `pipelex-vibe/skills`, which loads every skill a second time under its bare name; replace the `check-mthds` hook, which names the script by an absolute path, by the hook's entry above, and delete it from any trusted project's `.vibe/hooks.toml` you put it in, where it would override that entry; and replace the old `pipelex` server, with its `env` table, by the tools' entry above.
 
 ## The Pipelex MCP, for chatbots
 

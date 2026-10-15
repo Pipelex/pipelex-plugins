@@ -20,7 +20,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 
 ## Guards
 
-- **This skill writes nothing of its own.** It saves no document and changes nothing in the bundle, not even when asked to "document" the method; the one file it leaves is the workshop's method graph page (step 3). The explanation stays in the conversation; a user who wants it written down is told that `/pipelex-design` and `/pipelex-edit` own the bundle, and the rest is theirs to paste.
+- **This skill writes nothing of its own.** It saves no document and changes nothing in the bundle, not even when asked to "document" the method; the one file it leaves is the workshop's method graph page (step 3). The explanation stays in the conversation; a user who wants it written down is told that `/pipelex:pipelex-design` and `/pipelex:pipelex-edit` own the bundle, and the rest is theirs to paste.
 
 ## Steps
 
@@ -28,7 +28,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 
 For a bundle, read every `.mthds` file beneath the directory, not the root alone, and none under `runs/`, which holds a run's artifacts. They are one method: a concept declared in one file is used in another, and a pipe's implementation often sits in another file than the `PipeSignature` that declared it. **Read them all before saying anything about any of them.**
 
-**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
+**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex:pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
 
 ### 2. Resolve every signature before calling it pending
 
@@ -57,7 +57,7 @@ Say first whether it is **complete** or a **scaffold with a backlog**, from step
 | `PipeParallel` | list the branches and say what is combined at the end |
 | `PipeCondition` | map each condition to the pipe it routes to |
 
-Name every pipe with its type; the leaves are where the method actually does something: `PipeLLM` generates text or a structured output, `PipeExtract` pulls pages out of a document or image, `PipeSearch` searches the web, `PipeImgGen` generates images, `PipeCompose` templates or constructs an output without a model, `PipeDocGen` prints earlier results as a PDF or an Office file without one either, and `PipeFunc` calls a registered Python function. Point out a `PipeCompose` or a `PipeDocGen` by name when you meet one: it looks like a model step in a list of pipes and is not one, so a reader who assumes every leaf costs inference misjudges the method's cost and failure modes. For a **`PipeFunc`**, name the pipe and its `function_name`, and say: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. A fix, if one is wanted, is `/pipelex-edit`'s or `/pipelex-design`'s.
+Name every pipe with its type; the leaves are where the method actually does something: `PipeLLM` generates text or a structured output, `PipeExtract` pulls pages out of a document or image, `PipeSearch` searches the web, `PipeImgGen` generates images, `PipeCompose` templates or constructs an output without a model, `PipeDocGen` prints earlier results as a PDF or an Office file without one either, and `PipeFunc` calls a registered Python function. Point out a `PipeCompose` or a `PipeDocGen` by name when you meet one: it looks like a model step in a list of pipes and is not one, so a reader who assumes every leaf costs inference misjudges the method's cost and failure modes. For a **`PipeFunc`**, name the pipe and its `function_name`, and say: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. A fix, if one is wanted, is `/pipelex:pipelex-edit`'s or `/pipelex:pipelex-design`'s.
 
 Where it helps, add a compact text diagram of the execution flow, adapted to the method's shape rather than forced into a line:
 
@@ -81,11 +81,11 @@ Output: final_output
 | an id's source comes back `truncated` | name the files you could not read and say the explanation is partial. Never describe a withheld file's pipes as absent. |
 | an id is refused at `method_id` | give the tool's answer: an unknown id and an empty stored source are different answers, and an empty one is somebody's draft, not a wrong id |
 | a selector call answers a no-verdict error | report the error and its `hint` verbatim; hosted address and id resolution is not live everywhere yet |
-| a **local bundle** does not validate | explain it anyway from the source, say what the verdict was, and route a fix to `/pipelex-edit` or `/pipelex-design` |
+| a **local bundle** does not validate | explain it anyway from the source, say what the verdict was, and route a fix to `/pipelex:pipelex-edit` or `/pipelex:pipelex-design` |
 | a **catalog id** does not validate | explain it from the source read above with `validation_errors[]` beside it, and say the fix is not on this disk |
 | a published **address** does not validate | report `validation_errors[]` and stop: there is no source to explain, and the fix is upstream |
 | the verdict carries no `main_pipe` | say so, and which cause the tool's message points to: the method settles no entry pipe, the contract did not come back whole, or the workshop predates the field. Do not reconstruct a signature from the input template. |
-| the user wants the method changed, or a saved method's files on disk | route: `/pipelex-edit` for a contract-preserving fix, `/pipelex-design` for a structural one, `/pipelex-catalog` to bring a saved method to disk |
+| the user wants the method changed, or a saved method's files on disk | route: `/pipelex:pipelex-edit` for a contract-preserving fix, `/pipelex:pipelex-design` for a structural one, `/pipelex:pipelex-catalog` to bring a saved method to disk |
 
 ## References
 
