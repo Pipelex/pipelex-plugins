@@ -57,11 +57,12 @@ platform = "claude"
 harness_name = "Claude Code"
 skill_dir = "${CLAUDE_SKILL_DIR}"   # "<skill-dir>" on Codex and Mistral Vibe
 shared_dir = "../shared"            # "shared" in an outside target's in-each-skill layout
+skill_prefix = "/"                  # "/pipelex:" on Mistral Vibe
 
 [vars.mcp_server]
 command = "npx"
 args = ["-y", "@pipelex/mcp@latest"]
-env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]
+env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL", "PIPELEX_HOME"]
 
 [vars.mcp_server.user_config.api_key]
 type = "string"
