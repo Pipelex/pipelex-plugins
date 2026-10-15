@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex-design` rewrites the descriptions a change to an existing method outdated**: after a structural or contract change, the skill rewrites the `description` of every pipe whose inputs or output changed and of every reshaped concept, and the bundle's own when the main pipe's contract changed, so the method's graph and catalog card no longer describe what it used to produce.
+
 ## [0.15.0] - 2026-10-13
 
 ### Changed

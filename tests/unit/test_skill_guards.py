@@ -54,6 +54,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Never redesign on a broken baseline**",
         "**Retain the original contents until the final verdict is restored.**",
         "restore the retained baseline contents and report the failure",
+        "**A re-entry rewrites each stale `description`, the bundle's too,**",
         "give the page's `path` before the text flow",
         "**Report a valid verdict's `warnings`**",
         "With a `template_file`, say the catalog stores no template file yet",
