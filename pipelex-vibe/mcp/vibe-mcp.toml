@@ -4,19 +4,20 @@
 # Mistral Vibe starts an MCP server a plugin declares in the plugin's own
 # directory, and the workshop reads and writes files only inside the directory
 # it starts in, so the plugin cannot declare it: it is this one entry in your
-# configuration instead, which Mistral Vibe starts in your project. Append it
-# to the end of ~/.vibe/config.toml, or of $VIBE_HOME/config.toml when VIBE_HOME
+# configuration instead, which Mistral Vibe starts in your project. It goes
+# at the end of ~/.vibe/config.toml, or of $VIBE_HOME/config.toml when VIBE_HOME
 # is set, which Mistral Vibe merges with a trusted project's .vibe/config.toml,
-# server by server, so the entry reaches every project:
+# server by server, so the entry reaches every project.
+#
+# First clear two things in that file, since either stops Mistral Vibe from
+# starting once this is appended. An inline `mcp_servers = [...]` line, which TOML
+# cannot extend with a table: delete the `mcp_servers = []` line a new
+# configuration holds, or rewrite a list of servers as [[mcp_servers]] tables.
+# And a `pipelex` server already there, such as the entry earlier instructions
+# had you add: delete it,
+# since Mistral Vibe refuses two servers of the same name. Then append:
 #
 #   cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"
-#
-# Two things in that file stop Mistral Vibe from starting once this is
-# appended. An inline `mcp_servers = [...]` line, which TOML cannot extend with
-# a table: delete the `mcp_servers = []` line a new configuration holds, or
-# rewrite a list of servers as [[mcp_servers]] tables. And a `pipelex` server
-# already there, such as the entry earlier instructions had you add: delete it,
-# since Mistral Vibe refuses two servers of the same name.
 #
 # The entry holds no key. The workshop reads the one that
 # `npx -y @pipelex/mcp@latest login` saves in ~/.pipelex/.env, which it finds

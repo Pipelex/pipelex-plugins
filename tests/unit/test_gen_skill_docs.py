@@ -964,7 +964,12 @@ class TestSkillFailureDiscipline:
                 f"{target_name}: Vibe's message must give the command that appends the entry"
             )
             assert "`$VIBE_HOME/config.toml` when `VIBE_HOME` is set" in absent, f"{target_name}: name the file Vibe reads (L-260912-cd8054)"
-            assert "rewriting an inline `mcp_servers = [...]` line" in absent, f"{target_name}: an inline array must become tables (L-260912-fdbf27)"
+            assert "rewrite a list on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables" in absent, (
+                f"{target_name}: an inline array must become tables (L-260912-fdbf27)"
+            )
+            assert absent.index("delete the `mcp_servers = []` line") < absent.index("cat "), (
+                f"{target_name}: the deletion that keeps Vibe starting comes before the command that appends"
+            )
             assert "env" not in absent, f"{target_name}: the entry carries no key, so the stop line sends the user to no env table"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
@@ -2098,6 +2103,7 @@ class TestVibeMcpFragment:
         assert "delete the `mcp_servers = []` line" in body
         assert "refuses two servers of the same name" in body
         assert 'cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"' in body
+        assert body.index("delete the `mcp_servers = []` line") < body.index("cat <this file>"), "the deletions come before the append"
         assert "merges with a trusted project's .vibe/config.toml" in body
 
     def test_the_hook_entry_appends_to_a_hooks_file_and_names_no_path_of_the_user(self) -> None:
@@ -2110,7 +2116,9 @@ class TestVibeMcpFragment:
         assert [hook["name"] for hook in hooks] == ["lint", "check-mthds"]
         assert hooks[1]["command"] == '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
         assert 'cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"' in body
-        assert "Delete any `check-mthds` hook already there first" in body
+        assert "First delete any `check-mthds` hook already there" in body
+        assert "delete it from any trusted\n# project's .vibe/hooks.toml" in body, "an old project-level entry overrides the user's"
+        assert body.index("First delete any `check-mthds` hook") < body.index("cat <this file>"), "the deletions come before the append"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex"])
     def test_plugin_targets_do_not_ship_the_fragment(self, target_name: str) -> None:

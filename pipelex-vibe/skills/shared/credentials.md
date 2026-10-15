@@ -4,7 +4,7 @@ Read this when an MCP-backed skill sends you here: because one of the plugin's `
 
 ## The tool is absent
 
-Tell the user, in one line: *"The Pipelex plugin's MCP server isn't connected — on Mistral Vibe the plugin cannot start the local workshop (`npx -y @pipelex/mcp@latest`) itself, so it is one entry in your configuration: append the plugin's `mcp/vibe-mcp.toml` to the end of `~/.vibe/config.toml`, or of `$VIBE_HOME/config.toml` when `VIBE_HOME` is set (`cat "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/mcp/vibe-mcp.toml" >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"`), after deleting any `pipelex` server already there and rewriting an inline `mcp_servers = [...]` line as `[[mcp_servers]]` tables, then start a new Mistral Vibe session."*
+Tell the user, in one line: *"The Pipelex plugin's MCP server isn't connected — on Mistral Vibe the plugin cannot start the local workshop (`npx -y @pipelex/mcp@latest`) itself, so it is one entry in your configuration. First, in `~/.vibe/config.toml`, or `$VIBE_HOME/config.toml` when `VIBE_HOME` is set, delete the `mcp_servers = []` line a new configuration holds, or rewrite a list on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables, and delete any `pipelex` server already there, since either leftover stops Mistral Vibe from starting. Then append the plugin's `mcp/vibe-mcp.toml` to the end of that file (`cat "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/mcp/vibe-mcp.toml" >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"`) and start a new Mistral Vibe session."*
 
 The Pipelex connector's `pipelex_*` tools, when the session has them, belong to a different server: their presence does not mean the plugin's server is connected, and they do not stand in for its `mthds_*` tools.
 

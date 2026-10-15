@@ -108,13 +108,13 @@ Two pieces the plugin cannot carry are entries in your own Vibe files, each ship
 
 ### The Pipelex tools
 
-Vibe starts an MCP server that a plugin declares in the plugin's own directory, and the Pipelex tools read and write only inside the directory they start in, so a plugin-declared server would refuse every file of your project. The tools are therefore one entry in your Vibe configuration, which Vibe starts in your project, and the plugin ships that entry as `pipelex-vibe/mcp/vibe-mcp.toml`. Append it to the end of the file:
+Vibe starts an MCP server that a plugin declares in the plugin's own directory, and the Pipelex tools read and write only inside the directory they start in, so a plugin-declared server would refuse every file of your project. The tools are therefore one entry in your Vibe configuration, which Vibe starts in your project, and the plugin ships that entry as `pipelex-vibe/mcp/vibe-mcp.toml`. Before appending it, open `~/.vibe/config.toml`, or `$VIBE_HOME/config.toml` when `VIBE_HOME` is set, and clear two things: delete the `mcp_servers = []` line that a new configuration holds, or rewrite a list of servers written on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables; and delete any `pipelex` server already there, such as the entry an earlier version of this page had you write. Then append the entry to the end of the file and start a new Vibe session:
 
 ```bash
 cat ~/.local/share/pipelex-plugins/pipelex-vibe/mcp/vibe-mcp.toml >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"
 ```
 
-First, in that file, delete the `mcp_servers = []` line that a new configuration holds, or rewrite a list of servers written on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables; and delete any `pipelex` server already there, such as the entry an earlier version of this page had you write. Then start a new Vibe session. The entry it adds:
+The entry it adds:
 
 ```toml
 [[mcp_servers]]
@@ -139,7 +139,7 @@ The skills that need the tools stop with this setup instruction when the tools a
 
 ### The hook
 
-Vibe 2.26.1 does not yet run the hooks a plugin declares, so the hook that lints, formats and validates each `.mthds` file Vibe edits is one entry in your hooks file, and the plugin ships that entry as `pipelex-vibe/hooks/vibe-hooks.toml`. First delete any `check-mthds` hook already in that file, such as the entry an earlier version of this page had you write, since Vibe skips a second hook of the same name and would keep running the old one. Then append the entry and start a new Vibe session:
+Vibe 2.26.1 does not yet run the hooks a plugin declares, so the hook that lints, formats and validates each `.mthds` file Vibe edits is one entry in your hooks file, and the plugin ships that entry as `pipelex-vibe/hooks/vibe-hooks.toml`. First delete any `check-mthds` hook already in that file, such as the entry an earlier version of this page had you write, since Vibe skips a second hook of the same name and would keep running the old one; and delete it from any trusted project's `.vibe/hooks.toml` that page let you put it in, where it overrides the entry in yours. Then append the entry and start a new Vibe session:
 
 ```bash
 cat ~/.local/share/pipelex-plugins/pipelex-vibe/hooks/vibe-hooks.toml >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"
@@ -162,7 +162,7 @@ Its command names no path of yours: Vibe runs a hook through the shell, which fi
 
 ### Leaving the setup of earlier releases
 
-Earlier releases had you make three hand edits instead. Remove the `skill_paths` entry naming `pipelex-vibe/skills`, which loads every skill a second time under its bare name; replace the `check-mthds` hook, which names the script by an absolute path, by the hook's entry above; and replace the old `pipelex` server, with its `env` table, by the tools' entry above.
+Earlier releases had you make three hand edits instead. Remove the `skill_paths` entry naming `pipelex-vibe/skills`, which loads every skill a second time under its bare name; replace the `check-mthds` hook, which names the script by an absolute path, by the hook's entry above, and delete it from any trusted project's `.vibe/hooks.toml` you put it in, where it would override that entry; and replace the old `pipelex` server, with its `env` table, by the tools' entry above.
 
 ## The Pipelex MCP, for chatbots
 
