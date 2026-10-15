@@ -260,7 +260,9 @@ class TestPipelexScaffoldSkill:
         """
         for body in _bodies():
             assert "**On a project `uv init` created, finish with `uv sync` from inside `<dir>`**" in body
-            assert "`/pipelex-integrate` reads no lock file as `pip install`" in body
+            assert any(
+                f"`{prefix}pipelex-integrate` reads no lock file as `pip install`" in body for prefix in ("{{ skill_prefix }}", "/", "/pipelex:")
+            )
         reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
         assert (
             "**On a project `uv init` created, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**"

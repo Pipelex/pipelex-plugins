@@ -31,6 +31,25 @@ BUILD_ERROR_MARKER = "PIPELEX_BUILD_ERROR"
 ROOT_TARGET_OUTPUT_DIRS = ("skills", "hooks", "mcp", ".claude-plugin", ".codex-plugin")
 # Claude Code replaces `$ARGUMENTS`, `$ARGUMENTS[N]` and `$N` in a skill body with the invocation's arguments.
 ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
+# Skill frontmatter keys only Claude Code reads, which no other in-repo target may carry.
+CLAUDE_ONLY_SKILL_KEYS = ("allowed-tools",)
+
+# The native Mistral Vibe plugin, as Vibe 2.26.1's resolver reads it (`vibe/core/plugins/_native.py`):
+# the Agent Plugins 1.0 manifest at the plugin root, its fields and an `ai.mistral.vibe` extension's.
+# Two files of the build are no part of the plugin as Vibe reads it: the hook and the MCP fragment are
+# the entries the user appends to their own hooks file and configuration. A plugin's own hooks file,
+# `ai.mistral.vibe/hooks.toml`, is refused, since Vibe 2.26.1 lists the hooks it declares and runs none.
+VIBE_MANIFEST_PATH = "plugin.json"
+VIBE_MANIFEST_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+VIBE_MANIFEST_KEYS = frozenset({"$schema", "name", "version", "description", "author", "homepage", "repository", "license", "keywords", "extensions"})
+VIBE_AUTHOR_KEYS = frozenset({"name", "email", "url"})
+VIBE_PLUGIN_NAME_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?")
+VIBE_EXTENSION = "ai.mistral.vibe"
+VIBE_EXTENSION_KEYS = frozenset({"schemaVersion", "toolNamespace", "toolOverrides"})
+VIBE_PLUGIN_HOOKS_PATH = "ai.mistral.vibe/hooks.toml"
+VIBE_HOOKS_PATH = "hooks/vibe-hooks.toml"
+VIBE_HOOK_MATCH = "re:^(edit|write_file)$"
+VIBE_MCP_FRAGMENT_PATH = "mcp/vibe-mcp.toml"
 
 # The compaction ceiling (box C of the size diet's design, L-260923-a9bdfe). After a compaction Claude
 # Code re-attaches each invoked skill within 5,000 tokens, so a SKILL.md longer than that is
@@ -254,15 +273,15 @@ def check_target_plugin_versions(base_dir: Path) -> tuple[list[str], dict[str, s
         source = plugin_section.get("source", "./")
         plugin_name = plugin_section.get("name", target_name)
 
-        manifest_dirname = _platform_for_config(config, defaults).manifest_dirname
-        if manifest_dirname is None:
+        manifest_path = _platform_for_config(config, defaults).manifest_path
+        if manifest_path is None:
             versions[target_name] = str(config_version)
             continue
 
         if source == "./":
-            plugin_json_path = base_dir / manifest_dirname / "plugin.json"
+            plugin_json_path = base_dir / manifest_path
         else:
-            plugin_json_path = base_dir / str(source).rstrip("/") / manifest_dirname / "plugin.json"
+            plugin_json_path = base_dir / str(source).rstrip("/") / manifest_path
 
         if not plugin_json_path.is_file():
             errors.append(f"[{target_name}] plugin.json not found at {plugin_json_path.relative_to(base_dir)}")
@@ -510,7 +529,10 @@ def check_skill_frontmatter(base_dir: Path) -> list[str]:
     with nothing but a warning in its log; Codex repairs such a line and Claude Code tolerates it,
     so the loss shows on one harness only. The usual cause is a `: ` inside an unquoted
     `description:`, which strict YAML reads as a second mapping. The frontmatter must also carry a
-    string `name` equal to the skill's directory and a string `description`.
+    string `name` equal to the skill's directory, which Mistral Vibe requires of a plugin's skill,
+    and a string `description` with no square bracket: Vibe's slash-command completion renders a
+    description as Textual markup, so a `[/selector]` reads as a closing tag that matches no open
+    one, and typing `/` crashes Vibe (L-261015-445a4f).
     """
     errors: list[str] = []
     for output_dir in _collect_output_dirs(base_dir):
@@ -533,8 +555,11 @@ def check_skill_frontmatter(base_dir: Path) -> list[str]:
             fields = cast(dict[str, Any], data)
             if fields.get("name") != skill_md.parent.name:
                 errors.append(f"{rel}: frontmatter `name` is {fields.get('name')!r}, not the skill's directory {skill_md.parent.name!r}")
-            if not isinstance(fields.get("description"), str) or not fields["description"].strip():
+            description: object = fields.get("description")
+            if not isinstance(description, str) or not description.strip():
                 errors.append(f"{rel}: frontmatter carries no string `description`")
+            elif "[" in description or "]" in description:
+                errors.append(f"{rel}: frontmatter `description` holds a square bracket, which Mistral Vibe's slash completion reads as markup")
     return errors
 
 
@@ -794,39 +819,133 @@ def check_no_templates_in_output(base_dir: Path) -> list[str]:
     return errors
 
 
-def check_codex_no_claude_artifacts(base_dir: Path) -> list[str]:
-    """Check that Codex output directories do not contain Claude-only artifacts."""
+def check_no_claude_artifacts(base_dir: Path) -> list[str]:
+    """Check that the Codex and Mistral Vibe outputs carry none of Claude Code's own artifacts.
+
+    The skill templates are shared, so a Claude-only frontmatter key that leaked past its
+    `platform == "claude"` guard would ship on a harness that does not read it. `allowed-tools` is
+    the one that matters: it lists `mcp__plugin_…` tool names that exist on Claude Code alone. A
+    `.claude-plugin/` directory is refused too, since Vibe rejects a plugin with two manifests as
+    ambiguous and Codex would ship a manifest it never reads.
+    """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
     defaults = load_defaults_vars(base_dir)
     for target_name, config in configs.items():
-        if _platform_for_config(config, defaults) != Platform.CODEX:
-            continue
+        platform = _platform_for_config(config, defaults)
+        match platform:
+            case Platform.CLAUDE | Platform.AGENT_SKILLS:
+                continue
+            case Platform.CODEX | Platform.MISTRAL_VIBE:
+                pass
         source = config.get("plugin", {}).get("source", "./")
         if source == "./":
             continue
         output_dir = base_dir / str(source).rstrip("/")
         claude_dir = output_dir / ".claude-plugin"
         if claude_dir.is_dir():
-            errors.append(f"[{target_name}] .claude-plugin/ found in Codex output {source}")
+            errors.append(f"[{target_name}] .claude-plugin/ found in {platform} output {source}")
         for skill_md in sorted(output_dir.glob("skills/*/SKILL.md")):
             text = skill_md.read_text(encoding="utf-8")
             parts = text.split("---", 2)
             frontmatter = parts[1] if len(parts) >= 3 else ""
-            if "allowed-tools:" in frontmatter:
-                rel = skill_md.relative_to(base_dir)
-                errors.append(f"[{target_name}] {rel}: contains 'allowed-tools' (not supported in Codex)")
+            for key in CLAUDE_ONLY_SKILL_KEYS:
+                if re.search(rf"^{re.escape(key)}:", frontmatter, flags=re.MULTILINE):
+                    rel = skill_md.relative_to(base_dir)
+                    errors.append(f"[{target_name}] {rel}: contains '{key}' (Claude Code only, not read on {platform})")
+    return errors
+
+
+def _vibe_manifest_errors(target_name: str, manifest_path: Path, plugin_name: str) -> list[str]:
+    """Check the Vibe build's `plugin.json` against the fields Mistral Vibe's resolver accepts.
+
+    Vibe parses an Agent Plugins 1.0 manifest strictly: an unknown key, a `$schema` other than the
+    1.0.0 one, or an `ai.mistral.vibe` extension without `schemaVersion = 1` makes it refuse the
+    whole plugin, skills included (`vibe/core/plugins/_native.py`, `_PluginManifest`). The fields
+    are mirrored here so that the build fails before a user's Vibe does. The build declares no
+    extension, needing none of the components it enables, but one added later is held to them.
+    """
+    rel = VIBE_MANIFEST_PATH
+    manifest = _read_json_object(manifest_path)
+    if manifest is None:
+        return [f"[{target_name}] {rel} is missing, not valid JSON, or not an object"]
+    errors: list[str] = []
+    unknown = sorted(set(manifest) - VIBE_MANIFEST_KEYS)
+    if unknown:
+        errors.append(f"[{target_name}] {rel} carries {', '.join(unknown)}, which Vibe's manifest refuses")
+    if manifest.get("$schema") != VIBE_MANIFEST_SCHEMA:
+        errors.append(f"[{target_name}] {rel} must declare $schema {VIBE_MANIFEST_SCHEMA}")
+    name: object = manifest.get("name")
+    if not isinstance(name, str) or not VIBE_PLUGIN_NAME_PATTERN.fullmatch(name) or "--" in name or ".." in name:
+        errors.append(f"[{target_name}] {rel} name {name!r} is not a name Vibe accepts (lowercase letters, digits, dots and single hyphens)")
+    elif name != plugin_name:
+        errors.append(f"[{target_name}] {rel} name is {name!r}, targets/{target_name}.toml has {plugin_name!r}")
+    author: object = manifest.get("author")
+    if author is not None:
+        if not isinstance(author, dict):
+            errors.append(f"[{target_name}] {rel} author must be an object")
+        else:
+            unknown_author = sorted(set(cast(dict[str, object], author)) - VIBE_AUTHOR_KEYS)
+            if unknown_author:
+                errors.append(f"[{target_name}] {rel} author carries {', '.join(unknown_author)}, which Vibe's manifest refuses")
+    extensions: object = manifest.get("extensions")
+    extension: object = cast(dict[str, object], extensions).get(VIBE_EXTENSION) if isinstance(extensions, dict) else None
+    if extension is not None and not isinstance(extension, dict):
+        errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension must be an object")
+    elif isinstance(extension, dict):
+        fields = cast(dict[str, object], extension)
+        if fields.get("schemaVersion") != 1:
+            errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension must set schemaVersion = 1")
+        unknown_extension = sorted(set(fields) - VIBE_EXTENSION_KEYS)
+        if unknown_extension:
+            errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension carries {', '.join(unknown_extension)}, which Vibe refuses")
+    return errors
+
+
+def _vibe_hook_command(plugin_name: str) -> str:
+    """The command of the Vibe hook entry: the wrapper, found through the link the install makes."""
+    return f'"${{VIBE_HOME:-$HOME/.vibe}}/plugins/{plugin_name}/hooks/check-mthds-vibe.sh"'
+
+
+def _vibe_hooks_errors(target_name: str, hooks_path: Path, plugin_name: str) -> list[str]:
+    """Check that the Vibe hook entry declares the one post_tool hook, naming the wrapper through the plugin's link.
+
+    The user appends the entry to their own hooks file, which Vibe runs through the shell with its
+    own environment, so the command reaches the wrapper through `$VIBE_HOME/plugins/<plugin>`, the
+    link the install makes, quoted so that a home directory holding a space stays one word.
+    """
+    rel = VIBE_HOOKS_PATH
+    if not hooks_path.is_file():
+        return [f"[{target_name}] {rel} missing"]
+    try:
+        data = tomllib.loads(hooks_path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        return [f"[{target_name}] {rel} is not valid TOML: {exc}"]
+    hooks: object = data.get("hooks")
+    if not isinstance(hooks, list) or len(cast(list[object], hooks)) != 1 or not isinstance(cast(list[object], hooks)[0], dict):
+        return [f"[{target_name}] {rel} must declare exactly one [[hooks]] table"]
+    hook = cast(dict[str, object], cast(list[object], hooks)[0])
+    errors: list[str] = []
+    if hook.get("type") != "post_tool":
+        errors.append(f'[{target_name}] {rel} must use type = "post_tool"')
+    if hook.get("match") != VIBE_HOOK_MATCH:
+        errors.append(f"[{target_name}] {rel} must match {VIBE_HOOK_MATCH}")
+    expected_command = _vibe_hook_command(plugin_name)
+    if hook.get("command") != expected_command:
+        errors.append(f"[{target_name}] {rel} command must be {expected_command}")
     return errors
 
 
 def _vibe_mcp_fragment_errors(target_name: str, fragment: Path) -> list[str]:
     """Check that the Vibe MCP fragment declares the workshop launcher Vibe can load.
 
-    The fragment must parse as TOML and hold exactly one `[[mcp_servers]]` entry:
-    the `pipelex` server over stdio with a command, which is the only shape that
-    keeps tool names stable (`pipelex_mthds_validate` on Vibe) and spawns locally.
+    The fragment must parse as TOML and hold exactly one `[[mcp_servers]]` entry: the `pipelex`
+    server over stdio, which keeps the tool names stable and spawns locally. Its `command` is a
+    one-element list, since Vibe splits a string command with `shlex` and a launcher path holding a
+    space would split with it (L-260912-0d6469). It carries no `env` table: the workshop reads the
+    key its login saved, and an empty `PIPELEX_API_KEY` there would only invite pasting one in.
     """
-    rel = "mcp/vibe-mcp.toml"
+    rel = VIBE_MCP_FRAGMENT_PATH
     try:
         data = tomllib.loads(fragment.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:
@@ -843,60 +962,79 @@ def _vibe_mcp_fragment_errors(target_name: str, fragment: Path) -> list[str]:
         errors.append(f'[{target_name}] {rel} must name the server "{MCP_SERVER_NAME}"')
     if entry.get("transport") != "stdio":
         errors.append(f'[{target_name}] {rel} must use transport = "stdio"')
-    if not entry.get("command"):
-        errors.append(f"[{target_name}] {rel} must set a command")
+    command: object = entry.get("command")
+    if not isinstance(command, list) or len(cast("list[object]", command)) != 1 or not cast("list[object]", command)[0]:
+        errors.append(f"[{target_name}] {rel} must set command as a one-element list, which Vibe never splits")
+    if "env" in entry:
+        errors.append(f"[{target_name}] {rel} carries an env table; the workshop reads the key its login saved, so the entry ships none")
     return errors
 
 
 def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
-    """Check that Mistral Vibe targets emit Vibe-only hook and MCP artifacts.
+    """Check that each Mistral Vibe target is the native plugin Vibe's resolver loads.
 
-    Vibe is not a Claude/Codex plugin platform: it loads skills via skill_paths,
-    hooks from hooks.toml, and MCP servers from config.toml. The generated target
-    must therefore not carry a plugin manifest, it must render the post_tool hook
-    config/script pair, and it must render the workshop launcher as the
-    `mcp/vibe-mcp.toml` config fragment.
+    The build is an Agent Plugins 1.0 plugin: `plugin.json` at its root, the skills, and the
+    executable hook wrapper, with no other harness's manifest, no `mcp.json` and no hooks file of
+    the plugin's own: a second manifest makes Vibe refuse the plugin as ambiguous, an `mcp.json`
+    would start a workshop in the plugin's directory, outside the project, and Vibe 2.26.1 runs no
+    hook a plugin declares. The hook and the workshop ship as `hooks/vibe-hooks.toml` and
+    `mcp/vibe-mcp.toml` instead, the entries the user appends (docs/decisions.md).
     """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
     defaults = load_defaults_vars(base_dir)
     for target_name, config in configs.items():
-        if _platform_for_config(config, defaults) != Platform.MISTRAL_VIBE:
-            continue
-        source = config.get("plugin", {}).get("source", "./")
+        match _platform_for_config(config, defaults):
+            case Platform.MISTRAL_VIBE:
+                pass
+            case Platform.CLAUDE | Platform.CODEX | Platform.AGENT_SKILLS:
+                continue
+        plugin_section = config.get("plugin", {})
+        source = plugin_section.get("source", "./")
         output_dir = base_dir if source == "./" else base_dir / str(source).rstrip("/")
 
         for dirname in (".claude-plugin", ".codex-plugin"):
             if (output_dir / dirname).exists():
-                errors.append(f"[{target_name}] {dirname}/ found in Vibe output {source}")
+                errors.append(f"[{target_name}] {dirname}/ found in Vibe output {source}, which Vibe would refuse as ambiguous")
+        if (output_dir / "mcp.json").exists():
+            errors.append(f"[{target_name}] mcp.json found in Vibe output {source}; it would start the workshop outside the project")
 
-        hook_config = output_dir / "hooks" / "vibe-hooks.toml"
+        if (output_dir / VIBE_PLUGIN_HOOKS_PATH).exists():
+            errors.append(
+                f"[{target_name}] {VIBE_PLUGIN_HOOKS_PATH} found in Vibe output {source}; Vibe 2.26.1 runs no hook a plugin declares, "
+                f"so the hook ships as {VIBE_HOOKS_PATH}"
+            )
+        plugin_name = str(plugin_section.get("name", target_name))
+        errors.extend(_vibe_manifest_errors(target_name, output_dir / VIBE_MANIFEST_PATH, plugin_name))
+        errors.extend(_vibe_hooks_errors(target_name, output_dir / VIBE_HOOKS_PATH, plugin_name))
+
         hook_script = output_dir / "hooks" / "check-mthds-vibe.sh"
-        if not hook_config.is_file():
-            errors.append(f"[{target_name}] hooks/vibe-hooks.toml missing")
-        else:
-            text = hook_config.read_text(encoding="utf-8")
-            if 'type = "post_tool"' not in text:
-                errors.append(f'[{target_name}] hooks/vibe-hooks.toml must use type = "post_tool"')
-            if 'match = "re:^(edit|write_file)$"' not in text:
-                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must match edit/write_file")
-            if "check-mthds-vibe.sh" not in text:
-                errors.append(f"[{target_name}] hooks/vibe-hooks.toml must call check-mthds-vibe.sh")
-
         if not hook_script.is_file():
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh missing")
         elif not hook_script.stat().st_mode & 0o111:
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh is not executable")
 
-        mcp_fragment = output_dir / "mcp" / "vibe-mcp.toml"
+        mcp_fragment = output_dir / VIBE_MCP_FRAGMENT_PATH
         if not mcp_fragment.is_file():
-            errors.append(f"[{target_name}] mcp/vibe-mcp.toml missing")
+            errors.append(f"[{target_name}] {VIBE_MCP_FRAGMENT_PATH} missing")
         else:
             errors.extend(_vibe_mcp_fragment_errors(target_name, mcp_fragment))
 
         for filename in ("hooks.json", "codex-hooks.json", "check-mthds.sh", "check-mthds-codex.sh"):
             if (output_dir / "hooks" / filename).exists():
-                errors.append(f"[{target_name}] hooks/{filename} is not a Vibe artifact")
+                errors.append(f"[{target_name}] hooks/{filename} is not an artifact of the native Vibe plugin")
+
+        expected_prefix = f"/{plugin_name}:"
+        try:
+            prefix = resolve_target_var(base_dir, target_name, "skill_prefix")
+        except ValueError:
+            errors.append(f"[{target_name}] defines no skill_prefix, the prefix a skill names another skill by")
+        else:
+            if prefix != expected_prefix:
+                errors.append(
+                    f"[{target_name}] skill_prefix is {prefix!r}, but Vibe names a plugin's skill {expected_prefix}<skill>, "
+                    "so a skill named another way is never found"
+                )
 
     return errors
 
@@ -922,8 +1060,8 @@ def check_credential_wiring(base_dir: Path) -> list[str]:
       `PIPELEX_PLUGIN_<KEY>`; the launcher promotes each to `PIPELEX_<KEY>` only when it is non-empty,
       and the hook wrapper promotes `CLAUDE_PLUGIN_OPTION_<KEY>` the same way.
     - Codex: the manifest's `pipelex` server forwards every `env_vars` name into the spawn.
-    - Mistral Vibe: the fragment's `env` table names every `env_vars` name, with an empty value for
-      the user to fill in.
+    - Mistral Vibe: nothing to forward. The fragment carries no `env` table, which
+      `check_vibe_target_artifacts` holds it to, because the workshop reads the key its login saved.
 
     A file that is missing or does not parse is left to the checks that report exactly that.
     """
@@ -951,7 +1089,7 @@ def check_credential_wiring(base_dir: Path) -> list[str]:
             case Platform.CODEX:
                 errors.extend(_codex_credential_errors(label, output_dir, env_vars))
             case Platform.MISTRAL_VIBE:
-                errors.extend(_vibe_credential_errors(label, output_dir, env_vars))
+                pass  # Vibe passes the spawn no shell variable, so there is nothing to forward
             case Platform.AGENT_SKILLS:
                 pass  # an in-repo target on it is refused by check_target_platforms, and it declares no workshop
     return errors
@@ -1044,31 +1182,6 @@ def _codex_credential_errors(label: str, output_dir: Path, env_vars: list[str]) 
         f"{where}: the `{MCP_SERVER_NAME}` server's env_vars forwards no {', '.join(missing)}; "
         "Codex spawns it with a whitelisted environment, so the workshop would never see it"
     ]
-
-
-def _vibe_credential_errors(label: str, output_dir: Path, env_vars: list[str]) -> list[str]:
-    """The Mistral Vibe half of `check_credential_wiring`: the fragment's `env` table the user fills in."""
-    fragment = output_dir / "mcp" / "vibe-mcp.toml"
-    if not fragment.is_file() or not env_vars:
-        return []
-    try:
-        data = tomllib.loads(fragment.read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError:
-        return []
-    servers: object = data.get("mcp_servers")
-    if not isinstance(servers, list) or not servers or not isinstance(cast(list[object], servers)[0], dict):
-        return []
-    server = cast(dict[str, object], cast(list[object], servers)[0])
-    raw_env: object = server.get("env")
-    env = cast(dict[str, object], raw_env) if isinstance(raw_env, dict) else {}
-    where = f"{label}/mcp/vibe-mcp.toml"
-    errors: list[str] = []
-    for name in env_vars:
-        if name not in env:
-            errors.append(f"{where}: the env table has no `{name}` key; Vibe forwards no shell variable, so the user has nowhere to write it")
-        elif env[name] != "":
-            errors.append(f"{where}: the env table ships a value for `{name}`; the fragment leaves it empty for the user to fill in")
-    return errors
 
 
 def _run_check(title: str, errors: list[str], failure_message: str, success_message: str) -> bool:
@@ -1199,6 +1312,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         "  Every package the hook bundle inlines is named in its notices file.",
     )
     failed |= _run_check(
+        "Checking Codex and Mistral Vibe targets for Claude Code artifacts...",
+        check_no_claude_artifacts(base_dir),
+        "FAIL: A Codex or Mistral Vibe target contains a Claude Code artifact.",
+        "  No Claude Code artifacts in Codex or Mistral Vibe targets.",
+    )
+    failed |= _run_check(
         "Checking Mistral Vibe target artifacts...",
         check_vibe_target_artifacts(base_dir),
         "FAIL: Mistral Vibe target artifacts are inconsistent.",
@@ -1225,21 +1344,13 @@ def run_claude_checks(base_dir: Path) -> bool:
 
 
 def run_codex_checks(base_dir: Path) -> bool:
-    """Run Codex-specific packaging and artifact checks."""
-    failed = False
-    failed |= _run_check(
+    """Run Codex-specific packaging checks."""
+    return _run_check(
         "Checking Codex packaging marketplace entries...",
         check_codex_marketplace_plugins(base_dir),
         "FAIL: Codex packaging marketplace entries are inconsistent with target configs.",
         "  Codex packaging marketplace matches target configs.",
     )
-    failed |= _run_check(
-        "Checking Codex targets for Claude artifacts...",
-        check_codex_no_claude_artifacts(base_dir),
-        "FAIL: Codex target contains Claude-specific artifacts.",
-        "  No Claude artifacts in Codex targets.",
-    )
-    return failed
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

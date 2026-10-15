@@ -29,8 +29,15 @@ from pathlib import Path
 
 import pytest
 
+from scripts.gen_skill_docs import list_targets, load_target_config, resolve_output_dir
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 TARGET_OUTPUTS = ("pipelex", "pipelex-codex", "pipelex-vibe")
+# The prefix each target output names a skill with, from its target's `skill_prefix`.
+SKILL_PREFIXES = {
+    resolve_output_dir(REPO_ROOT, config.source).name: str(config.template_vars["skill_prefix"])
+    for config in (load_target_config(REPO_ROOT / "targets", name) for name in list_targets(REPO_ROOT / "targets"))
+}
 
 GUARDS: dict[str, tuple[str, ...]] = {
     "pipelex-design": (
@@ -341,21 +348,35 @@ def _on_demand_files(target: str, skill: str) -> list[Path]:
     return references + sorted((skills_dir / "shared").glob("*.md"))
 
 
+def _spelled_for(target: str, guard: str) -> str:
+    """A guard as the target names a skill in it: `/pipelex-x` on Claude Code and Codex, `/pipelex:pipelex-x` on Vibe.
+
+    Only a skill name in backticks is respaced, since that is how a skill names another; a literal such as the
+    gate file's `Copied verbatim into a project by /pipelex-integrate` line reads the same on every target.
+    """
+    return guard.replace("`/pipelex-", f"`{SKILL_PREFIXES[target]}pipelex-")
+
+
 @pytest.mark.parametrize(("target", "skill", "guard"), CASES)
 def test_a_guard_is_stated_exactly_once_in_its_skill(target: str, skill: str, guard: str) -> None:
     skill_md = REPO_ROOT / target / "skills" / skill / "SKILL.md"
+    guard = _spelled_for(target, guard)
     count = skill_md.read_text(encoding="utf-8").count(guard)
     assert count == 1, f"{target}/skills/{skill}/SKILL.md states the guard {guard!r} {count} times; a guard lives in SKILL.md exactly once"
 
 
 @pytest.mark.parametrize(("target", "skill", "guard"), CASES)
 def test_a_guard_never_moves_to_a_file_read_on_demand(target: str, skill: str, guard: str) -> None:
+    # A rendered shared file spells a skill name as the target does, and a static reference as Claude Code does.
+    spellings = {guard, _spelled_for(target, guard)}
     for path in _on_demand_files(target, skill):
         if path.suffix not in {".md", ".txt"}:
             continue
-        assert guard not in path.read_text(encoding="utf-8"), (
-            f"{path.relative_to(REPO_ROOT)} carries the guard {guard!r}; a guard stays in SKILL.md, where it is read before acting"
-        )
+        text = path.read_text(encoding="utf-8")
+        for spelling in spellings:
+            assert spelling not in text, (
+                f"{path.relative_to(REPO_ROOT)} carries the guard {spelling!r}; a guard stays in SKILL.md, where it is read before acting"
+            )
 
 
 def test_the_registry_names_shipped_skills() -> None:

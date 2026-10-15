@@ -1,6 +1,6 @@
 ---
 name: pipelex-run
-description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo[/selector][@tag]), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
+description: Run an MTHDS method on the hosted Pipelex API, and follow a run that is already going. Use when the user says "run this method", "run the pipeline", "execute the method", "run mt_abc123", "run the draft", "run github.com/Pipelex/methods/documents", "how is run X going", "what's the status of that run", "get the results of run X", "do a dry run first", or "download the files from yesterday's run". Takes a bundle directory, a catalog id (mt_…) or a published address (github.com/owner/repo, optional /selector and @tag), with run-ready inputs from /pipelex-inputs. A run spends inference credit, so this skill never starts one nobody asked for.
 allowed-tools:
   - Bash
   - Read

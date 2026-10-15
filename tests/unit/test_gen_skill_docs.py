@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tomllib
 from pathlib import Path
-from typing import ClassVar, cast
+from typing import ClassVar
 
 import pytest
 
@@ -22,6 +22,7 @@ from scripts.gen_skill_docs import (
     STATIC_HOOK_ASSETS_BY_PLATFORM,
     Platform,
     TargetConfig,
+    TemplateVarValue,
     build_target,
     check_freshness,
     generate,
@@ -53,18 +54,21 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 # Minimal hook templates for every platform. render_templates declares hooks
 # per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
-# Vibe: vibe-hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml launcher
-# fragment), so any test tree that reaches skill/hook rendering must provide them
-# or render fails with "hook template not found".
+# Vibe: vibe-hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml
+# launcher fragment), so any test tree that reaches skill/hook rendering must
+# provide them or render fails with "hook template not found".
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/launch-pipelex-mcp.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/vibe-hooks.toml.j2": '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = "./hooks/check-mthds-vibe.sh"\n',
+    "hooks/vibe-hooks.toml.j2": (
+        '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\n'
+        "command = '\"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh\"'\n"
+    ),
     "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "mcp/vibe-mcp.toml.j2": '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = "npx"\n',
+    "mcp/vibe-mcp.toml.j2": '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = ["npx"]\n',
 }
 
 # Static hook assets are copied verbatim — the fixture body stands in for the
@@ -174,6 +178,12 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     codex_plugin.mkdir()
     (codex_plugin / "plugin-base.json").write_text(
         '{"author": {"name": "test"}, "license": "Elastic-2.0", "skills": "./skills/", "interface": {"displayName": "Test"}}\n'
+    )
+
+    vibe_plugin = tmp_path / ".vibe-plugin"
+    vibe_plugin.mkdir()
+    (vibe_plugin / "plugin-base.json").write_text(
+        '{"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", "author": {"name": "test"}, "license": "Elastic-2.0"}\n'
     )
 
     targets_dir = tmp_path / "targets"
@@ -646,7 +656,7 @@ class TestTargetConfig:
         assert config.platform == "codex"
         assert config.has_plugin_manifest
 
-    def test_platform_mistral_vibe_has_no_manifest(self) -> None:
+    def test_platform_mistral_vibe_has_a_manifest(self) -> None:
         config = TargetConfig(
             name="test",
             plugin_name="test",
@@ -656,20 +666,23 @@ class TestTargetConfig:
             template_vars={"platform": "mistral-vibe"},
         )
         assert config.platform == "mistral-vibe"
-        assert not config.has_plugin_manifest
+        assert config.has_plugin_manifest
 
     @pytest.mark.parametrize(
-        ("platform", "manifest_dirname", "outside_only"),
+        ("platform", "base_dirname", "manifest_path", "outside_only"),
         [
-            (Platform.CLAUDE, ".claude-plugin", False),
-            (Platform.CODEX, ".codex-plugin", False),
-            (Platform.MISTRAL_VIBE, None, False),
-            (Platform.AGENT_SKILLS, None, True),
+            (Platform.CLAUDE, ".claude-plugin", ".claude-plugin/plugin.json", False),
+            (Platform.CODEX, ".codex-plugin", ".codex-plugin/plugin.json", False),
+            (Platform.MISTRAL_VIBE, ".vibe-plugin", "plugin.json", False),
+            (Platform.AGENT_SKILLS, None, None, True),
         ],
     )
-    def test_what_a_platform_emits_is_a_property_of_the_platform(self, platform: Platform, manifest_dirname: str | None, outside_only: bool) -> None:
-        assert platform.manifest_dirname == manifest_dirname
-        assert platform.has_plugin_manifest is (manifest_dirname is not None)
+    def test_what_a_platform_emits_is_a_property_of_the_platform(
+        self, platform: Platform, base_dirname: str | None, manifest_path: str | None, outside_only: bool
+    ) -> None:
+        assert platform.manifest_base_dirname == base_dirname
+        assert platform.manifest_path == manifest_path
+        assert platform.has_plugin_manifest is (manifest_path is not None)
         assert platform.is_outside_only is outside_only
 
     def test_load_codex_target_config(self, tmp_path: Path) -> None:
@@ -858,14 +871,26 @@ class TestPluginManifests:
         assert plugin_data["name"] == "pipelex"
         assert "interface" in plugin_data
 
-    def test_build_mistral_vibe_target_writes_no_plugin_manifest(self, tmp_path: Path) -> None:
+    def test_build_mistral_vibe_target_writes_its_manifest_at_the_plugin_root(self, tmp_path: Path) -> None:
+        """Vibe reads an Agent Plugins 1.0 manifest at the plugin's root: identity from the target, the rest from
+        `.vibe-plugin/plugin-base.json`, and no server, since the workshop is an entry in the user's configuration."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "mistral-vibe")
         result = build_target(tree, config)
-        claude_manifest = tree / "pipelex-vibe" / ".claude-plugin" / "plugin.json"
-        codex_manifest = tree / "pipelex-vibe" / ".codex-plugin" / "plugin.json"
-        assert claude_manifest not in result.files
-        assert codex_manifest not in result.files
+        manifest = tree / "pipelex-vibe" / "plugin.json"
+        assert tree / "pipelex-vibe" / ".claude-plugin" / "plugin.json" not in result.files
+        assert tree / "pipelex-vibe" / ".codex-plugin" / "plugin.json" not in result.files
+        assert not any(path.name == "mcp.json" for path in result.files)
+        assert json.loads(result.files[manifest]) == {
+            "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+            "author": {"name": "test"},
+            "license": "Elastic-2.0",
+            "name": "pipelex-vibe",
+            "description": "",
+            "version": "1.0.0",
+        }
+        assert tree / "pipelex-vibe" / "hooks" / "vibe-hooks.toml" in result.files
+        assert not any("ai.mistral.vibe" in path.parts for path in result.files)
         assert any(path.name == "writing-mthds.md" for path in result.files)
 
     def test_build_claude_target_writes_claude_plugin_dir(self, tmp_path: Path) -> None:
@@ -932,11 +957,15 @@ class TestSkillFailureDiscipline:
         if manifest_spawns:
             assert "plugin manifest spawns" in credentials, f"{target_name}: missing manifest-spawn diagnostic"
         else:
-            assert "plugin manifest spawns" not in credentials, f"{target_name}: Vibe has no manifest spawn"
-            assert "`mcp/vibe-mcp.toml`" in credentials, f"{target_name}: Vibe's message must point at the shipped MCP fragment"
-            assert "`env` table" in credentials, f"{target_name}: Vibe's message must say where the key goes"
-            assert "to the end of `~/.vibe/config.toml`" in credentials, f"{target_name}: Vibe's message must say to append the entry"
-            assert "`mcp_servers = []`" in credentials, f"{target_name}: Vibe's message must say to delete the inline empty array"
+            absent = credentials.split("## The tool is absent", 1)[1].split("## Where the key comes from", 1)[0]
+            assert "plugin manifest spawns" not in credentials, f"{target_name}: Vibe's plugin declares no server"
+            assert "`mcp/vibe-mcp.toml`" in absent, f"{target_name}: Vibe's message must point at the shipped MCP fragment"
+            assert 'cat "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/mcp/vibe-mcp.toml" >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"' in absent, (
+                f"{target_name}: Vibe's message must give the command that appends the entry"
+            )
+            assert "`$VIBE_HOME/config.toml` when `VIBE_HOME` is set" in absent, f"{target_name}: name the file Vibe reads (L-260912-cd8054)"
+            assert "rewriting an inline `mcp_servers = [...]` line" in absent, f"{target_name}: an inline array must become tables (L-260912-fdbf27)"
+            assert "env" not in absent, f"{target_name}: the entry carries no key, so the stop line sends the user to no env table"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_credential_sentence_names_the_platform_channel(self, target_name: str) -> None:
@@ -945,13 +974,14 @@ class TestSkillFailureDiscipline:
         It lives in `shared/credentials.md`, read when a `config` error is about
         the key, and no skill restates it.
 
-        On Claude the canonical channel is the plugin configuration, whose value
-        the launcher promotes into the spawn environment, and on Claude Desktop
-        it is the only channel: a GUI launch carries no shell environment, so an
-        agent that advises exporting a shell variable there advises something
-        that cannot work. Codex forwards the session environment by name. Vibe
-        spawns with a minimal environment and reads the server entry's own `env`
-        table."""
+        On every harness the workshop takes the host's key first and the key its
+        login saved in `~/.pipelex/.env` otherwise, so the login is the answer to
+        a key error (L-261012-ea374d). The host's key differs: on Claude the
+        plugin configuration's, which the launcher promotes into the spawn
+        environment, and on Claude Desktop the only one, since a GUI launch
+        carries no shell environment; on Codex the session's, forwarded by name;
+        on Vibe none but an `env` table the user adds, since it passes a stdio
+        server no shell variable but `HOME`."""
         bodies, body = self._render_mcp_skills(target_name)
         for skill, skill_body in bodies.items():
             assert "(../shared/credentials.md#where-the-key-comes-from)" in skill_body, (
@@ -960,19 +990,23 @@ class TestSkillFailureDiscipline:
             assert "The server authenticates to the API with" not in skill_body, (
                 f"{target_name}/{skill}: the credential sentence lives in shared/credentials.md"
             )
-        session_env_claim = "from the session environment — the same variable the plugin's validation hook documents"
+        login = "**`npx -y @pipelex/mcp@latest login`**"
+        assert login in body, f"{target_name}: a key error is answered by the workshop's login"
+        assert "does not count" not in body, f"{target_name}: a key saved by a login reaches the server now"
+        assert "The pipelex CLI's `pipelex login` saves to the same file, so a key it saved counts too." in body
+        assert "the saved one is never consulted until that key is removed or replaced" in body, f"{target_name}: a host key shadows the file"
+        assert "skips validating it against the API" in body, f"{target_name}: the hook reads no saved key"
         if target_name == "prod":
-            assert "from the **plugin configuration**" in body, f"{target_name}: Claude's canonical channel is the plugin configuration"
+            assert "the key entered in the **plugin configuration**" in body, f"{target_name}: Claude's host key is the plugin configuration's"
             assert "OS keychain" in body, f"{target_name}: say where the configured key is kept"
             assert "Claude Desktop" in body, f"{target_name}: name the host where the shell environment does not exist"
-            assert session_env_claim not in body, f"{target_name}: the session environment is Claude's fallback, not its channel"
         elif target_name == "codex":
-            assert session_env_claim in body, f"{target_name}: Codex forwards the session environment"
+            assert "a `PIPELEX_API_KEY` exported in the shell Codex starts from, forwarded by name" in body
             assert "plugin configuration" not in body, f"{target_name}: Codex has no plugin configuration prompt"
         else:
-            assert "`env` table in `~/.vibe/config.toml`" in body, f"{target_name}: Vibe reads the server entry's own env table"
-            assert "never from the session environment" in body, f"{target_name}: Vibe passes no shell env to the server"
-            assert "plugin configuration" not in body, f"{target_name}: Vibe has no plugin manifest to configure"
+            assert "passes a stdio MCP server no variable of your shell but `HOME`" in body, f"{target_name}: Vibe passes the server no shell env"
+            assert "exporting `PIPELEX_API_KEY` in the shell Mistral Vibe starts from restores that stage" in body
+            assert "plugin configuration" not in body, f"{target_name}: Vibe has no plugin configuration prompt"
 
 
 class TestPerSkillPartials:
@@ -1588,7 +1622,7 @@ class TestPipelexRunSkill:
         run = next(content for path, content in rendered.items() if path.match("skills/pipelex-run/SKILL.md"))
         for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
             assert f"mcp__plugin_pipelex_pipelex__{tool}" not in inputs, f"{target_name}: pipelex-inputs still declares {tool}"
-        assert "/pipelex-run" in inputs, f"{target_name}: pipelex-inputs must hand the run over"
+        assert f"`{config.template_vars['skill_prefix']}pipelex-run`" in inputs, f"{target_name}: pipelex-inputs must hand the run over"
         if target_name == "prod":
             for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
                 assert f"mcp__plugin_pipelex_pipelex__{tool}" in run, f"{target_name}: pipelex-run must declare {tool}"
@@ -1613,7 +1647,7 @@ class TestPipelexRunSkill:
 
     def test_design_points_at_the_run_without_running(self) -> None:
         design = _skill_source(self.TEMPLATES / "pipelex-design")
-        assert "`/pipelex-run` runs the method" in design
+        assert "`{{ skill_prefix }}pipelex-run` runs the method" in design
         assert "mcp__plugin_pipelex_pipelex__mthds_run" not in design
 
 
@@ -1783,7 +1817,7 @@ class TestPipelexCatalogSkill:
     def test_the_pull_uses_the_written_arm_and_leaves_the_inline_one_to_explain(self) -> None:
         body = self.catalog_skill
         assert "Always use the **written arm**" in body
-        assert "/pipelex-explain" in body
+        assert "{{ skill_prefix }}pipelex-explain" in body
 
     def test_unmanaged_files_are_named_and_never_deleted(self) -> None:
         """A pull writes what the catalog holds now; it does not make the directory
@@ -1824,7 +1858,7 @@ class TestPipelexCatalogSkill:
             assert "mthds_get_method" not in body, f"{skill} must not declare the get tool"
         for skill in ("pipelex-design", "pipelex-edit"):
             body = _skill_source(self.TEMPLATES / skill)
-            assert "/pipelex-catalog" in body, f"{skill} must point at the catalog skill"
+            assert "{{ skill_prefix }}pipelex-catalog" in body, f"{skill} must point at the catalog skill"
 
     def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
         """`function_name` is a key in the runtime's flat function registry — by
@@ -1952,7 +1986,7 @@ class TestPipelexCatalogSkill:
         second is design work, not an invalid save's fix."""
         body = self.catalog_skill
         assert "`invalid` is routed as an invalid save is" in body
-        assert "`not_runnable` names the signatures `/pipelex-design` finishes" in body
+        assert "`not_runnable` names the signatures `{{ skill_prefix }}pipelex-design` finishes" in body
 
     def test_publishing_to_github_is_named_as_another_gesture(self) -> None:
         """Decision box 3 of the drafts campaign: "publish" names the catalog's gesture, and
@@ -1994,11 +2028,12 @@ class TestPipelexCatalogSkill:
 
 
 class TestVibeMcpFragment:
-    """The Vibe target bakes the workshop launcher as a `[[mcp_servers]]` fragment.
+    """The Vibe target ships the workshop launcher as the `[[mcp_servers]]` entry the user appends.
 
-    Vibe has no plugin manifest, so this fragment is its MCP declaration. These
-    tests render the real template with the real target variables and read the
-    result the way Vibe does: as TOML holding one stdio server entry.
+    Vibe starts a server its plugin declares in the plugin's own directory, where the workshop would
+    refuse every file of the project, so the launcher lives in the user's configuration instead. These
+    tests render the real template with the real target variables and read the result the way Vibe
+    does: as TOML holding one stdio server entry.
     """
 
     REPO_ROOT = Path(__file__).parents[2]
@@ -2007,62 +2042,75 @@ class TestVibeMcpFragment:
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
         return render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, config.template_vars, include_skills=[], target_name=config.name)
 
+    def _fragment(self) -> str:
+        return self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+
     def test_fragment_declares_the_launcher_from_defaults(self) -> None:
         config = load_target_config(self.REPO_ROOT / "targets", "mistral-vibe")
         mcp_server = config.template_vars["mcp_server"]
         assert isinstance(mcp_server, dict)
-        rendered = self._render("mistral-vibe")
-        body = rendered[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
-        servers = tomllib.loads(body)["mcp_servers"]
+        servers = tomllib.loads(self._fragment())["mcp_servers"]
         assert len(servers) == 1
         server = servers[0]
         assert server["name"] == "pipelex"
         assert server["transport"] == "stdio"
-        assert server["command"] == mcp_server["command"]
+        assert server["command"] == [mcp_server["command"]]
         assert server["args"] == mcp_server["args"]
-        assert "npx -y @pipelex/mcp@latest" == " ".join([server["command"], *server["args"]])
+        assert "npx -y @pipelex/mcp@latest" == " ".join([*server["command"], *server["args"]])
 
-    def test_fragment_env_names_every_forwarded_variable_unset(self) -> None:
-        """Vibe forwards no shell env into a stdio spawn, so each variable Codex
-        forwards by name must appear here as a key the user fills in. Empty
-        values count as unset in the workshop, so an unfilled fragment is keyless
-        rather than carrying a bogus key."""
+    def test_a_launcher_path_holding_a_space_stays_one_word(self) -> None:
+        """Vibe splits a string command with `shlex`, so the fragment renders it as a one-element list (L-260912-0d6469)."""
         config = load_target_config(self.REPO_ROOT / "targets", "mistral-vibe")
-        mcp_server = config.template_vars["mcp_server"]
-        assert isinstance(mcp_server, dict)
-        env_vars = mcp_server["env_vars"]
-        assert isinstance(env_vars, list)
-        expected_env = {str(name): "" for name in cast("list[object]", env_vars)}
-        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
-        server = tomllib.loads(body)["mcp_servers"][0]
-        assert expected_env
-        assert server["env"] == expected_env
+        launcher: dict[str, object] = {"command": "/opt/Node JS/bin/node", "args": ["/opt/pipelex mcp/main.js"]}
+        template_vars: dict[str, TemplateVarValue] = {**config.template_vars, "mcp_server": launcher}
+        rendered = render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, template_vars, include_skills=[], target_name=config.name)
+        server = tomllib.loads(rendered[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"])["mcp_servers"][0]
+        assert server["command"] == ["/opt/Node JS/bin/node"]
+        assert server["args"] == ["/opt/pipelex mcp/main.js"]
+
+    def test_fragment_carries_no_key(self) -> None:
+        """The workshop reads the key its login saved in ~/.pipelex/.env, so the entry has no `env` table to paste one into."""
+        server = tomllib.loads(self._fragment())["mcp_servers"][0]
+        assert "env" not in server
+        assert "`npx -y @pipelex/mcp@latest login` saves in ~/.pipelex/.env" in self._fragment()
 
     def test_fragment_outlasts_the_cold_npx_spawn(self) -> None:
         """Vibe's default startup timeout is 10 s and a first-ever npx spawn takes longer."""
-        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
-        assert tomllib.loads(body)["mcp_servers"][0]["startup_timeout_sec"] > 10
+        assert tomllib.loads(self._fragment())["mcp_servers"][0]["startup_timeout_sec"] > 10
 
-    # The shape Vibe's first run writes: bare keys first, an inline empty
-    # `mcp_servers`, then tables (tomli_w.dump(VibeConfig.create_default())).
-    VIBE_DEFAULT_CONFIG = 'active_model = "devstral-2"\nmcp_servers = []\nskill_paths = []\n\n[session_logging]\nenabled = true\n'
+    # The shape Vibe 2.26.1's first run writes, cut to what matters here: bare keys first, an inline
+    # empty `mcp_servers`, then tables (`tomli_w.dumps(vibe.core.config.vibe_schema.create_default_config())`).
+    VIBE_DEFAULT_CONFIG = 'active_model = "devstral-2"\nmcp_servers = []\nconnectors = []\n\n[session_logging]\nenabled = true\n'
 
     def test_fragment_installs_into_a_default_vibe_config_only_after_deleting_the_inline_array(self) -> None:
-        """Appended to a fresh Vibe config as is, the fragment is invalid TOML and
-        Vibe cannot start; with the `mcp_servers = []` line deleted it loads, and
-        every top-level setting stays top-level. The fragment has to carry that
-        step, the paste position, and the session-log warning."""
-        body = self._render("mistral-vibe")[self.REPO_ROOT / "mcp" / "vibe-mcp.toml"]
+        """Appended to a fresh Vibe config as is, the fragment is invalid TOML and Vibe cannot start; with the
+        `mcp_servers = []` line deleted it loads, and every top-level setting stays top-level. The fragment
+        carries that step, the duplicate-name one, and the command that appends it to the end of the file.
+        It starts with a blank line, so it never joins the last line of a file that lacks a final newline."""
+        body = self._fragment()
+        assert body.startswith("\n")
         with pytest.raises(tomllib.TOMLDecodeError):
-            tomllib.loads(self.VIBE_DEFAULT_CONFIG + "\n" + body)
-        installed = tomllib.loads(self.VIBE_DEFAULT_CONFIG.replace("mcp_servers = []\n", "") + "\n" + body)
+            tomllib.loads(self.VIBE_DEFAULT_CONFIG + body)
+        installed = tomllib.loads(self.VIBE_DEFAULT_CONFIG.replace("mcp_servers = []\n", "") + body)
         assert installed["active_model"] == "devstral-2"
-        assert installed["skill_paths"] == []
+        assert installed["connectors"] == []
         assert [server["name"] for server in installed["mcp_servers"]] == ["pipelex"]
-        assert "Delete the `mcp_servers = []` line" in body
-        assert "two servers of the same name" in body
-        assert "Append everything below to the end of the file" in body
-        assert "~/.vibe/logs/session/" in body
+        assert "delete the `mcp_servers = []` line" in body
+        assert "refuses two servers of the same name" in body
+        assert 'cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"' in body
+        assert "merges with a trusted project's .vibe/config.toml" in body
+
+    def test_the_hook_entry_appends_to_a_hooks_file_and_names_no_path_of_the_user(self) -> None:
+        """Vibe 2.26.1 runs no hook a plugin declares, so the hook is an entry the user appends to their own hooks file,
+        beside the hooks already there, and it reaches the wrapper through the link the install made in Vibe's home."""
+        body = self._render("mistral-vibe")[self.REPO_ROOT / "hooks" / "vibe-hooks.toml"]
+        assert body.startswith("\n")
+        existing = '[[hooks]]\nname = "lint"\ntype = "post_agent"\ncommand = "eslint --quiet ."'
+        hooks = tomllib.loads(existing + body)["hooks"]
+        assert [hook["name"] for hook in hooks] == ["lint", "check-mthds"]
+        assert hooks[1]["command"] == '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
+        assert 'cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"' in body
+        assert "Delete any `check-mthds` hook already there first" in body
 
     @pytest.mark.parametrize("target_name", ["prod", "codex"])
     def test_plugin_targets_do_not_ship_the_fragment(self, target_name: str) -> None:
@@ -2292,8 +2340,8 @@ class TestAdaptiveDesignSkill:
 
     def test_edit_hands_structural_changes_off_by_invoking_design(self) -> None:
         edit = _skill_source(self.SKILLS / "pipelex-edit")
-        assert "then invoke `/pipelex-design`" in edit
-        assert "hand off to `/pipelex-design` now, before any files change" in edit
+        assert "then invoke `{{ skill_prefix }}pipelex-design`" in edit
+        assert "hand off to `{{ skill_prefix }}pipelex-design` now, before any files change" in edit
         assert "and stop. Never attempt a partial structural edit here." not in edit
 
     def test_adjacent_skills_describe_organization_as_conditional(self) -> None:
@@ -2793,7 +2841,7 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
         classify = body.index("### Step 2: Classify the change")
         baseline = body.index("### Step 3: Baseline verdict")
         assert classify < baseline
-        assert "hand off to `/pipelex-design` now, before any files change" in body
+        assert "hand off to `{{ skill_prefix }}pipelex-design` now, before any files change" in body
         assert "### Step 3: Classify the change" not in body
         assert "### Step 2: Baseline verdict" not in body
 
@@ -2831,8 +2879,8 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
 
     def test_edit_still_routes_a_structural_request_that_reaches_it(self) -> None:
         body = self._template("pipelex-edit")
-        assert '| "Add a step to do X" (open-ended) | structural → route to `/pipelex-design` |' in body
-        assert '| "Refactor this pipeline" (subjective) | structural → route to `/pipelex-design` |' in body
+        assert '| "Add a step to do X" (open-ended) | structural → route to `{{ skill_prefix }}pipelex-design` |' in body
+        assert '| "Refactor this pipeline" (subjective) | structural → route to `{{ skill_prefix }}pipelex-design` |' in body
 
     def test_scaffolding_is_the_scaffold_skills_word(self) -> None:
         """`/pipelex-scaffold` starts a project; in every other skill here a
@@ -2932,10 +2980,10 @@ class TestHookRendering:
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
-        output_names = {path.name for path in results}
-        assert "vibe-hooks.toml" in output_names
-        assert "check-mthds-vibe.sh" in output_names
+        assert tree / "hooks" / "vibe-hooks.toml" in results
+        assert tree / "hooks" / "check-mthds-vibe.sh" in results
         assert tree / "mcp" / "vibe-mcp.toml" in results
+        assert not any("ai.mistral.vibe" in path.parts for path in results)
 
     def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
         generate(template_tree, "prod")
@@ -3294,7 +3342,7 @@ class TestCatalogIdInEverySkill:
         touch the catalog right after writing files, which is exactly where an autonomous
         publish would creep in."""
         body = (self.TEMPLATES / "shared" / "saved-copy-notice.md.j2").read_text(encoding="utf-8")
-        assert "**Never publish here: a publish is `/pipelex-catalog`'s, on the user's request.**" in body
+        assert "**Never publish here: a publish is `{{ skill_prefix }}pipelex-catalog`'s, on the user's request.**" in body
         assert "**Offer that; never do it.**" not in body
         assert "Never write or edit `pipelex-method.json`" in body
         assert "Once this skill's own final verdict has proven the change" in body
@@ -3314,9 +3362,9 @@ class TestCatalogIdInEverySkill:
         # A key that may validate but not write the catalog makes the save a `config`-class error; that is
         # this save's failure alone, never a reason to stop over a change already validated on disk.
         assert "when the tool is absent or refuses, a `config`-class error included" in body
-        assert "Leave the save to `/pipelex-catalog`, saying the change is not saved" in body
+        assert "Leave the save to `{{ skill_prefix }}pipelex-catalog`, saying the change is not saved" in body
         bridge = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
-        assert "`/pipelex-catalog` is what compares the two" in bridge
+        assert "`{{ skill_prefix }}pipelex-catalog` is what compares the two" in bridge
         assert "it is also the only way the work done here reaches the saved copy" not in bridge
 
     def test_edit_offers_a_publish_only_after_a_save(self) -> None:
@@ -3331,7 +3379,7 @@ class TestCatalogIdInEverySkill:
         flow. Since the size diet's phase 6 one condition governs both of
         organize's report notices, the stale-types one and this one."""
         body = self.skill("pipelex-organize")
-        assert "**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries both notices)" in body
+        assert "**When invoked on its own rather than by `{{ skill_prefix }}pipelex-design`** (whose delivery step carries both notices)" in body
 
     def test_a_linked_run_sends_the_id_beside_the_files(self) -> None:
         """Box A step 5. A folder or files + `method_id` is the one legal selector pair

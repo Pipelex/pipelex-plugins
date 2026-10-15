@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Mistral Vibe installs the plugin natively (Breaking)**: on Mistral Vibe 2.26.1 or later the build is an Agent Plugins 1.0 plugin, a clone linked into `~/.vibe/plugins/pipelex`, whose skills Vibe names `/pipelex:pipelex-design` and so on, and the Pipelex tools and the `.mthds` hook are one entry each that you append to Vibe's configuration and hooks file, the first holding no key and the second no path of yours. Coming from an earlier release, remove the `skill_paths` entry and replace the old hook and `pipelex` server entries, as the Mistral Vibe section of the install page says.
+- **The key comes from the workshop's login on every agent**: a missing or refused key is answered by `npx -y @pipelex/mcp@latest login`, which saves a key in `~/.pipelex/.env` that the Pipelex tools read whenever the agent hands them none, and the skills say that a key the agent hands them wins over it and that the hook reads no file, so with only a saved key every edit is still linted and formatted but not validated. Codex now forwards `PIPELEX_HOME` to the tools beside the key.
+
 ### Fixed
 
 - **`pipelex-design` rewrites the descriptions a change to an existing method outdated**: after a structural or contract change, the skill rewrites the `description` of every pipe whose inputs or output changed and of every reshaped concept, and the bundle's own when the main pipe's contract changed, so the method's graph and catalog card no longer describe what it used to produce.
+- **Typing `/` no longer crashes Mistral Vibe**: the `pipelex-inputs` and `pipelex-run` descriptions held square brackets, which Vibe's slash completion reads as markup, and no skill description holds one now.
 
 ## [0.15.0] - 2026-10-13
 

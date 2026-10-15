@@ -1280,7 +1280,7 @@ class TestPipelexIntegrateSkill:
         for skill in ("pipelex-edit", "pipelex-design", "pipelex-organize"):
             assert 'include "skills/shared/stale-types-notice.md.j2"' in (templates / skill / "SKILL.md.j2").read_text(encoding="utf-8")
         organize = (templates / "pipelex-organize" / "SKILL.md.j2").read_text(encoding="utf-8")
-        assert "**When invoked on its own rather than by `/pipelex-design`**" in organize
+        assert "**When invoked on its own rather than by `{{ skill_prefix }}pipelex-design`**" in organize
 
     @pytest.mark.parametrize(
         "mutation",

@@ -1,6 +1,6 @@
 ---
 name: pipelex-integrate
-description: Wire an MTHDS method into a Python or TypeScript codebase with generated, drift-proof types and one typed call site that runs it through @pipelex/sdk or pipelex-sdk. Use when the user says "use this method in my app", "call this from my code", "generate types for this method", "wire the method into my project", "typed client for this method", "refresh the generated types", "the types are stale", or wants application code that runs a .mthds method — from a local bundle, a catalog id (mt_…) or a published method_ref address. Also the refresh path after a bundle edit. Not for authoring or editing the method itself (/pipelex-design, /pipelex-edit), and not for a project that does not exist yet (/pipelex-scaffold).
+description: Wire an MTHDS method into a Python or TypeScript codebase with generated, drift-proof types and one typed call site that runs it through @pipelex/sdk or pipelex-sdk. Use when the user says "use this method in my app", "call this from my code", "generate types for this method", "wire the method into my project", "typed client for this method", "refresh the generated types", "the types are stale", or wants application code that runs a .mthds method — from a local bundle, a catalog id (mt_…) or a published method_ref address. Also the refresh path after a bundle edit. Not for authoring or editing the method itself (/pipelex:pipelex-design, /pipelex:pipelex-edit), and not for a project that does not exist yet (/pipelex:pipelex-scaffold).
 ---
 
 # Integrate an MTHDS method into a codebase
@@ -120,13 +120,13 @@ Format **only the files you wrote**, then run the type checker and the gate. You
 
 ### 12. Report
 
-What was generated and where, the target and why, the call site's signature, the tooling changes, the gate's command, and any orphans as the orphans reference says. For an id not pinned, say what can move under the types; **for a `method_ref` with no tag, the types committed here are the ones the address resolved to on the day they were generated**, which no gate sees move. Refreshing is this skill again; then hand off to `/pipelex-inputs`.
+What was generated and where, the target and why, the call site's signature, the tooling changes, the gate's command, and any orphans as the orphans reference says. For an id not pinned, say what can move under the types; **for a `method_ref` with no tag, the types committed here are the ones the address resolved to on the day they were generated**, which no gate sees move. Refreshing is this skill again; then hand off to `/pipelex:pipelex-inputs`.
 
 ## Stops
 
 | Condition | Do this |
 |---|---|
-| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `validation_errors[]` to `/pipelex-design` or `/pipelex-edit`, else finish it in `/pipelex-design` |
+| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `validation_errors[]` to `/pipelex:pipelex-design` or `/pipelex:pipelex-edit`, else finish it in `/pipelex:pipelex-design` |
 | `input_domain` at `method_ref` / `method_id` | report it in the tool's words |
 | `runtime` | retry once (codegen: only if `retryable: true`, same `output_dir`), then report what landed |
 | `input_domain` at `output_dir`, outside the server's directory | step 1's containment: STOP, relaunch, say what is already written |

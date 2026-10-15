@@ -1,44 +1,36 @@
-# The Pipelex local workshop MCP server, for {{ harness_name }}.
+
+# The Pipelex workshop, the MCP server the plugin's skills call, for {{ harness_name }}.
 #
-# {{ harness_name }} has no plugin manifest to declare an MCP server in, so this
-# target ships the declaration as a config fragment. To install it in
-# ~/.vibe/config.toml ($VIBE_HOME/config.toml when VIBE_HOME is set):
+# {{ harness_name }} starts an MCP server a plugin declares in the plugin's own
+# directory, and the workshop reads and writes files only inside the directory
+# it starts in, so the plugin cannot declare it: it is this one entry in your
+# configuration instead, which {{ harness_name }} starts in your project. Append it
+# to the end of ~/.vibe/config.toml, or of $VIBE_HOME/config.toml when VIBE_HOME
+# is set, which {{ harness_name }} merges with a trusted project's .vibe/config.toml,
+# server by server, so the entry reaches every project:
 #
-# 1. Delete the `mcp_servers = []` line that {{ harness_name }} writes into a new
-#    config. TOML cannot add a [[mcp_servers]] table to an array already written
-#    inline, so {{ harness_name }} would refuse to start.
-# 2. Delete any `pipelex` server you registered by hand. {{ harness_name }} refuses
-#    to start with two servers of the same name.
-# 3. Append everything below to the end of the file, after every top-level
-#    setting such as skill_paths. Pasted above a top-level setting, the
-#    [mcp_servers.env] header would claim that setting as an environment
-#    variable of the server.
-# 4. Write your API key into the env table.
+#   cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"
 #
-# The key has to be written here. {{ harness_name }} spawns stdio MCP servers with
-# a minimal environment (HOME, LOGNAME, PATH, SHELL, TERM, USER, plus this entry's
-# env table) and expands no variables in its config, so a key exported in your
-# shell never reaches the server. The plugin's validation hook does read your
-# shell, so keep exporting the key there too. Add any other variable npx needs
-# to the same table, such as HTTPS_PROXY behind a proxy. An empty value counts
-# as unset: leave PIPELEX_BASE_URL empty for the hosted API. Get a key at
-# https://app.pipelex.com.
+# Two things in that file stop {{ harness_name }} from starting once this is
+# appended. An inline `mcp_servers = [...]` line, which TOML cannot extend with
+# a table: delete the `mcp_servers = []` line a new configuration holds, or
+# rewrite a list of servers as [[mcp_servers]] tables. And a `pipelex` server
+# already there, such as the entry earlier instructions had you add: delete it,
+# since {{ harness_name }} refuses two servers of the same name.
 #
-# {{ harness_name }} also records its whole configuration, this env table included,
-# in every session log under ~/.vibe/logs/session/, so the key is copied there
-# too. Redact it before you share a session log.
+# The entry holds no key. The workshop reads the one that
+# `npx -y @pipelex/mcp@latest login` saves in ~/.pipelex/.env, which it finds
+# because {{ harness_name }} passes it HOME, though no other variable of your shell.
+# To hand the server a variable, such as HTTPS_PROXY behind a proxy, or
+# PIPELEX_HOME when you set it and the login saved the key there, add an
+# [mcp_servers.env] table right below the entry.
 #
 # startup_timeout_sec is raised above {{ harness_name }}'s 10-second default because
-# the very first npx spawn fills the npm cache and takes longer than that.
+# the first npx spawn fills the npm cache and takes longer than that.
 
 [[mcp_servers]]
 name = "pipelex"
 transport = "stdio"
-command = {{ mcp_server.command | tojson }}
+command = {{ [mcp_server.command] | tojson }}
 args = {{ mcp_server.args | tojson }}
 startup_timeout_sec = 60.0
-
-[mcp_servers.env]
-{% for name in mcp_server.env_vars | default([]) -%}
-{{ name }} = ""
-{% endfor -%}

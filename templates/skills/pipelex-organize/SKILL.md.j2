@@ -1,6 +1,6 @@
 ---
 name: pipelex-organize
-description: Reorganize a designed method bundle into a clear, browsable layout. Use when signature-driven construction left one .mthds file per refinement, when any existing layout needs regrouping into coherent modules (or one simple file), or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Automatically follows converged /pipelex-design runs only when their construction-shaped layout needs it. Pure reorganization — never changes what the method does.
+description: Reorganize a designed method bundle into a clear, browsable layout. Use when signature-driven construction left one .mthds file per refinement, when any existing layout needs regrouping into coherent modules (or one simple file), or when the user says "organize the bundle", "organize the method", "regroup the files", "clean up the bundle layout". Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Automatically follows converged {{ skill_prefix }}pipelex-design runs only when their construction-shaped layout needs it. Pure reorganization — never changes what the method does.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -10,7 +10,7 @@ description: Reorganize a designed method bundle into a clear, browsable layout.
 
 # Organize a designed MTHDS bundle
 
-Regroup a designed library's `.mthds` files for **comprehension**, the way source code is spread across files: the root shows the contract and the top-level flow, and a reader descends into just the module they care about. Signature-driven construction leaves one file per refinement and satisfied `PipeSignature` headers behind. Direct designs are normally coherent already and skip this skill, unless the user asks or their layout genuinely needs regrouping; `/pipelex-design` auto-invokes it after converged signature-driven construction or re-entry when the layout still reflects construction history, and an already coherent direct result does not invoke it solely for process compliance.
+Regroup a designed library's `.mthds` files for **comprehension**, the way source code is spread across files: the root shows the contract and the top-level flow, and a reader descends into just the module they care about. Signature-driven construction leaves one file per refinement and satisfied `PipeSignature` headers behind. Direct designs are normally coherent already and skip this skill, unless the user asks or their layout genuinely needs regrouping; `{{ skill_prefix }}pipelex-design` auto-invokes it after converged signature-driven construction or re-entry when the layout still reflects construction history, and an already coherent direct result does not invoke it solely for process compliance.
 
 It is a **content-preserving transformation**: the method's semantics never change, and the validation verdict before and after must be identical.
 
@@ -65,7 +65,7 @@ Call `mthds_validate` with **the composed candidate set** alone, inline, since n
 
 One short summary: the layout, one line per file saying what it holds, and the preserved verdict (runnable, or a valid scaffold with its pending list). No approval prompts.
 
-**When invoked on its own rather than by `/pipelex-design`** (whose delivery step carries both notices), end with them, since an identical verdict still rewrote every file:
+**When invoked on its own rather than by `{{ skill_prefix }}pipelex-design`** (whose delivery step carries both notices), end with them, since an identical verdict still rewrote every file:
 
 1. {% include "skills/shared/stale-types-notice.md.j2" %}
 2. {% include "skills/shared/saved-copy-notice.md.j2" %}
@@ -74,8 +74,8 @@ One short summary: the layout, one line per file saying what it holds, and the p
 
 | Condition | Do this |
 |---|---|
-| `is_valid: false` at the baseline | never reorganize a broken library: report the verdict and point to `/pipelex-design` to fix it first |
+| `is_valid: false` at the baseline | never reorganize a broken library: report the verdict and point to `{{ skill_prefix }}pipelex-design` to fix it first |
 | `status: "error"`, class `input_domain` | fix the call |
 | `status: "error"`, class `runtime` | report it, and retry once before stopping |
 | the candidate still differs from the baseline after two fixes of the composition | stop, leave the original layout untouched, and report the discrepancy |
-| the regrouping seems to need a semantic edit (a rename, a contract fix, a missing declaration) | stop and report it: that is `/pipelex-design`'s work |
+| the regrouping seems to need a semantic edit (a rename, a contract fix, a missing declaration) | stop and report it: that is `{{ skill_prefix }}pipelex-design`'s work |

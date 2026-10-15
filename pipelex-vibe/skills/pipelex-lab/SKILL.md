@@ -5,13 +5,13 @@ description: Experiment with an MTHDS method the way a lab would — frame a use
 
 # Experiment with a method
 
-This skill owns the loop around a method: [frame](#1-frame-the-use-case) a use case, [set up](#2-set-up-the-experiment) test cases whose right answers are written down before anything runs, and [run the loop](#3-run-the-loop) of run, score, log and fix within a budget. It writes the brief, the keys and the log. The method is designed by `/pipelex-design`, the inputs are prepared by `/pipelex-inputs` with files made by `/pipelex-synthetic-inputs`, each run is started by `/pipelex-run`, and each fix is made by `/pipelex-edit` or `/pipelex-design`. Mistral Vibe has no cross-skill invocation, so wherever this skill hands a step to another, open that skill's `SKILL.md` beside this one and follow it.
+This skill owns the loop around a method: [frame](#1-frame-the-use-case) a use case, [set up](#2-set-up-the-experiment) test cases whose right answers are written down before anything runs, and [run the loop](#3-run-the-loop) of run, score, log and fix within a budget. It writes the brief, the keys and the log. The method is designed by `/pipelex:pipelex-design`, the inputs are prepared by `/pipelex:pipelex-inputs` with files made by `/pipelex:pipelex-synthetic-inputs`, each run is started by `/pipelex:pipelex-run`, and each fix is made by `/pipelex:pipelex-edit` or `/pipelex:pipelex-design`. Mistral Vibe has no cross-skill invocation, so wherever this skill hands a step to another, open that skill's `SKILL.md` beside this one and follow it.
 
 Start where the project stands: when `lab/<method>/` exists, read it and take up the move it has reached. A log already there is continued, never restarted, and **a series it leaves without a scorecard is closed with one first: the loop runs again only on a new go.**
 
 ## Requirements
 
-The loop needs the workshop: `/pipelex-run` starts and follows each run, and this skill reads each result with **`mthds_run_results`**, and with `mthds_run_status` and `mthds_download_artifacts`.
+The loop needs the workshop: `/pipelex:pipelex-run` starts and follows each run, and this skill reads each result with **`mthds_run_results`**, and with `mthds_run_status` and `mthds_download_artifacts`.
 
 - **If those tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe. That stop comes at the loop: framing and setting up need no tool, so frame and set up, then stop before the loop.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
@@ -27,7 +27,7 @@ lab/<method>/
   log.md           one entry per run, newest last
 ```
 
-**Never put the lab inside the bundle directory**: the catalog saves that directory and a Python package ships it, and a case's files can stand in for confidential documents. **The loop runs the directory, never an `mt_…` id or an address**: a fix lands in the files, and a run of the method's id sees it only once it is saved, and its bare id only once that draft is published, a publish the loop never makes. For a saved method, work in the directory linked to it, or one `/pipelex-catalog` pulls.
+**Never put the lab inside the bundle directory**: the catalog saves that directory and a Python package ships it, and a case's files can stand in for confidential documents. **The loop runs the directory, never an `mt_…` id or an address**: a fix lands in the files, and a run of the method's id sees it only once it is saved, and its bare id only once that draft is published, a publish the loop never makes. For a saved method, work in the directory linked to it, or one `/pipelex:pipelex-catalog` pulls.
 
 ## Guards
 
@@ -40,7 +40,7 @@ lab/<method>/
 
 Read [frame.md](references/frame.md) before asking anything: it holds the questions to ask, the shape of a candidate, and the brief. Read [fit.md](../shared/fit.md) with it, before any candidate: it says what a method can and cannot do, and what carries the rest. **State no capability that fit.md does not state**: a method designed around one the platform lacks fails at its first run, after credit is spent. **A candidate is the method's part of the request: name what carries the rest, and never promise a schedule, a connector or a write-back that no carrier provides.**
 
-For a use case with no method yet, propose two or three candidates, and recommend the one whose output can be checked against a key and whose inputs can be made safely. Once the user picks, write `lab/<method>/brief.md` with what "right" means for the chosen method, which seeds its keys, `<method>` being the `domain` you give `/pipelex-design` in the project language's casing. Hand the brief to `/pipelex-design`, and if the directory it makes is named otherwise, rename `lab/<method>/` to match. The setup follows once the method validates.
+For a use case with no method yet, propose two or three candidates, and recommend the one whose output can be checked against a key and whose inputs can be made safely. Once the user picks, write `lab/<method>/brief.md` with what "right" means for the chosen method, which seeds its keys, `<method>` being the `domain` you give `/pipelex:pipelex-design` in the project language's casing. Hand the brief to `/pipelex:pipelex-design`, and if the directory it makes is named otherwise, rename `lab/<method>/` to match. The setup follows once the method validates.
 
 A method that already exists and has no brief gets the short form frame.md gives, with no candidates, before the setup.
 
@@ -49,7 +49,7 @@ A method that already exists and has no brief gets the short form frame.md gives
 Read [key.md](references/key.md) before writing a key.
 
 1. **Cases.** At least two: one the method should pass cleanly, and one with traps it must not fall into. Name each in kebab-case.
-2. **Inputs.** The user's own files, or files from `/pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **Ask it to stop at run-ready, with no run offer**: the case has no key yet, and a yes to that offer would run it. **A case of the user's own files stays out of version control**: in a git repository, `git check-ignore -q` `lab/<method>/cases/<case>/` itself, never a file in it, before anything is copied into it. For a path not ignored, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
+2. **Inputs.** The user's own files, or files from `/pipelex:pipelex-synthetic-inputs` with facts planted in them; copy the facts it planted into the key. Give `/pipelex:pipelex-inputs` each case's directory, `cases/<case>/`, as its `<output_dir>`: `inputs.json` goes there and its files under `inputs/`, so no case writes over another. **Ask it to stop at run-ready, with no run offer**: the case has no key yet, and a yes to that offer would run it. **A case of the user's own files stays out of version control**: in a git repository, `git check-ignore -q` `lab/<method>/cases/<case>/` itself, never a file in it, before anything is copied into it. For a path not ignored, add `lab/<method>/cases/<case>/` to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 3. **Keys.** One `key.md` per case, in the format key.md gives.
 4. **Budget.** A ceiling in dollars for the loop, proposed from a round's estimated cost (every case run once) times the rounds the fixes may need. Before any round has run, a round's estimate is the brief's rough cost of one run times the cases. The platform caps nothing, so say that the budget is checked against estimates, before each run.
 5. **The go.** **Show every key, the budget and a round's estimated cost, then end the turn there**, as the guard above says: the user's go on them is the only go the loop gets, and a notice written between two tool calls can land where the user never sees it. A key the user corrects now is corrected before anything runs. A request that already asked for the runs, or already named a budget, is not that go: the budget it named is the one proposed.
@@ -58,12 +58,12 @@ Read [key.md](references/key.md) before writing a key.
 
 Read [log.md](references/log.md) before the first entry: it holds the entry format, the regression rule, how a round is scored and the scorecard. The go opens a series in the log, with its budget. Then, round after round, until a stop:
 
-1. **Run every case once** through `/pipelex-run`'s Start a run, naming `cases/<case>/` as the directory of its inputs. The go is the consent that skill needs.
-2. **Read each whole output** from the `main_stuff.json` that `/pipelex-run` saved for the run, or with `mthds_run_results`, by its run id, when nothing was saved, and look at any file a key line is about beside it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
+1. **Run every case once** through `/pipelex:pipelex-run`'s Start a run, naming `cases/<case>/` as the directory of its inputs. The go is the consent that skill needs.
+2. **Read each whole output** from the `main_stuff.json` that `/pipelex:pipelex-run` saved for the run, or with `mthds_run_results`, by its run id, when nothing was saved, and look at any file a key line is about beside it. **A line whose field was cut (`truncated: true`) or whose file was not seen is unscored, never passed.**
 3. **Score every Must and Must not line** as pass, fail or partial, quoting the field and the value you relied on. A reading an Also acceptable line allows passes the line it names; planted facts serve the diagnosis and are not scored.
 4. **Log each run** as log.md says: its id, its case, its cost, its duration, its score and the regressions.
 5. **Diagnose**, the inputs first, as the guard above says, then the method: which pipe produced the wrong value, and why.
-6. **Make one fix**: the change that addresses the most failing lines without touching the contract, through `/pipelex-edit` when it keeps the method's structure and through `/pipelex-design` when it changes it. Log it as the next round's "Changed" line before that round runs.
+6. **Make one fix**: the change that addresses the most failing lines without touching the contract, through `/pipelex:pipelex-edit` when it keeps the method's structure and through `/pipelex:pipelex-design` when it changes it. Log it as the next round's "Changed" line before that round runs.
 
 **The loop stops, and ends the turn on the scorecard**, when:
 
@@ -77,15 +77,15 @@ Read [log.md](references/log.md) before the first entry: it holds the entry form
 
 A new go opens a new series, with its own budget.
 
-**A run of a case that the lab did not start**, handed over by `/pipelex-run`, is read, scored and logged as steps 2 to 4 say, in an entry outside any round: read [log.md](references/log.md) first. It needs no go, since it has already run, and it starts no run and makes no fix.
+**A run of a case that the lab did not start**, handed over by `/pipelex:pipelex-run`, is read, scored and logged as steps 2 to 4 say, in an entry outside any round: read [log.md](references/log.md) first. It needs no go, since it has already run, and it starts no run and makes no fix.
 
 ## Stops
 
 | Condition | Do this |
 |---|---|
-| The bundle has a `PipeFunc` over a `.py` of its own | no run of the directory carries that Python, and the loop runs only the directory: stop before the go and say so; `/pipelex-catalog` saves it with its Python, outside the lab |
-| `/pipelex-inputs` leaves one of a case's inputs unfilled | the case cannot run: ask for the file, or leave the case out of the go with the user's say-so |
-| `/pipelex-run` stops waiting on a run that is still `RUNNING` | log the run as unfinished with its run id, which `/pipelex-run` can follow later, and stop the loop |
+| The bundle has a `PipeFunc` over a `.py` of its own | no run of the directory carries that Python, and the loop runs only the directory: stop before the go and say so; `/pipelex:pipelex-catalog` saves it with its Python, outside the lab |
+| `/pipelex:pipelex-inputs` leaves one of a case's inputs unfilled | the case cannot run: ask for the file, or leave the case out of the go with the user's say-so |
+| `/pipelex:pipelex-run` stops waiting on a run that is still `RUNNING` | log the run as unfinished with its run id, which `/pipelex:pipelex-run` can follow later, and stop the loop |
 
 ## References
 

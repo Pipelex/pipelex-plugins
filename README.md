@@ -110,17 +110,17 @@ The tools the skills call to validate a method, prepare its inputs, run it, gene
 
 ## Other agents
 
-The plugin also installs in **Mistral Vibe** 2.21.0 or later, from a clone of this repository: Vibe loads the skills from a path in its config, the hook from its `hooks.toml`, and the Pipelex tools from a config entry that carries your key. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
+The plugin also installs in **Mistral Vibe** 2.26.1 or later, as a native Vibe plugin: a clone of this repository linked into Vibe's plugins directory brings the skills, and the Pipelex tools and the hook are one entry each, appended to Vibe's configuration and hooks file, with no key and no path of yours in either. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
 
-**Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. Set the key in the plugin configuration dialog, which opens when you enable the plugin.
+**Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. The Pipelex tools find the login's key there; for the hook's validation, set the key in the plugin configuration dialog, which opens when you enable the plugin.
 
 Which Pipelex product each app takes, and every agent's install in detail, are in [Install the plugin, agent by agent](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md).
 
 ## Configuration
 
-- **API key.** In Claude Code, enter it in the plugin configuration dialog, which stores it in your OS keychain; `PIPELEX_API_KEY` in your environment is the fallback, and a value set in the dialog wins. Codex reads `PIPELEX_API_KEY` from your shell. Create a key in your console at [app.pipelex.com](https://app.pipelex.com).
+- **API key.** `npx -y @pipelex/mcp@latest login` creates one in your browser and saves it in `~/.pipelex/.env`, where the Pipelex tools read it in every agent. A key you give the agent wins over it, and only such a key reaches the hook, which validates with it: in Claude Code, the plugin configuration dialog, which stores the key in your OS keychain, or else `PIPELEX_API_KEY` in your environment; in Codex and Mistral Vibe, `PIPELEX_API_KEY` exported in your shell. Keys are also created in your console at [app.pipelex.com](https://app.pipelex.com). [The key, in detail](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#the-key).
 - **Base URL.** Optional, for a deployment other than the hosted API: the dialog's base URL field, or `PIPELEX_BASE_URL`. It defaults to `https://api.pipelex.com`.
-- **Without a key**, the hook still lints and formats every edit and skips only the validation, and the skills that need the Pipelex tools stop and say how to set one. The hook never blocks an edit because Node.js is missing or the API is unreachable.
+- **Without a key**, the hook still lints and formats every edit and skips only the validation, and the skills that need the Pipelex tools stop and say how to set one: the login. The hook never blocks an edit because Node.js is missing or the API is unreachable.
 - **Privacy.** With a key set, each validation sends the `.mthds` files around the edited one to the Pipelex API. Leave the key unset, in the dialog and in your environment, to keep the hook's checks on your machine.
 
 ## Documentation

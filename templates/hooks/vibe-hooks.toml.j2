@@ -1,8 +1,27 @@
+
+# The Pipelex plugin's .mthds check for {{ harness_name }}: the post_tool hook that
+# lints, formats and validates each .mthds file an edit or a write touches.
+#
+# {{ harness_name }} does not yet run the hooks a plugin declares, so the hook is
+# this one entry in your hooks file instead. Append it to the end of
+# ~/.vibe/hooks.toml, or of $VIBE_HOME/hooks.toml when VIBE_HOME is set:
+#
+#   cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"
+#
+# Delete any `check-mthds` hook already there first, such as the entry earlier
+# instructions had you add, since {{ harness_name }} skips a second hook of the
+# same name and would keep running the old one.
+#
+# The command holds no path of yours: the shell {{ harness_name }} runs it with
+# finds the script through the link the install made at
+# $VIBE_HOME/plugins/{{ plugin_name }}, and the double quotes keep a home directory
+# holding a space in one word.
+
 [[hooks]]
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = '"./hooks/check-mthds-vibe.sh"'
+command = '"${VIBE_HOME:-$HOME/.vibe}/plugins/{{ plugin_name }}/hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."

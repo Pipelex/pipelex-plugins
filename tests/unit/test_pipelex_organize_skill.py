@@ -117,7 +117,8 @@ class TestPipelexOrganizeSkill:
         """Design's delivery step carries both notices when it invoked organize, so one condition governs
         both here, said once, with both notices listed under it and nowhere else."""
         body = self.render(target_name)
-        condition = "**When invoked on its own rather than by `/pipelex-design`**"
+        prefix = load_target_config(self.REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+        condition = f"**When invoked on its own rather than by `{prefix}pipelex-design`**"
         assert body.count(condition) == 1
         _, governed = self.section(body, "### Step 5 — Report").split(condition, 1)
         for notice in ("now stale and offer", "**Save the linked method's draft.**"):

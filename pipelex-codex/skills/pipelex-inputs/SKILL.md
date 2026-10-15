@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo[/selector][@tag]) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo, optional /selector and @tag) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
 ---
 
 # Prepare Inputs for MTHDS methods

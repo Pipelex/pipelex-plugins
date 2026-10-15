@@ -6,5 +6,5 @@
    (docs/build-targets.md, "Per-skill partials"). Strips its own trailing
    newline (the closing comment below), so the including template supplies the
    line break. -#}
-**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `/pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
+**For a catalog id or a published address, read [not-on-disk.md](references/not-on-disk.md) before the first call on it.** **Say which content you explained**, the draft or version n, as the result's `version` says. An id's source comes from `mthds_get_method` with the `method_id` and **no `output_dir`**: with one, the same tool writes the sources and a link file to disk, which is `{{ skill_prefix }}pipelex-catalog`'s gesture and never this one's. Do not pass it, not even to a temporary directory.
 {#- -#}

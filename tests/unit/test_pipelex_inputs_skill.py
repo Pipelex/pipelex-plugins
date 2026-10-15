@@ -141,4 +141,5 @@ class TestPipelexInputsSkill:
             assert "mcp__plugin_pipelex_pipelex__mthds_prepare_inputs" in body
         else:
             assert "mcp__" not in body
-            assert "`/pipelex-run`'s, whose `SKILL.md` sits beside this one" in body
+            prefix = load_target_config(self.REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+            assert f"`{prefix}pipelex-run`'s, whose `SKILL.md` sits beside this one" in body

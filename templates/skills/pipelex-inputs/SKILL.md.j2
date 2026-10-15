@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo[/selector][@tag]) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo, optional /selector and @tag) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
@@ -57,10 +57,10 @@ Evaluated in order:
 | User gives file or folder paths, or says "my data" / "this file" / "use these images" / "here's my PDF" | **User data**, or **Mixed** if inputs remain unfilled |
 | User says "test data" / "generate inputs" / "synthesize" / "fake data" / "sample data" | **Synthetic** |
 | User says "template" / "schema" / "placeholder" / "what inputs does it need?" | **Template** |
-| No clear signal (e.g. right after `/pipelex-design`, with no further context) | **Template**, then offer to populate |
+| No clear signal (e.g. right after `{{ skill_prefix }}pipelex-design`, with no further context) | **Template**, then offer to populate |
 
 - **Template**: replace each file-ish mock URL (an `https://` URL on a `.invalid` host) with `"<VARNAME-url-or-path-relative-to-this-inputs-file>"`, never `"<path-to-VARNAME>"`; save, show it with its path, and offer synthetic data or the user's files.
-- **Synthetic**: read [references/synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input.{% if platform == "claude" %} Invoke it with `/pipelex-synthetic-inputs`.{% else %} {{ harness_name }} has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.{% endif %}
+- **Synthetic**: read [references/synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input.{% if platform == "claude" %} Invoke it with `{{ skill_prefix }}pipelex-synthetic-inputs`.{% else %} {{ harness_name }} has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.{% endif %}
 - **User data**: read [references/user-data.md](references/user-data.md) before matching any file to an input.
 - **Mixed**: the user's files first, then synthetic values for what they leave unfilled; read both references.
 
@@ -80,13 +80,13 @@ Call it with step 2's target, step 2's `pipe_ref` if it passed one (the signatur
 
 On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. Report the files uploaded and `inputs.prepared.json` written, in one line.
 
-`/pipelex-run`'s currency check misses a file moved over the original: **prepare again whenever a file was replaced in place.**
+`{{ skill_prefix }}pipelex-run`'s currency check misses a file moved over the original: **prepare again whenever a file was replaced in place.**
 
 ### 6. Offer the run
 
-Say what is ready: `inputs.json`, `inputs.prepared.json` where prepare wrote one, or the placeholders still to fill. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `/pipelex-integrate` wires it in.
+Say what is ready: `inputs.json`, `inputs.prepared.json` where prepare wrote one, or the placeholders still to fill. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `{{ skill_prefix }}pipelex-integrate` wires it in.
 
-**Offer the run, never start it**: it spends inference credit, so the user's yes buys it, and everything past that yes is `/pipelex-run`'s{% if platform != "claude" %}, whose `SKILL.md` sits beside this one on {{ harness_name }}, which has no cross-skill invocation{% endif %}; never call a run tool here. Offer only when:
+**Offer the run, never start it**: it spends inference credit, so the user's yes buys it, and everything past that yes is `{{ skill_prefix }}pipelex-run`'s{% if platform != "claude" %}, whose `SKILL.md` sits beside this one on {{ harness_name }}, which has no cross-skill invocation{% endif %}; never call a run tool here. Offer only when:
 
 - no calling skill asked to stop at run-ready (a user who said not to run still gets the offer: an offer is not a run);
 - no placeholder remains;
@@ -99,7 +99,7 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 
 | Condition | Do this |
 |---|---|
-| template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`/pipelex-design` resumes it), then retried; a registered method through `/pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
+| template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`{{ skill_prefix }}pipelex-design` resumes it), then retried; a registered method through `{{ skill_prefix }}pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
 | template: `input_domain` | an unknown `pipe_ref` or unresolvable `main_pipe`: pass an explicit `pipe_ref`. At `method_dir`, `method_id` or `method_ref`, report it in the tool's words; another organization's id reads as a miss |
 | `runtime`, either call | report, and retry once |
 | the factory returns no path | leave that one input unfilled, carry on with the others; report the reason and ask for the user's own file. Never fabricate a value or abandon `inputs.json` |

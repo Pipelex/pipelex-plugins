@@ -1,6 +1,6 @@
 ---
 name: pipelex-edit
-description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to /pipelex-design.
+description: Edit an existing MTHDS method bundle (.mthds files). Use when the user says "change this pipe", "update the prompt", "rename this concept", "rename this pipe", "change the model", "tweak the instructions", "modify the method", "edit mt_abc123", or wants any modification to an existing .mthds bundle. Takes a bundle directory, or a registered method's catalog id (mt_…), which it resolves to the directory linked to it or pulls to disk first. Applies contract-preserving edits directly and routes structural or contract changes to {{ skill_prefix }}pipelex-design.
 {%- include "skills/shared/frontmatter.md.j2" %}
 {%- if platform == "claude" %}
   - mcp__plugin_pipelex_pipelex__mthds_validate
@@ -15,7 +15,7 @@ description: Edit an existing MTHDS method bundle (.mthds files). Use when the u
 Modify an existing MTHDS method bundle. There are two classes of change; this skill applies the first and routes the second:
 
 - **Contract-preserving edits** (this skill): prompt and instruction text, `description` and `system_prompt` wording, model references, operator settings, and mechanical renames of pipes, concepts or input variables. The method's structure — which pipes exist, how they wire, what each one takes and produces — stays the same.
-- **Structural or contract changes** (route to `/pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These are design work: say in one line which pipe(s) the change touches, then invoke `/pipelex-design`, which re-enters existing methods adaptively. Never attempt a partial structural edit here.
+- **Structural or contract changes** (route to `{{ skill_prefix }}pipelex-design`): adding, removing, or rewiring steps; changing any pipe's `inputs`/`output` beyond a pure rename; reshaping a concept's structure; refactoring the flow. These are design work: say in one line which pipe(s) the change touches, then invoke `{{ skill_prefix }}pipelex-design`, which re-enters existing methods adaptively. Never attempt a partial structural edit here.
 
 ## Requirements
 
@@ -31,8 +31,8 @@ Automatic for clear, specific changes: state the planned edits in one line and p
 |--------|------|
 | "Rename X to Y" | automatic |
 | "Update the prompt in pipe Z" with new text provided | automatic |
-| "Add a step to do X" (open-ended) | structural → route to `/pipelex-design` |
-| "Refactor this pipeline" (subjective) | structural → route to `/pipelex-design` |
+| "Add a step to do X" (open-ended) | structural → route to `{{ skill_prefix }}pipelex-design` |
+| "Refactor this pipeline" (subjective) | structural → route to `{{ skill_prefix }}pipelex-design` |
 | Multiple changes requested at once | interactive (confirm the plan first) |
 
 ## Process
@@ -45,7 +45,7 @@ Read **every** `.mthds` file of the bundle directory outside `runs/` — the roo
 
 ### Step 2: Classify the change
 
-Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
+Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `{{ skill_prefix }}pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
 
 ### Step 3: Baseline verdict
 
@@ -70,7 +70,7 @@ Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline ver
 
 ### Step 6: Inputs refresh check
 
-When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with Step 3's source and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `/pipelex-inputs`. Otherwise skip this step.
+When the edit could have changed the input template (a renamed main-pipe input variable, a renamed boundary concept) and an `inputs.json` sits next to the bundle, re-project it: call `mthds_inputs_template` with Step 3's source and `explicit: false`, and compare its keys with `inputs.json`. Pure key renames may be applied in place; anything beyond that goes to `{{ skill_prefix }}pipelex-inputs`. Otherwise skip this step.
 
 ### Step 7: Report
 

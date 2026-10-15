@@ -1,11 +1,11 @@
 ---
 name: pipelex-scaffold
-description: Start a new project that calls MTHDS methods through Pipelex, in TypeScript or Python — a web app for a method from the method-app template, created in one command and left running with its URL reported, or any other project from the ecosystem's own initializer, handed to /pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "build me a web app for this method", "set up a Pipelex project from scratch", "new Python CLI for this method", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user stands in a copy of the method-app template not yet made theirs. Not for adding Pipelex to code that already exists — that is /pipelex-integrate.
+description: Start a new project that calls MTHDS methods through Pipelex, in TypeScript or Python — a web app for a method from the method-app template, created in one command and left running with its URL reported, or any other project from the ecosystem's own initializer, handed to /pipelex:pipelex-integrate. Use when the user says "start a new project with Pipelex", "I have a method and need an app around it", "create a Next.js app that runs my method", "build me a web app for this method", "set up a Pipelex project from scratch", "new Python CLI for this method", "bootstrap a Pipelex project", or wants a codebase where none exists yet. Also use when the user stands in a copy of the method-app template not yet made theirs. Not for adding Pipelex to code that already exists — that is /pipelex:pipelex-integrate.
 ---
 
 # Scaffold a project for Pipelex methods
 
-Give a user with no project one that runs their method, or one ready for `/pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
+Give a user with no project one that runs their method, or one ready for `/pipelex:pipelex-integrate`. This skill has exactly two branches and carries no templates of its own:
 
 - **The method app**, for a web app around a method in TypeScript. The method-app family's initializer writes its `webapp-js/` template, commits it as it came and runs the copy's own `make create` with the method; the copy's `make serve` then starts the app and proves the page answers. Both are the family's commands, and nothing they do is reimplemented here.
 - **The ecosystem's own initializer** for every other project: Python of any shape, and TypeScript that is not a web app. You run it and never assemble a project by hand.
@@ -16,7 +16,7 @@ Give a user with no project one that runs their method, or one ready for `/pipel
 
 ## Choosing the branch
 
-A cheap, reliable signal decides; an inconclusive one asks one question; nothing is guessed twice.
+An inconclusive signal asks one question; nothing is guessed twice.
 
 | Question | Signals, in order | When inconclusive |
 |---|---|---|
@@ -27,7 +27,7 @@ A cheap, reliable signal decides; an inconclusive one asks one question; nothing
 
 **An empty directory has no entry, or only `.git`. A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else**: `.DS_Store`, `.idea/`, `.vscode/`, `Thumbs.db` and every other entry refuse, since judging which of a user's files matter is what this rule forbids. So never write into a directory that exists and is not empty, and never offer to move, delete or merge what it holds to make room; the answer is another directory.
 
-**The method app needs the method first**, so a user without one goes to `/pipelex-design` and comes back with it. It is a bundle (a `.mthds` file or a directory of them), a catalog id (`mt_…`) or a package address (`github.com/<owner>/<repo>[/<package>][@<tag>]`). An unnamed directory takes the method's name, kebab-cased: a bundle's `domain`, or an address's last segment without its tag; for a catalog id, ask.
+**The method app needs the method first**, so a user without one goes to `/pipelex:pipelex-design` and comes back with it. It is a bundle (a `.mthds` file or a directory of them), a catalog id (`mt_…`) or a package address (`github.com/<owner>/<repo>[/<package>][@<tag>]`). An unnamed directory takes the method's name, kebab-cased: a bundle's `domain`, or an address's last segment without its tag; for a catalog id, ask.
 
 **A copy of the template not yet made the user's**, whose `package.json` says `pipelex-method-webapp-js` and which still has `scripts/create.mts`, is finished and never created again: read [references/uncreated-copy.md](references/uncreated-copy.md) before running anything in it.
 
@@ -39,7 +39,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ## Prerequisites
 
-`git`; `node` at 22.12 or later with `npm`, for the method app and for TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
+`git`; `node` at 22.12 or later with `npm`, for the method app and TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
 
 **On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
@@ -53,7 +53,7 @@ npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --qui
 
 It never prompts and reads a bundle path from where it runs. **Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step. Pass `--name`, `--title`, `--description`, `--author-name`, `--author-email`, `--repo-url` or a `--license…` option only with a value the user gave, never an invented one, and `--pipe`, `--method-name` or `--label` to answer a refusal that names it.
 
-**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome (`git: …`) and `make create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
+**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome and `make create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
 
 ### Step 2: Serve
 
@@ -65,7 +65,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
 
 ## Branch B — the ecosystem's initializer
 
-1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync` from inside `<dir>`**, because `/pipelex-integrate` reads no lock file as `pip install`.
+1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync` from inside `<dir>`**, because `/pipelex:pipelex-integrate` reads no lock file as `pip install`.
 2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. Run the script, never its steps by hand:
 
    ```bash
@@ -79,7 +79,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
    bash "<skill-dir>/scripts/write-env-file.sh" '<dir>'
    ```
 
-4. Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipelex-integrate` adds both with the first call site.
+4. Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipelex:pipelex-integrate` adds both with the first call site.
 
 ## The report
 
@@ -87,7 +87,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
 
 **On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it, or on `inside:` that the project is new files of that repository; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the `unversioned:`, `nested:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL. A key reported `filled` was taken from the environment **and not validated**.
 
-Two lines close it. **The project's own instructions and skills load in a session started inside it**: `cd <dir>`, then Mistral Vibe there. **`/pipelex-integrate` works from here meanwhile**, unless `node` was missing from the `PATH` and came through a version manager, whose hand-off [references/version-managers.md](references/version-managers.md) gives: `../pipelex-integrate/SKILL.md` with the method, or `/pipelex-design` first without one.
+Two lines close it. **The project's own instructions and skills load in a session started inside it**: `cd <dir>`, then Mistral Vibe there. **`/pipelex:pipelex-integrate` works from here meanwhile**, unless `node` was missing from the `PATH` and came through a version manager, whose hand-off [references/version-managers.md](references/version-managers.md) gives: `../pipelex-integrate/SKILL.md` with the method, or `/pipelex:pipelex-design` first without one.
 
 ## When something goes wrong
 
