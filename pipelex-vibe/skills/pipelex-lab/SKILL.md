@@ -89,6 +89,8 @@ A new go opens a new series, with its own budget.
 
 ## References
 
+These references name a skill by its bare `/pipelex-<name>`; to the user, write it `/pipelex:pipelex-<name>`, the only name Mistral Vibe resolves.
+
 - [frame.md](references/frame.md): at the first move, before asking anything.
 - [fit.md](../shared/fit.md): at the first move, with frame.md.
 - [key.md](references/key.md): at the second move, before writing a key.

@@ -97,6 +97,8 @@ An unknown run id is reported in the tool's own words.
 
 ## References
 
+These references name a skill by its bare `/pipelex-<name>`; to the user, write it `/pipelex:pipelex-<name>`, the only name Mistral Vibe resolves.
+
 - [by-id.md](references/by-id.md): an `mt_…` target, before the first call.
 - [published-address.md](references/published-address.md): a `method_ref` target, before the first call.
 - [failed-run.md](references/failed-run.md): a failed run, before routing it.

@@ -83,6 +83,8 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 
 ## References
 
+These references name a skill by its bare `/pipelex-<name>`; to the user, write it `/pipelex:pipelex-<name>`, the only name Mistral Vibe resolves.
+
 - [writing-mthds.md](../shared/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a re-entry.
