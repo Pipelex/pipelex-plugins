@@ -5,31 +5,20 @@ name, sent beside its `.mthds` files as the request's `resources`, so a hook tha
 files alone would block every edit of a templated bundle on a file the API was never given. These
 tests run `templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a
 Claude `PostToolUse` `Write`, against a stand-in API on a loopback port (`stub_api` in
-`conftest.py`), and read what the validate stage sent. The key they give the hook is a placeholder
-the stand-in never checks.
+`conftest.py`, run by `run_write_hook` in `stub_api.py`), and read what the validate stage sent.
+The key they give the hook is a placeholder the stand-in never checks.
 """
 
 from __future__ import annotations
 
 import base64
-import json
-import os
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from tests.unit.stub_api import StubApiServer
-
-REPO_ROOT = Path(__file__).parents[2]
-CHECK_MJS = REPO_ROOT / "templates" / "hooks" / "assets" / "check.mjs"
-HOOK_TIMEOUT_SECONDS = 60
-# What would reach the real API, or route the request elsewhere: replaced by the stand-in's own.
-STRIPPED_PREFIXES = ("PIPELEX_", "CLAUDE_PLUGIN_OPTION_")
-PROXY_VARIABLES = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy", "NODE_USE_ENV_PROXY")
-PLACEHOLDER_KEY = "plx_sk_placeholder_for_the_stub"
+from tests.unit.stub_api import StubApiServer, run_write_hook
 
 TEMPLATE_FILE = "templates/notice.html"
 TEMPLATE_HTML = "<h1>$notice.shop_name</h1>\n<p>Weekdays: $notice.weekdays</p>\n<p>Weekend: $notice.weekend</p>\n"
@@ -63,35 +52,22 @@ BACK_DOOR_METHOD = (
     .replace('main_pipe   = "print_notice"', 'main_pipe   = "print_back_notice"')
     .replace("[pipe.print_notice]", "[pipe.print_back_notice]")
 )
+# An invalid verdict, its fault a problem item, as a runner speaking the problem document answers it.
 INVALID_VERDICT: dict[str, Any] = {
     "is_valid": False,
-    "message": "The stand-in refuses every bundle it is sent",
-    "validation_errors": [{"category": "stub", "message": "refused by the stand-in"}],
+    "errors": [
+        {
+            "code": "method.template_invalid",
+            "detail": "The stand-in refuses every bundle it is sent.",
+            "params": {"pipe": "print_notice", "template": TEMPLATE_FILE, "finding": "refused by the stand-in"},
+            "location": {"pipe": "print_notice", "file": "notice.mthds"},
+        }
+    ],
+    "pending_signatures": [],
+    "is_runnable": False,
+    "message": "The method does not validate.",
     "rendered_markdown": "# Validation failed\n\nRefused by the stand-in.",
 }
-
-
-def _hook_environment(stub_api: StubApiServer) -> dict[str, str]:
-    environment = {key: value for key, value in os.environ.items() if not key.startswith(STRIPPED_PREFIXES) and key not in PROXY_VARIABLES}
-    environment["PIPELEX_API_KEY"] = PLACEHOLDER_KEY
-    environment["PIPELEX_BASE_URL"] = stub_api.base_url
-    return environment
-
-
-def _run_hook(*, node: str, method: Path, stub_api: StubApiServer) -> subprocess.CompletedProcess[str]:
-    """One PostToolUse `Write` of `method`, as Claude Code hands it to the hook."""
-    payload = json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": str(method)}})
-    result = subprocess.run(
-        [node, str(CHECK_MJS), "--platform=claude"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        env=_hook_environment(stub_api),
-        timeout=HOOK_TIMEOUT_SECONDS,
-        check=False,
-    )
-    assert result.returncode == 0, f"the hook exited {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
-    return result
 
 
 def _write_bundle(bundle: Path) -> Path:
@@ -128,7 +104,7 @@ class TestHookTemplateFiles:
         """The template goes out as `resources`, keyed by the step's `template_file`, and a file no step names stays home."""
         method = _write_bundle(tmp_path / "bundle")
 
-        result = _run_hook(node=node, method=method, stub_api=stub_api)
+        result = run_write_hook(node=node, method=method, stub_api=stub_api)
 
         assert result.stdout.strip() == "", f"a valid verdict passes silently, but the hook said: {result.stdout}"
         assert [request.path for request in stub_api.recorded] == ["/v1/validate"]
@@ -146,7 +122,7 @@ class TestHookTemplateFiles:
         method = _write_bundle(bundle)
         arrange(bundle, tmp_path / "elsewhere")
 
-        result = _run_hook(node=node, method=method, stub_api=stub_api)
+        result = run_write_hook(node=node, method=method, stub_api=stub_api)
 
         assert stub_api.recorded == [], f"the hook sent a request it could not make whole: {[request.path for request in stub_api.recorded]}"
         assert result.stdout.strip() == "", f"the validation stage should pass silently, but the hook said: {result.stdout}"

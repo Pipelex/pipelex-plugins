@@ -186,6 +186,8 @@ A file git ignores is left out of the comparison, as it is left out of the pruni
 - **Leaked templates** anywhere in a target's directory, and under the root's `skills/`, `hooks/` and `mcp/`.
 - **An in-repo target on an outside-only platform**, `agent-skills`, which the build refuses as well ("Outside targets" below).
 
+One unit test reads the generated skills for a vocabulary rather than a shape: `tests/unit/test_skill_error_fields.py` fails when any file a target ships under `skills/`, a reference or a script included, names a field of the runtime's error report that the MTHDS problem document replaced (`error_type`, `error_domain`, `error_category`, `user_action`, `caller_facing_message`): pipelex no longer writes them, and the workshop, which still relays them on a failed run's `failure` object while the hosted plane runs an older pipelex, drops them when it moves to the problem document. The error fields the skills do name, a verdict's `validation_errors[]`, an error's `class`, `retryable`, `location`, `hint` and `kind`, and a failed run's `failure_message`, are the workshop's own contract, which the skills follow as it stands and which moves to the problem document with the workshop itself.
+
 ## Per-target skill overlays
 
 A skill can carry **target-only content** without touching its shared `SKILL.md.j2`. Drop a `SKILL.<target>.md.j2` file next to a skill's `SKILL.md.j2` (where `<target>` is the stem of the target's `.toml`). When that target is built, the overlay is rendered with the same variables and **appended** to the skill's output; every other target stays byte-identical because the shared template is never modified.
