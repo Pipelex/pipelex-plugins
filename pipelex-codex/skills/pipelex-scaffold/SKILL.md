@@ -16,7 +16,7 @@ Give a user with no project one that runs their method, or one ready for `/pipel
 
 ## Choosing the branch
 
-A cheap, reliable signal decides; an inconclusive one asks one question; nothing is guessed twice.
+An inconclusive signal asks one question; nothing is guessed twice.
 
 | Question | Signals, in order | When inconclusive |
 |---|---|---|
@@ -39,7 +39,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ## Prerequisites
 
-`git`; `node` at 22.12 or later with `npm`, for the method app and for TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
+`git`; `node` at 22.12 or later with `npm`, for the method app and TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
 
 **On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
@@ -53,7 +53,7 @@ npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --qui
 
 It never prompts and reads a bundle path from where it runs. **Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step. Pass `--name`, `--title`, `--description`, `--author-name`, `--author-email`, `--repo-url` or a `--license…` option only with a value the user gave, never an invented one, and `--pipe`, `--method-name` or `--label` to answer a refusal that names it.
 
-**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome (`git: …`) and `make create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
+**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome and `make create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
 
 ### Step 2: Serve
 

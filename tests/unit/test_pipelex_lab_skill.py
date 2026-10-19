@@ -30,6 +30,11 @@ def render(target_name: str, skill: str = "pipelex-lab") -> str:
     return next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
 
 
+def skill_prefix(target_name: str) -> object:
+    """What the named target writes before a skill's name to name it: `/` on Claude Code and Codex, `/pipelex:` on Vibe."""
+    return load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+
+
 def description(skill: str) -> str:
     """A skill's `description:` line, read from its template, which every target renders unchanged."""
     template = (REPO_ROOT / "templates" / "skills" / skill / "SKILL.md.j2").read_text(encoding="utf-8")
@@ -225,7 +230,7 @@ class TestIntegrationPoints:
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_design_hands_off_to_the_lab(self, target_name: str) -> None:
         hand_off = render(target_name, "pipelex-design").split("5. **Hand off**:", 1)[1].split("\n", 1)[0]
-        assert "`/pipelex-lab` writes answer keys and scores the runs" in hand_off
+        assert f"`{skill_prefix(target_name)}pipelex-lab` writes answer keys and scores the runs" in hand_off
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_case_is_handed_to_inputs_with_no_run_offer(self, target_name: str) -> None:
@@ -245,16 +250,15 @@ class TestIntegrationPoints:
         """Only a run on a case's inputs is offered: a run on any other inputs has no key to be scored against, and
         the lab would have to improvise one with the output already in view."""
         results = render(target_name, "pipelex-run").split("### 7. ", 1)[1].split("\n### ", 1)[0]
-        assert (
-            "When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab`" in results
-        )
+        offer = f"offer `{skill_prefix(target_name)}pipelex-lab`"
+        assert f"When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, {offer}" in results
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_lab_logs_a_run_it_is_handed_outside_its_rounds(self, target_name: str) -> None:
         """A run the lab is handed has already spent its credit. It is scored and logged, and it starts nothing; it
         belongs to no round, so it moves neither a series' budget nor its best round."""
         loop = the_move(render(target_name), 3)
-        assert "**A run of a case that the lab did not start**, handed over by `/pipelex-run`" in loop
+        assert f"**A run of a case that the lab did not start**, handed over by `{skill_prefix(target_name)}pipelex-run`" in loop
         assert "it starts no run and makes no fix" in loop
         log = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "log.md").read_text(encoding="utf-8")
         assert "## A run the loop did not start" in log

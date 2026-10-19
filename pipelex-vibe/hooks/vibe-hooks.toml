@@ -1,8 +1,29 @@
+
+# The Pipelex plugin's .mthds check for Mistral Vibe: the post_tool hook that
+# lints, formats and validates each .mthds file an edit or a write touches.
+#
+# Mistral Vibe does not yet run the hooks a plugin declares, so the hook is
+# this one entry in your hooks file instead, at the end of ~/.vibe/hooks.toml,
+# or of $VIBE_HOME/hooks.toml when VIBE_HOME is set.
+#
+# First delete any `check-mthds` hook already there, such as the entry earlier
+# instructions had you add, since Mistral Vibe skips a second hook of the
+# same name and would keep running the old one; and delete it from any trusted
+# project's .vibe/hooks.toml those instructions let you put it in, where it
+# overrides this one. Then append:
+#
+#   cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"
+#
+# The command holds no path of yours: the shell Mistral Vibe runs it with
+# finds the script through the link the install made at
+# $VIBE_HOME/plugins/pipelex, and the double quotes keep a home directory
+# holding a space in one word.
+
 [[hooks]]
 name = "check-mthds"
 type = "post_tool"
 match = "re:^(edit|write_file)$"
-command = '"./hooks/check-mthds-vibe.sh"'
+command = '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
 timeout = 15.0
 strict = false
 description = "Validate .mthds files after Vibe file edits."

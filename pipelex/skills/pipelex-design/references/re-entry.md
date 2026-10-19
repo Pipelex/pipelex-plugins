@@ -7,6 +7,7 @@ Read this when the request is a structural or contract change to an existing met
 - A pipe contract change includes every parent controller whose wiring must adapt: a definition preserves the contract its parent relies on, matched by concept identity, and an intentional contract change propagates through every affected parent mapping before delivery.
 - A main-pipe contract change includes root boundary concepts and invalidates any saved `inputs.json`.
 - A concept reshape includes its introducing declaration and every consumer that field-reads it.
+- A contract change includes the words that describe it: the `description` of every pipe whose inputs or output changed and of every reshaped concept, and the bundle's own `description` when the main pipe's contract changed. Rewrite each to say what the method does now: the user reads them in the method's graph and catalog card, and no verdict flags one left describing the old contract.
 
 ## 2. Choose the re-entry mode from the affected graph, not the whole method's size
 

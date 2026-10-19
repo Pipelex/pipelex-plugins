@@ -88,7 +88,10 @@ class TestPipelexDesignSkill:
         body = self.render(target_name)
         gate = self.the_line(body, "this verdict is the runnable gate")
         assert gate.startswith("For a completed method, "), f"{target_name}: the runnable gate has lost its condition: {gate!r}"
-        assert "A re-entry restores at least its baseline verdict instead." in gate
+        assert "then restores at least its baseline verdict instead." in gate
+        assert gate.index("rewrites each stale `description`") < gate.index("restores at least its baseline verdict"), (
+            f"{target_name}: the descriptions are rewritten after the verdict the re-entry restores: {gate!r}"
+        )
         assert self.the_line(body, "**The baseline, before every edit**").endswith("otherwise deliver as step 6 says.")
 
     @pytest.mark.parametrize("target_name", TARGETS)

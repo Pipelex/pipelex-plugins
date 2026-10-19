@@ -27,4 +27,4 @@ Verify the runtime answers under that prefix, `node --version` or `uv --version`
 
 ## What it means for the hand-off
 
-The Pipelex workshop that `/pipelex-integrate` uses is spawned with `npx` on the **harness's** own `PATH`, which no prefix of yours reaches. So a `node` reached only through a `PATH` prefix means no workshop at all, whichever manager supplied it, `asdf` and `mise` included. The report says so instead of the usual hand-off: the harness must be restarted from a shell where the runtime is on the `PATH` before `/pipelex-integrate` can run.
+The Pipelex workshop that the integrate skill uses is spawned with `npx` on the **harness's** own `PATH`, which no prefix of yours reaches. So a `node` reached only through a `PATH` prefix means no workshop at all, whichever manager supplied it, `asdf` and `mise` included. The report says so instead of the usual hand-off: the harness must be restarted from a shell where the runtime is on the `PATH` before the skill the usual hand-off names can run.

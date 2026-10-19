@@ -716,7 +716,7 @@ A dry run composes the document for real against mock inputs, which checks the t
 
 **A `template_check_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, located by its `pipe_code`, `template_file` and `template_location`, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
 
-### PipeFunc — call a registered Python function
+### PipeFunc — call a Python function of the method's folder
 
 ```toml
 [pipe.capitalize_text]
@@ -724,14 +724,40 @@ type          = "PipeFunc"
 description   = "Uppercase the input text"
 inputs        = { text = "Text" }
 output        = "Text"
-function_name = "capitalize"
+function_name = "funcs.text_utils.capitalize"
 ```
 
-Only use this when the user has a registered function. Otherwise prefer PipeCompose or PipeLLM.
+The module `funcs/text_utils.py`, under the method's root, defines the function as Pipelex expects it:
 
-**`function_name` is a registry key, not an import path.** It names an entry in the runtime's flat, process-wide function registry — by default the decorated function's own name, and otherwise whatever string `@pipe_func(name=…)` was given — and resolution is a lookup with no import. So nothing in a bundle says which module defines a registered function, a dotted name is just a key that happens to contain dots, and on the hosted plane the stored `.py` files are flat importable module names beside each other. Name the function, not a path to it.
+```python
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
 
-{% include "skills/shared/pipefunc-warning.md.j2" %} The function must already be registered in the runtime that executes the method: a `function_name` naming something the plane cannot import fails at run time, not at validation.
+
+@pipe_func()
+def capitalize(working_memory: WorkingMemory) -> TextContent:
+    text = working_memory.get_stuff_as_str("text")
+    return TextContent(text=text.upper())
+```
+
+This is how Pipelex marks a function as callable from a method and calls it, which the standard leaves to the runtime: the `@pipe_func()` marker, which takes no argument, on a top-level `def` or `async def` that the module defines itself, never one it imports or assigns; one parameter named `working_memory` of type `WorkingMemory`, which holds the step's inputs by name; and a return type that is a `StuffContent` matching the step's `output`, such as `TextContent`. **Never write `@pipe_func(name=…)`**: a function has no name but its import path, and the argument is refused.
+
+Only use this when a step needs the user's own Python code. Otherwise prefer PipeCompose or PipeLLM.
+
+**`function_name` is the function's Python import path from the root of the method's tree, never a bare function name or a registry key.** The root is the nearest directory holding a `METHODS.toml`, at or above the folder the runtime is handed, or that folder itself when there is none; for a bundle of a dependency, it is that dependency's own root. The name splits at its last dot into a module path and the function's name: `funcs.text_utils.capitalize` names the function `capitalize` of the module `funcs.text_utils`, which is the file `funcs/text_utils.py` under the root or the package `funcs/text_utils/__init__.py`, each dot of the module path read as a `/`. The path starts at the root whichever folder the `.mthds` file sits in, so a step keeps its `function_name` when its bundle file moves, unlike a `template_file`. The modules that module imports resolve from the same root (`from funcs.rates import VAT_RATE`), so a helper module can sit in a subdirectory and relative imports work. Keep the Python in the method's folder, beside its bundles, and out of what the folder leaves out, such as a directory whose name starts with a dot or a file a `.gitignore` ignores.
+
+Validation refuses a `function_name` that breaks one of these rules:
+
+- The name holds at least one dot. A bare name such as `capitalize` names no module and is refused as the bundle is read.
+- Every dot-separated segment is a Python identifier that is not a Python keyword and that NFKC normalization leaves unchanged, so `funcs.text-utils.capitalize`, `funcs.class.capitalize` and a segment holding a ligature such as `ﬁ` or a fullwidth letter are refused.
+- The module path names a module of the method's tree: the tree holds `<module path>.py` or `<module path>/__init__.py`. A tree holding both, such as `funcs/text_utils.py` beside `funcs/text_utils/__init__.py`, is refused as ambiguous.
+
+Pipelex then reads the module's source, without running any Python, to prove that it defines the function as a top-level `def` or `async def` carrying `@pipe_func()`, and refuses the step otherwise as `pipe_func_function_refused`, located on its `function_name` and saying what is missing. The function is imported, and its signature and return type checked, when the step first runs.
+
+**A flat `function_name` is the retired function registry's key**, from a method written before import paths: rewrite it as the import path of the module defining the marked function, ending in the function's own `def` name even where a `@pipe_func(name=…)` marker registered it under another, and drop that marker's argument. Where the pipelex CLI is installed, `pipelex fix function-names <method dir>` does both, and reports a name it cannot resolve rather than guessing. A runner that answers a dotted name with `not found in registry` runs a pipelex that predates import paths, so the runtime is too old, not the name wrong: say so, and never shorten the name to get past it.
+
+{% include "skills/shared/pipefunc-warning.md.j2" %}
 
 ### PipeSignature — a contract-only header (forward declaration)
 

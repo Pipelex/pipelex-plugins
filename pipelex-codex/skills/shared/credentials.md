@@ -10,6 +10,8 @@ The Pipelex connector's `pipelex_*` tools, when the session has them, belong to 
 
 ## Where the key comes from
 
-The server authenticates to the API with **`PIPELEX_API_KEY`** from the session environment — the same variable the plugin's validation hook documents.
+The server authenticates to the API with **`PIPELEX_API_KEY`**. It uses the key its host hands it, which on Codex is a `PIPELEX_API_KEY` exported in the shell Codex starts from, forwarded by name. When the host hands it none, it reads the key saved in `~/.pipelex/.env`, or in the `.env` of `PIPELEX_HOME` when that variable reaches it, afresh on every call, so a key saved while the session runs is used from the next call with no restart.
 
-A key the user saved with the pipelex CLI's `pipelex login` does not count: that command writes it to `~/.pipelex/.env`, or to the `.env` of `PIPELEX_HOME` when that is set, a file only pipelex itself loads, when its Python package is imported, so it reaches neither the server nor the hook. Ask the user to give the server a key by exporting `PIPELEX_API_KEY` in the shell Codex starts from: a new one from app.pipelex.com, or the `PIPELEX_API_KEY` value in that file, which they copy themselves. Never read that file or print a key yourself.
+So a `config`-class error about the key is answered by the workshop's login, which the user runs themselves in a terminal: **`npx -y @pipelex/mcp@latest login`** opens the browser on app.pipelex.com, mints a key for the account's current organization and saves it in that file (`--paste` reads one created in the app instead, for a machine with no browser). The pipelex CLI's `pipelex login` saves to the same file, so a key it saved counts too. When the error's hint says the host's own key was refused, the saved one is never consulted until that key is removed or replaced in the shell Codex starts from. Never read that file or print a key yourself.
+
+The plugin's validation hook reads `PIPELEX_API_KEY` from Codex's environment alone, never from that file, so with only a saved key it still lints and formats each edit but skips validating it against the API.

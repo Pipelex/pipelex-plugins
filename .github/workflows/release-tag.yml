@@ -33,6 +33,10 @@ on:
     branches:
       - main
 
+# No process a job starts reports anonymous usage statistics (docs/ci.md, "No usage statistics").
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   release-tag:
     name: Release tag

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "author": {
+    "name": "Pipelex staff",
+    "email": "oss@pipelex.com",
+    "url": "https://pipelex.com"
+  },
+  "homepage": "https://pipelex.com",
+  "repository": "https://github.com/Pipelex/pipelex-plugins",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "pipelex",
+    "mthds",
+    "ai-methods"
+  ]
+}

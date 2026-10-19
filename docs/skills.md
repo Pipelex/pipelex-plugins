@@ -4,7 +4,7 @@ What each skill of the Pipelex plugin does, what it needs, and the tools it call
 
 ## Build a method
 
-**`pipelex-design`** designs a method contract-first and writes it as `.mthds` files. A method whose whole graph is understood and shallow is written directly as a coherent, runnable bundle; deep, uncertain, staged or resumable work goes through signature-driven refinement, validated at each step. A structural or contract change to an existing method, such as a new step or a new input, comes back here too, and the skill re-enters the affected region directly or through signatures according to its complexity. When the method is ready, the skill presents its flow, giving first the path of the flowchart page the Pipelex tools write beside the bundle.
+**`pipelex-design`** designs a method contract-first and writes it as `.mthds` files. A method whose whole graph is understood and shallow is written directly as a coherent, runnable bundle; deep, uncertain, staged or resumable work goes through signature-driven refinement, validated at each step. A structural or contract change to an existing method, such as a new step or a new input, comes back here too, and the skill re-enters the affected region directly or through signatures according to its complexity, rewriting the descriptions the change outdated, which the method's graph and catalog card show. When the method is ready, the skill presents its flow, giving first the path of the flowchart page the Pipelex tools write beside the bundle.
 
 **`pipelex-edit`** makes the edits that keep a method's contract: a prompt, a model reference, a mechanical rename. It proves each one with a validation before and after, and sends a structural or contract change to `/pipelex-design`.
 

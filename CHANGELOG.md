@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.16.0] - 2026-10-20
+
+### Changed
+
+- **Mistral Vibe installs the plugin natively (Breaking)**: on Mistral Vibe 2.26.1 or later the build is an Agent Plugins 1.0 plugin, a clone linked into `~/.vibe/plugins/pipelex`, whose skills Vibe names `/pipelex:pipelex-design` and so on, and the Pipelex tools and the `.mthds` hook are one entry each that you append to Vibe's configuration and hooks file, the first holding no key and the second no path of yours. Coming from an earlier release, remove the `skill_paths` entry and replace the old hook and `pipelex` server entries, as the Mistral Vibe section of the install page says.
+- **A `PipeFunc`'s `function_name` is an import path (Breaking)**: the MTHDS reference and the skills teach `function_name` as MTHDS standard 7.0.0 defines it and pipelex 0.87.0 runs it, the function's Python import path from the root of the method's tree, such as `funcs.text_utils.capitalize` for the function `capitalize` of `funcs/text_utils.py`, marked with `@pipe_func()` and no argument, where they taught a key of the retired function registry and `@pipe_func(name=…)`, so a method an agent writes now needs a runner on pipelex 0.87.0 or later. The reference gives the standard's validation rules and the rewrite of a method written with flat names, which `pipelex fix function-names <method dir>` performs where the pipelex CLI is installed, and `pipelex-catalog` saves the module each `function_name` names, saying that the catalog stores no `.py` file in a subdirectory yet.
+- **The validation hook blocks a `PipeFunc` whose `function_name` is not an import path (Breaking)**: the `check.mjs` bundle every target runs on a `.mthds` edit is rebuilt on `@pipelex/tools-wasm` 0.6.0 and `@pipelex/sdk` 0.46.1, so its offline lint now blocks a `function_name` holding no dot or an empty segment, such as `capitalize`, `funcs..compute_totals` or `funcs.`, the rule pipelex v0.87.0 and the hosted validation apply now that a `PipeFunc` names its function by its import path from the root of the method tree, such as `funcs.totals.compute_totals`. Nothing else the hook does changes: its format output is the same, and its validate stage sends the same request and reads the same verdict, naming 0.46.1 in its `User-Agent`.
+- **The hook's corpus sweep runs over the MTHDS Test Corpus of pipelex v0.87.0**: the corpus vocabulary now says a `PipeFunc` names its function by its import path in the method tree when it explains why the corpus has no `PipeFunc` entry, and declares as left out the `pipe_func_function_refused` error, which only a `PipeFunc` step produces, and the advisory `template_check_warning`, which never makes a verdict. No entry changes, so the sweep expects the same blocks and passes.
+- **The key comes from the workshop's login on every agent**: a missing or refused key is answered by `npx -y @pipelex/mcp@latest login`, which saves a key in `~/.pipelex/.env` that the Pipelex tools read whenever the agent hands them none, and the skills say that a key the agent hands them wins over it and that the hook reads no file, so with only a saved key every edit is still linted and formatted but not validated. Codex now forwards `PIPELEX_HOME` to the tools beside the key.
+
+### Fixed
+
+- **`pipelex-design` rewrites the descriptions a change to an existing method outdated**: after a structural or contract change, the skill rewrites the `description` of every pipe whose inputs or output changed and of every reshaped concept, and the bundle's own when the main pipe's contract changed, so the method's graph and catalog card no longer describe what it used to produce.
+- **Typing `/` no longer crashes Mistral Vibe**: the `pipelex-inputs` and `pipelex-run` descriptions held square brackets, which Vibe's slash completion reads as markup, and no skill description holds one now.
+
 ## [0.15.0] - 2026-10-13
 
 ### Changed

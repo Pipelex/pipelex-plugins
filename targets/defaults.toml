@@ -20,6 +20,13 @@ harness_name = "Claude Code"
 # sentence (the size diet's facts, L-260923-a9bdfe, sections 3 to 5).
 skill_dir = "${CLAUDE_SKILL_DIR}"
 
+# What a skill writes before another skill's name when it names that skill as
+# the user would type it: `/pipelex-design` on Claude Code and Codex. Mistral
+# Vibe names a plugin's skills `<plugin>:<skill>` and finds a typed skill by
+# that whole name alone, so its target sets `/pipelex:`. A template never spells
+# a skill's slash name: it writes `{{ skill_prefix }}pipelex-design`.
+skill_prefix = "/"
+
 # Where a skill's links find the shared files (`writing-mthds.md`, `fit.md` and
 # the rest), relative to its SKILL.md: every link to one is written
 # `{{ shared_dir }}/<file>`. The plugin ships them once, in `skills/shared/`
@@ -95,10 +102,17 @@ pipelex = "0.79.0"
 #   MCP-backed skill (regressed in 0.3.1 — see docs/decisions.md).
 # - Codex: `env_vars` names the variables Codex forwards into the spawn
 #   (Codex whitelist-filters MCP spawn env; terminal sessions carry them).
-# - Mistral Vibe: no manifest. mcp/vibe-mcp.toml renders command/args as a
-#   [[mcp_servers]] stdio entry the user copies into ~/.vibe/config.toml, and
-#   each env_vars name becomes an empty `env` key they fill in, because Vibe
-#   forwards no shell env into the spawn and expands no variables.
+#   PIPELEX_HOME is among them so that the workshop reads the `.env` the
+#   login wrote: without it a user who sets PIPELEX_HOME logs in to one file
+#   while the workshop reads ~/.pipelex/.env.
+# - Mistral Vibe: the native plugin's manifest declares no server, because
+#   Vibe starts a plugin's server in the plugin's own directory, outside the
+#   project. mcp/vibe-mcp.toml renders command/args as the [[mcp_servers]]
+#   stdio entry the user appends to their Vibe configuration, which starts it
+#   in the project, with no `env` table: the workshop reads the key its own
+#   `login` saves in ~/.pipelex/.env, found through HOME, one of the few basic
+#   shell variables Vibe passes into the spawn, which leave out every PIPELEX_
+#   one, and Vibe expands none in its config.
 # Dev override: never an edit of this block. `make claude-local-mcp` and
 # `make codex-local-mcp` start Claude Code or Codex on another workshop, a
 # pipelex-mcp checkout (MCP=<path>) or a published version (MCP_VERSION=x.y.z),
@@ -107,7 +121,7 @@ pipelex = "0.79.0"
 [vars.mcp_server]
 command = "npx"
 args = ["-y", "@pipelex/mcp@latest"]
-env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL"]
+env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL", "PIPELEX_HOME"]
 
 # Claude plugin user configuration. Keys map onto env variables by convention:
 # option `foo` is injected as PIPELEX_PLUGIN_FOO and promoted to PIPELEX_FOO

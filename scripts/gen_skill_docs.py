@@ -61,18 +61,37 @@ class Platform(StrEnum):
 
     @property
     def has_plugin_manifest(self) -> bool:
-        """Whether the build writes a Claude or Codex plugin manifest for this platform."""
-        return self.manifest_dirname is not None
+        """Whether the build writes a plugin manifest for this platform."""
+        return self.manifest_path is not None
 
     @property
-    def manifest_dirname(self) -> str | None:
-        """The directory holding the platform's `plugin.json` and `plugin-base.json`, or None when it has no manifest."""
+    def manifest_base_dirname(self) -> str | None:
+        """The repository directory holding the platform's `plugin-base.json`, or None when it has no manifest."""
         match self:
             case Platform.CLAUDE:
                 return ".claude-plugin"
             case Platform.CODEX:
                 return ".codex-plugin"
-            case Platform.MISTRAL_VIBE | Platform.AGENT_SKILLS:
+            case Platform.MISTRAL_VIBE:
+                return ".vibe-plugin"
+            case Platform.AGENT_SKILLS:
+                return None
+
+    @property
+    def manifest_path(self) -> str | None:
+        """Where the platform's `plugin.json` sits in a target's output, or None when it has no manifest.
+
+        Claude Code and Codex read theirs from a directory of their own; Mistral Vibe reads an Agent
+        Plugins 1.0 manifest at the plugin's root (docs/build-targets.md, "The Vibe plugin").
+        """
+        match self:
+            case Platform.CLAUDE:
+                return ".claude-plugin/plugin.json"
+            case Platform.CODEX:
+                return ".codex-plugin/plugin.json"
+            case Platform.MISTRAL_VIBE:
+                return "plugin.json"
+            case Platform.AGENT_SKILLS:
                 return None
 
     @property
@@ -106,6 +125,7 @@ REPOSITORY_OWN_PATHS = (
     ".claude",
     ".claude-plugin",
     ".codex-plugin",
+    ".vibe-plugin",
     GIT_DIR_NAME,
     ".github",
     ".venv",
@@ -170,7 +190,9 @@ HOOK_TEMPLATES = [
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml + the check-mthds-vibe.sh wrapper.
+# - Mistral Vibe: hooks/vibe-hooks.toml, the [[hooks]] entry the user appends
+#   to their own hooks file, since Vibe 2.26.1 runs no hook a plugin declares,
+#   + the check-mthds-vibe.sh wrapper it names through the plugin's link.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 # - Agent Skills: nothing, since the platform has no hooks.
@@ -183,12 +205,15 @@ HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.AGENT_SKILLS: [],
 }
 
-# MCP templates by platform: the workshop launcher's declaration where a
-# platform has no plugin manifest to carry it. Mistral Vibe gets
-# mcp/vibe-mcp.toml, a [[mcp_servers]] config fragment the user copies into
-# ~/.vibe/config.toml, as with vibe-hooks.toml. The Claude and Codex manifests
-# declare the server themselves (make_plugin_json), and an Agent Skills harness
-# is given its tools by whoever runs it.
+# MCP templates by platform: the workshop launcher's declaration where the
+# plugin cannot carry it. Mistral Vibe starts a plugin's MCP server in the
+# plugin's own directory, outside the project the workshop must work in, so
+# its target renders mcp/vibe-mcp.toml instead, the one [[mcp_servers]] entry
+# the user appends to their Vibe configuration (docs/decisions.md, "The
+# Mistral Vibe build is a native plugin, with two entries the user appends").
+# The Claude and Codex manifests declare the server themselves
+# (make_plugin_json), and an Agent Skills harness is given its tools by
+# whoever runs it.
 MCP_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: [],
     Platform.CODEX: [],
@@ -573,8 +598,11 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     Uses platform-specific plugin-base.json for shared fields:
     - Claude: .claude-plugin/plugin-base.json
     - Codex: .codex-plugin/plugin-base.json
+    - Mistral Vibe: .vibe-plugin/plugin-base.json, an Agent Plugins 1.0 manifest's
+      `$schema` and identity, every key of which Vibe must accept, since it
+      refuses a manifest holding any key it does not know
     """
-    base_dirname = config.platform.manifest_dirname
+    base_dirname = config.platform.manifest_base_dirname
     if base_dirname is None:
         msg = f"{config.name}: platform {config.platform} does not use plugin.json"
         raise SystemExit(msg)
@@ -616,10 +644,13 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # user_config stay; `make codex-local-mcp` replaces the entry with `-c`
     # overrides, which outrank the plugin tier on Codex and so must repeat
     # env_vars. Neither edits a tracked file.
-    # Vibe gets no manifest entry because it has no manifest:
-    # its target renders the same launcher as the mcp/vibe-mcp.toml config
-    # fragment instead (see MCP_TEMPLATES_BY_PLATFORM). Skipped when the
-    # target defines no mcp_server block.
+    # Vibe's manifest declares no server, and its target ships no mcp.json:
+    # Vibe starts a plugin's stdio server in the plugin's own directory and
+    # advertises no MCP roots, so a workshop declared there would refuse every
+    # file of the project, its working directory being its trust boundary. Its
+    # target renders the same launcher as the mcp/vibe-mcp.toml entry the user
+    # appends to their configuration instead (see MCP_TEMPLATES_BY_PLATFORM).
+    # Skipped when the target defines no mcp_server block.
     mcp_server = config.template_vars.get("mcp_server")
     if isinstance(mcp_server, dict):
         raw_command = mcp_server.get("command", "")
@@ -995,16 +1026,15 @@ def build_target(base_dir: Path, config: TargetConfig, *, dry_run: bool = False)
                 dst_path.parent.mkdir(parents=True, exist_ok=True)
             result.files[dst_path] = content
 
-        # Generate plugin.json for platforms that have a plugin manifest.
-        # Mistral Vibe uses skill_paths plus hooks.toml wiring instead.
-        manifest_dirname = config.platform.manifest_dirname
-        if manifest_dirname is not None:
+        # Generate plugin.json for platforms that have a plugin manifest: in its
+        # own directory on Claude Code and Codex, at the plugin's root on Vibe.
+        manifest_path = config.platform.manifest_path
+        if manifest_path is not None:
             plugin_json = make_plugin_json(base_dir, config)
             result.plugin_json = plugin_json
-            plugin_dir = output_dir / manifest_dirname
+            plugin_json_path = output_dir / manifest_path
             if not dry_run:
-                plugin_dir.mkdir(parents=True, exist_ok=True)
-            plugin_json_path = plugin_dir / "plugin.json"
+                plugin_json_path.parent.mkdir(parents=True, exist_ok=True)
             result.files[plugin_json_path] = json.dumps(plugin_json, indent=2) + "\n"
 
         # Everything else in the output directory goes, the other platform's

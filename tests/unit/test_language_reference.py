@@ -1,4 +1,4 @@
-# Pin what the shared MTHDS language reference teaches about `PipeDocGen` and the natives.
+# Pin what the shared MTHDS language reference teaches about `PipeDocGen`, `PipeFunc` and the natives.
 #
 # `writing-mthds.md` is the reference `pipelex-design` reads before every write and the other authoring
 # skills read for a syntax question; `native-content-types.md` beside it gives each native's attributes. An
@@ -6,12 +6,15 @@
 # document, and a natives table without `Choice` and `Rating` invited a concept of either name, which the
 # runtime refuses. These tests hold the two files to each other and to the places that enumerate the
 # operators again, so a pipe or a native added to one cannot go missing from the rest. The rationale is
-# `docs/decisions.md`, "PipeDocGen is taught whole, and the runner says what it cannot print".
+# `docs/decisions.md`, "PipeDocGen is taught whole, and the runner says what it cannot print", and
+# "A `PipeFunc` names its function by import path" for the `function_name` sweep.
 
 
 from __future__ import annotations
 
+import keyword
 import re
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -42,6 +45,29 @@ def section(text: str, heading: str) -> str:
     assert text.count(f"\n{heading}") == 1, f"expected one {heading!r} heading"
     _, rest = text.split(f"\n{heading}", 1)
     return re.split(r"\n#{2,3} ", rest, maxsplit=1)[0]
+
+
+def import_path_violation(function_name: str) -> str | None:
+    """Why a `function_name` is not an import path by MTHDS standard 7.0.0's rules, or None when it is one."""
+    name = unicodedata.normalize("NFC", function_name)
+    if "." not in name:
+        return "it holds no dot"
+    for segment in name.split("."):
+        if not segment.isidentifier():
+            return f"`{segment}` is not a Python identifier"
+        if keyword.iskeyword(segment):
+            return f"`{segment}` is a Python keyword"
+        if unicodedata.normalize("NFKC", segment) != segment:
+            return f"`{segment}` changes under NFKC normalization"
+    return None
+
+
+def shipped_text_files() -> list[Path]:
+    """Every Markdown and Jinja source the plugin ships from or renders, the vendored corpus and the hook bundle
+    aside, which this repository never edits."""
+    roots = [REPO_ROOT / "templates" / "skills", REPO_ROOT / "skills"]
+    roots += [REPO_ROOT / output / "skills" for output in ("pipelex", "pipelex-codex", "pipelex-vibe")]
+    return sorted(path for root in roots for path in root.rglob("*") if path.is_file() and path.suffix in {".md", ".j2"})
 
 
 def table_codes(table: str) -> list[str]:
@@ -221,6 +247,56 @@ class TestLanguageReference:
         model_field = next(line for line in models.splitlines() if line.startswith("Every pipe with a `model` field"))
         assert "`PipeDocGen`" in model_field
         assert "A `PipeDocGen`'s document engine is only ever checked, with `doc_gen`" in models
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_pipefunc_names_its_function_by_import_path(self, target_name: str) -> None:
+        """MTHDS standard 7.0.0 reads `function_name` as the function's import path from the method tree's root,
+        and the pipelex release that retired the function registry refuses a flat name and `@pipe_func(name=…)`.
+        The section teaches that reading, its rules, the marker without its argument and the migration, and none
+        of the registry's."""
+        pipefunc = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeFunc — ")
+        assert "**`function_name` is the function's Python import path from the root of the method's tree" in pipefunc
+        assert 'function_name = "funcs.text_utils.capitalize"' in pipefunc
+        assert "@pipe_func()\ndef capitalize(working_memory: WorkingMemory) -> TextContent:" in pipefunc
+        assert "**Never write `@pipe_func(name=…)`**" in pipefunc
+        assert "The name holds at least one dot." in pipefunc
+        assert "that NFKC normalization leaves unchanged" in pipefunc
+        assert "is refused as ambiguous" in pipefunc
+        assert "`pipe_func_function_refused`" in pipefunc
+        assert "`pipelex fix function-names <method dir>`" in pipefunc
+        assert "a step keeps its `function_name` when its bundle file moves, unlike a `template_file`" in pipefunc
+        for retired in ("is a registry key, not an import path", "must already be registered", "call a registered Python function"):
+            assert retired not in pipefunc, f"{target_name}: the registry reading is retired: {retired!r}"
+        assert "`PipeFunc` is experimental on the hosted plane." in pipefunc
+
+    def test_every_shipped_function_name_is_an_import_path(self) -> None:
+        """An agent copies the examples it reads, so every `function_name = "…"` a shipped source shows is an import
+        path the runtime accepts, and no `@pipe_func(…)` call passes an argument; the retired forms are named only in
+        prose, as what not to write."""
+        assignments = 0
+        for path in shipped_text_files():
+            text = path.read_text(encoding="utf-8")
+            for match in re.finditer(r'^function_name\s*=\s*"([^"]*)"', text, flags=re.MULTILINE):
+                assignments += 1
+                violation = import_path_violation(match.group(1))
+                assert violation is None, f"{path.relative_to(REPO_ROOT)}: `{match.group(1)}` is no import path: {violation}"
+            for match in re.finditer(r"^@pipe_func\((.*)\)", text, flags=re.MULTILINE):
+                assert match.group(1) == "", f"{path.relative_to(REPO_ROOT)}: `@pipe_func({match.group(1)})` takes no argument"
+        assert assignments > 0, "the sweep found no `function_name` example: the reference's PipeFunc example moved"
+
+    @pytest.mark.parametrize(
+        ("function_name", "is_import_path"),
+        [
+            ("funcs.text_utils.capitalize", True),
+            ("text_utils.capitalize", True),
+            ("capitalize", False),
+            ("funcs.text-utils.capitalize", False),
+            ("funcs.class.capitalize", False),
+            ("ﬁles.load", False),
+        ],
+    )
+    def test_the_sweep_reads_the_standard_s_rules(self, function_name: str, is_import_path: bool) -> None:
+        assert (import_path_violation(function_name) is None) is is_import_path
 
     def operators(self) -> list[str]:
         """The operators the reference documents, each a `### PipeX — ` heading of section 6 that is neither a
