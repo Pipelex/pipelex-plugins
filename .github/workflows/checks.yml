@@ -23,6 +23,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# No process a job starts reports anonymous usage statistics (docs/ci.md, "No usage statistics").
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   check:
     name: Checks
