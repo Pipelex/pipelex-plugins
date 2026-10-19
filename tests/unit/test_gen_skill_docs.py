@@ -1868,16 +1868,20 @@ class TestPipelexCatalogSkill:
             body = _skill_source(self.TEMPLATES / skill)
             assert "{{ skill_prefix }}pipelex-catalog" in body, f"{skill} must point at the catalog skill"
 
-    def test_the_python_rule_does_not_call_function_name_a_file_path(self) -> None:
-        """`function_name` is a key in the runtime's flat function registry — by
-        default the decorated function's own name — so nothing in the bundle says
-        which module defines it. A skill told otherwise sends one file, and since
-        `python` replaces rather than merges, that deletes the helpers beside it."""
+    def test_the_python_rule_reads_function_name_as_an_import_path(self) -> None:
+        """Since MTHDS standard 7.0.0 and the pipelex release that retired the function
+        registry, `function_name` is the function's import path from the method's root,
+        so its module path names the file to send. The catalog still stores no `.py`
+        file in a subdirectory, which the reference says before a save is refused, and
+        the helpers a module imports still go with it, since `python` replaces rather
+        than merges."""
         python = self.catalog_reference("python.md")
-        assert "**A `function_name` does not name a file.**" in python
-        assert "flat, process-wide function registry" in python
+        assert "**A `function_name` names its module.**" in python
+        assert "**The catalog stores no `.py` file in a subdirectory yet**" in python
+        assert "every file of the directory it imports from" in python
         for text in (self.catalog_skill, python):
-            assert "my_package.text_utils" not in text, "the dotted-path claim is wrong and must not come back"
+            assert "flat, process-wide function registry" not in text, "the registry reading is retired and must not come back"
+            assert "never an import path" not in text, "the registry reading is retired and must not come back"
 
     def test_an_input_domain_error_at_method_id_is_not_read_as_an_unknown_id(self) -> None:
         """A rejected payload, an organization-context failure and the workshop's own
@@ -3413,11 +3417,11 @@ class TestCatalogIdInEverySkill:
         """Step 8's standing rule is to route once from `failure_message`.
         Holding a `PipeFunc` is not evidence that one failed: a run that dies on
         a missing input upstream of the custom pipe would otherwise be declared
-        a registration failure and sent to `/pipelex-catalog`, which is a
+        a failure to find its function and sent to `/pipelex-catalog`, which is a
         deployment gesture and no cure for a missing input. The reading is the
         failure reference's since the size diet, and step 8 points at it before routing."""
         body = self.run_reference("failed-run.md")
-        assert "Where `failure_message` implicates resolving or registering that function" in body
+        assert "Where `failure_message` implicates finding or importing that function or its module" in body
         assert "**Where it says anything else, route on what it says**" in body
         assert "not evidence that it is what failed" in body
         assert "then read [failed-run.md](references/failed-run.md) before routing it" in self.skill("pipelex-run")

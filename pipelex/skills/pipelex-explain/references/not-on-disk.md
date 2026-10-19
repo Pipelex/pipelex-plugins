@@ -13,7 +13,7 @@ Call `mthds_get_method` with the `method_id`, as the skill's step 1 says. The `f
 Three things about the returned set are worth knowing before you describe it:
 
 - **The read is bounded, and a bounded read is not a complete library.** When `truncated` is true, some files come back carrying their name and byte size with **no content**, so the files you hold are part of the method and not all of it; the skill's stop table says what to tell the user.
-- **The stored Python comes back beside the sources.** A custom `PipeFunc`'s function is a registry key and no bundle file names its module, so this is the one reading where you can actually say which stored `.py` file defines it. Say it when it is clear from the code, and leave it at the pipe's `function_name` when it is not.
+- **The stored Python comes back beside the sources.** A custom `PipeFunc`'s `function_name` is its function's import path, whose module path names the file defining it (`text_utils.capitalize` is `capitalize` in `text_utils.py`), so name that stored `.py` file beside the pipe, and say so when no returned file matches it. A `function_name` with no dot is the retired function registry's key, which a current runtime refuses: say that rather than guessing the file.
 - **A method saved before the webapp's editor existed carries no file names.** It arrives as one unnamed file; explain it as a single-file method, which is what it is.
 
 ## Without `mthds_get_method`
