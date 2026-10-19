@@ -1,6 +1,6 @@
 [plugin]
 name = "pipelex"
-version = "0.15.0"
+version = "0.16.0"
 description = "Build and run AI methods from Mistral Vibe with Pipelex: skills that write them in MTHDS, and a hook that checks every edit."
 source = "pipelex-vibe/"
 
