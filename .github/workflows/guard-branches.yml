@@ -29,6 +29,10 @@ on:
 
 permissions: {}
 
+# No process a job starts reports anonymous usage statistics (docs/ci.md, "No usage statistics").
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   # main ← release/vX.Y.Z  (the release promotion, merged with a merge commit)
   gate-main:
