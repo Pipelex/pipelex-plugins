@@ -24,7 +24,7 @@ Leave a project calling a method through one typed module, over generated types 
 
 - **If a tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code.
 - **If a call returns `status: "error"` with an error of class `config`**, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. A **403** on `mthds_codegen` is a feature gate, not a key problem.
-- **`mthds_list_methods`** is optional, resolving a method named without its id; never stop for it.
+- **`mthds_list_methods`** is optional, for a method named without its id; never stop for it.
 
 ## Guards
 
@@ -44,7 +44,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. **Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir` or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop. A bundle outside the project is copied in first, where the language reference places it, and the user told. **A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -95,7 +95,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ```json
 {
-  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `sources` and `templates` hash what the call site sends from `bundle_dir`, so a change without a regeneration is detectable.",
+  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit.",
   "generator": "pipelex-integrate",
   "method": { "method_dir": "methods/summarize-pdf" },
   "target": "ts-zod",
@@ -146,6 +146,7 @@ What was generated and where, the target and why, the call site's signature, the
 | `python-structures`, its `pipelex-sdk` after step 8 unread or below the floor, templated bundle | STOP, nothing generated: [python.md](references/python.md) |
 | `TS2835` | the TypeScript reference: yours in your module, the emitter's in `binder.ts` |
 | a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md) |
+| a `METHODS.toml` above `bundle_dir` (step 1, or a gate's `roots the tree` line) | STOP: move the bundle out from under it, or make `bundle_dir` the package root; a refresh clears neither it nor its `added` lines |
 | `stale-source`: a file added, or no `bundle_dir` | [refresh mode](references/refresh.md); never add its hash to `sources` by hand |
 
 ## References

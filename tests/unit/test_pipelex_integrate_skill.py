@@ -1210,6 +1210,15 @@ class TestPipelexIntegrateSkill:
                 ),
                 id="manifest-above",
             ),
+            pytest.param(
+                "put a manifest above the bundle and a sibling bundle beside it",
+                (
+                    "stale-source: methods/summarize — a METHODS.toml at methods roots the tree the call site sends above the bundle "
+                    "directory, so the run sends files the types were not generated from",
+                    "stale-source: methods/other/other.mthds — added to the bundle since the types were generated",
+                ),
+                id="manifest-above-with-sibling-bundle",
+            ),
             pytest.param("add a sibling the bundle's .gitignore keeps out", (), id="current-ignored-sibling"),
             pytest.param("add a hidden directory holding a .mthds file", (), id="current-hidden"),
             pytest.param("add a run's inputs file", (), id="current-inputs-file"),
@@ -1238,7 +1247,10 @@ class TestPipelexIntegrateSkill:
         out without it, and an edit of the `.gitignore` alone never staled the gate. They now list the tree with
         the standard's lister, the one the SDK sends it with, so the gate and the run share one membership rule,
         and both report each change with the same lines, on one project. A line ending in `(` is a prefix, its
-        reason being the lister's own words."""
+        reason being the lister's own words. A manifest above the bundle roots the run's tree above it, while the
+        workshop lists the folder a refresh passes from the folder itself, so no refresh clears that line or the
+        files it brings in from beside the bundle: there the gates print the cure, moving the bundle or integrating
+        the package, in place of the hint to refresh."""
         python_script = (self.REFERENCES_DIR / "codegen_check.py").read_text(encoding="utf-8")
         typescript_script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
         assert "from mthds.method_tree.lister import list_method_tree" in python_script
@@ -1273,6 +1285,10 @@ class TestPipelexIntegrateSkill:
                 (bundle / ".gitignore").write_text("scratch.txt\n", encoding="utf-8")
             case "put a manifest above the bundle":
                 (bundle.parent / "METHODS.toml").write_text(self.MANIFEST, encoding="utf-8")
+            case "put a manifest above the bundle and a sibling bundle beside it":
+                (bundle.parent / "METHODS.toml").write_text(self.MANIFEST, encoding="utf-8")
+                (bundle.parent / "other").mkdir()
+                (bundle.parent / "other" / "other.mthds").write_text('domain = "other"\n', encoding="utf-8")
             case "add a sibling the bundle's .gitignore keeps out":
                 (bundle / "helpers.mthds").write_text('domain = "helpers"\n', encoding="utf-8")
                 (bundle / ".gitignore").write_text("helpers.mthds\n", encoding="utf-8")
@@ -1311,6 +1327,16 @@ class TestPipelexIntegrateSkill:
                 found = any(line.startswith(expected) for line in reported) if expected.endswith("(") else expected in reported
                 assert found, f"{name} did not report {expected!r}\n{self.explain(result)}"
             assert result.stdout.endswith("codegen-check: drift\n"), f"{name}: {self.explain(result)}"
+            if change.startswith("put a manifest above the bundle"):
+                cure = (
+                    "A refresh cannot clear this: move methods/summarize out from under methods/METHODS.toml, or integrate "
+                    "methods itself as the bundle, then run /pipelex-integrate. A file outside methods/summarize reported as "
+                    "added above has the same cause."
+                )
+                assert cure in result.stderr, f"{name}: {self.explain(result)}"
+                assert "Run /pipelex-integrate to refresh" not in result.stderr, f"{name}: a refresh cannot clear a manifest above"
+            else:
+                assert "Run /pipelex-integrate to refresh the generated types." in result.stderr, f"{name}: {self.explain(result)}"
         # Twins: the same paths reported in the same order. Only an OS error's own wording may differ between them.
         python_paths = [line.strip().split(" — ")[0] for line in python.stderr.splitlines() if line.strip().startswith("stale-source: ")]
         typescript_paths = [line.strip().split(" — ")[0] for line in typescript.stderr.splitlines() if line.strip().startswith("stale-source: ")]
@@ -1330,7 +1356,21 @@ class TestPipelexIntegrateSkill:
         # The folder's `files_sent` is the set of the tree the call site sends: the `.mthds` files the membership rule
         # keeps and the template files their steps name, so what is recorded is what a run carries.
         assert file_set.startswith("- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`")
-        assert "are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**." in file_set
+        # No fallback sends the tree the call site sends, so a bundle the folder cannot reach is a stop, and so is a
+        # manifest above it, which roots the run's tree above the folder the workshop lists.
+        assert "**Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir`" in file_set
+        assert "Inline `files`" not in file_set
+        assert file_set.endswith("**A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**")
+        manifest_stop = self.the_line(body, "| a `METHODS.toml` above `bundle_dir` (step 1, or a gate's `roots the tree` line) |")
+        assert "STOP: move the bundle out from under it, or make `bundle_dir` the package root;" in manifest_stop
+        assert "a refresh clears neither it nor its `added` lines" in manifest_stop
+        assert body.index(manifest_stop) < body.index("| `stale-source`: a file added, or no `bundle_dir` |"), (
+            "the manifest row must come before refresh's"
+        )
+        for language in ("typescript.md", "python.md"):
+            assert "**Step 1 stops over a `METHODS.toml` above the bundle**" in self.reference(language), language
+            assert "stopping after the one holding a `.git` entry, or at the filesystem root" in self.reference(language), language
+        assert "**A `METHODS.toml` above `bundle_dir` is not refresh mode's**" in self.reference("refresh.md")
         assert "Prefer the path form" not in file_set, "the folder replaced the listing"
         assert "sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector." in self.the_line(
             body, "One module per method"

@@ -41,6 +41,7 @@ const EXIT_NO_VERDICT = 2;
 
 const LOCK_FILENAME = "codegen.lock";
 const SIDECAR_FILENAME = "sources.json";
+const REFRESH_HINT = "  Run /pipelex-integrate to refresh the generated types.";
 const PRUNED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next"]);
 // The SDK is tested for the exports the check uses, not for a version, so an SDK that has them gets a
 // verdict whatever it is. SDK_MINIMUM is what a message asks the user to install: the floor
@@ -290,7 +291,7 @@ async function checkSources(dir, lister) {
     }
   }
   lines.push(...(await checkTemplates(sidecar, loaded)));
-  return { code: lines.length ? EXIT_DRIFT : EXIT_CURRENT, lines };
+  return { code: lines.length ? EXIT_DRIFT : EXIT_CURRENT, lines, cure: loaded.cure };
 }
 
 /**
@@ -353,9 +354,10 @@ async function checkTemplates(sidecar, loaded) {
  * `__pycache__`, a run's inputs file, and whatever a `.gitignore` inside the tree or the manifest's `exclude`
  * keeps out are not in it, exactly as they are not in the run. The tree is rooted at the nearest
  * `METHODS.toml` at or above the directory, as the SDK roots it, so a manifest above the bundle makes the run
- * send more than the bundle. Returns { paths, members, lines }: `paths` maps each .mthds file's resolved path
- * to the path shown for it, `members` each file's resolved path to its SHA-256, both null when the tree
- * cannot be listed, which `lines` then explains.
+ * send more than the bundle. Returns { paths, members, lines, cure }: `paths` maps each .mthds file's resolved
+ * path to the path shown for it, `members` each file's resolved path to its SHA-256, both null when the tree
+ * cannot be listed, which `lines` then explains, and `cure` is set when a refresh cannot clear what `lines`
+ * reports.
  */
 async function listBundle(bundleDir, { MethodTreeError, listMethodTree }) {
   const root = path.resolve(process.cwd(), bundleDir);
@@ -376,6 +378,7 @@ async function listBundle(bundleDir, { MethodTreeError, listMethodTree }) {
     return { paths: null, members: null, lines: [`  stale-source: ${bundleDir} — the call site cannot send it as a method tree (${error.message})`] };
   }
   const lines = [];
+  let cure = null;
   // The lister reports the physical root; the shown and compared paths stay on the bundle directory as recorded.
   const rootFromBundle = path.relative(await realpath(root), tree.root ?? (await realpath(root))).split(path.sep).join("/") || ".";
   if (rootFromBundle !== ".") {
@@ -384,6 +387,12 @@ async function listBundle(bundleDir, { MethodTreeError, listMethodTree }) {
       `  stale-source: ${bundleDir} — a METHODS.toml at ${shownRoot} roots the tree the call site sends above the bundle directory, ` +
         "so the run sends files the types were not generated from",
     );
+    // The workshop lists a folder from the folder itself, never from a manifest above it, so a refresh records
+    // the bundle alone again and this line, with every file it brings in from beside the bundle, stays.
+    cure =
+      `  A refresh cannot clear this: move ${bundleDir} out from under ${shownRoot}/METHODS.toml, or integrate ` +
+      `${shownRoot} itself as the bundle, then run /pipelex-integrate. A file outside ${bundleDir} reported as ` +
+      "added above has the same cause.";
   }
   const members = new Map();
   const shown = [];
@@ -397,7 +406,7 @@ async function listBundle(bundleDir, { MethodTreeError, listMethodTree }) {
   if (paths.size === 0) {
     lines.push(`  stale-source: ${bundleDir} — holds no .mthds file, so the call site has no bundle to send`);
   }
-  return { paths, members, lines };
+  return { paths, members, lines, cure };
 }
 
 /**
@@ -438,7 +447,7 @@ async function main(argv) {
     const code = worse(tree.code, sources.code);
     const write = code === EXIT_CURRENT ? out : err;
     for (const line of [...tree.lines, ...sources.lines]) write(line);
-    if (code === EXIT_DRIFT) err("  Run /pipelex-integrate to refresh the generated types.");
+    if (code === EXIT_DRIFT) err(sources.cure ?? REFRESH_HINT);
     exitCode = worse(exitCode, code);
   }
 

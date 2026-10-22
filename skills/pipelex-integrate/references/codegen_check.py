@@ -81,11 +81,15 @@ NO_SOURCES_LINE = f"  {SIDECAR_FILENAME} records no sources — a by-ref or by-i
 TEMPLATE_FILE_KEY = re.compile(r"""^\s*["']?template_file["']?\s*=""", re.MULTILINE)
 
 
+REFRESH_HINT = "  Run /pipelex-integrate to refresh the generated types."
+
+
 class Outcome(NamedTuple):
-    """One check's exit code and the lines explaining it."""
+    """One check's exit code, the lines explaining it, and the cure to print in place of the refresh hint, if any."""
 
     code: int
     lines: tuple[str, ...]
+    cure: str | None = None
 
 
 class Recorded(NamedTuple):
@@ -102,12 +106,14 @@ class Bundle(NamedTuple):
     """The method tree the call site sends: its .mthds files, each normalized path mapped to the path shown for it,
     and every file it carries, each normalized path mapped to its SHA-256.
 
-    `paths` and `members` are None when the tree cannot be listed, and `lines` then says why.
+    `paths` and `members` are None when the tree cannot be listed, and `lines` then says why. `cure` is set when a
+    refresh cannot clear what `lines` reports.
     """
 
     paths: dict[Path, str] | None
     members: dict[Path, str] | None
     lines: tuple[str, ...]
+    cure: str | None = None
 
 
 def _out(line: str) -> None:
@@ -244,7 +250,7 @@ def _compare_sources(*, recorded: Recorded) -> Outcome:
             if resolved not in recorded_paths:
                 stale_lines.append(f"  stale-source: {shown} — added to the bundle since the types were generated")
     stale_lines.extend(_check_templates(recorded=recorded, bundle=bundle, project_root=project_root))
-    return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines))
+    return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines), cure=bundle.cure)
 
 
 def _check_templates(*, recorded: Recorded, bundle: Bundle, project_root: Path) -> list[str]:
@@ -323,6 +329,7 @@ def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
     except MethodTreeError as exc:
         return Bundle(paths=None, members=None, lines=(f"  stale-source: {bundle_dir} — the call site cannot send it as a method tree ({exc})",))
     lines: list[str] = []
+    cure: str | None = None
     # The lister reports the physical root; the shown and compared paths stay on the bundle directory as recorded.
     tree_root = tree.directory if tree.directory is not None else root.resolve()
     root_from_bundle = Path(os.path.relpath(tree_root, root.resolve())).as_posix()
@@ -331,6 +338,13 @@ def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
         lines.append(
             f"  stale-source: {bundle_dir} — a METHODS.toml at {shown_root} roots the tree the call site sends above the bundle "
             "directory, so the run sends files the types were not generated from"
+        )
+        # The workshop lists a folder from the folder itself, never from a manifest above it, so a refresh records
+        # the bundle alone again and this line, with every file it brings in from beside the bundle, stays.
+        cure = (
+            f"  A refresh cannot clear this: move {bundle_dir} out from under {shown_root}/METHODS.toml, or integrate "
+            f"{shown_root} itself as the bundle, then run /pipelex-integrate. A file outside {bundle_dir} reported as "
+            "added above has the same cause."
         )
     members: dict[Path, str] = {}
     shown_by_path: dict[Path, str] = {}
@@ -343,7 +357,7 @@ def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
     paths = dict(sorted(shown_by_path.items(), key=lambda item: item[1]))
     if not paths:
         lines.append(f"  stale-source: {bundle_dir} — holds no .mthds file, so the call site has no bundle to send")
-    return Bundle(paths=paths, members=members, lines=tuple(lines))
+    return Bundle(paths=paths, members=members, lines=tuple(lines), cure=cure)
 
 
 def settle(*, name: str, check: Callable[[], Outcome]) -> Outcome:
@@ -397,7 +411,7 @@ def main(argv: list[str]) -> int:
         for line in (*tree.lines, *sources.lines):
             write(line)
         if code == EXIT_DRIFT:
-            _err("  Run /pipelex-integrate to refresh the generated types.")
+            _err(sources.cure or REFRESH_HINT)
         exit_code = worse(exit_code, code)
 
     verdicts = {EXIT_CURRENT: "current", EXIT_DRIFT: "drift", EXIT_NO_VERDICT: "no verdict"}

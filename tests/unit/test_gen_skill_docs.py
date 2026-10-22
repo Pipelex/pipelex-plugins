@@ -1230,6 +1230,10 @@ class TestSharedSkillIncludes:
         )
         template_files = "and every template file a `PipeDocGen` step names"
         root_first = "**the root `.mthds` file first**, as nothing above its directory is read"
+        tree_only = (
+            "**Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir`"
+            " or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop."
+        )
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert cure in body, f"{target_name}/{skill}: the cure is unnamed"
@@ -1241,8 +1245,15 @@ class TestSharedSkillIncludes:
             else:
                 assert body.count(folder) == 1, f"{target_name}/{skill}: the bundle directory is not passed as method_dir"
                 assert "It refuses one outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
-                assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
-                assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                if skill == "pipelex-integrate":
+                    # Its call site sends the folder's tree, which no fallback sends: the inline form sends the listing's set,
+                    # named in `files_sent` by tree paths a gate cannot find, and an older workshop's fallback is the listing.
+                    assert folder_fallback not in body and older not in body, f"{target_name}/{skill}: a fallback is not the call site's tree"
+                    assert tree_only in body, f"{target_name}/{skill}: a bundle the folder cannot reach is not a stop"
+                else:
+                    assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                    assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                    assert tree_only not in body, f"{target_name}/{skill}: only integrate replaces the fallbacks with a stop"
                 assert "Prefer the path form" not in body and template_files not in body, f"{target_name}/{skill}: the folder form lists no file"
             if skill == "pipelex-catalog":
                 assert templated_stop not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
@@ -1278,9 +1289,9 @@ class TestSharedSkillIncludes:
     def test_a_folder_form_skill_names_files_only_where_the_folder_cannot_go(self, target_name: str) -> None:
         """The structural half of the sweep above, which a rewording cannot slip past: in every skill
         that passes the folder, `files` is named only where the folder cannot go. That is the
-        include's inline fallback in every one of them, explain's single file, whose folder may hold
-        other methods, and in inputs the stop row of a workshop that answers a prepare at `files`.
-        Every other mention would be a listing the folder replaced."""
+        include's inline fallback in every one of them but integrate, which has none, explain's single
+        file, whose folder may hold other methods, and in inputs the stop row of a workshop that answers
+        a prepare at `files`. Every other mention would be a listing the folder replaced."""
         folder_form = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1298,7 +1309,9 @@ class TestSharedSkillIncludes:
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=folder_form, target_name=config.name)
         for skill in folder_form:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert body.count(everywhere) == 1, f"{target_name}/{skill}: the inline fallback is not named once"
+            assert body.count(everywhere) == (0 if skill == "pipelex-integrate" else 1), (
+                f"{target_name}/{skill}: the inline fallback is not named once"
+            )
             allowed = body.count(everywhere)
             if skill in exceptions:
                 assert body.count(exceptions[skill]) == 1, f"{target_name}/{skill}: its own use of `files` is gone"

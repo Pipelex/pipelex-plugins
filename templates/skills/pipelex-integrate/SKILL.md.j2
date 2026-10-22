@@ -22,7 +22,7 @@ Leave a project calling a method through one typed module, over generated types 
 {% set mcp_config_parenthetical = "" -%}
 {% set mcp_config_suffix %} A **403** on `mthds_codegen` is a feature gate, not a key problem.{% endset -%}
 {% include "skills/shared/mcp-requirements.md.j2" %}
-- **`mthds_list_methods`** is optional, resolving a method named without its id; never stop for it.
+- **`mthds_list_methods`** is optional, for a method named without its id; never stop for it.
 
 ## Guards
 
@@ -42,7 +42,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: record and hash what step 2's `files_sent` lists. {% include "skills/shared/validate-call.md.j2" %} A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: record and hash what step 2's `files_sent` lists. {% set validate_call_tree_only = true %}{% include "skills/shared/validate-call.md.j2" %} A bundle outside the project is copied in first, where the language reference places it, and the user told. **A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -93,7 +93,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ```json
 {
-  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `sources` and `templates` hash what the call site sends from `bundle_dir`, so a change without a regeneration is detectable.",
+  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit.",
   "generator": "pipelex-integrate",
   "method": { "method_dir": "methods/summarize-pdf" },
   "target": "ts-zod",
@@ -144,6 +144,7 @@ What was generated and where, the target and why, the call site's signature, the
 | `python-structures`, its `pipelex-sdk` after step 8 unread or below the floor, templated bundle | STOP, nothing generated: [python.md](references/python.md) |
 | `TS2835` | the TypeScript reference: yours in your module, the emitter's in `binder.ts` |
 | a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md) |
+| a `METHODS.toml` above `bundle_dir` (step 1, or a gate's `roots the tree` line) | STOP: move the bundle out from under it, or make `bundle_dir` the package root; a refresh clears neither it nor its `added` lines |
 | `stale-source`: a file added, or no `bundle_dir` | [refresh mode](references/refresh.md); never add its hash to `sources` by hand |
 
 ## References
