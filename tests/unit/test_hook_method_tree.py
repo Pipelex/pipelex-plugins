@@ -5,12 +5,13 @@ directory listed by the `mthds` package's lister under the standard's membership
 `METHODS.toml` at or above it, so every file the rule keeps travels at its tree path, every bundle of the method and
 every file a step reads, such as the template a `PipeDocGen` step names in `template_file`, among them, while names
 starting with a dot, a run's inputs file and what a `.gitignore` inside the tree or the manifest's `exclude` keeps out
-stay home. A `.gitignore` above the tree root keeps nothing out, and no file is screened for secrets. These tests run
-`templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a Claude `PostToolUse` `Write`,
-against a stand-in API on a loopback port (`stub_api` in `conftest.py`, run by `run_write_hook` in `stub_api.py`), and
-read what the validate stage sent. The stand-in answers the version handshake as a runner keeping no blob store, so
-the tree always travels inline and every file sent is in the request's body. The key they give the hook is a
-placeholder the stand-in never checks.
+stay home. A `.gitignore` above the tree root keeps nothing out. Before anything is sent, the hook screens every file
+for secrets: one named like a key or credentials file, or holding a well-known key format, stays home under a note,
+and a bundle or manifest that looks like a secret sends nothing. These tests run `templates/hooks/assets/check.mjs`,
+the copy every target carries byte for byte, as a Claude `PostToolUse` `Write`, against a stand-in API on a loopback
+port (`stub_api` in `conftest.py`, run by `run_write_hook` in `stub_api.py`), and read what the validate stage sent.
+The stand-in answers the version handshake as a runner keeping no blob store, so the tree always travels inline and
+every file sent is in the request's body. The key they give the hook is a placeholder the stand-in never checks.
 """
 
 from __future__ import annotations
