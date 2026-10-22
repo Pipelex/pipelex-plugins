@@ -44,7 +44,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name. Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**, as nothing above its directory is read. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. A bundle outside the project is copied in first, where the language reference places it, and the user told.
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -95,9 +95,9 @@ Write this unstamped `sources.json` beside the lock:
 
 ```json
 {
-  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `bundle_dir` is what the call site sends, and `sources` and `templates` hash its .mthds and template files, so a bundle changed without a regeneration is detectable.",
+  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `sources` and `templates` hash what the call site sends from `bundle_dir`, so a change without a regeneration is detectable.",
   "generator": "pipelex-integrate",
-  "method": { "files": ["methods/summarize-pdf/main.mthds"] },
+  "method": { "method_dir": "methods/summarize-pdf" },
   "target": "ts-zod",
   "pipe": { "pipe_ref": "summarize.summarize_pdf", "inputs": { "document": "native.Document", "context": "native.Text?" }, "output": "summarize.DocumentSummary" },
   "bundle_dir": "methods/summarize-pdf",
@@ -106,7 +106,7 @@ Write this unstamped `sources.json` beside the lock:
 }
 ```
 
-`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes every `.mthds` file beneath it with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
+`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes the `.mthds` files of `files_sent` with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
 
 ### 8. Dependencies
 

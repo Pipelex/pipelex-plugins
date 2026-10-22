@@ -657,6 +657,7 @@ class TestPipelexIntegrateSkill:
             "crateFingerprint: 'stubfingerprint', engineVersion: '0.0.0' });\n",
             encoding="utf-8",
         )
+        self.install_stub_mthds(tmp_path, self.STUB_MTHDS)
         tree = tmp_path / "generated" / "m"
         tree.mkdir(parents=True)
         (tree / "codegen.lock").write_text("lock_version = 1\n", encoding="utf-8")
@@ -691,10 +692,60 @@ class TestPipelexIntegrateSkill:
         "};\n"
     )
 
-    def run_typescript_gate(self, root: Path, *arguments: str, sdk_index: str | None) -> subprocess.CompletedProcess[str]:
+    # A stand-in for the `mthds` package's lister, which the gate finds beside `@pipelex/sdk`. It holds to the part of
+    # the MTHDS membership rule these tests exercise, as the real lister does and the Python twin's real one does:
+    # Manifest Discovery up to a `.git` entry, names starting with a dot, `node_modules` and `__pycache__`, a run's
+    # inputs file, and `.gitignore` lines naming a path from the directory holding them. A symbolic link and an
+    # empty tree are refused. That the gate takes the run's membership from the lister is what the twin tests
+    # prove; the rule itself is the standard's, held to its conformance corpus.
+    STUB_MTHDS = (
+        'import { createHash } from "node:crypto";\n'
+        'import { lstat, readdir, readFile, realpath } from "node:fs/promises";\n'
+        'import path from "node:path";\n'
+        "export class MethodTreeError extends Error {}\n"
+        "const holds = async (directory, name) => { try { await lstat(path.join(directory, name)); return true; } catch { return false; } };\n"
+        "export async function listMethodTree(handedOver) {\n"
+        "  const directory = await realpath(handedOver);\n"
+        "  let root = directory;\n"
+        "  for (let current = directory; ; current = path.dirname(current)) {\n"
+        '    if (await holds(current, "METHODS.toml")) { root = current; break; }\n'
+        '    if ((await holds(current, ".git")) || path.dirname(current) === current) break;\n'
+        "  }\n"
+        "  const files = [];\n"
+        "  const walk = async (prefix, ignored) => {\n"
+        "    const absolute = path.join(root, prefix);\n"
+        "    const names = (await readdir(absolute)).sort();\n"
+        "    const here = new Set(ignored);\n"
+        '    if (names.includes(".gitignore")) {\n'
+        '      for (const line of (await readFile(path.join(absolute, ".gitignore"), "utf8")).split("\\n")) {\n'
+        "        if (line.trim()) here.add(prefix ? `${prefix}/${line.trim()}` : line.trim());\n"
+        "      }\n"
+        "    }\n"
+        "    for (const name of names) {\n"
+        "      const rel = prefix ? `${prefix}/${name}` : name;\n"
+        '      if (name.startsWith(".") || name === "node_modules" || name === "__pycache__" || here.has(rel)) continue;\n'
+        "      const entry = await lstat(path.join(root, rel));\n"
+        "      if (entry.isSymbolicLink()) throw new MethodTreeError(`the tree holds a symbolic link at ${rel}`);\n"
+        "      if (entry.isDirectory()) await walk(rel, here);\n"
+        '      else if (name !== "inputs.json" && name !== "inputs.toml") {\n'
+        "        const bytes = await readFile(path.join(root, rel));\n"
+        '        files.push({ path: rel, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });\n'
+        "      }\n"
+        "    }\n"
+        "  };\n"
+        '  await walk("", new Set());\n'
+        "  if (files.length === 0) throw new MethodTreeError(`the tree at ${root} holds no file`);\n"
+        "  return { root, files };\n"
+        "}\n"
+    )
+
+    def run_typescript_gate(
+        self, root: Path, *arguments: str, sdk_index: str | None, mthds_index: str | None = STUB_MTHDS
+    ) -> subprocess.CompletedProcess[str]:
         """Copy the shipped script into `root` and run it from there, beside a stub `@pipelex/sdk` whose module
-        body is `sdk_index` — or with no `@pipelex/sdk` resolvable at all when it is `None`. Skipped when no
-        `node` is on the PATH."""
+        body is `sdk_index` — or with no `@pipelex/sdk` resolvable at all when it is `None` — and, with an SDK,
+        a stub `mthds` whose module body is `mthds_index`, none when it is `None`. Skipped when no `node` is on
+        the PATH."""
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on the PATH")
@@ -708,7 +759,19 @@ class TestPipelexIntegrateSkill:
                 encoding="utf-8",
             )
             (stub / "index.js").write_text(sdk_index, encoding="utf-8")
+            if mthds_index is not None:
+                self.install_stub_mthds(root, mthds_index)
         return subprocess.run([node, str(gate), *arguments], cwd=root, capture_output=True, text=True, check=False)
+
+    @staticmethod
+    def install_stub_mthds(root: Path, index: str) -> None:
+        """Put a stub `mthds` whose module body is `index` in the project's `node_modules`, where the gate looks for it from the SDK."""
+        lister = root / "node_modules" / "mthds"
+        lister.mkdir(parents=True, exist_ok=True)
+        (lister / "package.json").write_text(
+            '{"name":"mthds","version":"0.0.0-stub","type":"module","exports":{".":{"import":"./index.js"}}}', encoding="utf-8"
+        )
+        (lister / "index.js").write_text(index, encoding="utf-8")
 
     @staticmethod
     def write_typescript_tree(root: Path, name: str, lock: str) -> Path:
@@ -752,6 +815,40 @@ class TestPipelexIntegrateSkill:
             assert "npm run codegen:check" in result.stderr
         else:
             assert "is not importable" not in result.stderr
+        assert result.stdout == ""
+
+    @pytest.mark.parametrize(
+        ("mthds_index", "expected_message"),
+        [
+            pytest.param(
+                None,
+                "codegen-check: no verdict — the `mthds` package @pipelex/sdk depends on is not installed beside it.",
+                id="not-installed",
+            ),
+            pytest.param(
+                "export class MethodTreeError extends Error {}\n",
+                "codegen-check: no verdict — the `mthds` package beside @pipelex/sdk has no listMethodTree, so it predates the method tree. "
+                f"Raise the project's @pipelex/sdk to {TYPESCRIPT_SDK_FLOOR} or later",
+                id="too-old",
+            ),
+            pytest.param(
+                'import "a-package-nobody-installed";\nexport const x = 1;\n',
+                "codegen-check: no verdict — the `mthds` package @pipelex/sdk depends on could not be loaded (Error: Cannot find package",
+                id="broken-install",
+            ),
+        ],
+    )
+    def test_the_typescript_gate_has_no_verdict_when_the_lister_cannot_be_used(
+        self, mthds_index: str | None, expected_message: str, tmp_path: Path
+    ) -> None:
+        """The gate lists the bundle with the `mthds` lister `@pipelex/sdk` sends a `directory` with, found beside
+        the SDK. An install without it, with one too old to carry the lister, or with one that fails to load gives
+        the gate no membership to compare, so each is no verdict naming its fix, never drift and never a trace."""
+        self.write_typescript_tree(tmp_path, "m", "lock_version = 1")
+        result = self.run_typescript_gate(tmp_path, "generated/m", sdk_index=self.STUB_SDK_THAT_CAN_CRASH, mthds_index=mthds_index)
+        assert result.returncode == 2, self.explain(result)
+        assert expected_message in result.stderr, self.explain(result)
+        assert "node:internal" not in result.stderr, "the failure reached the user as a stack trace, not a verdict"
         assert result.stdout == ""
 
     def test_the_typescript_gate_has_no_verdict_when_a_check_throws(self, tmp_path: Path) -> None:
@@ -953,6 +1050,17 @@ class TestPipelexIntegrateSkill:
         (tree / "sources.json").write_text(json.dumps(sidecar), encoding="utf-8")
         return tree
 
+    MANIFEST = '[package]\naddress = "github.com/acme/methods"\nversion = "0.1.0"\ndescription = "The methods of the project"\n'
+
+    @classmethod
+    def record_sibling(cls, tree: Path, bundle: Path) -> None:
+        """Write `helpers.mthds` beside the bundle's main file and record it in the sidecar's sources, as a generation from both would."""
+        sibling = bundle / "helpers.mthds"
+        sibling.write_text('domain = "helpers"\n', encoding="utf-8")
+        sidecar = json.loads((tree / "sources.json").read_text(encoding="utf-8"))
+        relative = sibling.relative_to(bundle.parent.parent).as_posix()
+        cls.record_in_sidecar(tree, sources={**sidecar["sources"], relative: hashlib.sha256(sibling.read_bytes()).hexdigest()})
+
     @staticmethod
     def record_in_sidecar(tree: Path, **fields: object) -> None:
         """Set top-level fields of the tree's `sources.json`, removing each one given as `None`."""
@@ -1061,8 +1169,7 @@ class TestPipelexIntegrateSkill:
             pytest.param(
                 "narrow the recorded bundle directory",
                 (
-                    "stale-source: methods/summarize/main.mthds — recorded as a source but not under methods/summarize/nested, "
-                    "so the call site does not load it",
+                    "stale-source: methods/summarize/main.mthds — recorded as a source but left out of the tree the call site sends",
                     "stale-source: methods/summarize/nested/other.mthds — added to the bundle since the types were generated",
                 ),
                 id="source-outside-bundle",
@@ -1070,11 +1177,40 @@ class TestPipelexIntegrateSkill:
             pytest.param(
                 "empty the bundle directory",
                 (
-                    "stale-source: methods/summarize — holds no .mthds file, so the call site has no bundle to load",
+                    "stale-source: methods/summarize — the call site cannot send it as a method tree (",
                     "stale-source: methods/summarize/main.mthds — recorded as a source but no longer on disk",
                 ),
                 id="bundle-empty",
             ),
+            pytest.param(
+                "leave only a file that is not a .mthds file",
+                (
+                    "stale-source: methods/summarize — holds no .mthds file, so the call site has no bundle to send",
+                    "stale-source: methods/summarize/main.mthds — recorded as a source but no longer on disk",
+                ),
+                id="bundle-without-mthds",
+            ),
+            pytest.param(
+                "ignore a recorded sibling in the bundle's .gitignore",
+                ("stale-source: methods/summarize/helpers.mthds — recorded as a source but left out of the tree the call site sends",),
+                id="recorded-sibling-ignored",
+            ),
+            pytest.param(
+                "remove a recorded sibling from the bundle's .gitignore",
+                ("stale-source: methods/summarize/helpers.mthds — added to the bundle since the types were generated",),
+                id="ignored-sibling-let-in",
+            ),
+            pytest.param(
+                "put a manifest above the bundle",
+                (
+                    "stale-source: methods/summarize — a METHODS.toml at methods roots the tree the call site sends above the bundle "
+                    "directory, so the run sends files the types were not generated from",
+                ),
+                id="manifest-above",
+            ),
+            pytest.param("add a sibling the bundle's .gitignore keeps out", (), id="current-ignored-sibling"),
+            pytest.param("add a hidden directory holding a .mthds file", (), id="current-hidden"),
+            pytest.param("add a run's inputs file", (), id="current-inputs-file"),
             pytest.param(
                 "remove the bundle directory",
                 (
@@ -1095,13 +1231,18 @@ class TestPipelexIntegrateSkill:
     def test_both_gates_catch_a_file_added_to_the_bundle(self, change: str, expected_lines: tuple[str, ...], tmp_path: Path) -> None:
         """The call site sends the whole bundle directory, so a `.mthds` file added there changes what runs while
         every recorded hash still matches, and both gates once stayed green over it: they hashed the files
-        `sources.json` recorded and nothing else. They now list every `.mthds` file under the sidecar's
-        `bundle_dir`, and both report each change with the same lines, on one project."""
+        `sources.json` recorded and nothing else. They then listed every `.mthds` file under `bundle_dir`, which
+        the run does not send: a sibling a `.gitignore` keeps out stayed recorded and green while every run went
+        out without it, and an edit of the `.gitignore` alone never staled the gate. They now list the tree with
+        the standard's lister, the one the SDK sends it with, so the gate and the run share one membership rule,
+        and both report each change with the same lines, on one project. A line ending in `(` is a prefix, its
+        reason being the lister's own words."""
         python_script = (self.REFERENCES_DIR / "codegen_check.py").read_text(encoding="utf-8")
         typescript_script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
-        assert 'root.rglob("*.mthds")' in python_script, "the Python gate no longer lists every .mthds file of the bundle"
-        assert "readdir(root, { recursive: true })" in typescript_script, "the TypeScript gate no longer lists every .mthds file of the bundle"
-        assert '.filter((entry) => entry.endsWith(".mthds"))' in typescript_script
+        assert "from mthds.method_tree.lister import list_method_tree" in python_script
+        assert "tree = list_method_tree(root)" in python_script, "the Python gate no longer lists the tree with the standard's lister"
+        assert "tree = await listMethodTree(root);" in typescript_script, "the TypeScript gate no longer lists the tree with the standard's lister"
+        assert "rglob" not in python_script and "recursive: true" not in typescript_script, "a gate walks the bundle by a rule of its own"
 
         tree = self.write_python_project(tmp_path)
         bundle = tmp_path / "methods" / "summarize"
@@ -1119,6 +1260,25 @@ class TestPipelexIntegrateSkill:
                 self.record_in_sidecar(tree, bundle_dir="methods/summarize/nested")
             case "empty the bundle directory":
                 (bundle / "main.mthds").unlink()
+            case "leave only a file that is not a .mthds file":
+                (bundle / "main.mthds").unlink()
+                (bundle / "README.md").write_text("# summarize\n", encoding="utf-8")
+            case "ignore a recorded sibling in the bundle's .gitignore":
+                self.record_sibling(tree, bundle)
+                (bundle / ".gitignore").write_text("helpers.mthds\n", encoding="utf-8")
+            case "remove a recorded sibling from the bundle's .gitignore":
+                (bundle / "helpers.mthds").write_text('domain = "helpers"\n', encoding="utf-8")
+                (bundle / ".gitignore").write_text("scratch.txt\n", encoding="utf-8")
+            case "put a manifest above the bundle":
+                (bundle.parent / "METHODS.toml").write_text(self.MANIFEST, encoding="utf-8")
+            case "add a sibling the bundle's .gitignore keeps out":
+                (bundle / "helpers.mthds").write_text('domain = "helpers"\n', encoding="utf-8")
+                (bundle / ".gitignore").write_text("helpers.mthds\n", encoding="utf-8")
+            case "add a hidden directory holding a .mthds file":
+                (bundle / ".drafts").mkdir()
+                (bundle / ".drafts" / "extra.mthds").write_text('domain = "extra"\n', encoding="utf-8")
+            case "add a run's inputs file":
+                (bundle / "inputs.json").write_text('{"document": {"url": "https://example.com/a.pdf"}}\n', encoding="utf-8")
             case "remove the bundle directory":
                 shutil.rmtree(bundle)
             case "replace the bundle directory with a file":
@@ -1146,7 +1306,8 @@ class TestPipelexIntegrateSkill:
                 continue
             assert result.returncode == 1, f"{name}: {self.explain(result)}"
             for expected in expected_lines:
-                assert expected in reported, f"{name} did not report {expected!r}\n{self.explain(result)}"
+                found = any(line.startswith(expected) for line in reported) if expected.endswith("(") else expected in reported
+                assert found, f"{name} did not report {expected!r}\n{self.explain(result)}"
             assert result.stdout.endswith("codegen-check: drift\n"), f"{name}: {self.explain(result)}"
         # Twins: the same paths reported in the same order. Only an OS error's own wording may differ between them.
         python_paths = [line.strip().split(" — ")[0] for line in python.stderr.splitlines() if line.strip().startswith("stale-source: ")]
@@ -1164,9 +1325,11 @@ class TestPipelexIntegrateSkill:
         file, so over such a bundle it stops rather than ship a module whose every call fails."""
         body = self.render(target_name)
         file_set = self.the_line(body, "- **Local files**:")
-        assert "is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name." in file_set
-        assert "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**." in file_set
-        assert "**the root `.mthds` file first**, as nothing above its directory is read" in file_set
+        # The folder's `files_sent` is the set of the tree the call site sends: the `.mthds` files the membership rule
+        # keeps and the template files their steps name, so what is recorded is what a run carries.
+        assert file_set.startswith("- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`")
+        assert "are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**." in file_set
+        assert "Prefer the path form" not in file_set, "the folder replaced the listing"
         assert "sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector." in self.the_line(
             body, "One module per method"
         )
@@ -1193,7 +1356,9 @@ class TestPipelexIntegrateSkill:
 
         refresh = self.reference("refresh.md")
         cells = self.refresh_cells(refresh)
-        assert "passed with the template files its `PipeDocGen` steps name" in cells["taken from disk"]
+        assert (
+            "the `.mthds` files the folder's membership rule keeps and the template files their `PipeDocGen` steps name" in cells["taken from disk"]
+        )
         assert "**the template map re-derived from those steps**" in cells["taken from disk"]
         assert "the template files' hashes against the sidecar's `templates`" in cells["re-checked"]
         trigger = self.the_line(
@@ -1221,6 +1386,11 @@ class TestPipelexIntegrateSkill:
                 id="template-gone",
             ),
             pytest.param(
+                "keep the recorded template out with the bundle's .gitignore",
+                ("stale-source: methods/summarize/templates/notice.html — recorded as a template file but left out of the tree the call site sends",),
+                id="template-ignored",
+            ),
+            pytest.param(
                 "record templates as a list",
                 ("stale-source: sources.json — `templates` is not an object, so staleness cannot be ruled out",),
                 id="templates-not-an-object",
@@ -1245,11 +1415,13 @@ class TestPipelexIntegrateSkill:
         ],
     )
     def test_both_gates_check_the_template_files_the_call_site_sends(self, change: str, expected_lines: tuple[str, ...], tmp_path: Path) -> None:
-        """The TypeScript call site sends the template files its map lists, written from the sidecar's `templates`,
-        so a template moved, removed or edited since then is as stale as an edited `.mthds` file, and both gates
-        hash each recorded one. A renamed `template_file` edits a `.mthds` file the sources already hash. A sidecar
-        written before the skill recorded `templates` says nothing of them, so a bundle naming a `template_file`
-        there fails too, which is what sends a call site that sends no template to refresh."""
+        """The call site sends the template files its tree carries, which the sidecar's `templates` records, so a
+        template moved, removed or edited since then is as stale as an edited `.mthds` file, and both gates hash
+        each recorded one. A template a `.gitignore` inside the tree keeps out is never sent, so the run refuses
+        its step, and both gates find it missing from the tree the standard's lister lists. A renamed
+        `template_file` edits a `.mthds` file the sources already hash. A sidecar written before the skill
+        recorded `templates` says nothing of them, so a bundle naming a `template_file` there fails too, which is
+        what sends a call site that sends no template to refresh."""
         tree = self.write_python_project(tmp_path)
         bundle = tmp_path / "methods" / "summarize"
         template = tmp_path / self.TEMPLATE_PATH
@@ -1265,6 +1437,9 @@ class TestPipelexIntegrateSkill:
             case "remove the recorded template":
                 self.record_in_sidecar(tree, templates=recorded)
                 template.unlink()
+            case "keep the recorded template out with the bundle's .gitignore":
+                self.record_in_sidecar(tree, templates=recorded)
+                (bundle / ".gitignore").write_text(f"{self.TEMPLATE_KEY}\n", encoding="utf-8")
             case "record templates as a list":
                 self.record_in_sidecar(tree, templates=[recorded])
             case "record a template entry as a bare hash":
@@ -1306,7 +1481,10 @@ class TestPipelexIntegrateSkill:
         assert 'const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");' in typescript
         assert "sending **the whole `bundle_dir` as the method's tree** at call time" in body
         cells = self.refresh_cells(self.reference("refresh.md"))
-        assert "**file set, which is re-read from `bundle_dir` and never taken from `method.files`**" in cells["taken from disk"]
+        assert (
+            "**file set, which is re-read by passing `bundle_dir` as `method_dir` and never taken from the sidecar's `method`**"
+            in cells["taken from disk"]
+        )
         assert "a file edited, removed or added" in cells["re-checked"]
         assert "never add its hash to `sources` by hand" in self.the_line(body, "| `stale-source`")
 
@@ -1566,7 +1744,7 @@ class TestPipelexIntegrateSkill:
         assert imported, "the script should import something"
         for module in imported:
             top_level = module.split(".")[0]
-            assert top_level == "pipelex_sdk" or top_level in sys.stdlib_module_names, f"unexpected import: {module}"
+            assert top_level in ("pipelex_sdk", "mthds") or top_level in sys.stdlib_module_names, f"unexpected import: {module}"
         assert "from pipelex_sdk.codegen_check import run_codegen_check" in script
         assert "sys.stdout.write" in script and "sys.stderr.write" in script
         assert "print(" not in script
@@ -1594,6 +1772,9 @@ class TestPipelexIntegrateSkill:
         # import of it fails before any line of the script runs, and that uncaught failure exits 1: drift.
         assert "@pipelex/sdk" not in imports
         assert re.findall(r'\bimport\(\s*"([^"]+)"\s*\)', script) == ["@pipelex/sdk"]
+        # `mthds` is found from the SDK's own location and imported by path, never by a bare name the project root resolves.
+        assert 'fileURLToPath(import.meta.resolve("@pipelex/sdk"))' in script
+        assert 'path.join(directory, "node_modules", "mthds", "package.json")' in script
         assert "runCodegenCheck" in script and "isStampableArtifactPath" in script
         assert "process.stdout.write" in script and "process.stderr.write" in script
         assert "console." not in script
