@@ -5,7 +5,8 @@ whose faults are problem items in `errors[]`, each with its own `code`, `detail`
 older shape carried `validation_errors[]`. A validation that produced no verdict, such as a dry run meeting a model the
 deployment does not serve, is no longer an invalid verdict at all: the runner answers it as a non-2xx problem document.
 These tests run `templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a Claude
-`PostToolUse` `Write`, against a stand-in API on a loopback port that answers each of those shapes.
+`PostToolUse` `Write`, against a stand-in API on a loopback port that answers each of those shapes, after the version
+handshake the client asks before it sends the method's tree.
 """
 
 from __future__ import annotations
@@ -97,8 +98,8 @@ class TestHookValidateVerdict:
 
         result = run_write_hook(node=node, method=method, stub_api=stub_api)
 
-        assert [request.path for request in stub_api.recorded] == ["/v1/validate"]
-        assert "markdown" in stub_api.recorded[0].body["render"], "the hook must ask for the Markdown it forwards"
+        assert stub_api.routes == ["GET /v1/version", "POST /v1/validate"]
+        assert "markdown" in stub_api.recorded[1].body["render"], "the hook must ask for the Markdown it forwards"
         assert _decision(result.stdout) == {"decision": "block", "reason": RENDERED_MARKDOWN}
 
     def test_an_invalid_verdict_without_markdown_still_blocks_with_its_message(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
@@ -143,5 +144,5 @@ class TestHookValidateVerdict:
 
         result = run_write_hook(node=node, method=method, stub_api=stub_api)
 
-        assert [request.path for request in stub_api.recorded] == ["/v1/validate"]
+        assert stub_api.routes == ["GET /v1/version", "POST /v1/validate"]
         assert result.stdout.strip() == "", f"a validation with no verdict must not block, but the hook said: {result.stdout}"

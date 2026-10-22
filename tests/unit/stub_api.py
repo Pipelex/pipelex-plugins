@@ -22,26 +22,42 @@ PROXY_VARIABLES = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "http
 PLACEHOLDER_KEY = "plx_sk_placeholder_for_the_stub"
 
 
-class RecordedRequest(NamedTuple):
-    """One request the stand-in received: its path and its JSON body. Its headers, the key among them, are not kept."""
+# What the stand-in answers the client's version handshake with: a runner keeping no blob store, so every tree travels
+# inline, under the protocol version the vendored `mthds` speaks.
+VERSION_HANDSHAKE: dict[str, Any] = {"protocol_version": "2.0.0", "blob_store": False}
 
+
+class RecordedRequest(NamedTuple):
+    """One request the stand-in received: its method, its path and its JSON body, empty for a `GET`. Its headers, the key
+    among them, are not kept."""
+
+    method: str
     path: str
     body: dict[str, Any]
 
 
 class StubApiServer(ThreadingHTTPServer):
-    """Records every request and answers each with `verdict`, under `status` and `content_type`.
+    """Records every request, answers the version handshake with `version` and every `POST` with `verdict`, under
+    `status` and `content_type`.
 
-    By default the answer is a produced verdict on a `200`; a test sets `status` and `content_type` to answer a problem
-    document instead, as a server does when no verdict could be produced.
+    The client the hook validates through asks `GET /v1/version` before it sends a method's tree, to learn whether the
+    API keeps a blob store and how large an inline tree may be, so the stand-in answers it as a runner keeping none.
+    By default the `POST` answer is a produced verdict on a `200`; a test sets `status` and `content_type` to answer a
+    problem document instead, as a server does when no verdict could be produced.
     """
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), StubApiHandler)
         self.recorded: list[RecordedRequest] = []
+        self.version: dict[str, Any] = dict(VERSION_HANDSHAKE)
         self.verdict: dict[str, Any] = {"is_valid": True, "pending_signatures": []}
         self.status = 200
         self.content_type = "application/json"
+
+    @property
+    def routes(self) -> list[str]:
+        """Each request received, in order, as its method and path: `GET /v1/version`."""
+        return [f"{request.method} {request.path}" for request in self.recorded]
 
     @property
     def base_url(self) -> str:
@@ -51,14 +67,25 @@ class StubApiServer(ThreadingHTTPServer):
 
 
 class StubApiHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        server = cast(StubApiServer, self.server)
+        server.recorded.append(RecordedRequest(method="GET", path=self.path, body={}))
+        if self.path == "/v1/version":
+            self._answer(status=200, content_type="application/json", payload=server.version)
+        else:
+            self._answer(status=404, content_type="application/json", payload={"detail": f"the stand-in serves no GET {self.path}"})
+
     def do_POST(self) -> None:
         server = cast(StubApiServer, self.server)
         length = int(self.headers.get("Content-Length", "0"))
         body: dict[str, Any] = json.loads(self.rfile.read(length) or b"{}")
-        server.recorded.append(RecordedRequest(path=self.path, body=body))
-        answer = json.dumps(server.verdict).encode("utf-8")
-        self.send_response(server.status)
-        self.send_header("Content-Type", server.content_type)
+        server.recorded.append(RecordedRequest(method="POST", path=self.path, body=body))
+        self._answer(status=server.status, content_type=server.content_type, payload=server.verdict)
+
+    def _answer(self, *, status: int, content_type: str, payload: dict[str, Any]) -> None:
+        answer = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(answer)))
         self.end_headers()
         self.wfile.write(answer)

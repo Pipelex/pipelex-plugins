@@ -1,18 +1,30 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.46.1 (b199023) + @pipelex/tools-wasm 0.6.0 (npm)
+// Provenance: @pipelex/sdk 0.48.0 (2f7ab9d) + @pipelex/tools-wasm 0.6.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   } catch (e) {
     throw mod = 0, e;
   }
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -30,6 +42,10116 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+
+// node_modules/mthds/dist/protocol/exceptions.js
+var PipelineRequestError;
+var init_exceptions = __esm({
+  "node_modules/mthds/dist/protocol/exceptions.js"() {
+    PipelineRequestError = class extends Error {
+      constructor(message, options) {
+        super(message, options);
+        this.name = "PipelineRequestError";
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/problems/registry.generated.js
+var MTHDS_ERROR_REGISTRY_VERSION, CORE_ERROR_BASE_URL, EXTENSION_PREFIXES, ERROR_FAMILIES, ERROR_CODES, CORE_REGISTRY;
+var init_registry_generated = __esm({
+  "node_modules/mthds/dist/problems/registry.generated.js"() {
+    MTHDS_ERROR_REGISTRY_VERSION = "8.0.0";
+    CORE_ERROR_BASE_URL = "https://mthds.ai/errors";
+    EXTENSION_PREFIXES = [
+      { prefix: "pipelex", owner: "Pipelex", base_url: "https://docs.pipelex.com/errors" }
+    ];
+    ERROR_FAMILIES = [
+      "request",
+      "auth",
+      "account",
+      "input",
+      "method",
+      "pipe",
+      "model",
+      "provider",
+      "run",
+      "security",
+      "runtime",
+      "client"
+    ];
+    ERROR_CODES = {
+      /** The request body cannot be parsed */
+      REQUEST_MALFORMED: "request.malformed",
+      /** The request does not match the route's schema */
+      REQUEST_INVALID: "request.invalid",
+      /** The request exceeds a size limit */
+      REQUEST_TOO_LARGE: "request.too_large",
+      /** No such route */
+      REQUEST_NOT_FOUND: "request.not_found",
+      /** The route does not accept this HTTP method */
+      REQUEST_METHOD_NOT_ALLOWED: "request.method_not_allowed",
+      /** The request uses a form this runtime does not accept */
+      REQUEST_UNSUPPORTED: "request.unsupported",
+      /** The idempotency key was used for a different request */
+      REQUEST_IDEMPOTENCY_CONFLICT: "request.idempotency_conflict",
+      /** A request under this idempotency key is still running */
+      REQUEST_IDEMPOTENCY_KEY_IN_USE: "request.idempotency_key_in_use",
+      /** The request already ran and its answer is not kept */
+      REQUEST_ALREADY_EXECUTED: "request.already_executed",
+      /** The selected pipe is not in the method */
+      REQUEST_PIPE_NOT_FOUND: "request.pipe_not_found",
+      /** The pipe selection matches several pipes */
+      REQUEST_PIPE_AMBIGUOUS: "request.pipe_ambiguous",
+      /** No pipe is selected */
+      REQUEST_PIPE_UNSPECIFIED: "request.pipe_unspecified",
+      /** The runner does not hold some files sent by hash */
+      REQUEST_BLOBS_MISSING: "request.blobs_missing",
+      /** No credential was sent */
+      AUTH_MISSING_CREDENTIAL: "auth.missing_credential",
+      /** The credential was refused */
+      AUTH_INVALID_CREDENTIAL: "auth.invalid_credential",
+      /** The credential has expired */
+      AUTH_CREDENTIAL_EXPIRED: "auth.credential_expired",
+      /** The credential does not permit this */
+      AUTH_FORBIDDEN: "auth.forbidden",
+      /** The account is over its request rate */
+      ACCOUNT_RATE_LIMITED: "account.rate_limited",
+      /** The account's quota is used up */
+      ACCOUNT_QUOTA_EXHAUSTED: "account.quota_exhausted",
+      /** A required input is missing */
+      INPUT_MISSING: "input.missing",
+      /** An input the method does not declare */
+      INPUT_UNEXPECTED: "input.unexpected",
+      /** An input is not the declared concept */
+      INPUT_WRONG_CONCEPT: "input.wrong_concept",
+      /** An input has the wrong number of items */
+      INPUT_WRONG_MULTIPLICITY: "input.wrong_multiplicity",
+      /** An input does not fit its concept's structure */
+      INPUT_INVALID: "input.invalid",
+      /** An input file cannot be read */
+      INPUT_FILE_UNREADABLE: "input.file_unreadable",
+      /** An input file's type is not supported here */
+      INPUT_FILE_TYPE_UNSUPPORTED: "input.file_type_unsupported",
+      /** An input exceeds a size limit */
+      INPUT_TOO_LARGE: "input.too_large",
+      /** An input refers to something that does not exist */
+      INPUT_REFERENCE_NOT_FOUND: "input.reference_not_found",
+      /** An input's URL could not be fetched */
+      INPUT_URL_UNREACHABLE: "input.url_unreachable",
+      /** The method does not validate */
+      METHOD_INVALID: "method.invalid",
+      /** The method does not parse */
+      METHOD_SYNTAX: "method.syntax",
+      /** The method breaks a rule of the language */
+      METHOD_SCHEMA_VIOLATION: "method.schema_violation",
+      /** No method at this address */
+      METHOD_NOT_FOUND: "method.not_found",
+      /** The method address matches several methods */
+      METHOD_AMBIGUOUS: "method.ambiguous",
+      /** The method could not be fetched */
+      METHOD_FETCH_FAILED: "method.fetch_failed",
+      /** The method's package breaks a package rule */
+      METHOD_PACKAGE_INVALID: "method.package_invalid",
+      /** A dependency of the method is not available */
+      METHOD_DEPENDENCY_MISSING: "method.dependency_missing",
+      /** A dependency of the method does not load */
+      METHOD_DEPENDENCY_INVALID: "method.dependency_invalid",
+      /** A file the method refers to is not in its tree */
+      METHOD_RESOURCE_MISSING: "method.resource_missing",
+      /** The method names a concept no library declares */
+      METHOD_CONCEPT_UNRESOLVED: "method.concept_unresolved",
+      /** The method names a pipe that does not exist */
+      METHOD_PIPE_UNRESOLVED: "method.pipe_unresolved",
+      /** The method calls a pipe its dependency does not export */
+      METHOD_PIPE_NOT_EXPORTED: "method.pipe_not_exported",
+      /** A reference matches several declarations */
+      METHOD_REF_AMBIGUOUS: "method.ref_ambiguous",
+      /** A name is declared twice or collides with a reserved one */
+      METHOD_NAME_CONFLICT: "method.name_conflict",
+      /** Declarations form a cycle */
+      METHOD_CYCLE: "method.cycle",
+      /** A name is not a valid identifier */
+      METHOD_IDENTIFIER_INVALID: "method.identifier_invalid",
+      /** A pipe's type is missing, unknown or retired */
+      METHOD_PIPE_TYPE_INVALID: "method.pipe_type_invalid",
+      /** A pipe differs from its signature */
+      METHOD_SIGNATURE_MISMATCH: "method.signature_mismatch",
+      /** The method still holds pipe signatures */
+      METHOD_NOT_RUNNABLE: "method.not_runnable",
+      /** A pipe reads an input it does not declare */
+      METHOD_INPUT_UNDECLARED: "method.input_undeclared",
+      /** A pipe declares an input it never reads */
+      METHOD_INPUT_UNUSED: "method.input_unused",
+      /** A pipe's input concept does not fit its use */
+      METHOD_INPUT_CONCEPT_MISMATCH: "method.input_concept_mismatch",
+      /** A pipe's output concept does not fit */
+      METHOD_OUTPUT_CONCEPT_MISMATCH: "method.output_concept_mismatch",
+      /** A pipe's declared multiplicity does not fit its use */
+      METHOD_OUTPUT_MULTIPLICITY_MISMATCH: "method.output_multiplicity_mismatch",
+      /** A pipe's wiring does not give it what it reads */
+      METHOD_WIRING_INVALID: "method.wiring_invalid",
+      /** A path names a field its concept does not have */
+      METHOD_FIELD_PATH_UNRESOLVED: "method.field_path_unresolved",
+      /** A binding step is malformed */
+      METHOD_BINDING_STEP_INVALID: "method.binding_step_invalid",
+      /** An optional marker is misplaced */
+      METHOD_OPTIONAL_MARKER_INVALID: "method.optional_marker_invalid",
+      /** An optional value reaches a place that needs a required one */
+      METHOD_OPTIONAL_UNHANDLED: "method.optional_unhandled",
+      /** A template in the method is invalid */
+      METHOD_TEMPLATE_INVALID: "method.template_invalid",
+      /** A template reads a name reserved to the runtime */
+      METHOD_TEMPLATE_PRIVATE_NAME: "method.template_private_name",
+      /** A function the method declares cannot be used */
+      METHOD_FUNCTION_INVALID: "method.function_invalid",
+      /** A concept's structure cannot be built or described */
+      METHOD_CONCEPT_INVALID: "method.concept_invalid",
+      /** A model setting in the method is invalid */
+      METHOD_MODEL_SETTING_INVALID: "method.model_setting_invalid",
+      /** The dry run cannot mock an output concept */
+      METHOD_MOCK_UNSATISFIABLE: "method.mock_unsatisfiable",
+      /** A method file changed while it was being fixed */
+      METHOD_CHANGED_CONCURRENTLY: "method.changed_concurrently",
+      /** A hint is not understood */
+      METHOD_HINT_INVALID: "method.hint_invalid",
+      /** A presence check always holds */
+      METHOD_INPUT_PRESENCE_VACUOUS: "method.input_presence_vacuous",
+      /** An optional force is redundant */
+      METHOD_OPTIONAL_FORCE_REDUNDANT: "method.optional_force_redundant",
+      /** A pipe's output does not have the declared multiplicity */
+      PIPE_OUTPUT_MULTIPLICITY: "pipe.output_multiplicity",
+      /** A pipe's output does not fit its concept */
+      PIPE_OUTPUT_INVALID: "pipe.output_invalid",
+      /** The method's function raised */
+      PIPE_FUNCTION_RAISED: "pipe.function_raised",
+      /** The method's function ran past its time limit */
+      PIPE_FUNCTION_TIMED_OUT: "pipe.function_timed_out",
+      /** A template failed to render */
+      PIPE_TEMPLATE_RENDER_FAILED: "pipe.template_render_failed",
+      /** A template exceeded its render budget */
+      PIPE_TEMPLATE_BUDGET_EXCEEDED: "pipe.template_budget_exceeded",
+      /** A condition matched no outcome */
+      PIPE_CONDITION_UNMATCHED: "pipe.condition_unmatched",
+      /** The method refused these inputs */
+      PIPE_CONDITION_REFUSED: "pipe.condition_refused",
+      /** A binding step could not bind its value */
+      PIPE_BINDING_FAILED: "pipe.binding_failed",
+      /** A pipe could not read a value it needs */
+      PIPE_INPUT_UNRESOLVED: "pipe.input_unresolved",
+      /** A forced input was absent */
+      PIPE_FORCED_INPUT_ABSENT: "pipe.forced_input_absent",
+      /** A pipe's prompt is empty */
+      PIPE_PROMPT_EMPTY: "pipe.prompt_empty",
+      /** The run nested pipes deeper than the limit */
+      PIPE_STACK_OVERFLOW: "pipe.stack_overflow",
+      /** The method names a model that does not exist */
+      MODEL_UNKNOWN: "model.unknown",
+      /** This deployment serves no backend for the model */
+      MODEL_UNAVAILABLE: "model.unavailable",
+      /** No model is named for this step */
+      MODEL_UNSPECIFIED: "model.unspecified",
+      /** The model cannot do what the step asks */
+      MODEL_CAPABILITY_UNSUPPORTED: "model.capability_unsupported",
+      /** The inputs exceed what the model can read */
+      MODEL_CONTEXT_EXCEEDED: "model.context_exceeded",
+      /** The answer was cut at the method's token cap */
+      MODEL_OUTPUT_TRUNCATED: "model.output_truncated",
+      /** The model's structured output did not match its schema */
+      MODEL_OUTPUT_SCHEMA_MISMATCH: "model.output_schema_mismatch",
+      /** The provider refused the content */
+      MODEL_CONTENT_REFUSED: "model.content_refused",
+      /** The model found nothing for this request */
+      MODEL_NO_RESULT: "model.no_result",
+      /** The provider is rate limiting this deployment */
+      PROVIDER_RATE_LIMITED: "provider.rate_limited",
+      /** The provider is unavailable */
+      PROVIDER_UNAVAILABLE: "provider.unavailable",
+      /** The provider did not answer in time */
+      PROVIDER_TIMEOUT: "provider.timeout",
+      /** The provider failed */
+      PROVIDER_FAILED: "provider.failed",
+      /** The provider's answer could not be used */
+      PROVIDER_RESPONSE_INVALID: "provider.response_invalid",
+      /** The provider refused this deployment's credential */
+      PROVIDER_CREDENTIAL_REFUSED: "provider.credential_refused",
+      /** This deployment's provider account is out of quota */
+      PROVIDER_QUOTA_EXHAUSTED: "provider.quota_exhausted",
+      /** The provider call may have taken effect */
+      PROVIDER_OUTCOME_UNKNOWN: "provider.outcome_unknown",
+      /** No such run */
+      RUN_NOT_FOUND: "run.not_found",
+      /** The run did not succeed */
+      RUN_FAILED: "run.failed",
+      /** The run has not finished */
+      RUN_NOT_FINISHED: "run.not_finished",
+      /** The run was cancelled by its caller */
+      RUN_CANCELLED: "run.cancelled",
+      /** The run passed its time limit */
+      RUN_TIMED_OUT: "run.timed_out",
+      /** The run's outcome is lost */
+      RUN_LOST: "run.lost",
+      /** The runtime cannot tell whether the run started or finished */
+      RUN_OUTCOME_UNKNOWN: "run.outcome_unknown",
+      /** The run has already ended */
+      RUN_ALREADY_ENDED: "run.already_ended",
+      /** The run's answer was not kept */
+      RUN_ANSWER_NOT_KEPT: "run.answer_not_kept",
+      /** The run's results were not stored */
+      RUN_RESULTS_NOT_STORED: "run.results_not_stored",
+      /** The run was stopped by an operator or an erasure */
+      RUN_TERMINATED: "run.terminated",
+      /** A URL in the request was refused */
+      SECURITY_INPUT_URL_REFUSED: "security.input_url_refused",
+      /** A URL the method names was refused */
+      SECURITY_METHOD_URL_REFUSED: "security.method_url_refused",
+      /** A URL a provider returned was refused */
+      SECURITY_PROVIDER_URL_REFUSED: "security.provider_url_refused",
+      /** A path the caller supplied was refused */
+      SECURITY_INPUT_PATH_REFUSED: "security.input_path_refused",
+      /** A path the method names was refused */
+      SECURITY_METHOD_PATH_REFUSED: "security.method_path_refused",
+      /** A template was refused by the template sandbox */
+      SECURITY_TEMPLATE_REFUSED: "security.template_refused",
+      /** An output schema was refused */
+      SECURITY_SCHEMA_REFUSED: "security.schema_refused",
+      /** A dependency's content differs from its lock */
+      SECURITY_INTEGRITY_MISMATCH: "security.integrity_mismatch",
+      /** An unexpected error occurred */
+      RUNTIME_UNEXPECTED: "runtime.unexpected",
+      /** The runtime is misconfigured */
+      RUNTIME_MISCONFIGURED: "runtime.misconfigured",
+      /** The runtime or a service it depends on is unavailable */
+      RUNTIME_UNAVAILABLE: "runtime.unavailable",
+      /** This runtime cannot do what was asked */
+      RUNTIME_UNSUPPORTED: "runtime.unsupported",
+      /** The runtime could not be reached */
+      CLIENT_UNREACHABLE: "client.unreachable",
+      /** The runtime did not answer in time */
+      CLIENT_TIMEOUT: "client.timeout",
+      /** The runtime's answer could not be read */
+      CLIENT_RESPONSE_UNREADABLE: "client.response_unreadable",
+      /** The call may have created a run */
+      CLIENT_OUTCOME_UNKNOWN: "client.outcome_unknown",
+      /** Following a started run stopped */
+      CLIENT_FOLLOW_FAILED: "client.follow_failed",
+      /** The client has no usable configuration */
+      CLIENT_NOT_CONFIGURED: "client.not_configured",
+      /** An argument was refused before sending */
+      CLIENT_ARGUMENT_INVALID: "client.argument_invalid",
+      /** A local file cannot be read */
+      CLIENT_FILE_UNREADABLE: "client.file_unreadable",
+      /** A local file could not be written */
+      CLIENT_WRITE_FAILED: "client.write_failed",
+      /** The target already exists */
+      CLIENT_TARGET_EXISTS: "client.target_exists",
+      /** Local files changed underneath the client */
+      CLIENT_WORKSPACE_BUSY: "client.workspace_busy",
+      /** An output does not match the generated types */
+      CLIENT_OUTPUT_MISMATCH: "client.output_mismatch",
+      /** A download link was refused */
+      CLIENT_LINK_REFUSED: "client.link_refused",
+      /** A download passed the client's limit */
+      CLIENT_DOWNLOAD_LIMIT_EXCEEDED: "client.download_limit_exceeded",
+      /** The call was stopped by the caller */
+      CLIENT_ABORTED: "client.aborted",
+      /** A local tool the client needs is missing */
+      CLIENT_TOOL_MISSING: "client.tool_missing",
+      /** A local tool is too old */
+      CLIENT_TOOL_OUTDATED: "client.tool_outdated"
+    };
+    CORE_REGISTRY = {
+      "request.malformed": {
+        code: "request.malformed",
+        title: "The request body cannot be parsed",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The runner cannot parse the request body (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Fix the body so that it parses, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must send a request body that parses."
+          }
+        },
+        params: { reason: { type: "enum", values: ["not_json", "not_utf8", "bad_base64", "bad_zip"] } }
+      },
+      "request.invalid": {
+        code: "request.invalid",
+        title: "The request does not match the route's schema",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The request's field '{field}' does not match the route's schema.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Correct the field '{field}' as the route's schema requires, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must correct the field '{field}' of the request."
+          }
+        },
+        params: { field: { type: "identifier" } }
+      },
+      "request.too_large": {
+        code: "request.too_large",
+        title: "The request exceeds a size limit",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 413,
+        detail: "The request reaches {size} bytes, past the runner's limit of {limit} bytes.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Make the request smaller than {limit} bytes, then send it again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must make the request smaller than {limit} bytes."
+          }
+        },
+        params: { limit: { type: "bytes" }, size: { type: "bytes" } }
+      },
+      "request.not_found": {
+        code: "request.not_found",
+        title: "No such route",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 404,
+        detail: "This runner serves no such route.",
+        steps: {
+          actor: {
+            kind: "upgrade",
+            detail: "Use a client written for the protocol version this runner reports in GET /version, or upgrade the runner."
+          },
+          other: {
+            kind: "upgrade",
+            detail: "Upgrade the client or the runner so that both implement the same protocol version."
+          }
+        },
+        params: {}
+      },
+      "request.method_not_allowed": {
+        code: "request.method_not_allowed",
+        title: "The route does not accept this HTTP method",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 405,
+        detail: "This route does not accept the request's HTTP method.",
+        steps: {
+          actor: {
+            kind: "upgrade",
+            detail: "Use a client written for the protocol version this runner reports in GET /version, which sends each route the HTTP method the protocol defines."
+          },
+          other: {
+            kind: "upgrade",
+            detail: "Upgrade the client or the runner so that both implement the same protocol version."
+          }
+        },
+        params: {}
+      },
+      "request.unsupported": {
+        code: "request.unsupported",
+        title: "The request uses a form this runtime does not accept",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "This runtime does not accept the form the request's field '{field}' uses (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Send the field '{field}' in a form this runtime accepts, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must send the field '{field}' in a form this runtime accepts."
+          }
+        },
+        params: { field: { type: "identifier" }, reason: { type: "identifier" } }
+      },
+      "request.idempotency_conflict": {
+        code: "request.idempotency_conflict",
+        title: "The idempotency key was used for a different request",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The request's idempotency key was already used with a different body.",
+        steps: {
+          actor: { kind: "change_input", detail: "Send this request with a new idempotency key." },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must send the request with a new idempotency key."
+          }
+        },
+        params: {}
+      },
+      "request.idempotency_key_in_use": {
+        code: "request.idempotency_key_in_use",
+        title: "A request under this idempotency key is still running",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 409,
+        detail: "An earlier request with the same idempotency key and the same body is still in flight.",
+        steps: {
+          actor: {
+            kind: "wait",
+            detail: "Wait for the earlier request to finish, then repeat this one unchanged."
+          },
+          other: {
+            kind: "wait",
+            detail: "Wait for the earlier request to finish, then repeat this one unchanged."
+          }
+        },
+        params: {}
+      },
+      "request.already_executed": {
+        code: "request.already_executed",
+        title: "The request already ran and its answer is not kept",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The request under this idempotency key already ran, and its answer is not kept.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read what the first request created, such as its run, rather than sending the request again."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read what the first request created, such as its run, rather than sending the request again."
+          }
+        },
+        params: {}
+      },
+      "request.pipe_not_found": {
+        code: "request.pipe_not_found",
+        title: "The selected pipe is not in the method",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method declares no pipe '{pipe}'.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Select a pipe the method declares, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must select a pipe the method declares."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          suggestions: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "request.pipe_ambiguous": {
+        code: "request.pipe_ambiguous",
+        title: "The pipe selection matches several pipes",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The pipe selection '{pipe}' matches several pipes: {candidates}.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Select one of the matching pipes by a reference that names it alone, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must select one of the matching pipes unambiguously."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          candidates: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "request.pipe_unspecified": {
+        code: "request.pipe_unspecified",
+        title: "No pipe is selected",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The request selects no pipe, and the method gives no main pipe to start from.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Select a pipe with pipe_code, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must select a pipe with pipe_code."
+          }
+        },
+        params: { candidates: { type: "list", items: { type: "identifier" } } }
+      },
+      "request.blobs_missing": {
+        code: "request.blobs_missing",
+        title: "The runner does not hold some files sent by hash",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "This runner does not hold a file the request sends by hash.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Upload each listed blob, or send its file inline if this runner keeps no blob store, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must upload each listed blob, or send its file inline if this runner keeps no blob store."
+          }
+        },
+        params: { missing_blobs: { type: "list", items: { type: "sha256" } } }
+      },
+      "auth.missing_credential": {
+        code: "auth.missing_credential",
+        title: "No credential was sent",
+        domain: "account",
+        retry: "no",
+        raised_as: "problem",
+        status: 401,
+        detail: "This route needs a credential, and the request carried none.",
+        steps: {
+          actor: {
+            kind: "check_credentials",
+            detail: "Send the request with a credential this runtime accepts."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the account's owner for a credential this runtime accepts."
+          }
+        },
+        params: {}
+      },
+      "auth.invalid_credential": {
+        code: "auth.invalid_credential",
+        title: "The credential was refused",
+        domain: "account",
+        retry: "no",
+        raised_as: "problem",
+        status: 401,
+        detail: "The runtime refused the request's credential.",
+        steps: {
+          actor: {
+            kind: "check_credentials",
+            detail: "Check that the credential is the one issued for this runtime and that it was not revoked, then send the request again."
+          },
+          other: { kind: "contact_owner", detail: "Ask the account's owner for a valid credential." }
+        },
+        params: {}
+      },
+      "auth.credential_expired": {
+        code: "auth.credential_expired",
+        title: "The credential has expired",
+        domain: "account",
+        retry: "no",
+        raised_as: "problem",
+        status: 401,
+        detail: "The request's credential has expired.",
+        steps: {
+          actor: {
+            kind: "refresh",
+            detail: "Fetch a fresh credential, then send the request again with it."
+          },
+          other: { kind: "contact_owner", detail: "Ask the account's owner for a fresh credential." }
+        },
+        params: {}
+      },
+      "auth.forbidden": {
+        code: "auth.forbidden",
+        title: "The credential does not permit this",
+        domain: "account",
+        retry: "no",
+        raised_as: "problem",
+        status: 403,
+        detail: "The request's identity lacks '{requirement}', which this operation needs.",
+        steps: {
+          actor: {
+            kind: "request_access",
+            detail: "Ask for '{requirement}' on this account, then send the request again."
+          },
+          other: { kind: "contact_owner", detail: "Ask the account's owner to grant '{requirement}'." }
+        },
+        params: { requirement: { type: "identifier" } }
+      },
+      "account.rate_limited": {
+        code: "account.rate_limited",
+        title: "The account is over its request rate",
+        domain: "account",
+        retry: "yes",
+        raised_as: "problem",
+        status: 429,
+        detail: "The account sent more than {limit} requests in {window} seconds.",
+        steps: {
+          actor: {
+            kind: "wait",
+            detail: "Wait for the rate window to pass, then send the request again."
+          },
+          other: {
+            kind: "wait",
+            detail: "Wait for the rate window to pass, then send the request again."
+          }
+        },
+        params: { limit: { type: "integer" }, window: { type: "seconds" } }
+      },
+      "account.quota_exhausted": {
+        code: "account.quota_exhausted",
+        title: "The account's quota is used up",
+        domain: "account",
+        retry: "no",
+        raised_as: "problem",
+        status: 429,
+        detail: "The account's quota '{quota}' is used up.",
+        steps: {
+          actor: {
+            kind: "check_account",
+            detail: "Check the account's quota '{quota}', and raise it or wait for it to renew."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the account's owner to raise the quota '{quota}'."
+          }
+        },
+        params: { quota: { type: "identifier" } }
+      },
+      "input.missing": {
+        code: "input.missing",
+        title: "A required input is missing",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The request does not give the input '{input}', which the method requires.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Add the input '{input}' to the request, then send it again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must add the input '{input}' to the request."
+          }
+        },
+        params: { input: { type: "identifier" } }
+      },
+      "input.unexpected": {
+        code: "input.unexpected",
+        title: "An input the method does not declare",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The request gives the input '{input}', which the method does not declare.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Remove the input '{input}' from the request, or give it under the name the method declares, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must remove the input '{input}' from the request."
+          }
+        },
+        params: { input: { type: "identifier" } }
+      },
+      "input.wrong_concept": {
+        code: "input.wrong_concept",
+        title: "An input is not the declared concept",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The input '{input}' is given as '{provided}', but the method accepts '{expected}' there.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give the input '{input}' as '{expected}', then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must give the input '{input}' as '{expected}'."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          expected: { type: "identifier" },
+          provided: { type: "identifier" }
+        }
+      },
+      "input.wrong_multiplicity": {
+        code: "input.wrong_multiplicity",
+        title: "An input has the wrong number of items",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The input '{input}' gives {provided_count} item or items, which does not fit the multiplicity the method declares ({expected}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give the input '{input}' with the multiplicity the method declares, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must give the input '{input}' with the multiplicity the method declares."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          expected: { type: "enum", values: ["single", "list", "count"] },
+          expected_count: { type: "integer", optional: true },
+          provided_count: { type: "integer" }
+        }
+      },
+      "input.invalid": {
+        code: "input.invalid",
+        title: "An input does not fit its concept's structure",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The input '{input}' does not fit its concept's structure at '{field}'.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Correct the field '{field}' of the input '{input}', then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must correct the field '{field}' of the input '{input}'."
+          }
+        },
+        params: { input: { type: "identifier" }, field: { type: "identifier" } }
+      },
+      "input.file_unreadable": {
+        code: "input.file_unreadable",
+        title: "An input file cannot be read",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The file of the input '{input}' cannot be read as '{file_type}' (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give a readable file as the input '{input}', then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must give a readable file as the input '{input}'."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          file_type: { type: "identifier" },
+          reason: { type: "identifier" }
+        }
+      },
+      "input.file_type_unsupported": {
+        code: "input.file_type_unsupported",
+        title: "An input file's type is not supported here",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model '{model}' cannot take the file of the input '{input}', whose format is '{format}'.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give the input '{input}' in a format the model '{model}' takes, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must give the input '{input}' in a format the model takes."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          format: { type: "identifier" },
+          model: { type: "identifier" }
+        }
+      },
+      "input.too_large": {
+        code: "input.too_large",
+        title: "An input exceeds a size limit",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The input '{input}' reaches {size}, past the limit of {limit}.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Make the input '{input}' smaller than {limit}, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must make the input '{input}' smaller."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          limit: { type: "integer" },
+          size: { type: "integer" }
+        }
+      },
+      "input.reference_not_found": {
+        code: "input.reference_not_found",
+        title: "An input refers to something that does not exist",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The input '{input}' refers to something that does not exist.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Point the input '{input}' at something that exists, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose input '{input}' refers to something that does not exist."
+          }
+        },
+        params: { input: { type: "identifier" } }
+      },
+      "input.url_unreachable": {
+        code: "input.url_unreachable",
+        title: "An input's URL could not be fetched",
+        domain: "input",
+        retry: "yes",
+        raised_as: "problem",
+        status: 422,
+        detail: "The URL of the input '{input}', on '{host}', did not answer or answered with an error.",
+        steps: {
+          actor: {
+            kind: "retry",
+            detail: "Send the request again later, or point the input '{input}' at a URL that answers."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose input '{input}' names a URL that did not answer."
+          }
+        },
+        params: { input: { type: "identifier" }, host: { type: "identifier" } }
+      },
+      "method.invalid": {
+        code: "method.invalid",
+        title: "The method does not validate",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method does not validate.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Fix each fault the problem's errors list, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the faults the problem's errors list."
+          }
+        },
+        params: {}
+      },
+      "method.syntax": {
+        code: "method.syntax",
+        title: "The method does not parse",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method does not parse ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Fix the syntax at the place the problem's location names, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the method's syntax."
+          }
+        },
+        params: { finding: { type: "caller_text" } }
+      },
+      "method.schema_violation": {
+        code: "method.schema_violation",
+        title: "The method breaks a rule of the language",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The declaration at '{field_path}' breaks a rule of the language ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the declaration at '{field_path}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the declaration at '{field_path}'."
+          }
+        },
+        params: { field_path: { type: "identifier" }, finding: { type: "caller_text" } }
+      },
+      "method.not_found": {
+        code: "method.not_found",
+        title: "No method at this address",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 404,
+        detail: "No method is found at '{method_ref}'.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Correct the method's address, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose request names a method that does not exist."
+          }
+        },
+        params: { method_ref: { type: "identifier" } }
+      },
+      "method.ambiguous": {
+        code: "method.ambiguous",
+        title: "The method address matches several methods",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method address '{method_ref}' matches several methods: {candidates}.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Name one of the matching methods by an address that matches it alone, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, who must name one of the matching methods unambiguously."
+          }
+        },
+        params: {
+          method_ref: { type: "identifier" },
+          candidates: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.fetch_failed": {
+        code: "method.fetch_failed",
+        title: "The method could not be fetched",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "The method '{method_ref}', or one of its dependencies, could not be fetched.",
+        steps: {
+          actor: {
+            kind: "retry",
+            detail: "Send the request again, since the host serving the method may answer later."
+          },
+          other: {
+            kind: "retry",
+            detail: "Send the request again, since the host serving the method may answer later."
+          }
+        },
+        params: { method_ref: { type: "identifier" } }
+      },
+      "method.package_invalid": {
+        code: "method.package_invalid",
+        title: "The method's package breaks a package rule",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method's package breaks a package rule (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Bring the method's tree within the package rules, then send it again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to bring the method's tree within the package rules."
+          }
+        },
+        params: {
+          reason: { type: "identifier" },
+          path: { type: "identifier", optional: true },
+          limit: { type: "integer", optional: true }
+        }
+      },
+      "method.dependency_missing": {
+        code: "method.dependency_missing",
+        title: "A dependency of the method is not available",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method depends on the {kind} '{name}', which is not available here (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare a dependency this runtime can satisfy in place of '{name}', then send the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare a dependency this runtime can satisfy in place of '{name}'."
+          }
+        },
+        params: {
+          kind: { type: "enum", values: ["package", "function", "requirement"] },
+          name: { type: "identifier" },
+          reason: { type: "enum", values: ["not_found", "no_matching_version", "cycle"] }
+        }
+      },
+      "method.dependency_invalid": {
+        code: "method.dependency_invalid",
+        title: "A dependency of the method does not load",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A file of the dependency '{package}' does not load ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Depend on a version of '{package}' whose files load, then send the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to depend on a version of '{package}' whose files load."
+          }
+        },
+        params: { package: { type: "identifier" }, finding: { type: "caller_text" } }
+      },
+      "method.resource_missing": {
+        code: "method.resource_missing",
+        title: "A file the method refers to is not in its tree",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The file reference '{file}' resolves to no file of the method's tree (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Point the reference '{file}' at a file of the method's tree, written as a relative path with forward slashes, then send the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to point the reference '{file}' at a file of the method's tree."
+          }
+        },
+        params: {
+          file: { type: "identifier" },
+          reason: {
+            type: "enum",
+            values: ["not_in_tree", "leaves_tree", "absolute", "backslash", "scheme"]
+          }
+        }
+      },
+      "method.concept_unresolved": {
+        code: "method.concept_unresolved",
+        title: "The method names a concept no library declares",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method names the concept '{concept}', which no library declares.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the concept '{concept}', or correct the reference, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare or correct the concept '{concept}'."
+          }
+        },
+        params: {
+          concept: { type: "identifier" },
+          suggestions: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.pipe_unresolved": {
+        code: "method.pipe_unresolved",
+        title: "The method names a pipe that does not exist",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' names the pipe '{missing}', which does not exist.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the pipe '{missing}', or correct the reference in pipe '{pipe}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare or correct the pipe '{missing}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          missing: { type: "identifier" },
+          candidates: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.pipe_not_exported": {
+        code: "method.pipe_not_exported",
+        title: "The method calls a pipe its dependency does not export",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method calls the pipe '{pipe}' of '{package}', which does not export it.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Call a pipe that '{package}' exports, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to call only the pipes '{package}' exports."
+          }
+        },
+        params: { pipe: { type: "identifier" }, package: { type: "identifier" } }
+      },
+      "method.ref_ambiguous": {
+        code: "method.ref_ambiguous",
+        title: "A reference matches several declarations",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The reference '{ref}' matches several declarations: {candidates}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Qualify the reference '{ref}' so that it names one declaration, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to qualify the reference '{ref}'."
+          }
+        },
+        params: {
+          ref: { type: "identifier" },
+          candidates: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.name_conflict": {
+        code: "method.name_conflict",
+        title: "A name is declared twice or collides with a reserved one",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The name '{name}' collides with another declaration (conflict: {conflict}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Rename '{name}' so that it is unique and reserved by nothing, then validate the method again."
+          },
+          other: { kind: "contact_owner", detail: "Ask the method's owner to rename '{name}'." }
+        },
+        params: {
+          name: { type: "identifier" },
+          conflict: {
+            type: "enum",
+            values: ["duplicate_declaration", "native_concept", "batch_item", "reserved_domain"]
+          }
+        }
+      },
+      "method.cycle": {
+        code: "method.cycle",
+        title: "Declarations form a cycle",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "These declarations form a cycle: {cycle}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Break the cycle by removing one of its links, then validate the method again."
+          },
+          other: { kind: "contact_owner", detail: "Ask the method's owner to break the cycle." }
+        },
+        params: {
+          kind: { type: "enum", values: ["refines", "structure", "pipe"] },
+          cycle: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.identifier_invalid": {
+        code: "method.identifier_invalid",
+        title: "A name is not a valid identifier",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The name '{name}' breaks the naming rules of a {identifier_kind}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Rename '{name}' to a plain snake_case identifier, then validate the method again."
+          },
+          other: { kind: "contact_owner", detail: "Ask the method's owner to rename '{name}'." }
+        },
+        params: {
+          identifier_kind: { type: "enum", values: ["pipe_code", "main_pipe", "input_name"] },
+          name: { type: "caller_text" }
+        }
+      },
+      "method.pipe_type_invalid": {
+        code: "method.pipe_type_invalid",
+        title: "A pipe's type is missing, unknown or retired",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' has no usable type (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Give pipe '{pipe}' one of the language's pipe types, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to give pipe '{pipe}' a valid type."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          reason: { type: "enum", values: ["missing", "unknown", "retired"] },
+          pipe_type: { type: "caller_text", optional: true }
+        }
+      },
+      "method.signature_mismatch": {
+        code: "method.signature_mismatch",
+        title: "A pipe differs from its signature",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' differs from the signature it implements ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make pipe '{pipe}' take the inputs and give the output its signature declares, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make pipe '{pipe}' match its signature."
+          }
+        },
+        params: { pipe: { type: "identifier" }, finding: { type: "caller_text" } }
+      },
+      "method.not_runnable": {
+        code: "method.not_runnable",
+        title: "The method still holds pipe signatures",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The run reached pipe '{pipe}', a signature with no implementation.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Implement the signature '{pipe}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to implement the signature '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" } }
+      },
+      "method.input_undeclared": {
+        code: "method.input_undeclared",
+        title: "A pipe reads an input it does not declare",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' reads names its inputs do not declare: {variables}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare what pipe '{pipe}' reads in its inputs, or stop reading it, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare the inputs pipe '{pipe}' reads."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          variables: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.input_unused": {
+        code: "method.input_unused",
+        title: "A pipe declares an input it never reads",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' declares inputs it never reads: {variables}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove the inputs pipe '{pipe}' never reads, or read them, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove the inputs pipe '{pipe}' never reads."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          variables: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.input_concept_mismatch": {
+        code: "method.input_concept_mismatch",
+        title: "A pipe's input concept does not fit its use",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' declares the input '{input}' as '{declared}', which its use does not accept. It accepts: {expected}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the input '{input}' of pipe '{pipe}' with a concept its use accepts, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare the input '{input}' of pipe '{pipe}' with a concept its use accepts."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          input: { type: "identifier" },
+          declared: { type: "identifier" },
+          expected: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.output_concept_mismatch": {
+        code: "method.output_concept_mismatch",
+        title: "A pipe's output concept does not fit",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}', a {pipe_type}, declares its output as '{declared}', which does not fit. It accepts: {expected}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the output of pipe '{pipe}' with a concept that fits, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to declare the output of pipe '{pipe}' with a concept that fits."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          declared: { type: "identifier" },
+          expected: { type: "list", items: { type: "identifier" } },
+          pipe_type: { type: "identifier" }
+        }
+      },
+      "method.output_multiplicity_mismatch": {
+        code: "method.output_multiplicity_mismatch",
+        title: "A pipe's declared multiplicity does not fit its use",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' declares its output with the multiplicity '{declared}', but its use expects '{expected}'.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the output of pipe '{pipe}' with the multiplicity '{expected}', or change its use, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the output multiplicity of pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          declared: { type: "identifier" },
+          expected: { type: "enum", values: ["single", "list", "fixed"] }
+        }
+      },
+      "method.wiring_invalid": {
+        code: "method.wiring_invalid",
+        title: "A pipe's wiring does not give it what it reads",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' reads '{variable_path}' in a shape its wiring does not give it ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Wire pipe '{pipe}' so that '{variable_path}' reaches it in the shape it reads, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the wiring of pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          variable_path: { type: "identifier" },
+          finding: { type: "caller_text" }
+        }
+      },
+      "method.field_path_unresolved": {
+        code: "method.field_path_unresolved",
+        title: "A path names a field its concept does not have",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "In pipe '{pipe}', the path '{path}' cannot follow '{segment}', which is not a field of the value before it.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the path '{path}' so that it names fields its concepts hold, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the path '{path}' in pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          path: { type: "identifier" },
+          segment: { type: "identifier" },
+          available_fields: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.binding_step_invalid": {
+        code: "method.binding_step_invalid",
+        title: "A binding step is malformed",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A binding step of pipe '{pipe}', at '{field_path}', is malformed.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the binding step at '{field_path}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the binding step at '{field_path}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, field_path: { type: "identifier" } }
+      },
+      "method.optional_marker_invalid": {
+        code: "method.optional_marker_invalid",
+        title: "An optional marker is misplaced",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' carries a presence marker at '{field_path}', where the language does not allow one.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove or move the marker at '{field_path}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the presence marker at '{field_path}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, field_path: { type: "identifier" } }
+      },
+      "method.optional_unhandled": {
+        code: "method.optional_unhandled",
+        title: "An optional value reaches a place that needs a required one",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "In pipe '{pipe}', the maybe-absent '{input}' reaches a place that needs a value (site: {site}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Guard '{input}' where it is used, or declare the receiving side optional, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to guard the optional '{input}' in pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          input: { type: "identifier" },
+          site: {
+            type: "enum",
+            values: ["sequence_step", "condition", "condition_output", "template", "parallel_branch"]
+          }
+        }
+      },
+      "method.template_invalid": {
+        code: "method.template_invalid",
+        title: "A template in the method is invalid",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The template '{template}' of pipe '{pipe}' is invalid ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the template '{template}' of pipe '{pipe}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the template '{template}' of pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          template: { type: "identifier" },
+          finding: { type: "caller_text" }
+        }
+      },
+      "method.template_private_name": {
+        code: "method.template_private_name",
+        title: "A template reads a name reserved to the runtime",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A template of pipe '{pipe}' reads names reserved to the runtime: {variables}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Stop reading the reserved names in the templates of pipe '{pipe}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove the reserved names from the templates of pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          variables: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "method.function_invalid": {
+        code: "method.function_invalid",
+        title: "A function the method declares cannot be used",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The function '{function}' of pipe '{pipe}' cannot be used ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the function '{function}' of pipe '{pipe}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the function '{function}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          function: { type: "identifier" },
+          finding: { type: "caller_text" }
+        }
+      },
+      "method.concept_invalid": {
+        code: "method.concept_invalid",
+        title: "A concept's structure cannot be built or described",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The structure of the concept '{concept}' cannot be built ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the structure of the concept '{concept}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the concept '{concept}'."
+          }
+        },
+        params: { concept: { type: "identifier" }, finding: { type: "caller_text" } }
+      },
+      "method.model_setting_invalid": {
+        code: "method.model_setting_invalid",
+        title: "A model setting in the method is invalid",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model setting '{field}' is invalid ({finding}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the model setting '{field}', then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the model setting '{field}'."
+          }
+        },
+        params: { field: { type: "identifier" }, finding: { type: "caller_text" } }
+      },
+      "method.mock_unsatisfiable": {
+        code: "method.mock_unsatisfiable",
+        title: "The dry run cannot mock an output concept",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The dry run cannot mock the concept '{concept}', since no value satisfies its constraints.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Loosen the constraints of the concept '{concept}' so that a value can satisfy them, then validate the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make the concept '{concept}' satisfiable."
+          }
+        },
+        params: { concept: { type: "identifier" } }
+      },
+      "method.changed_concurrently": {
+        code: "method.changed_concurrently",
+        title: "A method file changed while it was being fixed",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 409,
+        detail: "A file of the method changed after the fix read it and before the fix wrote it.",
+        steps: {
+          actor: {
+            kind: "refresh",
+            detail: "Read the method's files again, then apply the fix to their current content."
+          },
+          other: {
+            kind: "refresh",
+            detail: "Read the method's files again, then apply the fix to their current content."
+          }
+        },
+        params: {}
+      },
+      "method.hint_invalid": {
+        code: "method.hint_invalid",
+        title: "A hint is not understood",
+        domain: "method",
+        retry: "no",
+        raised_as: "warning",
+        detail: "The hint '{hint}' is not understood (reason: {reason}).",
+        steps: {
+          actor: { kind: "change_method", detail: "Correct or remove the hint '{hint}'." },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to correct the hint '{hint}'."
+          }
+        },
+        params: {
+          reason: { type: "enum", values: ["unknown_key", "unknown_intent", "inapplicable_intent"] },
+          hint: { type: "caller_text" }
+        }
+      },
+      "method.input_presence_vacuous": {
+        code: "method.input_presence_vacuous",
+        title: "A presence check always holds",
+        domain: "method",
+        retry: "no",
+        raised_as: "warning",
+        detail: "Pipe '{pipe}' checks whether '{input}' is present, and it always is.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove the presence check on '{input}' in pipe '{pipe}'."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove the presence check on '{input}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, input: { type: "identifier" } }
+      },
+      "method.optional_force_redundant": {
+        code: "method.optional_force_redundant",
+        title: "An optional force is redundant",
+        domain: "method",
+        retry: "no",
+        raised_as: "warning",
+        detail: "The force marker on '{input}' in pipe '{pipe}' changes nothing.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove the force marker on '{input}' in pipe '{pipe}'."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove the redundant force marker on '{input}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, input: { type: "identifier" } }
+      },
+      "pipe.output_multiplicity": {
+        code: "pipe.output_multiplicity",
+        title: "A pipe's output does not have the declared multiplicity",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' produced an output of the multiplicity '{produced}', but its output '{output}' is declared '{declared}'.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Declare the output '{output}' as '{produced}', or make pipe '{pipe}' produce '{declared}'."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make the output '{output}' of pipe '{pipe}' match its declared multiplicity."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          output: { type: "identifier" },
+          declared: { type: "enum", values: ["single", "list"] },
+          produced: { type: "enum", values: ["single", "list"] }
+        }
+      },
+      "pipe.output_invalid": {
+        code: "pipe.output_invalid",
+        title: "A pipe's output does not fit its concept",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' produced an output that does not fit the concept '{output_concept}', at the fields {fields}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make pipe '{pipe}' produce an output that fits '{output_concept}', or loosen the concept, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make pipe '{pipe}' produce an output that fits its concept."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          output_concept: { type: "identifier" },
+          fields: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "pipe.function_raised": {
+        code: "pipe.function_raised",
+        title: "The method's function raised",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The function '{function}' of pipe '{pipe}' raised an error.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Fix the function '{function}' so that it does not raise on these inputs, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the function '{function}' of pipe '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, function: { type: "identifier" } }
+      },
+      "pipe.function_timed_out": {
+        code: "pipe.function_timed_out",
+        title: "The method's function ran past its time limit",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The function '{function}' of pipe '{pipe}' ran past its limit of {timeout} seconds.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make the function '{function}' finish within {timeout} seconds, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make the function '{function}' finish in time."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          function: { type: "identifier" },
+          timeout: { type: "seconds" }
+        }
+      },
+      "pipe.template_render_failed": {
+        code: "pipe.template_render_failed",
+        title: "A template failed to render",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A template of pipe '{pipe}' failed to render at '{variable}'.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Fix the template of pipe '{pipe}' where it reads '{variable}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the template of pipe '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
+      },
+      "pipe.template_budget_exceeded": {
+        code: "pipe.template_budget_exceeded",
+        title: "A template exceeded its render budget",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A template of pipe '{pipe}' passed its render budget in a {operation} operation (limit {limit}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make the template of pipe '{pipe}' do less in one render, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make the template of pipe '{pipe}' do less in one render."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          operation: { type: "enum", values: ["repeat", "pad", "join", "loop", "recursion", "output"] },
+          limit: { type: "integer" }
+        }
+      },
+      "pipe.condition_unmatched": {
+        code: "pipe.condition_unmatched",
+        title: "A condition matched no outcome",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The condition of pipe '{pipe}' rendered a value that no outcome maps.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Map every value the condition of pipe '{pipe}' can render to an outcome, or give it a default outcome."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to map every value of the condition of pipe '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" } }
+      },
+      "pipe.condition_refused": {
+        code: "pipe.condition_refused",
+        title: "The method refused these inputs",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' chose the outcome '{outcome}', which the method maps to a refusal of these inputs.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Change the inputs so that the method accepts them, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose inputs the method refuses."
+          }
+        },
+        params: { pipe: { type: "identifier" }, outcome: { type: "identifier" } }
+      },
+      "pipe.binding_failed": {
+        code: "pipe.binding_failed",
+        title: "A binding step could not bind its value",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The binding '{binding}' of pipe '{pipe}' could not follow '{segment}' in this run's value.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Correct the binding '{binding}' of pipe '{pipe}', or the structure it reads, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to fix the binding '{binding}' of pipe '{pipe}'."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          binding: { type: "identifier" },
+          segment: { type: "identifier" }
+        }
+      },
+      "pipe.input_unresolved": {
+        code: "pipe.input_unresolved",
+        title: "A pipe could not read a value it needs",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' could not read '{variable}', which an earlier step should have produced.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make an earlier step produce '{variable}' for pipe '{pipe}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make an earlier step produce '{variable}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
+      },
+      "pipe.forced_input_absent": {
+        code: "pipe.forced_input_absent",
+        title: "A forced input was absent",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' forces '{variable}' with '!', and it was absent in this run.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove the '!' on '{variable}' and handle its absence, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to handle the absence of '{variable}' in pipe '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
+      },
+      "pipe.prompt_empty": {
+        code: "pipe.prompt_empty",
+        title: "A pipe's prompt is empty",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The {part} of pipe '{pipe}' rendered empty from these inputs.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give the inputs that the prompt of pipe '{pipe}' is written from, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose inputs leave the prompt of pipe '{pipe}' empty."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          part: { type: "enum", values: ["user_text", "system_text", "image_prompt"] }
+        }
+      },
+      "pipe.stack_overflow": {
+        code: "pipe.stack_overflow",
+        title: "The run nested pipes deeper than the limit",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The run nested pipes deeper than the limit of {limit}.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Find the pipes that call each other without end, and break the loop, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to stop the method's pipes from nesting without end."
+          }
+        },
+        params: { limit: { type: "integer" } }
+      },
+      "model.unknown": {
+        code: "model.unknown",
+        title: "The method names a model that does not exist",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The method names the {model_type} model '{model}', which no catalog knows.",
+        steps: {
+          actor: {
+            kind: "change_model",
+            detail: "Name a model that exists in place of '{model}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to name a model that exists in place of '{model}'."
+          }
+        },
+        params: {
+          model: { type: "identifier" },
+          model_type: { type: "identifier" },
+          suggestions: { type: "list", items: { type: "identifier" } }
+        }
+      },
+      "model.unavailable": {
+        code: "model.unavailable",
+        title: "This deployment serves no backend for the model",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 501,
+        detail: "The {model_type} model '{model}' exists, but this deployment does not serve it (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Configure a backend for the model '{model}' on this deployment."
+          },
+          other: {
+            kind: "change_model",
+            detail: "Use a model this deployment serves in place of '{model}', or ask whoever runs the runtime to serve it."
+          }
+        },
+        params: {
+          model: { type: "identifier" },
+          model_type: { type: "identifier" },
+          reason: {
+            type: "enum",
+            values: [
+              "not_served",
+              "not_allowed",
+              "unknown_at_provider",
+              "fallback_disabled",
+              "no_fallback_served"
+            ]
+          }
+        }
+      },
+      "model.unspecified": {
+        code: "model.unspecified",
+        title: "No model is named for this step",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The step names no {model_type} model, and the deployment names no default for that kind.",
+        steps: {
+          actor: {
+            kind: "change_model",
+            detail: "Name a {model_type} model on the step, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to name a model on the step."
+          }
+        },
+        params: { model_type: { type: "identifier" } }
+      },
+      "model.capability_unsupported": {
+        code: "model.capability_unsupported",
+        title: "The model cannot do what the step asks",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model '{model}' does not support {capability}, which the step needs.",
+        steps: {
+          actor: {
+            kind: "change_model",
+            detail: "Use a model that supports {capability}, or change what the step asks, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to use a model that supports {capability}."
+          }
+        },
+        params: { model: { type: "identifier" }, capability: { type: "identifier" } }
+      },
+      "model.context_exceeded": {
+        code: "model.context_exceeded",
+        title: "The inputs exceed what the model can read",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The prompt for the model '{model}' reaches {count} against a {limit} of {max}.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Send smaller inputs, or fewer images, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose inputs exceed what the model '{model}' can read."
+          }
+        },
+        params: {
+          model: { type: "identifier" },
+          limit: { type: "enum", values: ["context_window", "prompt_images"] },
+          count: { type: "integer" },
+          max: { type: "integer" }
+        }
+      },
+      "model.output_truncated": {
+        code: "model.output_truncated",
+        title: "The answer was cut at the method's token cap",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model '{model}' stopped at the step's cap of {max_tokens} tokens, after {output_tokens} tokens.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Raise the step's max_tokens above {max_tokens}, or ask for a shorter answer, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to raise the step's token cap."
+          }
+        },
+        params: {
+          model: { type: "identifier" },
+          max_tokens: { type: "integer" },
+          output_tokens: { type: "integer" }
+        }
+      },
+      "model.output_schema_mismatch": {
+        code: "model.output_schema_mismatch",
+        title: "The model's structured output did not match its schema",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "The model '{model}' gave an answer that does not fit the concept '{concept}', after the runtime asked again.",
+        steps: {
+          actor: { kind: "retry", detail: "Run the method again, since another answer may fit." },
+          other: { kind: "retry", detail: "Run the method again, since another answer may fit." }
+        },
+        params: { model: { type: "identifier" }, concept: { type: "identifier" } }
+      },
+      "model.content_refused": {
+        code: "model.content_refused",
+        title: "The provider refused the content",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model '{model}' or its provider refused the request's content on policy grounds.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Change the inputs so that they meet the provider's content policy, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose inputs the provider refused."
+          }
+        },
+        params: { model: { type: "identifier" } }
+      },
+      "model.no_result": {
+        code: "model.no_result",
+        title: "The model found nothing for this request",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The model '{model}' returned no result for the query built from the inputs.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Broaden the inputs the query is built from, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose query found nothing."
+          }
+        },
+        params: { model: { type: "identifier" } }
+      },
+      "provider.rate_limited": {
+        code: "provider.rate_limited",
+        title: "The provider is rate limiting this deployment",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 429,
+        detail: "The provider '{provider}' is rate limiting this deployment's calls to the model '{model}'.",
+        steps: {
+          actor: { kind: "wait", detail: "Wait, then run the method again." },
+          other: { kind: "wait", detail: "Wait, then run the method again." }
+        },
+        params: { provider: { type: "identifier" }, model: { type: "identifier" } }
+      },
+      "provider.unavailable": {
+        code: "provider.unavailable",
+        title: "The provider is unavailable",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "The provider '{provider}' is unavailable.",
+        steps: {
+          actor: { kind: "retry", detail: "Run the method again, since the provider may be back." },
+          other: { kind: "retry", detail: "Run the method again, since the provider may be back." }
+        },
+        params: { provider: { type: "identifier" } }
+      },
+      "provider.timeout": {
+        code: "provider.timeout",
+        title: "The provider did not answer in time",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 504,
+        detail: "The provider '{provider}' did not answer in time.",
+        steps: {
+          actor: { kind: "retry", detail: "Run the method again." },
+          other: { kind: "retry", detail: "Run the method again." }
+        },
+        params: { provider: { type: "identifier" } }
+      },
+      "provider.failed": {
+        code: "provider.failed",
+        title: "The provider failed",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "The provider '{provider}' failed with the HTTP status {status}.",
+        steps: {
+          actor: { kind: "retry", detail: "Run the method again." },
+          other: { kind: "retry", detail: "Run the method again." }
+        },
+        params: { provider: { type: "identifier" }, status: { type: "integer" } }
+      },
+      "provider.response_invalid": {
+        code: "provider.response_invalid",
+        title: "The provider's answer could not be used",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "The provider '{provider}' gave an answer the runtime cannot use ({defect}).",
+        steps: {
+          actor: { kind: "retry", detail: "Run the method again." },
+          other: { kind: "retry", detail: "Run the method again." }
+        },
+        params: {
+          provider: { type: "identifier" },
+          defect: { type: "enum", values: ["empty", "malformed"] }
+        }
+      },
+      "provider.credential_refused": {
+        code: "provider.credential_refused",
+        title: "The provider refused this deployment's credential",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 502,
+        detail: "The provider '{provider}' refused this deployment's credential.",
+        steps: {
+          actor: {
+            kind: "check_credentials",
+            detail: "Check the credential this deployment holds for the provider '{provider}'."
+          },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { provider: { type: "identifier" } }
+      },
+      "provider.quota_exhausted": {
+        code: "provider.quota_exhausted",
+        title: "This deployment's provider account is out of quota",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 502,
+        detail: "This deployment's account with the provider '{provider}' is out of quota.",
+        steps: {
+          actor: {
+            kind: "check_account",
+            detail: "Check this deployment's account with the provider '{provider}', and raise its quota or its credit."
+          },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { provider: { type: "identifier" } }
+      },
+      "provider.outcome_unknown": {
+        code: "provider.outcome_unknown",
+        title: "The provider call may have taken effect",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 502,
+        detail: "A call to the model '{model}' of the provider '{provider}' failed after it was sent, so its work may exist and be billed.",
+        steps: {
+          actor: {
+            kind: "retry",
+            detail: "Run the method again if a repeat of the work is acceptable, since a new run may bill that work again."
+          },
+          other: {
+            kind: "check_account",
+            detail: "Check the account's usage before running the method again, since the work may have been billed."
+          }
+        },
+        params: { provider: { type: "identifier" }, model: { type: "identifier" } }
+      },
+      "run.not_found": {
+        code: "run.not_found",
+        title: "No such run",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 404,
+        detail: "No run '{pipeline_run_id}' is visible to this caller.",
+        steps: {
+          actor: { kind: "change_input", detail: "Check the run id, then read the run again." },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose run id names no run it can read."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "run.failed": {
+        code: "run.failed",
+        title: "The run did not succeed",
+        domain: "runtime",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run '{pipeline_run_id}' ended as '{run_status}', without success.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run's own problem in run_error to see why it did not succeed."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run's own problem in run_error to see why it did not succeed."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
+      },
+      "run.not_finished": {
+        code: "run.not_finished",
+        title: "The run has not finished",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run '{pipeline_run_id}' has not finished yet.",
+        steps: {
+          actor: { kind: "wait", detail: "Wait, then read the run's results again." },
+          other: { kind: "wait", detail: "Wait, then read the run's results again." }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "run.cancelled": {
+        code: "run.cancelled",
+        title: "The run was cancelled by its caller",
+        domain: "input",
+        retry: "yes",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run was cancelled by its caller before it ended.",
+        steps: {
+          actor: { kind: "retry", detail: "Start the run again if its result is still wanted." },
+          other: { kind: "read_run", detail: "Read the run to see when it was cancelled." }
+        },
+        params: {}
+      },
+      "run.timed_out": {
+        code: "run.timed_out",
+        title: "The run passed its time limit",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The run did not end within the deployment's run limit of {timeout} seconds.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make the method do less work per run, so that it ends within {timeout} seconds."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to make the method end within the deployment's run limit."
+          }
+        },
+        params: { timeout: { type: "seconds" } }
+      },
+      "run.lost": {
+        code: "run.lost",
+        title: "The run's outcome is lost",
+        domain: "runtime",
+        retry: "outcome_unknown",
+        raised_as: "problem",
+        status: 500,
+        detail: "The runtime lost track of the run '{pipeline_run_id}', and its outcome is unknown.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "run.outcome_unknown": {
+        code: "run.outcome_unknown",
+        title: "The runtime cannot tell whether the run started or finished",
+        domain: "runtime",
+        retry: "outcome_unknown",
+        raised_as: "problem",
+        status: 502,
+        detail: "The run '{pipeline_run_id}' was sent on, and its answer was lost.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "run.already_ended": {
+        code: "run.already_ended",
+        title: "The run has already ended",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run '{pipeline_run_id}' has already ended as '{run_status}', so it cannot be changed.",
+        steps: {
+          actor: { kind: "read_run", detail: "Read the run's final outcome rather than change it." },
+          other: { kind: "read_run", detail: "Read the run's final outcome rather than change it." }
+        },
+        params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
+      },
+      "run.answer_not_kept": {
+        code: "run.answer_not_kept",
+        title: "The run's answer was not kept",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run '{pipeline_run_id}' under this idempotency key ended as '{run_status}', and its answer was not kept.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' rather than repeat the request."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' rather than repeat the request."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
+      },
+      "run.results_not_stored": {
+        code: "run.results_not_stored",
+        title: "The run's results were not stored",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 404,
+        detail: "The run '{pipeline_run_id}' completed, and its results were delivered with its answer rather than stored.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the results from the answer the run was started with."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the results from the answer the run was started with."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "run.terminated": {
+        code: "run.terminated",
+        title: "The run was stopped by an operator or an erasure",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 409,
+        detail: "The run was stopped before it ended (ended by: {ended_by}).",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run's record to see when and why it was stopped."
+          },
+          other: {
+            kind: "report",
+            detail: "Report this to whoever runs the runtime if the run was still wanted."
+          }
+        },
+        params: { ended_by: { type: "enum", values: ["operator", "erasure"] } }
+      },
+      "security.input_url_refused": {
+        code: "security.input_url_refused",
+        title: "A URL in the request was refused",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The URL of the input '{input}' points at a {target_class} target, which a security rule forbids (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Give the input '{input}' a URL on the public internet, or send the file itself, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose input '{input}' names a URL a security rule forbids."
+          }
+        },
+        params: {
+          input: { type: "identifier" },
+          target_class: {
+            type: "enum",
+            values: ["loopback", "private", "link_local", "metadata", "scheme"]
+          },
+          reason: { type: "identifier" }
+        }
+      },
+      "security.method_url_refused": {
+        code: "security.method_url_refused",
+        title: "A URL the method names was refused",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' names a URL that points at a {target_class} target, which a security rule forbids (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make pipe '{pipe}' name a URL on the public internet, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to change the URL pipe '{pipe}' names."
+          }
+        },
+        params: {
+          pipe: { type: "identifier" },
+          target_class: {
+            type: "enum",
+            values: ["loopback", "private", "link_local", "metadata", "scheme"]
+          },
+          reason: { type: "identifier" }
+        }
+      },
+      "security.provider_url_refused": {
+        code: "security.provider_url_refused",
+        title: "A URL a provider returned was refused",
+        domain: "runtime",
+        retry: "no",
+        raised_as: "problem",
+        status: 502,
+        detail: "The provider '{provider}' returned a URL that points at a private address, and the runtime did not fetch it.",
+        steps: {
+          actor: { kind: "report", detail: "Report this to whoever runs the runtime." },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { provider: { type: "identifier" } }
+      },
+      "security.input_path_refused": {
+        code: "security.input_path_refused",
+        title: "A path the caller supplied was refused",
+        domain: "input",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A path in the request could escape its root (rule: {rule}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Write every path of the request relative to its root, with forward slashes, then send the request again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Pass this to the caller, whose request holds a path that could escape its root."
+          }
+        },
+        params: {
+          rule: {
+            type: "enum",
+            values: ["absolute", "parent_segment", "outside_root", "backslash", "colon", "empty"]
+          }
+        }
+      },
+      "security.method_path_refused": {
+        code: "security.method_path_refused",
+        title: "A path the method names was refused",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "Pipe '{pipe}' names the path '{file}', which would open a file outside the method on the runtime's disk.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Make pipe '{pipe}' name a file inside the method's tree, then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to change the path pipe '{pipe}' names."
+          }
+        },
+        params: { pipe: { type: "identifier" }, file: { type: "identifier" } }
+      },
+      "security.template_refused": {
+        code: "security.template_refused",
+        title: "A template was refused by the template sandbox",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "A template of pipe '{pipe}' reached for '{name}', which the template sandbox forbids.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove '{name}' from the templates of pipe '{pipe}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove '{name}' from the templates of pipe '{pipe}'."
+          }
+        },
+        params: { pipe: { type: "identifier" }, name: { type: "identifier" } }
+      },
+      "security.schema_refused": {
+        code: "security.schema_refused",
+        title: "An output schema was refused",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The schema of the concept '{concept}' carries extensions or imports the runtime refuses to execute.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Remove the code-generation extensions and imports from the concept '{concept}', then run the method again."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to remove the extensions from the concept '{concept}'."
+          }
+        },
+        params: { concept: { type: "identifier" } }
+      },
+      "security.integrity_mismatch": {
+        code: "security.integrity_mismatch",
+        title: "A dependency's content differs from its lock",
+        domain: "method",
+        retry: "no",
+        raised_as: "problem",
+        status: 422,
+        detail: "The content of the dependency '{dependency}' differs from the hash its lock pins.",
+        steps: {
+          actor: {
+            kind: "change_method",
+            detail: "Check where the dependency '{dependency}' changed, then update its lock only if the change is trusted."
+          },
+          other: {
+            kind: "contact_owner",
+            detail: "Ask the method's owner to check the dependency '{dependency}'."
+          }
+        },
+        params: { dependency: { type: "identifier" } }
+      },
+      "runtime.unexpected": {
+        code: "runtime.unexpected",
+        title: "An unexpected error occurred",
+        domain: "runtime",
+        retry: "no",
+        raised_as: "problem",
+        status: 500,
+        detail: "The runtime met an unexpected error.",
+        steps: {
+          actor: { kind: "report", detail: "Report this to whoever runs the runtime." },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: {}
+      },
+      "runtime.misconfigured": {
+        code: "runtime.misconfigured",
+        title: "The runtime is misconfigured",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 500,
+        detail: "The runtime is misconfigured, so it cannot serve this request.",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Set or correct the configuration of '{component}', then restart the runtime."
+          },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { component: { type: "identifier", operator_only: true } }
+      },
+      "runtime.unavailable": {
+        code: "runtime.unavailable",
+        title: "The runtime or a service it depends on is unavailable",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "problem",
+        status: 503,
+        detail: "The runtime, or a service it depends on, is unavailable.",
+        steps: {
+          actor: { kind: "retry", detail: "Send the request again after a while." },
+          other: { kind: "wait", detail: "Wait, then send the request again." }
+        },
+        params: { dependency: { type: "identifier", operator_only: true } }
+      },
+      "runtime.unsupported": {
+        code: "runtime.unsupported",
+        title: "This runtime cannot do what was asked",
+        domain: "operator",
+        retry: "no",
+        raised_as: "problem",
+        status: 501,
+        detail: "This runtime lacks {capability}, which the request needs.",
+        steps: {
+          actor: { kind: "fix_configuration", detail: "Enable {capability} on this runtime." },
+          other: {
+            kind: "change_input",
+            detail: "Send a request that does not need {capability}, or use a runtime that offers it."
+          }
+        },
+        params: { capability: { type: "identifier" } }
+      },
+      "client.unreachable": {
+        code: "client.unreachable",
+        title: "The runtime could not be reached",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "client",
+        detail: "The client could not connect to the runtime at {base_url}.",
+        steps: {
+          actor: {
+            kind: "retry",
+            detail: "Check that the runtime at {base_url} is up and reachable, then try again."
+          },
+          other: { kind: "retry", detail: "Try again once the runtime at {base_url} is reachable." }
+        },
+        params: { base_url: { type: "identifier" } }
+      },
+      "client.timeout": {
+        code: "client.timeout",
+        title: "The runtime did not answer in time",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "client",
+        detail: "The runtime did not answer within {seconds} seconds.",
+        steps: {
+          actor: { kind: "retry", detail: "Try the call again, or raise the client's time limit." },
+          other: { kind: "retry", detail: "Try the call again." }
+        },
+        params: { seconds: { type: "seconds" } }
+      },
+      "client.response_unreadable": {
+        code: "client.response_unreadable",
+        title: "The runtime's answer could not be read",
+        domain: "runtime",
+        retry: "no",
+        raised_as: "client",
+        detail: "The runtime answered with the HTTP status {status} and a body that is not a problem document the client can read.",
+        steps: {
+          actor: {
+            kind: "report",
+            detail: "Report this to whoever runs the runtime, with the status and the body."
+          },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { status: { type: "integer" } }
+      },
+      "client.outcome_unknown": {
+        code: "client.outcome_unknown",
+        title: "The call may have created a run",
+        domain: "runtime",
+        retry: "outcome_unknown",
+        raised_as: "client",
+        detail: "The connection was lost after a request that creates a run had left, so the run may exist.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier", optional: true } }
+      },
+      "client.follow_failed": {
+        code: "client.follow_failed",
+        title: "Following a started run stopped",
+        domain: "runtime",
+        retry: "outcome_unknown",
+        raised_as: "client",
+        detail: "The client stopped following the run '{pipeline_run_id}', which may still be going.",
+        steps: {
+          actor: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' by its id rather than start it again."
+          },
+          other: {
+            kind: "read_run",
+            detail: "Read the run '{pipeline_run_id}' by its id rather than start it again."
+          }
+        },
+        params: { pipeline_run_id: { type: "identifier" } }
+      },
+      "client.not_configured": {
+        code: "client.not_configured",
+        title: "The client has no usable configuration",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The client's setting '{setting}' is missing or unusable.",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Set '{setting}' in the client's configuration."
+          },
+          other: {
+            kind: "fix_configuration",
+            detail: "Set '{setting}' in the client's configuration."
+          }
+        },
+        params: { setting: { type: "identifier" } }
+      },
+      "client.argument_invalid": {
+        code: "client.argument_invalid",
+        title: "An argument was refused before sending",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The argument '{argument}' was refused before any request left (reason: {reason}).",
+        steps: {
+          actor: { kind: "change_input", detail: "Correct the argument '{argument}', then try again." },
+          other: { kind: "change_input", detail: "Correct the argument '{argument}', then try again." }
+        },
+        params: { argument: { type: "identifier" }, reason: { type: "identifier" } }
+      },
+      "client.file_unreadable": {
+        code: "client.file_unreadable",
+        title: "A local file cannot be read",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The local file '{path}' cannot be read (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Check that '{path}' exists and is readable, then try again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Check that '{path}' exists and is readable, then try again."
+          }
+        },
+        params: { path: { type: "caller_text" }, reason: { type: "identifier" } }
+      },
+      "client.write_failed": {
+        code: "client.write_failed",
+        title: "A local file could not be written",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The client could not write '{path}' (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Make '{path}' writable, or choose another place to write, then try again."
+          },
+          other: {
+            kind: "fix_configuration",
+            detail: "Make '{path}' writable, or choose another place to write, then try again."
+          }
+        },
+        params: { path: { type: "caller_text" }, reason: { type: "identifier" } }
+      },
+      "client.target_exists": {
+        code: "client.target_exists",
+        title: "The target already exists",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "'{path}' already holds something the client will not overwrite.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Choose another target, or remove what '{path}' holds, then try again."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Choose another target, or remove what '{path}' holds, then try again."
+          }
+        },
+        params: { path: { type: "caller_text" } }
+      },
+      "client.workspace_busy": {
+        code: "client.workspace_busy",
+        title: "Local files changed underneath the client",
+        domain: "runtime",
+        retry: "yes",
+        raised_as: "client",
+        detail: "Another process holds or changed '{path}', which this call read.",
+        steps: {
+          actor: { kind: "retry", detail: "Try again once the other process is done with '{path}'." },
+          other: { kind: "retry", detail: "Try again once the other process is done with '{path}'." }
+        },
+        params: { path: { type: "caller_text" } }
+      },
+      "client.output_mismatch": {
+        code: "client.output_mismatch",
+        title: "An output does not match the generated types",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The output field '{field}' does not match the generated type of the concept '{concept}'.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Generate the types again from the method as it is now."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Generate the types again from the method as it is now."
+          }
+        },
+        params: { field: { type: "identifier" }, concept: { type: "identifier" } }
+      },
+      "client.link_refused": {
+        code: "client.link_refused",
+        title: "A download link was refused",
+        domain: "operator",
+        retry: "no",
+        raised_as: "client",
+        detail: "The client refused a download link the runtime's storage handed out (reason: {reason}).",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Make the runtime's storage hand out https links that need no redirect."
+          },
+          other: { kind: "report", detail: "Report this to whoever runs the runtime." }
+        },
+        params: { reason: { type: "enum", values: ["plain_http", "unsupported_scheme", "redirect"] } }
+      },
+      "client.download_limit_exceeded": {
+        code: "client.download_limit_exceeded",
+        title: "A download passed the client's limit",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "A download passed the client's limit of {limit} bytes.",
+        steps: {
+          actor: {
+            kind: "change_input",
+            detail: "Raise the client's download limit, or download fewer files at once."
+          },
+          other: {
+            kind: "change_input",
+            detail: "Raise the client's download limit, or download fewer files at once."
+          }
+        },
+        params: { limit: { type: "bytes" } }
+      },
+      "client.aborted": {
+        code: "client.aborted",
+        title: "The call was stopped by the caller",
+        domain: "input",
+        retry: "yes",
+        raised_as: "client",
+        detail: "The caller stopped the call before it finished, and the call created nothing.",
+        steps: {
+          actor: { kind: "retry", detail: "Make the call again if its result is still wanted." },
+          other: { kind: "retry", detail: "Make the call again if its result is still wanted." }
+        },
+        params: {}
+      },
+      "client.tool_missing": {
+        code: "client.tool_missing",
+        title: "A local tool the client needs is missing",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The program '{tool}', which the client needs, is missing or cannot be started.",
+        steps: {
+          actor: {
+            kind: "fix_configuration",
+            detail: "Install '{tool}' and put it on the PATH, then try again."
+          },
+          other: {
+            kind: "fix_configuration",
+            detail: "Install '{tool}' and put it on the PATH, then try again."
+          }
+        },
+        params: { tool: { type: "identifier" } }
+      },
+      "client.tool_outdated": {
+        code: "client.tool_outdated",
+        title: "A local tool is too old",
+        domain: "input",
+        retry: "no",
+        raised_as: "client",
+        detail: "The program '{tool}' is at version {version}, older than the client requires.",
+        steps: {
+          actor: { kind: "upgrade", detail: "Upgrade '{tool}', then try again." },
+          other: { kind: "upgrade", detail: "Upgrade '{tool}', then try again." }
+        },
+        params: { tool: { type: "identifier" }, version: { type: "identifier" } }
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/problems/registry-target.js
+var MTHDS_ERROR_REGISTRY_TARGET_VERSION;
+var init_registry_target = __esm({
+  "node_modules/mthds/dist/problems/registry-target.js"() {
+    MTHDS_ERROR_REGISTRY_TARGET_VERSION = "8.0.0";
+  }
+});
+
+// node_modules/mthds/dist/problems/vocabulary.js
+var PROBLEM_DOMAINS, RETRY_VERDICTS, STEP_KINDS, FIX_SAFETIES, FIX_OP_KINDS;
+var init_vocabulary = __esm({
+  "node_modules/mthds/dist/problems/vocabulary.js"() {
+    PROBLEM_DOMAINS = ["input", "method", "account", "operator", "runtime"];
+    RETRY_VERDICTS = ["no", "yes", "outcome_unknown"];
+    STEP_KINDS = [
+      "retry",
+      "wait",
+      "read_run",
+      "refresh",
+      "change_input",
+      "change_method",
+      "change_model",
+      "check_credentials",
+      "request_access",
+      "check_account",
+      "fix_configuration",
+      "upgrade",
+      "contact_owner",
+      "report"
+    ];
+    FIX_SAFETIES = ["safe", "unsafe"];
+    FIX_OP_KINDS = [
+      "set_key",
+      "ensure_table",
+      "delete_key",
+      "delete_table",
+      "rename_table_key",
+      "move_key",
+      "remap_value"
+    ];
+  }
+});
+
+// node_modules/mthds/dist/problems/registry.js
+function isCoreErrorCode(code) {
+  return Object.prototype.hasOwnProperty.call(CORE_REGISTRY, code);
+}
+function registryEntry(code) {
+  return isCoreErrorCode(code) ? CORE_REGISTRY[code] : void 0;
+}
+function codeFamily(code) {
+  const last = code.lastIndexOf(".");
+  return last === -1 ? code : code.slice(0, last);
+}
+function familyEntries(family) {
+  if (entriesByFamily === void 0) {
+    const index = /* @__PURE__ */ new Map();
+    for (const entry of Object.values(CORE_REGISTRY)) {
+      const name = codeFamily(entry.code);
+      index.set(name, [...index.get(name) ?? [], entry]);
+    }
+    entriesByFamily = index;
+  }
+  return [...entriesByFamily.get(family) ?? []];
+}
+function typeUriOf(code) {
+  const segments = code.split(".");
+  if (segments.length === 2)
+    return `${CORE_ERROR_BASE_URL}/${code}`;
+  const prefix = EXTENSION_PREFIXES.find((candidate) => candidate.prefix === segments[0]);
+  return prefix === void 0 ? void 0 : `${prefix.base_url}/${code}`;
+}
+var PROBLEM_CODE_PATTERN, entriesByFamily;
+var init_registry = __esm({
+  "node_modules/mthds/dist/problems/registry.js"() {
+    init_registry_generated();
+    PROBLEM_CODE_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$/;
+  }
+});
+
+// node_modules/mthds/dist/problems/reading.js
+function isOneOf(values, value) {
+  return typeof value === "string" && values.includes(value);
+}
+function shared(values) {
+  if (values.length === 0)
+    return void 0;
+  return values.every((value) => value === values[0]) ? values[0] : void 0;
+}
+function familyDomain(code) {
+  return shared(familyEntries(codeFamily(code)).map((entry) => entry.domain));
+}
+function familyStepKind(code) {
+  return shared(familyEntries(codeFamily(code)).flatMap((entry) => [
+    entry.steps.actor.kind,
+    entry.steps.other.kind
+  ]));
+}
+function knownProblemDomain(problem) {
+  if (isOneOf(PROBLEM_DOMAINS, problem.domain))
+    return problem.domain;
+  return familyDomain(problem.code);
+}
+function problemDomain(problem) {
+  return knownProblemDomain(problem) ?? "runtime";
+}
+function problemRetry(problem) {
+  return isOneOf(RETRY_VERDICTS, problem.retry) ? problem.retry : "no";
+}
+function problemStepKind(problem) {
+  if (isOneOf(STEP_KINDS, problem.next_step.kind))
+    return problem.next_step.kind;
+  return familyStepKind(problem.code) ?? "report";
+}
+function itemDomain(item) {
+  return registryEntry(item.code)?.domain ?? familyDomain(item.code) ?? "runtime";
+}
+function fixSafety(fix) {
+  return isOneOf(FIX_SAFETIES, fix.safety) ? fix.safety : "unsafe";
+}
+function isKnownFixOp(op) {
+  return isOneOf(FIX_OP_KINDS, op.kind);
+}
+function isApplicableFix(fix) {
+  return fix.ops.every(isKnownFixOp);
+}
+var init_reading = __esm({
+  "node_modules/mthds/dist/problems/reading.js"() {
+    init_vocabulary();
+    init_registry();
+  }
+});
+
+// node_modules/mthds/dist/problems/build.js
+function defaultStepReader(domain) {
+  return domain === "input" || domain === "runtime" ? "actor" : "other";
+}
+function writeValue(value) {
+  if (Array.isArray(value))
+    return value.map(writeValue).join(", ");
+  if (typeof value === "string")
+    return value;
+  return JSON.stringify(value) ?? String(value);
+}
+function templateParams(template) {
+  const names = [];
+  for (const match of template.matchAll(TEMPLATE_TOKEN)) {
+    if (match[1] !== void 0)
+      names.push(match[1]);
+    else if (match[0] === "{" || match[0] === "}") {
+      throw new Error(`A lone brace at ${match.index} makes the template malformed: ${template}`);
+    }
+  }
+  return names;
+}
+function renderTemplate(template, params) {
+  return template.replace(TEMPLATE_TOKEN, (match, name, offset) => {
+    if (match === "{{")
+      return "{";
+    if (match === "}}")
+      return "}";
+    if (name === void 0) {
+      throw new Error(`A lone brace at ${offset} makes the template malformed: ${template}`);
+    }
+    if (params[name] === void 0) {
+      throw new Error(`The template names the parameter '${name}', which is not given: ${template}`);
+    }
+    return writeValue(params[name]);
+  });
+}
+function buildProblemFromEntry(entry, params, options = {}) {
+  const step = entry.steps[options.reader ?? defaultStepReader(entry.domain)];
+  const problem = { type: typeUriOf(entry.code) ?? entry.code, title: entry.title };
+  if (options.status !== void 0)
+    problem.status = options.status;
+  problem.detail = renderTemplate(entry.detail, params);
+  problem.code = entry.code;
+  problem.domain = entry.domain;
+  problem.retry = entry.retry;
+  if (options.retryAfter !== void 0 && entry.retry === "yes")
+    problem.retry_after = options.retryAfter;
+  problem.next_step = { kind: step.kind, detail: renderTemplate(step.detail, params) };
+  const declared = Object.entries(entry.params);
+  if (declared.length > 0) {
+    const visible = {};
+    for (const [name, spec] of declared) {
+      if (spec.operator_only === true || params[name] === void 0)
+        continue;
+      visible[name] = params[name];
+    }
+    problem.params = visible;
+  }
+  if (options.location !== void 0)
+    problem.location = options.location;
+  if (options.errors !== void 0 && options.errors.length > 0)
+    problem.errors = options.errors;
+  if (options.pipeline_run_id !== void 0)
+    problem.pipeline_run_id = options.pipeline_run_id;
+  for (const [name, value] of Object.entries(options.extra ?? {})) {
+    if (value !== void 0 && !(name in problem))
+      problem[name] = value;
+  }
+  return problem;
+}
+function buildProblem(code, params, options = {}) {
+  return buildProblemFromEntry(CORE_REGISTRY[code], params, options);
+}
+var TEMPLATE_TOKEN;
+var init_build = __esm({
+  "node_modules/mthds/dist/problems/build.js"() {
+    init_registry_generated();
+    init_registry();
+    TEMPLATE_TOKEN = /\{\{|\}\}|\{([a-z][a-z0-9_]*)\}|[{}]/g;
+  }
+});
+
+// node_modules/mthds/dist/problems/read.js
+function nestsDeeperThan(text, limit) {
+  let depth = 0;
+  let inString = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text.charCodeAt(index);
+    if (inString) {
+      if (char === 92)
+        index += 1;
+      else if (char === 34)
+        inString = false;
+      continue;
+    }
+    if (char === 34)
+      inString = true;
+    else if (char === 91 || char === 123) {
+      depth += 1;
+      if (depth > limit)
+        return true;
+    } else if (char === 93 || char === 125)
+      depth -= 1;
+  }
+  return false;
+}
+function refuseNonFinite(_key, value) {
+  if (typeof value === "number" && !Number.isFinite(value))
+    throw new NonFiniteNumber();
+  return value;
+}
+function parseJsonBody(text) {
+  if (nestsDeeperThan(text, MAX_BODY_NESTING))
+    return { ok: false };
+  try {
+    return { ok: true, value: JSON.parse(text, refuseNonFinite) };
+  } catch {
+    return { ok: false };
+  }
+}
+function isObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isString(value) {
+  return typeof value === "string";
+}
+function isStringArray(value, minItems = 0) {
+  return Array.isArray(value) && value.length >= minItems && value.every(isString);
+}
+function isIntegerAtLeast(value, minimum, maximum = Infinity) {
+  return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum;
+}
+function optional(object, name, check) {
+  return !(name in object) || check(object[name]);
+}
+function isCode(value) {
+  return isString(value) && PROBLEM_CODE_PATTERN.test(value);
+}
+function isParams(value) {
+  if (!isObject(value))
+    return false;
+  return optional(value, "missing_blobs", (blobs) => Array.isArray(blobs) && blobs.every((hash) => isString(hash) && SHA256_PATTERN.test(hash)));
+}
+function isLocation(value) {
+  if (!isObject(value))
+    return false;
+  return optional(value, "pipe", isString) && optional(value, "path", (path) => isStringArray(path)) && optional(value, "input", isString) && optional(value, "field", isString) && optional(value, "item", (item) => isIntegerAtLeast(item, 0)) && optional(value, "attempt", (attempt) => isIntegerAtLeast(attempt, 1)) && optional(value, "file", isString) && optional(value, "line", (line) => isIntegerAtLeast(line, 1)) && optional(value, "column", (column) => isIntegerAtLeast(column, 1));
+}
+function isScalar(value) {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+function isTomlValue(value) {
+  return isScalar(value) || isObject(value) && Object.values(value).every(isScalar);
+}
+function isFixOp(value) {
+  if (!isObject(value) || !isString(value.kind))
+    return false;
+  if (!KNOWN_OP_KINDS.has(value.kind))
+    return true;
+  const tablePath = (minItems) => isStringArray(value.table_path, minItems);
+  const key = isString(value.key);
+  switch (value.kind) {
+    case "set_key":
+      return tablePath(0) && key && "value" in value && isTomlValue(value.value);
+    case "ensure_table":
+    case "delete_table":
+      return tablePath(1);
+    case "delete_key":
+      return tablePath(0) && key;
+    case "rename_table_key":
+      return tablePath(0) && key && isString(value.new_key);
+    case "move_key":
+      return tablePath(0) && key && isStringArray(value.new_table_path) && isString(value.new_key);
+    case "remap_value":
+      return tablePath(0) && key && isObject(value.mapping) && Object.keys(value.mapping).length > 0 && Object.values(value.mapping).every(isString);
+    default:
+      return false;
+  }
+}
+function isSuggestedFix(value) {
+  return isObject(value) && isString(value.fix_code) && FIX_CODE_PATTERN.test(value.fix_code) && isString(value.description) && isString(value.safety) && optional(value, "file", isString) && Array.isArray(value.ops) && value.ops.length > 0 && value.ops.every(isFixOp);
+}
+function isProblemItem(value) {
+  return isObject(value) && isCode(value.code) && isString(value.detail) && optional(value, "params", isParams) && optional(value, "location", isLocation) && optional(value, "suggestions", (suggestions) => isStringArray(suggestions)) && optional(value, "suggested_fix", isSuggestedFix);
+}
+function isNextStep(value) {
+  return isObject(value) && isString(value.kind) && isString(value.detail);
+}
+function isProblem(value) {
+  return isObject(value) && isString(value.type) && isString(value.title) && isString(value.detail) && isCode(value.code) && isString(value.domain) && isString(value.retry) && isNextStep(value.next_step) && optional(value, "status", (status) => isIntegerAtLeast(status, 100, 599)) && optional(value, "retry_after", (seconds) => typeof seconds === "number" && seconds >= 0) && optional(value, "params", isParams) && optional(value, "location", isLocation) && optional(value, "errors", (errors) => Array.isArray(errors) && errors.length > 0 && errors.every(isProblemItem)) && optional(value, "pipeline_run_id", isString);
+}
+function readProblemBody(body) {
+  const reading = parseJsonBody(body);
+  return reading.ok && isProblem(reading.value) ? reading.value : void 0;
+}
+function header(headers, name) {
+  if (typeof headers.get === "function") {
+    return headers.get(name) ?? void 0;
+  }
+  const map = headers;
+  const found = Object.keys(map).find((key) => key.toLowerCase() === name);
+  return found === void 0 ? void 0 : map[found];
+}
+function isLeapYear(year) {
+  return year % 4 === 0 && year % 100 !== 0 || year % 400 === 0;
+}
+function daysInMonth(year, monthIndex) {
+  const days = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return days[monthIndex] ?? 0;
+}
+function rfc850Year(twoDigits, currentYear) {
+  const year = currentYear - currentYear % 100 + twoDigits;
+  if (year > currentYear + 50)
+    return year - 100;
+  if (year <= currentYear - 50)
+    return year + 100;
+  return year;
+}
+function parseHttpDate(text, now = Date.now()) {
+  let day;
+  let month;
+  let year;
+  let time;
+  const imf = IMF_FIXDATE.exec(text);
+  const asctime = imf === null ? ASCTIME_DATE.exec(text) : null;
+  const rfc850 = imf === null && asctime === null ? RFC850_DATE.exec(text) : null;
+  if (imf !== null) {
+    [, day, month] = imf;
+    year = Number(imf[3]);
+    time = [imf[4], imf[5], imf[6]];
+  } else if (asctime !== null) {
+    [, month, day] = asctime;
+    time = [asctime[3], asctime[4], asctime[5]];
+    year = Number(asctime[6]);
+  } else if (rfc850 !== null) {
+    [, day, month] = rfc850;
+    year = rfc850Year(Number(rfc850[3]), new Date(now).getUTCFullYear());
+    time = [rfc850[4], rfc850[5], rfc850[6]];
+  } else {
+    return void 0;
+  }
+  const monthIndex = MONTHS.indexOf(month);
+  const dayOfMonth = Number(day.trim());
+  const [hour, minute, second] = time.map(Number);
+  if (year < FIRST_YEAR || year > LAST_YEAR || dayOfMonth < 1 || dayOfMonth > daysInMonth(year, monthIndex) || hour > 23 || minute > 59 || second > LEAP_SECOND) {
+    return void 0;
+  }
+  const moment = /* @__PURE__ */ new Date(0);
+  moment.setUTCFullYear(year, monthIndex, dayOfMonth);
+  moment.setUTCHours(hour, minute, 0, 0);
+  const instant = moment.getTime() + second * 1e3;
+  return new Date(instant).getUTCFullYear() > LAST_YEAR ? void 0 : instant;
+}
+function retryAfterSeconds(headers, now = Date.now()) {
+  const raw = header(headers, "retry-after")?.trim();
+  if (!raw)
+    return void 0;
+  if (/^[0-9]+$/.test(raw)) {
+    const seconds = Number(raw);
+    return Number.isSafeInteger(seconds) ? seconds : void 0;
+  }
+  const date = parseHttpDate(raw, now);
+  if (date === void 0)
+    return void 0;
+  return Math.max(0, Math.ceil((date - now) / 1e3));
+}
+function soleCodeOfStatus(status) {
+  if (soleCodesByStatus === void 0) {
+    const byStatus = /* @__PURE__ */ new Map();
+    for (const entry of Object.values(CORE_REGISTRY)) {
+      if (entry.raised_as !== "problem" || entry.status === void 0)
+        continue;
+      byStatus.set(entry.status, [...byStatus.get(entry.status) ?? [], entry]);
+    }
+    soleCodesByStatus = /* @__PURE__ */ new Map();
+    for (const [code, entries] of byStatus) {
+      const [only] = entries;
+      if (entries.length !== 1 || only === void 0)
+        continue;
+      const callerStatable = Object.values(only.params).every((param) => param.optional === true || param.operator_only === true);
+      if (callerStatable)
+        soleCodesByStatus.set(code, only);
+    }
+  }
+  return soleCodesByStatus.get(status);
+}
+function unreadableAnswer(status) {
+  return buildProblem("client.response_unreadable", { status });
+}
+function isHttpStatus(status) {
+  return Number.isInteger(status) && status >= 100 && status <= 599;
+}
+function readAnswer(answer, options = {}) {
+  const received = readProblemBody(answer.body);
+  if (received !== void 0) {
+    let problem = received;
+    if (problem.status === void 0 && isHttpStatus(answer.status)) {
+      const { type, title, ...rest } = problem;
+      problem = { type, title, status: answer.status, ...rest };
+    }
+    if (problem.retry_after === void 0 && problem.retry === "yes") {
+      const seconds = retryAfterSeconds(answer.headers);
+      if (seconds !== void 0)
+        problem.retry_after = seconds;
+    }
+    return { problem, fromBody: true };
+  }
+  return { problem: readAnswerByStatus(answer, options), fromBody: false };
+}
+function readAnswerByStatus(answer, options) {
+  if (answer.status >= 200 && answer.status < 300)
+    return unreadableAnswer(answer.status);
+  if (options.createsRun === true && answer.status >= 500 && answer.status <= 599) {
+    return buildProblem("client.outcome_unknown", {});
+  }
+  const entry = soleCodeOfStatus(answer.status);
+  if (entry === void 0 || options.createsRun === true && entry.retry === "yes") {
+    return unreadableAnswer(answer.status);
+  }
+  return buildProblemFromEntry(entry, {}, { status: answer.status, retryAfter: retryAfterSeconds(answer.headers) });
+}
+function readErrorAnswer(answer, options = {}) {
+  return readAnswer(answer, options).problem;
+}
+var MAX_BODY_NESTING, NonFiniteNumber, SHA256_PATTERN, KNOWN_OP_KINDS, FIX_CODE_PATTERN, MONTHS, MONTH, DAY_NAME, DAY_NAME_LONG, TIME_OF_DAY, IMF_FIXDATE, RFC850_DATE, ASCTIME_DATE, LEAP_SECOND, FIRST_YEAR, LAST_YEAR, soleCodesByStatus;
+var init_read = __esm({
+  "node_modules/mthds/dist/problems/read.js"() {
+    init_registry_generated();
+    init_build();
+    init_registry();
+    init_vocabulary();
+    MAX_BODY_NESTING = 512;
+    NonFiniteNumber = class extends Error {
+    };
+    SHA256_PATTERN = /^[0-9a-f]{64}$/;
+    KNOWN_OP_KINDS = new Set(FIX_OP_KINDS);
+    FIX_CODE_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+    MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    MONTH = `(${MONTHS.join("|")})`;
+    DAY_NAME = "(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)";
+    DAY_NAME_LONG = "(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)";
+    TIME_OF_DAY = "([0-9]{2}):([0-9]{2}):([0-9]{2})";
+    IMF_FIXDATE = new RegExp(`^${DAY_NAME}, ([0-9]{2}) ${MONTH} ([0-9]{4}) ${TIME_OF_DAY} GMT$`);
+    RFC850_DATE = new RegExp(`^${DAY_NAME_LONG}, ([0-9]{2})-${MONTH}-([0-9]{2}) ${TIME_OF_DAY} GMT$`);
+    ASCTIME_DATE = new RegExp(`^${DAY_NAME} ${MONTH} ([0-9]{2}| [0-9]) ${TIME_OF_DAY} ([0-9]{4})$`);
+    LEAP_SECOND = 60;
+    FIRST_YEAR = 1;
+    LAST_YEAR = 9999;
+  }
+});
+
+// node_modules/mthds/dist/problems/render.js
+function problemRequestId(problem) {
+  const id = problem.request_id;
+  return typeof id === "string" && id.length > 0 ? id : void 0;
+}
+function problemMessage(problem) {
+  const message = problem.message;
+  return typeof message === "string" && message.length > 0 && message !== problem.detail ? message : void 0;
+}
+function formatLocation(location) {
+  if (location === void 0)
+    return "";
+  const parts = [];
+  if (typeof location.pipe === "string")
+    parts.push(`pipe '${location.pipe}'`);
+  if (Array.isArray(location.path) && location.path.length > 0) {
+    parts.push(`path ${location.path.join(" > ")}`);
+  }
+  if (typeof location.input === "string")
+    parts.push(`input '${location.input}'`);
+  if (typeof location.field === "string")
+    parts.push(`field '${location.field}'`);
+  if (typeof location.item === "number")
+    parts.push(`item ${location.item}`);
+  if (typeof location.attempt === "number")
+    parts.push(`attempt ${location.attempt}`);
+  if (typeof location.file === "string")
+    parts.push(`file '${location.file}'`);
+  if (typeof location.line === "number")
+    parts.push(`line ${location.line}`);
+  if (typeof location.column === "number")
+    parts.push(`column ${location.column}`);
+  return parts.join(", ");
+}
+function formatSuggestedFix(fix) {
+  return `Suggested fix (${fixSafety(fix)}, ${fix.fix_code}): ${fix.description}`;
+}
+function formatItem(item) {
+  const where = formatLocation(item.location);
+  return `${item.code}: ${item.detail}${where ? ` (${where})` : ""}`;
+}
+function factLines(problem, code) {
+  const verdict = [`domain ${problemDomain(problem)}`, `retry ${problemRetry(problem)}`];
+  if (typeof problem.retry_after === "number")
+    verdict.push(`after ${problem.retry_after} seconds`);
+  const lines = [`Code: ${code(problem.code)} (${verdict.join(", ")})`];
+  const requestId = problemRequestId(problem);
+  if (requestId !== void 0)
+    lines.push(`Request id: ${code(requestId)}`);
+  if (problem.pipeline_run_id !== void 0)
+    lines.push(`Run: ${code(problem.pipeline_run_id)}`);
+  const where = formatLocation(problem.location);
+  if (where)
+    lines.push(`Location: ${where}`);
+  return lines;
+}
+function renderProblemMarkdown(problem) {
+  const tick = (text) => `\`${text}\``;
+  const lines = [`## ${problem.title}`, "", problem.detail];
+  const message = problemMessage(problem);
+  if (message !== void 0)
+    lines.push("", message);
+  lines.push("", `**Next step** (${tick(problem.next_step.kind)}): ${problem.next_step.detail}`, "");
+  lines.push(...factLines(problem, tick).map((line) => `- ${line}`));
+  if (problem.errors !== void 0 && problem.errors.length > 0) {
+    lines.push("", "### Errors", "");
+    for (const item of problem.errors) {
+      const where = formatLocation(item.location);
+      lines.push(`- ${tick(item.code)}: ${item.detail}${where ? ` (${where})` : ""}`);
+      if (item.suggested_fix !== void 0) {
+        lines.push(`  - ${formatSuggestedFix(item.suggested_fix)}`);
+      }
+    }
+  }
+  return `${lines.join("\n")}
+`;
+}
+function renderProblemLines(problem, context = []) {
+  const lines = [`${problem.title}: ${problem.detail}`];
+  const message = problemMessage(problem);
+  if (message !== void 0)
+    lines.push(message);
+  lines.push(...context);
+  lines.push(`Next step: ${problem.next_step.detail}`);
+  lines.push(...factLines(problem, (text) => text));
+  for (const item of problem.errors ?? []) {
+    lines.push(`- ${formatItem(item)}`);
+    if (item.suggested_fix !== void 0)
+      lines.push(`  ${formatSuggestedFix(item.suggested_fix)}`);
+  }
+  return lines;
+}
+var init_render = __esm({
+  "node_modules/mthds/dist/problems/render.js"() {
+    init_reading();
+  }
+});
+
+// node_modules/mthds/dist/problems/errors.js
+function problemSentence(problem) {
+  return typeof problem.message === "string" && problem.message.length > 0 ? problem.message : problem.detail;
+}
+function problemErrorMessage(problem) {
+  const sentence = problemSentence(problem);
+  const step = problem.next_step.detail;
+  return step.length > 0 && !sentence.endsWith(step) ? `${sentence} ${step}` : sentence;
+}
+function reportedProblem(err) {
+  const requestId = err.requestId;
+  if (requestId === void 0 || problemRequestId(err.problem) !== void 0)
+    return err.problem;
+  return { ...err.problem, request_id: requestId };
+}
+function isProblemError(err) {
+  return err instanceof ProblemError;
+}
+function problemError(code, params, options = {}) {
+  return new ProblemError(buildProblem(code, params, { reader: options.reader, extra: { message: options.message } }), options.cause === void 0 ? void 0 : { cause: options.cause });
+}
+function argumentInvalid(argument, reason, message) {
+  return problemError("client.argument_invalid", { argument, reason }, { message });
+}
+var ProblemError;
+var init_errors = __esm({
+  "node_modules/mthds/dist/problems/errors.js"() {
+    init_exceptions();
+    init_reading();
+    init_build();
+    init_render();
+    ProblemError = class extends PipelineRequestError {
+      /** The problem, as received from the runtime or as the client built it. */
+      problem;
+      constructor(problem, options) {
+        super(problemErrorMessage(problem), options);
+        this.name = "ProblemError";
+        this.problem = problem;
+      }
+      /** The problem's code, the member a caller branches on. */
+      get code() {
+        return this.problem.code;
+      }
+      /** Who must act, read into the closed list (`problemDomain`). */
+      get domain() {
+        return problemDomain(this.problem);
+      }
+      /** Whether a repeat can succeed, read into the closed list (`problemRetry`): never repeat on `outcome_unknown`. */
+      get retry() {
+        return problemRetry(this.problem);
+      }
+      /** The next step as received, its kind read into the closed list. */
+      get nextStep() {
+        return { ...this.problem.next_step, kind: problemStepKind(this.problem) };
+      }
+      /** Seconds to wait before a repeat, when the problem gives them. */
+      get retryAfter() {
+        return this.problem.retry_after;
+      }
+      /** The runtime's id for the request that failed, to hand to whoever runs it. */
+      get requestId() {
+        return problemRequestId(this.problem);
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/problems/index.js
+var init_problems = __esm({
+  "node_modules/mthds/dist/problems/index.js"() {
+    init_registry_generated();
+    init_registry_target();
+    init_vocabulary();
+    init_registry();
+    init_reading();
+    init_build();
+    init_read();
+    init_render();
+    init_errors();
+  }
+});
+
+// node_modules/mthds/dist/protocol/options.js
+function assertOneMethodSource(options) {
+  if (options.files != null && options.tree != null) {
+    throw argumentInvalid("tree", "conflicts_with_files", "files and tree are two forms of the method's tree and are mutually exclusive; provide one.");
+  }
+  if (options.files != null && Object.keys(options.files).length === 0) {
+    throw argumentInvalid("files", "empty", EMPTY_METHOD_TREE_MESSAGE);
+  }
+  if (options.tree != null && options.tree.files.length === 0) {
+    throw argumentInvalid("tree", "empty", EMPTY_METHOD_TREE_MESSAGE);
+  }
+}
+function hasMethodSource(options) {
+  const hasFiles = options.files != null && Object.keys(options.files).length > 0;
+  const hasTree = options.tree != null && options.tree.files.length > 0;
+  return hasFiles || hasTree;
+}
+var EMPTY_METHOD_TREE_MESSAGE;
+var init_options = __esm({
+  "node_modules/mthds/dist/protocol/options.js"() {
+    init_errors();
+    EMPTY_METHOD_TREE_MESSAGE = "The method's tree holds no file; a tree holds at least one, so give the method's files or leave the method out.";
+  }
+});
+
+// node_modules/mthds/dist/protocol/method_files.js
+function isBlank(content) {
+  return content.trim().length === 0;
+}
+function serializeMethodFiles(files) {
+  const kept = files.filter((file) => !isBlank(file.content));
+  if (kept.length === 0)
+    return "";
+  return JSON.stringify(kept.map(({ name, content }) => ({ name, content })));
+}
+function parseMethodFiles(source) {
+  if (source == null || source.trim().length === 0)
+    return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(source);
+  } catch (cause) {
+    throw methodFilesInvalid("not_json", "Method file source is not valid JSON; expected a [{ name, content }] array.", cause);
+  }
+  if (!Array.isArray(parsed)) {
+    throw methodFilesInvalid("not_an_array", "Method file source must be a JSON array of { name, content } entries.");
+  }
+  const files = [];
+  for (const entry of parsed) {
+    if (!isMethodFileEntry(entry)) {
+      throw methodFilesInvalid("entry_invalid", "Each method file entry must be an object with string `name` and string `content`.");
+    }
+    if (!isBlank(entry.content))
+      files.push({ name: entry.name, content: entry.content });
+  }
+  return files;
+}
+function methodFilesInvalid(reason, message, cause) {
+  return problemError("client.argument_invalid", { argument: "files", reason }, { message, cause });
+}
+function isMethodFileEntry(value) {
+  return typeof value === "object" && value !== null && typeof value.name === "string" && typeof value.content === "string";
+}
+var init_method_files = __esm({
+  "node_modules/mthds/dist/protocol/method_files.js"() {
+    init_errors();
+  }
+});
+
+// node_modules/mthds/dist/protocol/models.js
+var MTHDS_PROTOCOL_VERSION, MODEL_CATEGORIES;
+var init_models = __esm({
+  "node_modules/mthds/dist/protocol/models.js"() {
+    MTHDS_PROTOCOL_VERSION = "2.0.0";
+    MODEL_CATEGORIES = ["llm", "extract", "img_gen", "search", "judgment"];
+  }
+});
+
+// node_modules/mthds/dist/protocol/input_form.js
+var FIELD_KINDS;
+var init_input_form = __esm({
+  "node_modules/mthds/dist/protocol/input_form.js"() {
+    FIELD_KINDS = [
+      "text",
+      "prose",
+      "date",
+      "number",
+      "boolean",
+      "enum",
+      "document",
+      "image",
+      "object",
+      "list",
+      "unknown"
+    ];
+  }
+});
+
+// node_modules/mthds/dist/protocol/toml_emitter.js
+function renderTableLayout(template) {
+  const lines = [];
+  emitMembers(substituteNulls(template), [], lines);
+  return join(lines);
+}
+function renderInlineLayout(template, comments) {
+  const lines = [];
+  for (const [key, value] of Object.entries(substituteNulls(template))) {
+    const commentText = comments[key];
+    if (commentText) {
+      lines.push(`# ${checkedComment(commentText, key)}`);
+    }
+    lines.push(`${renderKey(key)} = ${renderInlineValue(value)}`);
+  }
+  return join(lines);
+}
+function spellNumber(value) {
+  if (value instanceof TemplateFloat) {
+    return Number.isInteger(value.value) ? `${value.value}.0` : String(value.value);
+  }
+  return String(value);
+}
+function checkedComment(text, key) {
+  for (const character of text) {
+    if (isCommentForbidden(character)) {
+      const codePoint = character.charCodeAt(0).toString(16).padStart(4, "0");
+      throw new TomlEmissionError(`The comment on key '${key}' carries '\\u${codePoint}', which a TOML comment cannot hold`);
+    }
+  }
+  return text;
+}
+function join(lines) {
+  if (lines.length === 0)
+    return "";
+  return `${lines.join("\n")}
+`;
+}
+function substituteNulls(value) {
+  if (value === null)
+    return "";
+  if (Array.isArray(value))
+    return value.map((element) => substituteNulls(element));
+  if (isTable(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, member]) => [key, substituteNulls(member)]));
+  }
+  return value;
+}
+function isTable(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof TemplateFloat);
+}
+function isTableValue(value) {
+  if (isTable(value))
+    return true;
+  if (Array.isArray(value))
+    return value.length > 0 && value.every((element) => isTable(element));
+  return false;
+}
+function isSuperTable(table) {
+  const members = Object.values(table);
+  if (members.length === 0)
+    return false;
+  return members.every((value) => isTableValue(value));
+}
+function emitMembers(table, path, lines) {
+  const tableMembers = [];
+  for (const [key, value] of Object.entries(table)) {
+    if (isTableValue(value)) {
+      tableMembers.push([key, value]);
+    } else {
+      lines.push(`${renderKey(key)} = ${renderInlineValue(value)}`);
+    }
+  }
+  for (const [key, value] of tableMembers) {
+    const memberPath = [...path, key];
+    if (Array.isArray(value)) {
+      for (const element of value) {
+        emitTable(element, memberPath, lines, true);
+      }
+    } else {
+      emitTable(value, memberPath, lines, false);
+    }
+  }
+}
+function emitTable(table, path, lines, isArrayElement) {
+  if (isArrayElement || !isSuperTable(table)) {
+    if (lines.length > 0)
+      lines.push("");
+    const [openMarker, closeMarker] = isArrayElement ? ["[[", "]]"] : ["[", "]"];
+    lines.push(`${openMarker}${renderPath(path)}${closeMarker}`);
+  }
+  emitMembers(table, path, lines);
+}
+function renderPath(path) {
+  return path.map((segment) => renderKey(segment)).join(".");
+}
+function renderKey(key) {
+  if (BARE_KEY.test(key))
+    return key;
+  return renderString(key);
+}
+function renderInlineValue(value) {
+  if (isTable(value)) {
+    const rendered = Object.entries(value).map(([key, member]) => `${renderKey(key)} = ${renderInlineValue(member)}`).join(", ");
+    return `{${rendered}}`;
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((element) => renderInlineValue(element)).join(", ")}]`;
+  }
+  return renderScalar(value);
+}
+function renderScalar(value) {
+  if (typeof value === "boolean")
+    return value ? TRUE : FALSE;
+  if (typeof value === "number" || value instanceof TemplateFloat)
+    return spellNumber(value);
+  if (typeof value === "string")
+    return renderString(value);
+  throw new TomlEmissionError(`No TOML spelling for a value of type '${typeof value}'`);
+}
+function renderString(text) {
+  let escaped = "";
+  for (const character of text) {
+    const compact = COMPACT_ESCAPES[character];
+    if (compact !== void 0) {
+      escaped += compact;
+    } else if (isControl(character)) {
+      escaped += `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`;
+    } else {
+      escaped += character;
+    }
+  }
+  return `"${escaped}"`;
+}
+function isControl(character) {
+  const code = character.charCodeAt(0);
+  return code < 32 || code === 127;
+}
+function isCommentForbidden(character) {
+  return isControl(character) && character !== "	";
+}
+var BARE_KEY, COMPACT_ESCAPES, TRUE, FALSE, TemplateFloat, TomlEmissionError;
+var init_toml_emitter = __esm({
+  "node_modules/mthds/dist/protocol/toml_emitter.js"() {
+    BARE_KEY = /^[A-Za-z0-9_-]+$/;
+    COMPACT_ESCAPES = {
+      "\b": "\\b",
+      "	": "\\t",
+      "\n": "\\n",
+      "\f": "\\f",
+      "\r": "\\r",
+      '"': '\\"',
+      "\\": "\\\\"
+    };
+    TRUE = "true";
+    FALSE = "false";
+    TemplateFloat = class {
+      value;
+      constructor(value) {
+        this.value = value;
+      }
+      toJSON() {
+        return this.value;
+      }
+    };
+    TomlEmissionError = class extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "TomlEmissionError";
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/protocol/inputs_template.js
+function renderInputsTemplate(descriptor, options) {
+  const { explicit, format } = options;
+  if (!INPUTS_TEMPLATE_FORMATS.includes(format)) {
+    throw new InputsTemplateError(`Unknown inputs-template format '${String(format)}'; expected one of ${INPUTS_TEMPLATE_FORMATS.join(", ")}.`);
+  }
+  const template = projectInputsTemplate(descriptor, { explicit });
+  switch (format) {
+    case "json":
+      return renderJsonTemplate(template);
+    case "toml":
+      if (explicit)
+        return renderTableLayout(template);
+      return renderInlineLayout(template, projectConceptComments(descriptor));
+  }
+}
+function projectInputsTemplate(descriptor, options) {
+  return Object.fromEntries(descriptor.fields.map((field) => [
+    field.name,
+    options.explicit ? {
+      [ENVELOPE_CONCEPT_KEY]: field.concept_ref ?? null,
+      [ENVELOPE_CONTENT_KEY]: slotContent(field, field.name)
+    } : compactSlot(field)
+  ]));
+}
+function projectConceptComments(descriptor) {
+  return Object.fromEntries(descriptor.fields.map((field) => [
+    field.name,
+    `${CONCEPT_COMMENT_PREFIX}${formatSlotSignature(field)}`
+  ]));
+}
+function formatSlotSignature(field) {
+  return `${field.concept_ref ?? ""}${multiplicitySuffix(field)}${presenceSymbol(field.presence)}`;
+}
+function multiplicitySuffix(field) {
+  switch (field.kind) {
+    case "list":
+      return field.item_count === void 0 ? "[]" : `[${field.item_count}]`;
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum":
+    case "document":
+    case "image":
+    case "object":
+    case "unknown":
+      return "";
+  }
+}
+function presenceSymbol(presence) {
+  switch (presence) {
+    case "plain":
+      return "";
+    case "optional":
+      return "?";
+    case "force":
+      return "!";
+  }
+}
+function nativeCode(node) {
+  const candidates = [
+    ...node.concept_ref === void 0 ? [] : [node.concept_ref],
+    ...node.refines ?? []
+  ];
+  for (const candidate of candidates) {
+    if (candidate.startsWith(NATIVE_PREFIX))
+      return candidate.slice(NATIVE_PREFIX.length);
+  }
+  return null;
+}
+function keepsEnvelope(node) {
+  const code = nativeCode(node);
+  if (code === null)
+    return false;
+  if (OUT_OF_MATRIX_NATIVES.has(code))
+    return true;
+  switch (node.kind) {
+    case "object":
+      return true;
+    case "list":
+      return keepsEnvelope(node.item);
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum":
+    case "document":
+    case "image":
+    case "unknown":
+      return false;
+  }
+}
+function slotContentKey(node) {
+  switch (node.kind) {
+    case "text":
+    case "prose":
+      return node.format === TIME_FORMAT ? TIME_CONTENT_KEY : TEXT_CONTENT_KEY;
+    case "number":
+      return NUMBER_CONTENT_KEY;
+    case "boolean":
+      return BOOLEAN_CONTENT_KEY;
+    case "date":
+      return DATE_CONTENT_KEY;
+    case "enum":
+      return TEXT_CONTENT_KEY;
+    case "image":
+    case "document":
+      return FILE_CONTENT_KEY;
+    case "object":
+    case "list":
+    case "unknown":
+      return null;
+  }
+}
+function projectValue(node, name) {
+  switch (node.kind) {
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum": {
+      const contentKey = nativeCode(node) === null ? null : slotContentKey(node);
+      if (contentKey !== null)
+        return { [contentKey]: leafPlaceholder(node, contentKey) };
+      return leafPlaceholder(node, name);
+    }
+    case "image":
+    case "document":
+      return { [FILE_CONTENT_KEY]: leafPlaceholder(node, FILE_CONTENT_KEY) };
+    case "object":
+      return Object.fromEntries(node.fields.map((member) => [member.name, projectValue(member, member.name)]));
+    case "list":
+      return repeatElements(node.item_count, () => projectValue(node.item, `${name}_item`));
+    case "unknown":
+      return {};
+  }
+}
+function leafPlaceholder(node, name) {
+  switch (node.kind) {
+    case "text":
+    case "prose":
+      return node.format === TIME_FORMAT ? "12:00:00" : `${name}_value`;
+    case "date":
+      return node.datetime ? "2026-01-01T12:00:00" : "2026-01-01";
+    case "number":
+      if (nativeCode(node) === NATIVE_NUMBER)
+        return NATIVE_NUMBER_PLACEHOLDER;
+      if (node.integer)
+        return 0;
+      return new TemplateFloat(0);
+    case "boolean":
+      return false;
+    case "enum":
+      return node.choices.length > 0 ? node.choices[0] : `${name}_value`;
+    case "image":
+    case "document":
+      return `${MOCK_URL_PREFIX}${FILE_CONTENT_KEY}`;
+    case "object":
+    case "list":
+    case "unknown":
+      throw new InputsTemplateError(`Not a leaf kind: ${node.kind}`);
+  }
+}
+function repeatElements(itemCount, projectElement) {
+  return Array.from({ length: itemCount ?? 1 }, () => projectElement());
+}
+function slotContent(node, name) {
+  const contentKey = slotContentKey(node);
+  if (contentKey !== null)
+    return { [contentKey]: leafPlaceholder(node, contentKey) };
+  switch (node.kind) {
+    case "list":
+      return repeatElements(node.item_count, () => slotContent(node.item, `${name}_item`));
+    case "object":
+    case "unknown":
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum":
+    case "image":
+    case "document":
+      return projectValue(node, name);
+  }
+}
+function compactValue(node, name) {
+  const contentKey = slotContentKey(node);
+  if (contentKey !== null)
+    return leafPlaceholder(node, contentKey);
+  return projectValue(node, name);
+}
+function compactSlot(field) {
+  if (keepsEnvelope(field)) {
+    return {
+      [ENVELOPE_CONCEPT_KEY]: field.concept_ref ?? null,
+      [ENVELOPE_CONTENT_KEY]: slotContent(field, field.name)
+    };
+  }
+  switch (field.kind) {
+    case "list":
+      return repeatElements(field.item_count, () => compactValue(field.item, `${field.name}_item`));
+    case "object":
+    case "unknown":
+    case "text":
+    case "prose":
+    case "date":
+    case "number":
+    case "boolean":
+    case "enum":
+    case "image":
+    case "document":
+      return compactValue(field, field.name);
+  }
+}
+function renderJsonTemplate(template) {
+  return renderJsonValue(template, "");
+}
+function renderJsonValue(value, indent) {
+  if (value === null)
+    return "null";
+  if (value instanceof TemplateFloat || typeof value === "number")
+    return spellNumber(value);
+  if (typeof value === "boolean")
+    return value ? "true" : "false";
+  if (typeof value === "string")
+    return JSON.stringify(value);
+  const inner = `${indent}${JSON_INDENT}`;
+  if (Array.isArray(value)) {
+    if (value.length === 0)
+      return "[]";
+    const elements = value.map((element) => `${inner}${renderJsonValue(element, inner)}`);
+    return `[
+${elements.join(",\n")}
+${indent}]`;
+  }
+  const members = Object.entries(value).map(([key, member]) => `${inner}${JSON.stringify(key)}: ${renderJsonValue(member, inner)}`);
+  if (members.length === 0)
+    return "{}";
+  return `{
+${members.join(",\n")}
+${indent}}`;
+}
+var MOCK_URL_PREFIX, FILE_CONTENT_KEY, TIME_FORMAT, ENVELOPE_CONCEPT_KEY, ENVELOPE_CONTENT_KEY, TEXT_CONTENT_KEY, NUMBER_CONTENT_KEY, BOOLEAN_CONTENT_KEY, DATE_CONTENT_KEY, TIME_CONTENT_KEY, NATIVE_PREFIX, OUT_OF_MATRIX_NATIVES, NATIVE_NUMBER, NATIVE_NUMBER_PLACEHOLDER, CONCEPT_COMMENT_PREFIX, JSON_INDENT, INPUTS_TEMPLATE_FORMATS, InputsTemplateError;
+var init_inputs_template = __esm({
+  "node_modules/mthds/dist/protocol/inputs_template.js"() {
+    init_toml_emitter();
+    MOCK_URL_PREFIX = "https://mock.invalid/";
+    FILE_CONTENT_KEY = "url";
+    TIME_FORMAT = "time";
+    ENVELOPE_CONCEPT_KEY = "concept";
+    ENVELOPE_CONTENT_KEY = "content";
+    TEXT_CONTENT_KEY = "text";
+    NUMBER_CONTENT_KEY = "number";
+    BOOLEAN_CONTENT_KEY = "yes_no";
+    DATE_CONTENT_KEY = "date";
+    TIME_CONTENT_KEY = "time";
+    NATIVE_PREFIX = "native.";
+    OUT_OF_MATRIX_NATIVES = /* @__PURE__ */ new Set([
+      "Anything",
+      "Composite",
+      "Dynamic",
+      "Html",
+      "JSON",
+      "Page",
+      "SearchResult",
+      "TextAndImages"
+    ]);
+    NATIVE_NUMBER = "Number";
+    NATIVE_NUMBER_PLACEHOLDER = 1;
+    CONCEPT_COMMENT_PREFIX = "concept: ";
+    JSON_INDENT = "  ";
+    INPUTS_TEMPLATE_FORMATS = ["json", "toml"];
+    InputsTemplateError = class extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "InputsTemplateError";
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/protocol/concept.js
+function conceptRef(concept) {
+  return `${concept.domain_code}.${concept.code}`;
+}
+var init_concept = __esm({
+  "node_modules/mthds/dist/protocol/concept.js"() {
+  }
+});
+
+// node_modules/mthds/dist/protocol/index.js
+var init_protocol = __esm({
+  "node_modules/mthds/dist/protocol/index.js"() {
+    init_exceptions();
+    init_problems();
+    init_options();
+    init_method_files();
+    init_models();
+    init_input_form();
+    init_inputs_template();
+    init_toml_emitter();
+    init_concept();
+  }
+});
+
+// node_modules/mthds/dist/runners/types.js
+var Runners, RUNNER_NAMES, PIPE_SELECTION_CODES;
+var init_types = __esm({
+  "node_modules/mthds/dist/runners/types.js"() {
+    Runners = {
+      API: "api",
+      PIPELEX: "pipelex"
+    };
+    RUNNER_NAMES = Object.values(Runners);
+    PIPE_SELECTION_CODES = /* @__PURE__ */ new Set([
+      "request.pipe_not_found",
+      "request.pipe_ambiguous",
+      "request.pipe_unspecified"
+    ]);
+  }
+});
+
+// node_modules/mthds/dist/runners/api/exceptions.js
+function urlShown(url) {
+  const end = url.search(/[?#]/);
+  const beforeQuery = end === -1 ? url : url.slice(0, end);
+  return beforeQuery.replace(URL_USERINFO, "$1");
+}
+function bodyExcerpt(body) {
+  const flat = body.replace(/\s+/g, " ").trim().replace(URL_IN_TEXT, urlShown);
+  if (flat === "")
+    return void 0;
+  return flat.length > BODY_EXCERPT_LENGTH ? `${flat.slice(0, BODY_EXCERPT_LENGTH)}\u2026` : flat;
+}
+var BODY_EXCERPT_LENGTH, URL_IN_TEXT, URL_USERINFO, ApiResponseError2, RunStillRunningError2, ApiTransportError, BlobUploadError, MalformedBlobsAnswerError;
+var init_exceptions2 = __esm({
+  "node_modules/mthds/dist/runners/api/exceptions.js"() {
+    init_exceptions();
+    init_errors();
+    init_build();
+    init_exceptions();
+    BODY_EXCERPT_LENGTH = 500;
+    URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:(?:\/\/|\\\/\\\/)[^\s"'<>`]*/gi;
+    URL_USERINFO = /^([a-z][a-z0-9+.-]*:(?:\/\/|\\\/\\\/))[^/\\@?#]*@/i;
+    ApiResponseError2 = class extends ProblemError {
+      apiUrl;
+      route;
+      /** The answer's HTTP status, whatever the problem's own `status` member says. */
+      status;
+      statusText;
+      /**
+       * The answer's body, as received. It is never quoted whole, and an answer of
+       * `POST /blobs/missing` names upload targets by presigned URLs, so treat it as a secret.
+       */
+      responseBody;
+      /**
+       * What the server said, for a person: the start of a body that is no problem document, as
+       * `bodyExcerpt` cuts it, every URL without its query. `undefined` when the body is the problem
+       * the error carries or is empty, and for every answer of `POST /blobs/missing`, whose upload URLs
+       * are bearer capabilities. The message quotes it, and so do both CLIs.
+       */
+      answerExcerpt;
+      requestIdHeader;
+      constructor(problem, facts, options) {
+        super(problem, options);
+        this.name = "ApiResponseError";
+        this.answerExcerpt = facts.bodyIsProblem === false && facts.withholdBody !== true ? bodyExcerpt(facts.responseBody) : void 0;
+        const head = `${facts.route} failed (${facts.status}): `;
+        if (this.answerExcerpt !== void 0) {
+          const step = problem.next_step.detail;
+          this.message = `${head}${problemSentence(problem)}
+The server answered: ${this.answerExcerpt}` + (step.length > 0 ? `
+Next step: ${step}` : "");
+        } else {
+          this.message = `${head}${this.message}`;
+        }
+        this.apiUrl = facts.apiUrl;
+        this.route = facts.route;
+        this.status = facts.status;
+        this.statusText = facts.statusText;
+        this.responseBody = facts.responseBody;
+        this.requestIdHeader = facts.requestIdHeader;
+      }
+      /** The request's id: the problem's `request_id`, else the answer's `X-Request-ID` header. */
+      get requestId() {
+        return super.requestId ?? this.requestIdHeader;
+      }
+    };
+    RunStillRunningError2 = class extends ApiResponseError2 {
+      runId;
+      /** The answer's `Retry-After`, in seconds, when it gives one. */
+      retryAfterSeconds;
+      /** The answer's `Location` header, the run's status resource, when it gives one. */
+      location;
+      constructor(problem, facts) {
+        super(problem, facts);
+        this.name = "RunStillRunningError";
+        this.runId = facts.runId;
+        this.retryAfterSeconds = facts.retryAfterSeconds;
+        this.location = facts.location;
+      }
+    };
+    ApiTransportError = class extends ProblemError {
+      apiUrl;
+      /** The network code of the failure, such as `ECONNREFUSED`, when it carries one. */
+      networkCode;
+      constructor(problem, facts, options) {
+        super(problem, options);
+        this.name = "ApiTransportError";
+        this.apiUrl = facts.apiUrl;
+        this.networkCode = facts.networkCode;
+      }
+    };
+    BlobUploadError = class extends PipelineRequestError {
+      /** The SHA-256 of the blob, in lowercase hexadecimal. */
+      sha256;
+      /** The status the target answered, or `undefined` when it could not be reached. */
+      status;
+      /** The host of the upload target. */
+      host;
+      constructor(message, sha256, status, host, options) {
+        super(message, options);
+        this.name = "BlobUploadError";
+        this.sha256 = sha256;
+        this.status = status;
+        this.host = host;
+      }
+    };
+    MalformedBlobsAnswerError = class extends ProblemError {
+      /** The position of the faulty entry in `missing`, or `undefined` when the answer as a whole is malformed. */
+      index;
+      /** The faulty entry's SHA-256 when it carries a well-formed one, else `undefined`. */
+      sha256;
+      constructor(message, status, index, sha256) {
+        super(buildProblem("client.response_unreadable", { status }, { extra: { message } }));
+        this.name = "MalformedBlobsAnswerError";
+        this.index = index;
+        this.sha256 = sha256;
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/runners/api/transport.js
+function provesNothingSent2(fetchFailure) {
+  return fetchFailure instanceof Error && isConnectionSetupFailure2(fetchFailure.cause);
+}
+function networkErrorCode(fetchFailure) {
+  const cause = fetchFailure instanceof Error ? fetchFailure.cause : void 0;
+  if (typeof cause !== "object" || cause === null)
+    return void 0;
+  const code = cause.code;
+  return typeof code === "string" ? code : void 0;
+}
+function isConnectionSetupFailure2(failure) {
+  if (failure instanceof AggregateError) {
+    return failure.errors.length > 0 && failure.errors.every(isConnectionSetupFailure2);
+  }
+  if (typeof failure !== "object" || failure === null)
+    return false;
+  const { code, syscall } = failure;
+  if (typeof code === "string" && CONNECTION_SETUP_CODES2.has(code))
+    return true;
+  return typeof syscall === "string" && CONNECTION_SETUP_CALLS2.has(syscall);
+}
+var CONNECTION_SETUP_CALLS2, CONNECTION_SETUP_CODES2;
+var init_transport = __esm({
+  "node_modules/mthds/dist/runners/api/transport.js"() {
+    CONNECTION_SETUP_CALLS2 = /* @__PURE__ */ new Set(["getaddrinfo", "connect"]);
+    CONNECTION_SETUP_CODES2 = /* @__PURE__ */ new Set([
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "UND_ERR_CONNECT_TIMEOUT",
+      "ERR_SOCKET_CONNECTION_TIMEOUT",
+      "ERR_TLS_CERT_ALTNAME_INVALID",
+      "ERR_TLS_CERT_ALTNAME_FORMAT",
+      "UNABLE_TO_GET_ISSUER_CERT",
+      "UNABLE_TO_GET_CRL",
+      "UNABLE_TO_DECRYPT_CERT_SIGNATURE",
+      "UNABLE_TO_DECRYPT_CRL_SIGNATURE",
+      "UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY",
+      "CERT_SIGNATURE_FAILURE",
+      "CRL_SIGNATURE_FAILURE",
+      "CERT_NOT_YET_VALID",
+      "CERT_HAS_EXPIRED",
+      "CRL_NOT_YET_VALID",
+      "CRL_HAS_EXPIRED",
+      "ERROR_IN_CERT_NOT_BEFORE_FIELD",
+      "ERROR_IN_CERT_NOT_AFTER_FIELD",
+      "ERROR_IN_CRL_LAST_UPDATE_FIELD",
+      "ERROR_IN_CRL_NEXT_UPDATE_FIELD",
+      "OUT_OF_MEM",
+      "DEPTH_ZERO_SELF_SIGNED_CERT",
+      "SELF_SIGNED_CERT_IN_CHAIN",
+      "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+      "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+      "CERT_CHAIN_TOO_LONG",
+      "CERT_REVOKED",
+      "INVALID_CA",
+      "PATH_LENGTH_EXCEEDED",
+      "INVALID_PURPOSE",
+      "CERT_UNTRUSTED",
+      "CERT_REJECTED",
+      "HOSTNAME_MISMATCH",
+      "UNSPECIFIED"
+    ]);
+  }
+});
+
+// node_modules/mthds/dist/config/dotenv.js
+var init_dotenv = __esm({
+  "node_modules/mthds/dist/config/dotenv.js"() {
+  }
+});
+
+// node_modules/mthds/dist/config/config-file.js
+var init_config_file = __esm({
+  "node_modules/mthds/dist/config/config-file.js"() {
+    init_dotenv();
+  }
+});
+
+// node_modules/mthds/dist/usage-stats/contract.js
+var NOTICE_DETAILS_URL, NOTICE_DISABLE_COMMAND, NOTICE_TEXT, STATE_FILES;
+var init_contract = __esm({
+  "node_modules/mthds/dist/usage-stats/contract.js"() {
+    NOTICE_DETAILS_URL = "https://docs.pipelex.com/latest/setup/usage-statistics/";
+    NOTICE_DISABLE_COMMAND = "mthds telemetry disable";
+    NOTICE_TEXT = `Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run \`${NOTICE_DISABLE_COMMAND}\` or set DO_NOT_TRACK=1. Details: ${NOTICE_DETAILS_URL}`;
+    STATE_FILES = {
+      id: "id",
+      disabled: "disabled",
+      legacyMigrated: "legacy-migrated",
+      noticePrefix: "notice-v",
+      internal: "internal",
+      spool: "spool"
+    };
+  }
+});
+
+// node_modules/mthds/dist/usage-stats/environment.js
+var init_environment = __esm({
+  "node_modules/mthds/dist/usage-stats/environment.js"() {
+    init_contract();
+  }
+});
+
+// node_modules/mthds/dist/usage-stats/state.js
+var ID_TEMP_PREFIX;
+var init_state = __esm({
+  "node_modules/mthds/dist/usage-stats/state.js"() {
+    init_config_file();
+    init_dotenv();
+    init_contract();
+    init_environment();
+    ID_TEMP_PREFIX = `${STATE_FILES.id}.tmp-`;
+  }
+});
+
+// node_modules/smol-toml/dist/date.js
+var DATE_TIME_RE, TomlDate;
+var init_date = __esm({
+  "node_modules/smol-toml/dist/date.js"() {
+    DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})?[T ]?(?:(\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?)?(Z|[-+]\d{2}:\d{2})?$/i;
+    TomlDate = class _TomlDate extends Date {
+      #hasDate = false;
+      #hasTime = false;
+      #offset = null;
+      constructor(date) {
+        let hasDate = true;
+        let hasTime = true;
+        let offset = "Z";
+        if (typeof date === "string") {
+          let match = date.match(DATE_TIME_RE);
+          if (match) {
+            if (!match[1]) {
+              hasDate = false;
+              date = `0000-01-01T${date}`;
+            }
+            hasTime = !!match[2];
+            hasTime && date[10] === " " && (date = date.replace(" ", "T"));
+            if (match[2] && +match[2] > 23) {
+              date = "";
+            } else {
+              offset = match[3] || null;
+              date = date.toUpperCase();
+              if (!offset && hasTime)
+                date += "Z";
+            }
+          } else {
+            date = "";
+          }
+        }
+        super(date);
+        if (!isNaN(this.getTime())) {
+          this.#hasDate = hasDate;
+          this.#hasTime = hasTime;
+          this.#offset = offset;
+        }
+      }
+      isDateTime() {
+        return this.#hasDate && this.#hasTime;
+      }
+      isLocal() {
+        return !this.#hasDate || !this.#hasTime || !this.#offset;
+      }
+      isDate() {
+        return this.#hasDate && !this.#hasTime;
+      }
+      isTime() {
+        return this.#hasTime && !this.#hasDate;
+      }
+      isValid() {
+        return this.#hasDate || this.#hasTime;
+      }
+      toISOString() {
+        let iso = super.toISOString();
+        if (this.isDate())
+          return iso.slice(0, 10);
+        if (this.isTime())
+          return iso.slice(11, 23);
+        if (this.#offset === null)
+          return iso.slice(0, -1);
+        if (this.#offset === "Z")
+          return iso;
+        let offset = +this.#offset.slice(1, 3) * 60 + +this.#offset.slice(4, 6);
+        offset = this.#offset[0] === "-" ? offset : -offset;
+        let offsetDate = new Date(this.getTime() - offset * 6e4);
+        return offsetDate.toISOString().slice(0, -1) + this.#offset;
+      }
+      static wrapAsOffsetDateTime(jsDate, offset = "Z") {
+        let date = new _TomlDate(jsDate);
+        date.#offset = offset;
+        return date;
+      }
+      static wrapAsLocalDateTime(jsDate) {
+        let date = new _TomlDate(jsDate);
+        date.#offset = null;
+        return date;
+      }
+      static wrapAsLocalDate(jsDate) {
+        let date = new _TomlDate(jsDate);
+        date.#hasTime = false;
+        date.#offset = null;
+        return date;
+      }
+      static wrapAsLocalTime(jsDate) {
+        let date = new _TomlDate(jsDate);
+        date.#hasDate = false;
+        date.#offset = null;
+        return date;
+      }
+    };
+  }
+});
+
+// node_modules/smol-toml/dist/error.js
+function getLineColFromPtr(string, ptr) {
+  let lines = string.slice(0, ptr).split(/\r\n|\n|\r/g);
+  return [lines.length, lines.pop().length + 1];
+}
+function makeCodeBlock(string, line, column) {
+  let lines = string.split(/\r\n|\n|\r/g);
+  let codeblock = "";
+  let numberLen = (Math.log10(line + 1) | 0) + 1;
+  for (let i = line - 1; i <= line + 1; i++) {
+    let l = lines[i - 1];
+    if (!l)
+      continue;
+    codeblock += i.toString().padEnd(numberLen, " ");
+    codeblock += ":  ";
+    codeblock += l;
+    codeblock += "\n";
+    if (i === line) {
+      codeblock += " ".repeat(numberLen + column + 2);
+      codeblock += "^\n";
+    }
+  }
+  return codeblock;
+}
+var TomlError;
+var init_error = __esm({
+  "node_modules/smol-toml/dist/error.js"() {
+    TomlError = class extends Error {
+      line;
+      column;
+      codeblock;
+      constructor(message, options) {
+        const [line, column] = getLineColFromPtr(options.toml, options.ptr);
+        const codeblock = makeCodeBlock(options.toml, line, column);
+        super(`Invalid TOML document: ${message}
+
+${codeblock}`, options);
+        this.line = line;
+        this.column = column;
+        this.codeblock = codeblock;
+      }
+    };
+  }
+});
+
+// node_modules/smol-toml/dist/util.js
+function indexOfNewline(str, start = 0) {
+  let idx = str.indexOf("\n", start);
+  if (str.charCodeAt(idx - 1) === 13)
+    idx--;
+  return idx;
+}
+function skipComment(ctx) {
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    let c = ctx.s.charCodeAt(ctx.p);
+    if (c === 10)
+      break;
+    if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10) {
+      ctx.p++;
+      break;
+    }
+    if (c < 32 && c !== 9 || c === 127) {
+      throw new TomlError("control characters are not allowed in comments", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
+    }
+  }
+}
+function skipVoid(ctx, banNewLines, banComments) {
+  let c;
+  while (1) {
+    while ((c = ctx.s.charCodeAt(ctx.p)) === 32 || c === 9 || !banNewLines && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10))
+      ctx.p++;
+    if (banComments || c !== 35)
+      break;
+    skipComment(ctx);
+  }
+}
+function skipUntil(ctx, sep4, end) {
+  let ptr = ctx.p;
+  if (!end) {
+    ptr = indexOfNewline(ctx.s, ptr);
+    ctx.p = ptr < 0 ? ctx.s.length : ptr;
+    return;
+  }
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    let c = ctx.s.charCodeAt(ctx.p);
+    if (c === 35) {
+      skipComment(ctx);
+    } else if (c === end || c === sep4) {
+      return;
+    }
+  }
+  throw new TomlError("cannot find end of structure", {
+    toml: ctx.s,
+    ptr
+  });
+}
+var init_util = __esm({
+  "node_modules/smol-toml/dist/util.js"() {
+    init_error();
+  }
+});
+
+// node_modules/smol-toml/dist/primitive.js
+function parseString(ctx) {
+  let start = ctx.p;
+  let c = ctx.s.charCodeAt(ctx.p++);
+  let first = c;
+  let isLiteral = c === 39;
+  let isMultiline = c === ctx.s.charCodeAt(ctx.p) && c === ctx.s.charCodeAt(ctx.p + 1);
+  if (isMultiline) {
+    if ((c = ctx.s.charCodeAt(ctx.p += 2)) === 10)
+      ctx.p++;
+    else if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)
+      ctx.p += 2;
+  }
+  let parsed = "";
+  let sliceStart = ctx.p;
+  let state = 0;
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    c = ctx.s.charCodeAt(ctx.p);
+    if (isMultiline && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)) {
+      state = state && 3;
+    } else if (c < 32 && c !== 9 || c === 127) {
+      throw new TomlError("control characters are not allowed in strings", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
+    } else if ((!state || state === 3) && c === first && (!isMultiline || ctx.s.charCodeAt(ctx.p + 1) === first && ctx.s.charCodeAt(ctx.p + 2) === first)) {
+      if (isMultiline) {
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+      }
+      if (!state)
+        parsed += ctx.s.slice(sliceStart, ctx.p);
+      ctx.p += isMultiline ? 3 : 1;
+      return parsed;
+    } else if (!state) {
+      if (!isLiteral && c === 92) {
+        parsed += ctx.s.slice(sliceStart, sliceStart = ctx.p);
+        state = 1;
+      }
+    } else if (state === 1) {
+      if (c === 120 || c === 117 || c === 85) {
+        let value = 0;
+        let len = c === 120 ? 2 : c === 117 ? 4 : 8;
+        for (let j = 0; j < len; j++, ctx.p++) {
+          let hex = ctx.s.charCodeAt(ctx.p + 1);
+          let digit = (
+            /* 0-9 */
+            hex >= 48 && hex <= 57 ? hex - 48 : (
+              /* A-F */
+              hex >= 65 && hex <= 70 ? hex - 65 + 10 : (
+                /* a-f */
+                hex >= 97 && hex <= 102 ? hex - 97 + 10 : -1
+              )
+            )
+          );
+          if (digit < 0)
+            throw new TomlError("invalid non-hex character in unicode escape", { toml: ctx.s, ptr: ctx.p + 1 });
+          value = value << 4 | digit;
+        }
+        if (value < 0 || value > 1114111 || value >= 55296 && value <= 57343) {
+          throw new TomlError("invalid unicode escape", { toml: ctx.s, ptr: ctx.p });
+        }
+        parsed += String.fromCodePoint(value);
+        sliceStart = ctx.p + 1;
+        state = 0;
+      } else if (c === 32 || c === 9) {
+        state = 2;
+      } else {
+        if (c === 98)
+          parsed += "\b";
+        else if (c === 116)
+          parsed += "	";
+        else if (c === 110)
+          parsed += "\n";
+        else if (c === 102)
+          parsed += "\f";
+        else if (c === 114)
+          parsed += "\r";
+        else if (c === 101)
+          parsed += "\x1B";
+        else if (c === 34)
+          parsed += '"';
+        else if (c === 92)
+          parsed += "\\";
+        else
+          throw new TomlError("unrecognized escape sequence", { toml: ctx.s, ptr: ctx.p });
+        sliceStart = ctx.p + 1;
+        state = 0;
+      }
+    } else if (c !== 32 && c !== 9) {
+      if (state === 2) {
+        throw new TomlError("invalid escape: only line-ending whitespace may be escaped", {
+          toml: ctx.s,
+          ptr: sliceStart
+        });
+      }
+      state = !isLiteral && c === 92 ? 1 : 0;
+      sliceStart = ctx.p;
+    }
+  }
+  throw new TomlError("unfinished string", { toml: ctx.s, ptr: start });
+}
+function sliceAndTrimEndOf(ctx, start, end) {
+  let value = ctx.s.slice(start, end);
+  let commentIdx = value.indexOf("#");
+  if (commentIdx > 0) {
+    skipComment({ s: value, p: commentIdx, d: 0 });
+    value = value.slice(0, commentIdx);
+  }
+  return value.trimEnd();
+}
+function parseValue(ctx, integersAsBigInt, end) {
+  let ptr = ctx.p;
+  let err = { toml: ctx.s, ptr };
+  skipUntil(ctx, 44, end);
+  let value = sliceAndTrimEndOf(ctx, ptr, ctx.p);
+  if (!value)
+    throw new TomlError("incomplete declaration: value expected", err);
+  if (value === "-inf")
+    return -Infinity;
+  if (value === "inf" || value === "+inf")
+    return Infinity;
+  if (value === "nan" || value === "+nan" || value === "-nan")
+    return NaN;
+  if (value === "-0")
+    return integersAsBigInt ? 0n : 0;
+  let isInt = INT_REGEX.test(value);
+  if (isInt || FLOAT_REGEX.test(value)) {
+    if (LEADING_ZERO.test(value)) {
+      throw new TomlError("leading zeroes are not allowed", err);
+    }
+    value = value.replace(/_/g, "");
+    let numeric = +value;
+    if (isNaN(numeric)) {
+      throw new TomlError("invalid number", err);
+    }
+    if (isInt) {
+      if ((isInt = !Number.isSafeInteger(numeric)) && !integersAsBigInt) {
+        throw new TomlError("integer value cannot be represented losslessly", err);
+      }
+      if (isInt || integersAsBigInt === true)
+        numeric = BigInt(value);
+    }
+    return numeric;
+  }
+  const date = new TomlDate(value);
+  if (!date.isValid())
+    throw new TomlError("invalid value", err);
+  return date;
+}
+var INT_REGEX, FLOAT_REGEX, LEADING_ZERO;
+var init_primitive = __esm({
+  "node_modules/smol-toml/dist/primitive.js"() {
+    init_date();
+    init_error();
+    init_util();
+    INT_REGEX = /^((0x[0-9a-fA-F](_?[0-9a-fA-F])*)|(([+-]|0[ob])?\d(_?\d)*))$/;
+    FLOAT_REGEX = /^[+-]?\d(_?\d)*(\.\d(_?\d)*)?([eE][+-]?\d(_?\d)*)?$/;
+    LEADING_ZERO = /^[+-]?0[0-9_]/;
+  }
+});
+
+// node_modules/smol-toml/dist/extract.js
+function extractValue(ctx, end, integersAsBigInt) {
+  let ptr = ctx.p;
+  let c = ctx.s.charCodeAt(ptr);
+  if (c === 91 || c === 123) {
+    if (!ctx.d--) {
+      throw new TomlError("document contains excessively nested structures. aborting.", {
+        toml: ctx.s,
+        ptr
+      });
+    }
+    let value = c === 91 ? parseArray(ctx, integersAsBigInt) : parseInlineTable(ctx, integersAsBigInt);
+    ctx.d++;
+    return value;
+  }
+  if (c === 34 || c === 39) {
+    return parseString(ctx);
+  }
+  if (c === 116) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 114 || ctx.s.charCodeAt(++ctx.p) !== 117 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      throw new TomlError("invalid value", { toml: ctx.s, ptr });
+    ctx.p++;
+    return true;
+  }
+  if (c === 102) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 97 || ctx.s.charCodeAt(++ctx.p) !== 108 || ctx.s.charCodeAt(++ctx.p) !== 115 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      throw new TomlError("invalid value", { toml: ctx.s, ptr });
+    ctx.p++;
+    return false;
+  }
+  return parseValue(ctx, integersAsBigInt, end);
+}
+var init_extract = __esm({
+  "node_modules/smol-toml/dist/extract.js"() {
+    init_primitive();
+    init_struct();
+    init_error();
+  }
+});
+
+// node_modules/smol-toml/dist/struct.js
+function parseKey(ctx, end = "=") {
+  let start = ctx.p;
+  let dot = start - 1;
+  let parsed = [];
+  let endPtr = ctx.s.indexOf(end, start);
+  if (endPtr < 0) {
+    throw new TomlError("incomplete key-value: cannot find end of key", {
+      toml: ctx.s,
+      ptr: start
+    });
+  }
+  do {
+    let c = ctx.s.charCodeAt(ctx.p = ++dot);
+    if (c !== 32 && c !== 9) {
+      if (c === 34 || c === 39) {
+        if (c === ctx.s.charCodeAt(ctx.p + 1) && c === ctx.s.charCodeAt(ctx.p + 2)) {
+          throw new TomlError("multiline strings are not allowed in keys", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        let part = parseString(ctx);
+        dot = ctx.s.indexOf(".", ctx.p);
+        let strEnd = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
+        let newLine = indexOfNewline(strEnd);
+        if (newLine > -1) {
+          throw new TomlError("newlines are not allowed in keys", {
+            toml: ctx.s,
+            ptr: newLine
+          });
+        }
+        if (strEnd.trimStart()) {
+          throw new TomlError("found extra tokens after the string part", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        if (endPtr < ctx.p) {
+          endPtr = ctx.s.indexOf(end, ctx.p);
+          if (endPtr < 0) {
+            throw new TomlError("incomplete key-value: cannot find end of key", {
+              toml: ctx.s,
+              ptr: start
+            });
+          }
+        }
+        parsed.push(part);
+      } else {
+        dot = ctx.s.indexOf(".", ctx.p);
+        let part = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
+        if (!KEY_PART_RE.test(part)) {
+          throw new TomlError("only letter, numbers, dashes and underscores are allowed in keys", {
+            toml: ctx.s,
+            ptr: ctx.p
+          });
+        }
+        parsed.push(part.trimEnd());
+      }
+    }
+  } while (dot + 1 && dot < endPtr);
+  ctx.p = endPtr + 1;
+  skipVoid(ctx, true, true);
+  return parsed;
+}
+function parseInlineTable(ctx, integersAsBigInt) {
+  let res = {};
+  let seen = /* @__PURE__ */ new Set();
+  let c;
+  ctx.p++;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 125) {
+      ctx.p++;
+      return res;
+    }
+    let k;
+    let t = res;
+    let hasOwn = false;
+    let p = ctx.p;
+    let key = parseKey(ctx);
+    for (let i = 0; i < key.length; i++) {
+      if (i)
+        t = hasOwn ? t[k] : t[k] = {};
+      k = key[i];
+      if ((hasOwn = Object.hasOwn(t, k)) && (typeof t[k] !== "object" || seen.has(t[k]))) {
+        throw new TomlError("trying to redefine an already defined value", {
+          toml: ctx.s,
+          ptr: p
+        });
+      }
+      if (!hasOwn && k === "__proto__") {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+      }
+    }
+    if (hasOwn) {
+      throw new TomlError("trying to redefine an already defined value", {
+        toml: ctx.s,
+        ptr: ctx.p
+      });
+    }
+    let value = extractValue(ctx, 125, integersAsBigInt);
+    seen.add(t[k] = value);
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 125) {
+      return res;
+    }
+    if (c !== 44) {
+      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
+    }
+  }
+  throw new TomlError("unfinished table encountered", {
+    toml: ctx.s,
+    ptr: ctx.p
+  });
+}
+function parseArray(ctx, integersAsBigInt) {
+  let res = [];
+  let c;
+  ctx.p++;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 93) {
+      ctx.p++;
+      return res;
+    }
+    res.push(extractValue(ctx, 93, integersAsBigInt));
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 93) {
+      return res;
+    }
+    if (c !== 44) {
+      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
+    }
+  }
+  throw new TomlError("unfinished array encountered", {
+    toml: ctx.s,
+    ptr: ctx.p
+  });
+}
+var KEY_PART_RE;
+var init_struct = __esm({
+  "node_modules/smol-toml/dist/struct.js"() {
+    init_primitive();
+    init_extract();
+    init_util();
+    init_error();
+    KEY_PART_RE = /^[a-zA-Z0-9-_]+[ \t]*$/;
+  }
+});
+
+// node_modules/smol-toml/dist/parse.js
+function peekTable(key, table, meta, type) {
+  let t = table;
+  let m = meta;
+  let k;
+  let hasOwn = false;
+  let state;
+  for (let i = 0; i < key.length; i++) {
+    if (i) {
+      t = hasOwn ? t[k] : t[k] = {};
+      m = (state = m[k]).c;
+      if (type === 0 && (state.t === 1 || state.t === 2)) {
+        return null;
+      }
+      if (state.t === 2) {
+        let l = t.length - 1;
+        t = t[l];
+        m = m[l].c;
+      }
+    }
+    k = key[i];
+    if ((hasOwn = Object.hasOwn(t, k)) && m[k]?.t === 0 && m[k]?.d) {
+      return null;
+    }
+    if (!hasOwn) {
+      if (k === "__proto__") {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+        Object.defineProperty(m, k, { enumerable: true, configurable: true, writable: true });
+      }
+      m[k] = {
+        t: i < key.length - 1 && type === 2 ? 3 : type,
+        d: false,
+        i: 0,
+        c: {}
+      };
+    }
+  }
+  state = m[k];
+  if (state.t !== type && !(type === 1 && state.t === 3)) {
+    return null;
+  }
+  if (type === 2) {
+    if (!state.d) {
+      state.d = true;
+      t[k] = [];
+    }
+    t[k].push(t = {});
+    state.c[state.i++] = state = { t: 1, d: false, i: 0, c: {} };
+  }
+  if (state.d) {
+    return null;
+  }
+  state.d = true;
+  if (type === 1) {
+    t = hasOwn ? t[k] : t[k] = {};
+  } else if (type === 0 && hasOwn) {
+    return null;
+  }
+  return [k, t, state.c];
+}
+function parse(toml, { maxDepth = 1e3, integersAsBigInt } = {}) {
+  let ctx = { s: toml, p: 0, d: maxDepth };
+  let res = {};
+  let meta = {};
+  let tmp;
+  let tbl = res;
+  let m = meta;
+  skipVoid(ctx);
+  while (ctx.p < toml.length) {
+    if (toml.charCodeAt(ctx.p) === 91) {
+      let isTableArray = toml.charCodeAt(++ctx.p) === 91;
+      tmp = ctx.p += +isTableArray;
+      let k = parseKey(ctx, "]");
+      if (isTableArray) {
+        if (toml.charCodeAt(ctx.p - 1) !== 93) {
+          throw new TomlError("expected end of table declaration", {
+            toml,
+            ptr: ctx.p - 1
+          });
+        }
+        ctx.p++;
+      }
+      let p = peekTable(
+        k,
+        res,
+        meta,
+        isTableArray ? 2 : 1
+        /* Type.EXPLICIT */
+      );
+      if (!p) {
+        throw new TomlError("trying to redefine an already defined table or value", {
+          toml,
+          ptr: tmp
+        });
+      }
+      m = p[2];
+      tbl = p[1];
+    } else {
+      tmp = ctx.p;
+      let k = parseKey(ctx);
+      let p = peekTable(
+        k,
+        tbl,
+        m,
+        0
+        /* Type.DOTTED */
+      );
+      if (!p) {
+        throw new TomlError("trying to redefine an already defined table or value", {
+          toml,
+          ptr: tmp
+        });
+      }
+      p[1][p[0]] = extractValue(ctx, void 0, integersAsBigInt);
+    }
+    skipVoid(ctx, true);
+    if (ctx.p < toml.length && (tmp = toml.charCodeAt(ctx.p)) !== 10 && tmp !== 13) {
+      throw new TomlError("each key-value declaration must be followed by an end-of-line", {
+        toml,
+        ptr: ctx.p
+      });
+    }
+    skipVoid(ctx);
+  }
+  return res;
+}
+var init_parse = __esm({
+  "node_modules/smol-toml/dist/parse.js"() {
+    init_struct();
+    init_extract();
+    init_util();
+    init_error();
+  }
+});
+
+// node_modules/smol-toml/dist/stringify.js
+var init_stringify = __esm({
+  "node_modules/smol-toml/dist/stringify.js"() {
+  }
+});
+
+// node_modules/smol-toml/dist/index.js
+var init_dist = __esm({
+  "node_modules/smol-toml/dist/index.js"() {
+    init_parse();
+    init_stringify();
+    init_date();
+    init_error();
+  }
+});
+
+// node_modules/mthds/dist/usage-stats/project.js
+var init_project = __esm({
+  "node_modules/mthds/dist/usage-stats/project.js"() {
+    init_dist();
+    init_contract();
+  }
+});
+
+// node_modules/mthds/dist/usage-stats/switches.js
+var init_switches = __esm({
+  "node_modules/mthds/dist/usage-stats/switches.js"() {
+    init_contract();
+    init_environment();
+    init_project();
+    init_state();
+  }
+});
+
+// node_modules/mthds/dist/config/config.js
+function isValidBaseUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    return false;
+  if (parsed.pathname !== "/" && parsed.pathname !== "")
+    return false;
+  if (parsed.username || parsed.password)
+    return false;
+  return !parsed.search && !parsed.hash;
+}
+var DEFAULT_BASE_URL, DEFAULTS, KEY_ALIASES, VALID_KEYS;
+var init_config = __esm({
+  "node_modules/mthds/dist/config/config.js"() {
+    init_types();
+    init_dotenv();
+    init_config_file();
+    init_contract();
+    init_environment();
+    init_state();
+    init_switches();
+    DEFAULT_BASE_URL = "https://api.pipelex.com";
+    DEFAULTS = {
+      runner: Runners.PIPELEX,
+      baseUrl: DEFAULT_BASE_URL,
+      apiKey: "",
+      autoUpgrade: false,
+      updateCheck: true
+    };
+    KEY_ALIASES = {
+      runner: "runner",
+      "base-url": "baseUrl",
+      "api-key": "apiKey",
+      telemetry: "telemetry",
+      "auto-upgrade": "autoUpgrade",
+      "update-check": "updateCheck"
+    };
+    VALID_KEYS = Object.keys(KEY_ALIASES);
+  }
+});
+
+// node_modules/mthds/dist/version.js
+var MTHDS_JS_VERSION;
+var init_version = __esm({
+  "node_modules/mthds/dist/version.js"() {
+    MTHDS_JS_VERSION = "0.33.0";
+  }
+});
+
+// node_modules/mthds/dist/runners/api/user-agent.js
+function isToken(value) {
+  return typeof value === "string" && TOKEN_RE.test(value);
+}
+function isValidDetail(detail) {
+  if (typeof detail !== "string")
+    return false;
+  const eq = detail.indexOf("=");
+  if (eq === -1)
+    return isToken(detail);
+  return isToken(detail.slice(0, eq)) && DETAIL_VALUE_RE.test(detail.slice(eq + 1));
+}
+function validateAppInfo(appInfo) {
+  if (appInfo === null || typeof appInfo !== "object") {
+    throw new TypeError("appInfo must be an object with at least a `name`.");
+  }
+  if (!isToken(appInfo.name)) {
+    throw new TypeError(`Invalid appInfo.name ${JSON.stringify(appInfo.name)}: must be a non-empty RFC 9110 token (letters, digits and !#$%&'*+-.^_\`|~ only; no spaces or slashes).`);
+  }
+  if (appInfo.version !== void 0 && appInfo.version !== "" && !isToken(appInfo.version)) {
+    throw new TypeError(`Invalid appInfo.version ${JSON.stringify(appInfo.version)}: must be a non-empty RFC 9110 token (e.g. 1.4.0; no spaces or slashes).`);
+  }
+  if (appInfo.url !== void 0 && appInfo.url !== "") {
+    if (typeof appInfo.url !== "string" || !URL_VISIBLE_ASCII_RE.test(appInfo.url) || URL_COMMENT_BREAKERS_RE.test(appInfo.url)) {
+      throw new TypeError(`Invalid appInfo.url ${JSON.stringify(appInfo.url)}: must be visible ASCII with no whitespace, parentheses, backslash or semicolons.`);
+    }
+  }
+  if (appInfo.details !== void 0) {
+    if (!Array.isArray(appInfo.details)) {
+      throw new TypeError("Invalid appInfo.details: must be an array of strings.");
+    }
+    for (const detail of appInfo.details) {
+      if (!isValidDetail(detail)) {
+        throw new TypeError(`Invalid appInfo.details entry ${JSON.stringify(detail)}: must be a token or token=value, where value is a token or name/version (e.g. \`workshop\`, \`host=claude-code/2.1.4\`).`);
+      }
+    }
+  }
+}
+function renderAppInfo(appInfo) {
+  const product = appInfo.version ? `${appInfo.name}/${appInfo.version}` : appInfo.name;
+  const params = [...appInfo.details ?? []];
+  if (appInfo.url)
+    params.push(`+${appInfo.url}`);
+  return params.length > 0 ? `${product} (${params.join("; ")})` : product;
+}
+function detectRuntime(g = globalThis) {
+  const win = g.window;
+  if (win !== void 0 && win !== null && win.document !== void 0 || typeof g.importScripts === "function") {
+    return { isBrowser: true };
+  }
+  const deno = g.Deno;
+  if (deno?.version?.deno) {
+    return {
+      name: "deno",
+      version: deno.version.deno,
+      os: deno.build?.os,
+      arch: deno.build?.arch,
+      isBrowser: false
+    };
+  }
+  const proc = g.process;
+  const versions = proc?.versions;
+  if (versions?.bun) {
+    return {
+      name: "bun",
+      version: versions.bun,
+      os: proc?.platform,
+      arch: proc?.arch,
+      isBrowser: false
+    };
+  }
+  if (versions?.node) {
+    return {
+      name: "node",
+      version: versions.node,
+      os: proc?.platform,
+      arch: proc?.arch,
+      isBrowser: false
+    };
+  }
+  return { isBrowser: false };
+}
+function buildUserAgent(appInfo, runtime = detectRuntime(), libraryVersion = MTHDS_JS_VERSION) {
+  if (appInfo !== void 0)
+    validateAppInfo(appInfo);
+  const parts = [];
+  if (appInfo !== void 0)
+    parts.push(renderAppInfo(appInfo));
+  parts.push(`${MTHDS_JS_TOKEN_NAME}/${libraryVersion}`);
+  if (!runtime.isBrowser && runtime.name && runtime.version && isToken(runtime.version)) {
+    let token = `${runtime.name}/${runtime.version}`;
+    if (runtime.os && runtime.arch && isToken(runtime.os) && isToken(runtime.arch)) {
+      token += ` (${runtime.os}; ${runtime.arch})`;
+    }
+    parts.push(token);
+  }
+  const header2 = parts.join(" ");
+  if (header2.length > USER_AGENT_MAX_LENGTH) {
+    throw new RangeError(`The User-Agent built from appInfo is ${header2.length} characters; the limit is ${USER_AGENT_MAX_LENGTH}. Shorten appInfo.details or appInfo.url.`);
+  }
+  if (runtime.isBrowser)
+    return void 0;
+  return header2;
+}
+var MTHDS_JS_TOKEN_NAME, USER_AGENT_MAX_LENGTH, TOKEN_RE, DETAIL_VALUE_RE, URL_VISIBLE_ASCII_RE, URL_COMMENT_BREAKERS_RE;
+var init_user_agent = __esm({
+  "node_modules/mthds/dist/runners/api/user-agent.js"() {
+    init_version();
+    MTHDS_JS_TOKEN_NAME = "mthds-js";
+    USER_AGENT_MAX_LENGTH = 512;
+    TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+    DETAIL_VALUE_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+)?$/;
+    URL_VISIBLE_ASCII_RE = /^[!-~]+$/;
+    URL_COMMENT_BREAKERS_RE = /[()\\;]/;
+  }
+});
+
+// node_modules/mthds/dist/method-tree/file-entry-encoding.js
+function utf8TextOf(bytes) {
+  try {
+    return strictUtf8.decode(bytes);
+  } catch {
+    return null;
+  }
+}
+function encodeBase64(bytes) {
+  const chunks = [];
+  let line = "";
+  const full = bytes.length - bytes.length % 3;
+  for (let index = 0; index < full; index += 3) {
+    const triple = bytes[index] << 16 | bytes[index + 1] << 8 | bytes[index + 2];
+    line += BASE64_ALPHABET[triple >> 18 & 63] + BASE64_ALPHABET[triple >> 12 & 63] + BASE64_ALPHABET[triple >> 6 & 63] + BASE64_ALPHABET[triple & 63];
+    if (line.length >= 8192) {
+      chunks.push(line);
+      line = "";
+    }
+  }
+  const rest = bytes.length - full;
+  if (rest === 1) {
+    const value = bytes[full] << 16;
+    line += BASE64_ALPHABET[value >> 18 & 63] + BASE64_ALPHABET[value >> 12 & 63] + "==";
+  } else if (rest === 2) {
+    const value = bytes[full] << 16 | bytes[full + 1] << 8;
+    line += BASE64_ALPHABET[value >> 18 & 63] + BASE64_ALPHABET[value >> 12 & 63] + BASE64_ALPHABET[value >> 6 & 63] + "=";
+  }
+  chunks.push(line);
+  return chunks.join("");
+}
+function inlineFileEntry(bytes) {
+  const text = utf8TextOf(bytes);
+  return text ?? { base64: encodeBase64(bytes) };
+}
+function defineFileEntry(files, treePath, entry) {
+  Object.defineProperty(files, treePath, {
+    value: entry,
+    enumerable: true,
+    writable: true,
+    configurable: true
+  });
+}
+var strictUtf8, BASE64_ALPHABET;
+var init_file_entry_encoding = __esm({
+  "node_modules/mthds/dist/method-tree/file-entry-encoding.js"() {
+    strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+    BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  }
+});
+
+// node_modules/mthds/dist/runners/api/tree-sending.js
+function declaresBlobStore(version) {
+  return version.blob_store === true;
+}
+function announcedTreeLimits(version) {
+  const limits = objectMember(version, "limits");
+  const tree = limits === void 0 ? void 0 : objectMember(limits, "method_tree");
+  if (tree === void 0)
+    return {};
+  const read = (name) => {
+    const value = tree[name];
+    return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : void 0;
+  };
+  return withoutUndefined({
+    maxFiles: read("max_files"),
+    maxFileBytes: read("max_file_bytes"),
+    maxTotalBytes: read("max_total_bytes"),
+    maxInlineBytes: read("max_inline_bytes")
+  });
+}
+function listerLimitsOf(announced) {
+  return withoutUndefined({
+    maxFileCount: announced.maxFiles,
+    maxFileSize: announced.maxFileBytes,
+    maxTotalSize: announced.maxTotalBytes
+  });
+}
+function treeTotalSize(tree) {
+  return tree.files.reduce((total, file) => total + file.size, 0);
+}
+function mightTravelInline(tree, maxBytes) {
+  return treeTotalSize(tree) <= maxBytes;
+}
+function inlineMapBytes(files) {
+  return new TextEncoder().encode(JSON.stringify(files)).length;
+}
+function inlineFilesOf(tree, bytesByPath) {
+  const files = {};
+  for (const file of tree.files) {
+    const bytes = bytesByPath.get(file.path);
+    if (bytes === void 0)
+      throw new Error(`No bytes were read for '${file.path}'.`);
+    defineFileEntry(files, file.path, inlineFileEntry(bytes));
+  }
+  return files;
+}
+function hashMethodFiles(tree) {
+  const files = {};
+  for (const file of tree.files) {
+    defineFileEntry(files, file.path, { sha256: file.sha256, size: file.size });
+  }
+  return files;
+}
+function uniqueBlobs(tree) {
+  const seen = /* @__PURE__ */ new Set();
+  const blobs = [];
+  for (const file of tree.files) {
+    if (seen.has(file.sha256))
+      continue;
+    seen.add(file.sha256);
+    blobs.push({ sha256: file.sha256, size: file.size });
+  }
+  return blobs;
+}
+function fileByBlob(tree) {
+  const files = /* @__PURE__ */ new Map();
+  for (const file of tree.files) {
+    if (!files.has(file.sha256))
+      files.set(file.sha256, file);
+  }
+  return files;
+}
+async function forEachConcurrently(items, limit, task) {
+  const controller = new AbortController();
+  let next = 0;
+  let failure;
+  const worker = async () => {
+    while (failure === void 0 && next < items.length) {
+      const item = items[next];
+      next += 1;
+      try {
+        await task(item, controller.signal);
+      } catch (error) {
+        if (failure === void 0) {
+          failure = { error };
+          controller.abort(error);
+        }
+        return;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  if (failure !== void 0)
+    throw failure.error;
+}
+function objectMember(holder, name) {
+  const value = holder[name];
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+}
+function withoutUndefined(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, member]) => member !== void 0));
+}
+var INLINE_TREE_MAX_BYTES;
+var init_tree_sending = __esm({
+  "node_modules/mthds/dist/runners/api/tree-sending.js"() {
+    init_file_entry_encoding();
+    INLINE_TREE_MAX_BYTES = 256 * 1024;
+  }
+});
+
+// node_modules/mthds/dist/runners/api/client.js
+function runIdOf(body) {
+  if (!isObject(body))
+    return void 0;
+  const runId = body.pipeline_run_id;
+  return typeof runId === "string" && runId !== "" ? runId : void 0;
+}
+function outcomeUnknown(runId) {
+  if (runId === void 0)
+    return buildProblem("client.outcome_unknown", {});
+  return buildProblem("client.outcome_unknown", { pipeline_run_id: runId }, { pipeline_run_id: runId });
+}
+function parseResultBody(text) {
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false };
+  }
+}
+function isRunResultExecute(value) {
+  return isObject(value) && typeof value.pipeline_run_id === "string" && isObject(value.pipe_output);
+}
+function isRunResultStart(value) {
+  return runIdOf(value) !== void 0;
+}
+function isVerdict(value) {
+  if (!isObject(value) || typeof value.is_valid !== "boolean")
+    return false;
+  if (value.is_valid)
+    return true;
+  return Array.isArray(value.errors) && value.errors.every(isProblemItem);
+}
+function isModelDeck(value) {
+  return isObject(value) && Array.isArray(value.models);
+}
+function isVersionInfo(value) {
+  return isObject(value) && typeof value.protocol_version === "string";
+}
+function buildExtensions(extra) {
+  if (!extra)
+    return {};
+  const overlap = Object.keys(extra).filter((key) => RESERVED_REQUEST_KEYS.has(key));
+  if (overlap.length > 0) {
+    throw argumentInvalid("extra", "reserved_arg", `extra carries reserved args [${overlap.sort().join(", ")}] \u2014 pass them as named options instead.`);
+  }
+  return { ...extra };
+}
+function assertRunnable(options, extensions, verb) {
+  if (!options.pipe_code && !hasMethodSource(options) && Object.keys(extensions).length === 0) {
+    throw argumentInvalid("pipe_code", "missing", `Either pipe_code, the method's tree (files or tree) or a server-specific extension arg (extra) must be provided to ${verb}().`);
+  }
+}
+function runRequestBody(options, files, extensions) {
+  return {
+    pipe_code: options.pipe_code ?? void 0,
+    files,
+    inputs: options.inputs ?? void 0,
+    output_name: options.output_name ?? void 0,
+    output_multiplicity: options.output_multiplicity ?? void 0,
+    dynamic_output_concept_ref: options.dynamic_output_concept_ref ?? void 0,
+    ...extensions
+  };
+}
+async function readAll(tree, read) {
+  for (const file of tree.files) {
+    if (!read.has(file.path))
+      read.set(file.path, await tree.readFile(file.path));
+  }
+  return read;
+}
+function inlineLimitError(weight, limit, measured) {
+  return argumentInvalid("tree", "past_inline_limit", `The method's tree cannot be sent: this runner keeps no blob store, so a tree travels inline, and ${measured} ${weight} bytes, more than its inline limit max_inline_bytes of ${limit} bytes.`);
+}
+function isMethodTreeTooLarge(res) {
+  if (res.status !== 422)
+    return false;
+  const reading = parseJsonBody(res.body);
+  if (!reading.ok || !isObject(reading.value))
+    return false;
+  const body = reading.value;
+  if (body.code === PACKAGE_INVALID_CODE) {
+    return isObject(body.params) && typeof body.params.limit === "number";
+  }
+  return body.code === METHOD_TREE_TOO_LARGE_CODE || body.error_type === METHOD_TREE_TOO_LARGE_ERROR_TYPE;
+}
+function missingBlobsOf(res) {
+  const problem = readProblemBody(res.body);
+  if (problem === void 0 || problem.code !== BLOBS_MISSING_CODE)
+    return void 0;
+  return problem.params?.missing_blobs;
+}
+function missingBlobFault(entry) {
+  if (!isObject(entry))
+    return "it is not an object";
+  if (typeof entry.sha256 !== "string" || !SHA256_HEX.test(entry.sha256)) {
+    return "its sha256 is not 64 lowercase hexadecimal digits";
+  }
+  if (typeof entry.size !== "number" || !Number.isSafeInteger(entry.size) || entry.size < 0) {
+    return "its size is not a non-negative integer";
+  }
+  const upload = entry.upload;
+  if (!isObject(upload))
+    return "it has no upload object";
+  if (typeof upload.method !== "string" || upload.method.length === 0) {
+    return "its upload.method is not a method name";
+  }
+  if (typeof upload.url !== "string" || !URL.canParse(upload.url)) {
+    return "its upload.url is not a URL";
+  }
+  const headers = upload.headers;
+  if (!isObject(headers) || Object.values(headers).some((value) => typeof value !== "string")) {
+    return "its upload.headers is not an object of strings";
+  }
+  return null;
+}
+function nonEmptyString(value) {
+  return value != null && value.length > 0 ? value : void 0;
+}
+function crateRequestTimeoutMs(request) {
+  return nonEmptyString(request.method_ref) !== void 0 ? METHOD_REF_FETCH_TIMEOUT_MS : POLL_REQUEST_TIMEOUT_MS;
+}
+function withValidateMarkdownRender(render) {
+  const formats = new Set(render ?? []);
+  formats.add(VALIDATE_MARKDOWN_RENDER_FORMAT);
+  return [...formats];
+}
+var DEFAULT_API_BASE_URL, API_PREFIX, SENDABLE_API_KEY, DEFAULT_REQUEST_TIMEOUT_MS, POLL_REQUEST_TIMEOUT_MS, METHOD_REF_FETCH_TIMEOUT_MS, VALIDATE_MARKDOWN_RENDER_FORMAT, BLOB_UPLOAD_TIMEOUT_MS, BLOB_UPLOAD_CONCURRENCY, SHA256_HEX, HANDSHAKE_TTL_MS, PACKAGE_INVALID_CODE, BLOBS_MISSING_CODE, METHOD_TREE_TOO_LARGE_CODE, METHOD_TREE_TOO_LARGE_ERROR_TYPE, MthdsApiClient, RESERVED_REQUEST_KEYS;
+var init_client = __esm({
+  "node_modules/mthds/dist/runners/api/client.js"() {
+    init_types();
+    init_exceptions2();
+    init_exceptions();
+    init_errors();
+    init_build();
+    init_read();
+    init_transport();
+    init_config();
+    init_options();
+    init_user_agent();
+    init_tree_sending();
+    DEFAULT_API_BASE_URL = "https://api.pipelex.com";
+    API_PREFIX = "v1";
+    SENDABLE_API_KEY = /^[!-~]+$/;
+    DEFAULT_REQUEST_TIMEOUT_MS = 12e5;
+    POLL_REQUEST_TIMEOUT_MS = 3e4;
+    METHOD_REF_FETCH_TIMEOUT_MS = 18e4;
+    VALIDATE_MARKDOWN_RENDER_FORMAT = "markdown";
+    BLOB_UPLOAD_TIMEOUT_MS = 3e5;
+    BLOB_UPLOAD_CONCURRENCY = 4;
+    SHA256_HEX = /^[0-9a-f]{64}$/;
+    HANDSHAKE_TTL_MS = 5 * 6e4;
+    PACKAGE_INVALID_CODE = "method.package_invalid";
+    BLOBS_MISSING_CODE = "request.blobs_missing";
+    METHOD_TREE_TOO_LARGE_CODE = "method_tree_too_large";
+    METHOD_TREE_TOO_LARGE_ERROR_TYPE = "MethodTreeTooLarge";
+    MthdsApiClient = class {
+      type = Runners.API;
+      apiKey;
+      baseUrl;
+      /** Origin root derived from the base URL — `/health` lives here, not under `/v1`. */
+      originUrl;
+      /**
+       * `User-Agent` value computed once at construction; `undefined` in a browser,
+       * where the header must not be set.
+       */
+      userAgent;
+      /** The runner's handshake and when it was asked, kept for `HANDSHAKE_TTL_MS`. */
+      handshakeCache;
+      constructor(options = {}) {
+        this.userAgent = buildUserAgent(options.appInfo);
+        this.apiKey = options.apiKey ?? process.env.MTHDS_API_KEY;
+        if (this.apiKey && !SENDABLE_API_KEY.test(this.apiKey)) {
+          throw problemError("client.not_configured", { setting: "api_key" }, {
+            message: "The API key holds a character an HTTP header cannot carry, such as a line break or a space at its end. Set it to the key alone."
+          });
+        }
+        const normalizedBaseUrl = (options.baseUrl ?? process.env.MTHDS_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+        if (!isValidBaseUrl(normalizedBaseUrl)) {
+          throw problemError("client.not_configured", { setting: "base_url" }, {
+            message: `Invalid API base URL "${normalizedBaseUrl}": must be host-only (http/https, no path, query, fragment, or credentials). Endpoints compose as {base}/v1/{endpoint}.`
+          });
+        }
+        this.baseUrl = normalizedBaseUrl;
+        this.originUrl = new URL("/", this.baseUrl).origin;
+      }
+      // ── Routes ─────────────────────────────────────────────────────────
+      /** A route under `<base>/v1/`. */
+      route(method, endpoint, timeoutMs, createsRun = false) {
+        const path = `/${API_PREFIX}/${endpoint.replace(/^\/+/, "")}`;
+        return {
+          method,
+          url: `${this.baseUrl}${path}`,
+          name: `${method} ${path}`,
+          createsRun,
+          timeoutMs
+        };
+      }
+      // ── Transport ──────────────────────────────────────────────────────
+      /**
+       * The request's headers, the API key among them, which the constructor checked. This is the one
+       * place request headers are built, so no request path can miss the `User-Agent` (spec:
+       * client-identification, "Client obligations").
+       */
+      buildHeaders(hasBody) {
+        const headers = { Accept: "application/json" };
+        if (this.userAgent !== void 0) {
+          headers["User-Agent"] = this.userAgent;
+        }
+        if (this.apiKey) {
+          headers["Authorization"] = `Bearer ${this.apiKey}`;
+        }
+        if (hasBody) {
+          headers["Content-Type"] = "application/json";
+        }
+        return headers;
+      }
+      /**
+       * Send one request and return what came back, its body read whole, within the route's time
+       * limit. A call that gets no answer throws an `ApiTransportError` (see `transportProblem`).
+       * Reading the answer is the caller's. On a route that creates a run, a redirect is not followed
+       * but returned as the answer, which reads as `client.response_unreadable` naming its status.
+       */
+      async send(route, options = {}) {
+        const hasBody = options.body !== void 0;
+        let payload;
+        if (hasBody) {
+          try {
+            payload = JSON.stringify(options.body);
+          } catch (cause) {
+            throw problemError("client.argument_invalid", { argument: "body", reason: "not_json" }, { message: `The request body of ${route.name} cannot be written as JSON.`, cause });
+          }
+        }
+        const headers = this.buildHeaders(hasBody);
+        const controller = new AbortController();
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort(new DOMException("Request timed out.", "TimeoutError"));
+        }, route.timeoutMs);
+        try {
+          const response = await fetch(route.url, {
+            method: route.method,
+            headers,
+            body: payload,
+            // A request that creates a run is never sent twice, so a redirect is an answer to read
+            // rather than a second request to make: following it would send the request again, and a
+            // failure to reach the redirect's target would read as a runtime never reached although
+            // the request had reached one.
+            redirect: route.createsRun ? "manual" : "follow",
+            signal: controller.signal
+          });
+          const body = await response.text();
+          return {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            body
+          };
+        } catch (err) {
+          controller.abort();
+          throw new ApiTransportError(this.transportProblem(route, err, timedOut), { apiUrl: this.baseUrl, networkCode: networkErrorCode(err) }, { cause: err });
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      /**
+       * The problem of a call that got no answer, once its request may have left:
+       *
+       * - on a route that creates a run, every failure but one that proves nothing was sent leaves
+       *   the outcome unknown (`client.outcome_unknown`): the connection lost, or the client's time
+       *   limit;
+       * - on any other route, the client's time limit is `client.timeout`, and a lost or refused
+       *   connection is `client.unreachable`;
+       * - a failure of the connection's set-up, which proves nothing was sent, is
+       *   `client.unreachable` on every route.
+       */
+      transportProblem(route, err, timedOut) {
+        const unreachable = () => buildProblem("client.unreachable", { base_url: this.baseUrl });
+        if (!timedOut && provesNothingSent2(err))
+          return unreachable();
+        if (route.createsRun)
+          return buildProblem("client.outcome_unknown", {});
+        if (timedOut)
+          return buildProblem("client.timeout", { seconds: route.timeoutMs / 1e3 });
+        return unreachable();
+      }
+      // ── Reading answers ─────────────────────────────────────────────────
+      answerFacts(route, res, bodyIsProblem) {
+        const requestIdHeader = res.headers.get("x-request-id")?.trim();
+        return {
+          apiUrl: this.baseUrl,
+          route: route.name,
+          status: res.status,
+          statusText: res.statusText,
+          responseBody: res.body,
+          requestIdHeader: requestIdHeader ? requestIdHeader : void 0,
+          bodyIsProblem,
+          withholdBody: route.withholdsBody
+        };
+      }
+      /**
+       * The route's result, when the answer is a `2xx` whose body is JSON of the route's shape;
+       * otherwise the answer read as its problem, thrown as an `ApiResponseError`. A `2xx` that is not
+       * the route's result reads as `client.response_unreadable`, except on a route that creates a run,
+       * where the runtime accepted the request and the run may exist: there it reads as
+       * `client.outcome_unknown`, naming the run whenever the body names one.
+       */
+      readResult(route, res, isResult) {
+        if (res.status < 200 || res.status >= 300)
+          throw this.refusal(route, res);
+        const reading = parseResultBody(res.body);
+        if (!reading.ok || !isResult(reading.value)) {
+          const problem = route.createsRun ? outcomeUnknown(reading.ok ? runIdOf(reading.value) : void 0) : unreadableAnswer(res.status);
+          throw new ApiResponseError2(problem, this.answerFacts(route, res, false));
+        }
+        return reading.value;
+      }
+      /** An answer outside `2xx`, read as its problem (`readAnswer`). */
+      refusal(route, res) {
+        const { problem, fromBody } = readAnswer(res, { createsRun: route.createsRun });
+        return new ApiResponseError2(problem, this.answerFacts(route, res, fromBody));
+      }
+      /**
+       * The protocol's optional `202` degrade of a blocking execute: the runner accepted the run and
+       * will not hold the connection, so the client stops following a run that has started
+       * (`client.follow_failed`, naming it). A `202` that does not name its run leaves the outcome
+       * unknown (`client.outcome_unknown`); its body is no problem document, so the error quotes its
+       * start (`answerExcerpt`), as `readResult` quotes a success that is not the route's result.
+       */
+      acceptedAsynchronously(route, res) {
+        const reading = parseResultBody(res.body);
+        const runId = reading.ok ? runIdOf(reading.value) : void 0;
+        if (runId === void 0) {
+          return new ApiResponseError2(outcomeUnknown(void 0), this.answerFacts(route, res, false));
+        }
+        const facts = this.answerFacts(route, res);
+        return new RunStillRunningError2(buildProblem("client.follow_failed", { pipeline_run_id: runId }, { pipeline_run_id: runId }), {
+          ...facts,
+          runId,
+          retryAfterSeconds: retryAfterSeconds(res.headers),
+          location: res.headers.get("location") ?? void 0
+        });
+      }
+      // ── Health ────────────────────────────────────────────────────────
+      /** The runtime's health — `GET /health`, at the origin and not under `/v1`. */
+      async health() {
+        const route = {
+          method: "GET",
+          url: `${this.originUrl}/health`,
+          name: "GET /health",
+          createsRun: false,
+          timeoutMs: POLL_REQUEST_TIMEOUT_MS
+        };
+        return this.readResult(route, await this.send(route), isObject);
+      }
+      // ── Protocol surface ─────────────────────────────────────────────────
+      /**
+       * Execute a method synchronously and wait for its completion —
+       * `POST /v1/execute`.
+       *
+       * The method travels as `files`, the map sent as given, or as `tree`, which the
+       * client sends inline or by hash (see `prepareMethodFiles`). Sent by hash, a
+       * `422` coded `request.blobs_missing` is answered by uploading the blobs it lists and resending
+       * once.
+       *
+       * A request that creates a run: a connection lost or a time limit reached once it left throws
+       * an `ApiTransportError` of `client.outcome_unknown`, which no caller repeats automatically. A
+       * `202` throws `RunStillRunningError` (`client.follow_failed`).
+       */
+      async execute(options) {
+        const extensions = buildExtensions(options.extra);
+        assertOneMethodSource(options);
+        assertRunnable(options, extensions, "execute");
+        const route = this.route("POST", "execute", DEFAULT_REQUEST_TIMEOUT_MS, true);
+        const res = await this.postMethodRequest(route, options, (files) => runRequestBody(options, files, extensions));
+        if (res.status === 202)
+          throw this.acceptedAsynchronously(route, res);
+        return this.readResult(route, res, isRunResultExecute);
+      }
+      /**
+       * Start a method asynchronously — `POST /v1/start` (202, no output yet).
+       *
+       * The method travels as `execute` sends it. Server-specific extension args ride
+       * `options.extra` and merge into the request body — the server you call defines
+       * and handles them (including a client-supplied run id where a server supports
+       * one). The returned `pipeline_run_id` is always authoritative. How completion is
+       * later delivered (durable polling, callbacks) is implementation-defined and
+       * outside this client — the durable run-lifecycle lives in `@pipelex/sdk`. A request that
+       * creates a run, so an answer lost once it left is `client.outcome_unknown`.
+       */
+      async start(options) {
+        const extensions = buildExtensions(options.extra);
+        assertOneMethodSource(options);
+        assertRunnable(options, extensions, "start");
+        const route = this.route("POST", "start", POLL_REQUEST_TIMEOUT_MS, true);
+        const res = await this.postMethodRequest(route, options, (files) => runRequestBody(options, files, extensions));
+        return this.readResult(route, res, isRunResultStart);
+      }
+      /**
+       * Parse, validate, and dry-run a method — `POST /v1/validate`.
+       *
+       * The method travels as its whole tree: `{ files }`, the map sent as given, or
+       * `{ tree }`, which the client sends inline or by hash as it does for a run. The
+       * runner judges every bundle and every file a bundle names, and attributes each
+       * fault to its file by tree path (the item's `location.file`).
+       *
+       * `/validate` is a diagnostic endpoint: every produced verdict rides a **200**,
+       * discriminated on `is_valid`. This returns the protocol's `ValidationResult` union verbatim —
+       * `is_valid: true` ⇒ a `ValidationReport`, `is_valid: false` ⇒ an `InvalidValidationReport`,
+       * whose `errors` are problem items. An invalid method is NOT thrown — the caller
+       * pattern-matches `is_valid`. Only a *no-verdict* condition (a malformed request, a tree the
+       * runner refuses, auth, a server fault) is non-2xx and surfaces as `ApiResponseError`.
+       *
+       * `render` is the Pipelex-API presentation hint — a list of view-format tokens.
+       * This client always asks for Markdown so both valid results and produced
+       * validation-error verdicts carry `rendered_markdown`; callers may add more
+       * tokens. Unknown tokens are server-side lenient-ignored (never a 422).
+       */
+      async validate(source, allowSignatures = false, render) {
+        assertOneMethodSource(source);
+        if (!hasMethodSource(source)) {
+          throw argumentInvalid("files", "missing", "validate() needs the method's tree, as files or tree.");
+        }
+        const route = this.route("POST", "validate", DEFAULT_REQUEST_TIMEOUT_MS);
+        const res = await this.postMethodRequest(route, source, (files) => ({
+          files,
+          allow_signatures: allowSignatures,
+          render: withValidateMarkdownRender(render)
+        }));
+        return this.readResult(route, res, isVerdict);
+      }
+      /** The model deck the runner can route to — `GET /v1/models[?type=]`. */
+      async models(category) {
+        const endpoint = category ? `models?type=${encodeURIComponent(category)}` : "models";
+        const route = this.route("GET", endpoint, POLL_REQUEST_TIMEOUT_MS);
+        return this.readResult(route, await this.send(route), isModelDeck);
+      }
+      /**
+       * Protocol + implementation versions — `GET /v1/version` (always public).
+       * The handshake for feature detection (hosted extensions or not).
+       */
+      async version() {
+        const route = this.route("GET", "version", POLL_REQUEST_TIMEOUT_MS);
+        return this.readResult(route, await this.send(route), isVersionInfo);
+      }
+      // ── Sending a method tree ─────────────────────────────────────────
+      /**
+       * The limits this runner announces for a tree, as `listMethodTree` takes them,
+       * so a lister stops at the first breach before it hashes anything: the hosted
+       * platform's `limits.method_tree` member of `GET /v1/version`. Empty when the
+       * runner announces none; no limit is ever assumed.
+       */
+      async methodTreeLimits() {
+        return listerLimitsOf(announcedTreeLimits(await this.handshake()));
+      }
+      /**
+       * The `files` map to send for a tree, after uploading what the runner lacks. The
+       * whole tree travels inline when the runner keeps no blob store, or when its
+       * inline map, serialized as JSON in UTF-8, weighs 256 KiB or less
+       * (`INLINE_TREE_MAX_BYTES`) and no more than the inline limit the runner
+       * announces; otherwise every file travels by hash, after
+       * `POST /v1/blobs/missing` with the tree's digest and the upload of each blob it
+       * names. `execute`, `start`, `validate` and `pipeIo` call it for a `tree`; a
+       * caller building its own request calls it directly.
+       */
+      async prepareMethodFiles(tree) {
+        assertOneMethodSource({ tree });
+        const prepared = await this.prepareTree(tree, /* @__PURE__ */ new Map());
+        return prepared.files;
+      }
+      /**
+       * Which of these blobs the runner lacks, and where to upload each —
+       * `POST /v1/blobs/missing`, the protocol's optional route, served by a runner
+       * whose `GET /v1/version` declares `blob_store: true`. A blob the runner holds is
+       * left out, and an empty `missing` means there is nothing to upload. An answer that is not a
+       * success throws an `ApiResponseError`; a success whose body is not shaped as the protocol says
+       * throws a `MalformedBlobsAnswerError`, which never quotes the body, since its upload URLs are
+       * bearer capabilities.
+       */
+      async findMissingBlobs(request) {
+        const route = {
+          ...this.route("POST", "blobs/missing", POLL_REQUEST_TIMEOUT_MS),
+          withholdsBody: true
+        };
+        const res = await this.send(route, { body: request });
+        if (res.status < 200 || res.status >= 300)
+          throw this.refusal(route, res);
+        const reading = parseResultBody(res.body);
+        if (!reading.ok) {
+          throw new MalformedBlobsAnswerError("POST /v1/blobs/missing answered a body that is not JSON.", res.status);
+        }
+        const parsed = reading.value;
+        const missing = isObject(parsed) ? parsed.missing : void 0;
+        if (!Array.isArray(missing)) {
+          throw new MalformedBlobsAnswerError("POST /v1/blobs/missing answered without a `missing` list, which the protocol requires.", res.status);
+        }
+        missing.forEach((entry, index) => {
+          const fault2 = missingBlobFault(entry);
+          if (fault2 !== null) {
+            const sha256 = isObject(entry) && typeof entry.sha256 === "string" ? entry.sha256 : "";
+            const wellFormed = SHA256_HEX.test(sha256) ? sha256 : void 0;
+            const named = wellFormed === void 0 ? "" : ` (blob ${wellFormed})`;
+            throw new MalformedBlobsAnswerError(`POST /v1/blobs/missing answered a malformed entry at missing[${index}]${named}: ${fault2}.`, res.status, index, wellFormed);
+          }
+        });
+        return parsed;
+      }
+      /**
+       * Upload one blob's bytes to the target `findMissingBlobs` named: its bytes as the
+       * whole body of a request with the target's method to its URL, carrying exactly
+       * its headers. No credential is sent: the target authorizes the upload itself, by
+       * a signed URL. The `User-Agent` is added only when the target is this runner's
+       * own origin, since a third party's object store is not the API. A `412` means
+       * the bytes are already held and counts as uploaded. Throws `BlobUploadError`,
+       * which never carries the target URL, a bearer capability.
+       */
+      async uploadBlob(blob, bytes, options = {}) {
+        const { sha256, upload } = blob;
+        let target;
+        try {
+          target = new URL(upload.url);
+        } catch {
+          throw new BlobUploadError(`The upload target of blob ${sha256} is not a URL.`, sha256, void 0, "");
+        }
+        const headers = { ...upload.headers };
+        const namesUserAgent = Object.keys(headers).some((name) => name.toLowerCase() === "user-agent");
+        if (this.userAgent !== void 0 && target.origin === this.originUrl && !namesUserAgent) {
+          headers["User-Agent"] = this.userAgent;
+        }
+        const controller = new AbortController();
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort(new DOMException("Upload timed out.", "TimeoutError"));
+        }, BLOB_UPLOAD_TIMEOUT_MS);
+        const callerSignal = options.signal;
+        const onCallerAbort = () => controller.abort(callerSignal?.reason);
+        if (callerSignal?.aborted === true)
+          controller.abort(callerSignal.reason);
+        else
+          callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+        let response;
+        try {
+          response = await fetch(upload.url, {
+            method: upload.method,
+            headers,
+            body: bytes,
+            signal: controller.signal
+          });
+          await response.arrayBuffer().catch(() => void 0);
+        } catch (err) {
+          const code = callerSignal?.aborted === true ? "stopped" : timedOut ? "ABORT_TIMEOUT" : networkErrorCode(err) ?? "network error";
+          throw new BlobUploadError(`Could not upload blob ${sha256} to ${target.host} (${code}).`, sha256, void 0, target.host);
+        } finally {
+          clearTimeout(timer);
+          callerSignal?.removeEventListener("abort", onCallerAbort);
+        }
+        if (response.ok || response.status === 412)
+          return;
+        throw new BlobUploadError(`Uploading blob ${sha256} to ${target.host} failed (${response.status} ${response.statusText}).`.trimEnd(), sha256, response.status, target.host);
+      }
+      /**
+       * The runner's handshake, asked once per `HANDSHAKE_TTL_MS`; a failed ask is not
+       * kept, so the next call asks again.
+       */
+      handshake() {
+        const now = Date.now();
+        const cached = this.handshakeCache;
+        if (cached !== void 0 && now - cached.askedAt < HANDSHAKE_TTL_MS)
+          return cached.promise;
+        const promise = this.version().catch((err) => {
+          if (this.handshakeCache?.promise === promise)
+            this.handshakeCache = void 0;
+          throw err;
+        });
+        this.handshakeCache = { promise, askedAt: now };
+        return promise;
+      }
+      /** Drop the kept handshake, which a refusal has shown to be stale. */
+      forgetHandshake() {
+        this.handshakeCache = void 0;
+      }
+      /**
+       * Post a request carrying a method: prepare its `files` (a `tree` sent inline or by
+       * hash, a `files` map as given), post it, and answer a `422` coded `request.blobs_missing`
+       * (see `postWithBlobRetry`). When a run, a validation or a pipe I/O read refuses a
+       * tree the client prepared as past one of the runner's limits (`isMethodTreeTooLarge`), the
+       * limits the handshake announced may be stale, so the client asks the handshake again, prepares
+       * the tree as the fresh limits say and sends it once more: a `422` created nothing, so the
+       * second request is no repeat of one whose outcome is unknown.
+       */
+      async postMethodRequest(route, method, body) {
+        const read = /* @__PURE__ */ new Map();
+        const send = async () => {
+          const prepared = await this.prepareRequestFiles(method, read);
+          return this.postWithBlobRetry(route, body(prepared.files), prepared, read);
+        };
+        const res = await send();
+        if (method.tree == null || !isMethodTreeTooLarge(res))
+          return res;
+        this.forgetHandshake();
+        return send();
+      }
+      /** The `files` a request carries: `tree` prepared, `files` as given, or none. */
+      async prepareRequestFiles(options, read) {
+        if (options.tree != null)
+          return this.prepareTree(options.tree, read);
+        return { files: options.files ?? void 0, byHashTree: void 0 };
+      }
+      /**
+       * Choose how a tree travels, upload what it needs, and give the map to send. A file
+       * is read at most once per request: what was read to weigh the inline map is what an
+       * upload sends. When `/blobs/missing` answers `404`, the handshake that declared a
+       * blob store is stale, so it is asked again and the tree prepared once more.
+       */
+      async prepareTree(tree, read, retried = false) {
+        const version = await this.handshake();
+        const { maxInlineBytes } = announcedTreeLimits(version);
+        if (!declaresBlobStore(version)) {
+          return { files: await this.inlineWithin(tree, read, maxInlineBytes), byHashTree: void 0 };
+        }
+        const inlineLimit = Math.min(INLINE_TREE_MAX_BYTES, maxInlineBytes ?? Infinity);
+        if (mightTravelInline(tree, inlineLimit)) {
+          const inline = inlineFilesOf(tree, await readAll(tree, read));
+          if (inlineMapBytes(inline) <= inlineLimit) {
+            return { files: inline, byHashTree: void 0 };
+          }
+        }
+        let answer;
+        try {
+          answer = await this.findMissingBlobs({ digest: tree.digest, blobs: uniqueBlobs(tree) });
+        } catch (err) {
+          if (!retried && err instanceof ApiResponseError2 && err.status === 404) {
+            this.forgetHandshake();
+            return this.prepareTree(tree, read, true);
+          }
+          throw err;
+        }
+        await this.uploadMissing(tree, answer.missing, read);
+        return { files: hashMethodFiles(tree), byHashTree: tree };
+      }
+      /**
+       * The whole tree inline, for a runner with no blob store, held to the inline limit it
+       * announces: its raw sizes are checked before anything is read, since the map weighs
+       * at least that much, then the encoded map, so a tree the runner would refuse is
+       * refused here, naming the limit, without being sent.
+       */
+      async inlineWithin(tree, read, maxInlineBytes) {
+        if (maxInlineBytes !== void 0 && treeTotalSize(tree) > maxInlineBytes) {
+          throw inlineLimitError(treeTotalSize(tree), maxInlineBytes, "its files alone weigh");
+        }
+        const inline = inlineFilesOf(tree, await readAll(tree, read));
+        if (maxInlineBytes !== void 0) {
+          const weight = inlineMapBytes(inline);
+          if (weight > maxInlineBytes) {
+            throw inlineLimitError(weight, maxInlineBytes, "its inline map weighs");
+          }
+        }
+        return inline;
+      }
+      /**
+       * Upload each missing blob from the tree's bytes, a few at a time, stopping at the
+       * first failure. A blob the tree does not hold is refused before anything is sent.
+       */
+      async uploadMissing(tree, missing, read) {
+        const byBlob = fileByBlob(tree);
+        const stranger = missing.find((blob) => !byBlob.has(blob.sha256));
+        if (stranger !== void 0) {
+          throw new PipelineRequestError(`The runner asked for blob ${stranger.sha256}, which is not a file of the tree being sent.`);
+        }
+        await forEachConcurrently(missing, BLOB_UPLOAD_CONCURRENCY, async (blob, signal) => {
+          const file = byBlob.get(blob.sha256);
+          const bytes = read.get(file.path) ?? await tree.readFile(file.path);
+          await this.uploadBlob(blob, bytes, { signal });
+        });
+      }
+      /**
+       * Post a request whose method may have travelled by hash. When it did and the
+       * runner answers a `422` coded `request.blobs_missing` whose `params.missing_blobs` the tree
+       * holds, such as a blob dropped since the check, the client asks where to upload them, uploads
+       * them and sends the same request once more, which the refusal left uncreated.
+       */
+      async postWithBlobRetry(route, body, prepared, read) {
+        const res = await this.send(route, { body });
+        const byHashTree = prepared.byHashTree;
+        if (res.status !== 422 || byHashTree === void 0)
+          return res;
+        const missing = missingBlobsOf(res);
+        if (missing === void 0 || missing.length === 0)
+          return res;
+        const byBlob = fileByBlob(byHashTree);
+        const files = missing.map((sha256) => byBlob.get(sha256));
+        if (files.some((file) => file === void 0))
+          return res;
+        const answer = await this.findMissingBlobs({
+          blobs: files.map((file) => ({ sha256: file.sha256, size: file.size }))
+        });
+        await this.uploadMissing(byHashTree, answer.missing, read);
+        return this.send(route, { body });
+      }
+      // ── Pipe I/O (Pipelex API extension — `POST /v1/pipe-io`) ─────────
+      /**
+       * Read a method's three I/O artifacts — `POST /v1/pipe-io`.
+       *
+       * Resolves the method through the server's static core, selects a pipe, and
+       * returns its pipe I/O contracts, input form and output form (the MTHDS standard's
+       * artifacts, typed from `mthds/protocol`) beside the resolved `pipe_ref`, the
+       * method's own `default_pipe_ref` and the runnability facts. It runs no dry run, so
+       * it costs one load and one derivation where `validate` dry-runs every pipe.
+       *
+       * The method travels as `validate` sends it: `files`, the map posted as given, or
+       * `tree`, which the client sends inline or by hash (see `prepareMethodFiles`), the
+       * two refused together, as is an empty tree, before anything is sent. A tree sent
+       * by hash and refused with a `422` coded `request.blobs_missing` is uploaded and resent
+       * once, and a tree refused as too large is prepared again on a fresh handshake and
+       * resent once. A `method_ref` or a `method_id` is posted as given.
+       *
+       * Returns a **200 verdict**: pattern-match `is_valid` before reading the arm. A
+       * method that does not load comes back as `is_valid: false` with its `errors`, problem items,
+       * never as a throw. Only a no-verdict condition throws an `ApiResponseError`: a malformed
+       * selector, a tree the runner refuses and a refused pipe selection are `422`s (a selection
+       * refusal is coded by one of `PIPE_SELECTION_CODES`), a registry-form `method_ref` is a `501`,
+       * and an artifact that cannot be derived is a `500`.
+       *
+       * The selector XOR between the tree, `method_ref` and `method_id` is the server's
+       * to enforce. A `method_ref` gets the fetch-sized budget; every other request gets
+       * the static-route one.
+       */
+      async pipeIo(request) {
+        const { files, tree, ...rest } = request;
+        const route = this.route("POST", "pipe-io", crateRequestTimeoutMs(request));
+        let res;
+        if (files == null && tree == null) {
+          res = await this.send(route, { body: rest });
+        } else {
+          assertOneMethodSource({ files, tree });
+          res = await this.postMethodRequest(route, { files, tree }, (prepared) => ({
+            files: prepared,
+            ...rest
+          }));
+        }
+        return this.readResult(route, res, isVerdict);
+      }
+    };
+    RESERVED_REQUEST_KEYS = /* @__PURE__ */ new Set([
+      "pipe_code",
+      "files",
+      "inputs",
+      "output_name",
+      "output_multiplicity",
+      "dynamic_output_concept_ref",
+      "tree",
+      "bundleMain"
+    ]);
+  }
+});
+
+// node_modules/mthds/dist/method-tree/membership.js
+function entryKindOf(entry) {
+  if (entry.isSymbolicLink())
+    return "symlink";
+  if (entry.isFile())
+    return "file";
+  if (entry.isDirectory())
+    return "directory";
+  return "other";
+}
+function isDotSegment(name) {
+  return name.startsWith(".");
+}
+function isDefaultExcludedDirectory(name) {
+  return DEFAULT_EXCLUDED_DIRECTORY_NAMES.has(name);
+}
+function isRunInputsFile(name, kind) {
+  return RUN_INPUTS_NAMES.has(name) && (kind === "file" || kind === "symlink");
+}
+function markerRule(name, kind, belowRoot) {
+  if (name === VENV_MARKER_NAME && (kind === "file" || kind === "symlink")) {
+    return "virtual_environment";
+  }
+  if (!belowRoot)
+    return null;
+  if (name === GIT_ENTRY_NAME)
+    return "nested_repository";
+  if (name === MANIFEST_NAME && kind === "file")
+    return "nested_package";
+  return null;
+}
+function isMarkerRule(rule) {
+  return MARKER_RULES.includes(rule);
+}
+function isExcludedName(treePath) {
+  const segments = treePath.split("/");
+  const name = segments[segments.length - 1];
+  if (segments.some(isDotSegment))
+    return true;
+  if (segments.slice(0, -1).some(isDefaultExcludedDirectory))
+    return true;
+  if (isRunInputsFile(name, "file"))
+    return true;
+  return markerRule(name, "file", segments.length > 1) !== null;
+}
+function isValidExcludePattern(pattern) {
+  return !/[\n\r]/.test(pattern);
+}
+var MANIFEST_NAME, GIT_ENTRY_NAME, VENV_MARKER_NAME, GITIGNORE_NAME, DEFAULT_EXCLUDED_DIRECTORY_NAMES, RUN_INPUTS_NAMES, MARKER_RULES;
+var init_membership = __esm({
+  "node_modules/mthds/dist/method-tree/membership.js"() {
+    MANIFEST_NAME = "METHODS.toml";
+    GIT_ENTRY_NAME = ".git";
+    VENV_MARKER_NAME = "pyvenv.cfg";
+    GITIGNORE_NAME = ".gitignore";
+    DEFAULT_EXCLUDED_DIRECTORY_NAMES = /* @__PURE__ */ new Set([
+      "__pycache__",
+      "node_modules"
+    ]);
+    RUN_INPUTS_NAMES = /* @__PURE__ */ new Set(["inputs.json", "inputs.toml"]);
+    MARKER_RULES = [
+      "virtual_environment",
+      "nested_repository",
+      "nested_package"
+    ];
+  }
+});
+
+// node_modules/mthds/dist/method-tree/discovery.js
+import { lstatSync, readdirSync } from "node:fs";
+import { dirname, join as join2 } from "node:path";
+function exactEntryKind(directory, name) {
+  let stats;
+  try {
+    stats = lstatSync(join2(directory, name));
+  } catch {
+    return null;
+  }
+  try {
+    if (!readdirSync(directory).includes(name))
+      return null;
+  } catch {
+  }
+  return entryKindOf(stats);
+}
+function findManifestDirectory(startDirectory) {
+  let current = startDirectory;
+  for (; ; ) {
+    if (exactEntryKind(current, MANIFEST_NAME) === "file")
+      return current;
+    if (exactEntryKind(current, GIT_ENTRY_NAME) !== null)
+      return null;
+    const parent = dirname(current);
+    if (parent === current)
+      return null;
+    current = parent;
+  }
+}
+var init_discovery = __esm({
+  "node_modules/mthds/dist/method-tree/discovery.js"() {
+    init_membership();
+  }
+});
+
+// node_modules/mthds/dist/method-tree/case-folding-table.js
+var CASE_FOLDING_UNICODE_VERSION, FULL_CASE_FOLDING;
+var init_case_folding_table = __esm({
+  "node_modules/mthds/dist/method-tree/case-folding-table.js"() {
+    CASE_FOLDING_UNICODE_VERSION = "17.0.0";
+    FULL_CASE_FOLDING = [
+      [65, 97],
+      [66, 98],
+      [67, 99],
+      [68, 100],
+      [69, 101],
+      [70, 102],
+      [71, 103],
+      [72, 104],
+      [73, 105],
+      [74, 106],
+      [75, 107],
+      [76, 108],
+      [77, 109],
+      [78, 110],
+      [79, 111],
+      [80, 112],
+      [81, 113],
+      [82, 114],
+      [83, 115],
+      [84, 116],
+      [85, 117],
+      [86, 118],
+      [87, 119],
+      [88, 120],
+      [89, 121],
+      [90, 122],
+      [181, 956],
+      [192, 224],
+      [193, 225],
+      [194, 226],
+      [195, 227],
+      [196, 228],
+      [197, 229],
+      [198, 230],
+      [199, 231],
+      [200, 232],
+      [201, 233],
+      [202, 234],
+      [203, 235],
+      [204, 236],
+      [205, 237],
+      [206, 238],
+      [207, 239],
+      [208, 240],
+      [209, 241],
+      [210, 242],
+      [211, 243],
+      [212, 244],
+      [213, 245],
+      [214, 246],
+      [216, 248],
+      [217, 249],
+      [218, 250],
+      [219, 251],
+      [220, 252],
+      [221, 253],
+      [222, 254],
+      [223, 115, 115],
+      [256, 257],
+      [258, 259],
+      [260, 261],
+      [262, 263],
+      [264, 265],
+      [266, 267],
+      [268, 269],
+      [270, 271],
+      [272, 273],
+      [274, 275],
+      [276, 277],
+      [278, 279],
+      [280, 281],
+      [282, 283],
+      [284, 285],
+      [286, 287],
+      [288, 289],
+      [290, 291],
+      [292, 293],
+      [294, 295],
+      [296, 297],
+      [298, 299],
+      [300, 301],
+      [302, 303],
+      [304, 105, 775],
+      [306, 307],
+      [308, 309],
+      [310, 311],
+      [313, 314],
+      [315, 316],
+      [317, 318],
+      [319, 320],
+      [321, 322],
+      [323, 324],
+      [325, 326],
+      [327, 328],
+      [329, 700, 110],
+      [330, 331],
+      [332, 333],
+      [334, 335],
+      [336, 337],
+      [338, 339],
+      [340, 341],
+      [342, 343],
+      [344, 345],
+      [346, 347],
+      [348, 349],
+      [350, 351],
+      [352, 353],
+      [354, 355],
+      [356, 357],
+      [358, 359],
+      [360, 361],
+      [362, 363],
+      [364, 365],
+      [366, 367],
+      [368, 369],
+      [370, 371],
+      [372, 373],
+      [374, 375],
+      [376, 255],
+      [377, 378],
+      [379, 380],
+      [381, 382],
+      [383, 115],
+      [385, 595],
+      [386, 387],
+      [388, 389],
+      [390, 596],
+      [391, 392],
+      [393, 598],
+      [394, 599],
+      [395, 396],
+      [398, 477],
+      [399, 601],
+      [400, 603],
+      [401, 402],
+      [403, 608],
+      [404, 611],
+      [406, 617],
+      [407, 616],
+      [408, 409],
+      [412, 623],
+      [413, 626],
+      [415, 629],
+      [416, 417],
+      [418, 419],
+      [420, 421],
+      [422, 640],
+      [423, 424],
+      [425, 643],
+      [428, 429],
+      [430, 648],
+      [431, 432],
+      [433, 650],
+      [434, 651],
+      [435, 436],
+      [437, 438],
+      [439, 658],
+      [440, 441],
+      [444, 445],
+      [452, 454],
+      [453, 454],
+      [455, 457],
+      [456, 457],
+      [458, 460],
+      [459, 460],
+      [461, 462],
+      [463, 464],
+      [465, 466],
+      [467, 468],
+      [469, 470],
+      [471, 472],
+      [473, 474],
+      [475, 476],
+      [478, 479],
+      [480, 481],
+      [482, 483],
+      [484, 485],
+      [486, 487],
+      [488, 489],
+      [490, 491],
+      [492, 493],
+      [494, 495],
+      [496, 106, 780],
+      [497, 499],
+      [498, 499],
+      [500, 501],
+      [502, 405],
+      [503, 447],
+      [504, 505],
+      [506, 507],
+      [508, 509],
+      [510, 511],
+      [512, 513],
+      [514, 515],
+      [516, 517],
+      [518, 519],
+      [520, 521],
+      [522, 523],
+      [524, 525],
+      [526, 527],
+      [528, 529],
+      [530, 531],
+      [532, 533],
+      [534, 535],
+      [536, 537],
+      [538, 539],
+      [540, 541],
+      [542, 543],
+      [544, 414],
+      [546, 547],
+      [548, 549],
+      [550, 551],
+      [552, 553],
+      [554, 555],
+      [556, 557],
+      [558, 559],
+      [560, 561],
+      [562, 563],
+      [570, 11365],
+      [571, 572],
+      [573, 410],
+      [574, 11366],
+      [577, 578],
+      [579, 384],
+      [580, 649],
+      [581, 652],
+      [582, 583],
+      [584, 585],
+      [586, 587],
+      [588, 589],
+      [590, 591],
+      [837, 953],
+      [880, 881],
+      [882, 883],
+      [886, 887],
+      [895, 1011],
+      [902, 940],
+      [904, 941],
+      [905, 942],
+      [906, 943],
+      [908, 972],
+      [910, 973],
+      [911, 974],
+      [912, 953, 776, 769],
+      [913, 945],
+      [914, 946],
+      [915, 947],
+      [916, 948],
+      [917, 949],
+      [918, 950],
+      [919, 951],
+      [920, 952],
+      [921, 953],
+      [922, 954],
+      [923, 955],
+      [924, 956],
+      [925, 957],
+      [926, 958],
+      [927, 959],
+      [928, 960],
+      [929, 961],
+      [931, 963],
+      [932, 964],
+      [933, 965],
+      [934, 966],
+      [935, 967],
+      [936, 968],
+      [937, 969],
+      [938, 970],
+      [939, 971],
+      [944, 965, 776, 769],
+      [962, 963],
+      [975, 983],
+      [976, 946],
+      [977, 952],
+      [981, 966],
+      [982, 960],
+      [984, 985],
+      [986, 987],
+      [988, 989],
+      [990, 991],
+      [992, 993],
+      [994, 995],
+      [996, 997],
+      [998, 999],
+      [1e3, 1001],
+      [1002, 1003],
+      [1004, 1005],
+      [1006, 1007],
+      [1008, 954],
+      [1009, 961],
+      [1012, 952],
+      [1013, 949],
+      [1015, 1016],
+      [1017, 1010],
+      [1018, 1019],
+      [1021, 891],
+      [1022, 892],
+      [1023, 893],
+      [1024, 1104],
+      [1025, 1105],
+      [1026, 1106],
+      [1027, 1107],
+      [1028, 1108],
+      [1029, 1109],
+      [1030, 1110],
+      [1031, 1111],
+      [1032, 1112],
+      [1033, 1113],
+      [1034, 1114],
+      [1035, 1115],
+      [1036, 1116],
+      [1037, 1117],
+      [1038, 1118],
+      [1039, 1119],
+      [1040, 1072],
+      [1041, 1073],
+      [1042, 1074],
+      [1043, 1075],
+      [1044, 1076],
+      [1045, 1077],
+      [1046, 1078],
+      [1047, 1079],
+      [1048, 1080],
+      [1049, 1081],
+      [1050, 1082],
+      [1051, 1083],
+      [1052, 1084],
+      [1053, 1085],
+      [1054, 1086],
+      [1055, 1087],
+      [1056, 1088],
+      [1057, 1089],
+      [1058, 1090],
+      [1059, 1091],
+      [1060, 1092],
+      [1061, 1093],
+      [1062, 1094],
+      [1063, 1095],
+      [1064, 1096],
+      [1065, 1097],
+      [1066, 1098],
+      [1067, 1099],
+      [1068, 1100],
+      [1069, 1101],
+      [1070, 1102],
+      [1071, 1103],
+      [1120, 1121],
+      [1122, 1123],
+      [1124, 1125],
+      [1126, 1127],
+      [1128, 1129],
+      [1130, 1131],
+      [1132, 1133],
+      [1134, 1135],
+      [1136, 1137],
+      [1138, 1139],
+      [1140, 1141],
+      [1142, 1143],
+      [1144, 1145],
+      [1146, 1147],
+      [1148, 1149],
+      [1150, 1151],
+      [1152, 1153],
+      [1162, 1163],
+      [1164, 1165],
+      [1166, 1167],
+      [1168, 1169],
+      [1170, 1171],
+      [1172, 1173],
+      [1174, 1175],
+      [1176, 1177],
+      [1178, 1179],
+      [1180, 1181],
+      [1182, 1183],
+      [1184, 1185],
+      [1186, 1187],
+      [1188, 1189],
+      [1190, 1191],
+      [1192, 1193],
+      [1194, 1195],
+      [1196, 1197],
+      [1198, 1199],
+      [1200, 1201],
+      [1202, 1203],
+      [1204, 1205],
+      [1206, 1207],
+      [1208, 1209],
+      [1210, 1211],
+      [1212, 1213],
+      [1214, 1215],
+      [1216, 1231],
+      [1217, 1218],
+      [1219, 1220],
+      [1221, 1222],
+      [1223, 1224],
+      [1225, 1226],
+      [1227, 1228],
+      [1229, 1230],
+      [1232, 1233],
+      [1234, 1235],
+      [1236, 1237],
+      [1238, 1239],
+      [1240, 1241],
+      [1242, 1243],
+      [1244, 1245],
+      [1246, 1247],
+      [1248, 1249],
+      [1250, 1251],
+      [1252, 1253],
+      [1254, 1255],
+      [1256, 1257],
+      [1258, 1259],
+      [1260, 1261],
+      [1262, 1263],
+      [1264, 1265],
+      [1266, 1267],
+      [1268, 1269],
+      [1270, 1271],
+      [1272, 1273],
+      [1274, 1275],
+      [1276, 1277],
+      [1278, 1279],
+      [1280, 1281],
+      [1282, 1283],
+      [1284, 1285],
+      [1286, 1287],
+      [1288, 1289],
+      [1290, 1291],
+      [1292, 1293],
+      [1294, 1295],
+      [1296, 1297],
+      [1298, 1299],
+      [1300, 1301],
+      [1302, 1303],
+      [1304, 1305],
+      [1306, 1307],
+      [1308, 1309],
+      [1310, 1311],
+      [1312, 1313],
+      [1314, 1315],
+      [1316, 1317],
+      [1318, 1319],
+      [1320, 1321],
+      [1322, 1323],
+      [1324, 1325],
+      [1326, 1327],
+      [1329, 1377],
+      [1330, 1378],
+      [1331, 1379],
+      [1332, 1380],
+      [1333, 1381],
+      [1334, 1382],
+      [1335, 1383],
+      [1336, 1384],
+      [1337, 1385],
+      [1338, 1386],
+      [1339, 1387],
+      [1340, 1388],
+      [1341, 1389],
+      [1342, 1390],
+      [1343, 1391],
+      [1344, 1392],
+      [1345, 1393],
+      [1346, 1394],
+      [1347, 1395],
+      [1348, 1396],
+      [1349, 1397],
+      [1350, 1398],
+      [1351, 1399],
+      [1352, 1400],
+      [1353, 1401],
+      [1354, 1402],
+      [1355, 1403],
+      [1356, 1404],
+      [1357, 1405],
+      [1358, 1406],
+      [1359, 1407],
+      [1360, 1408],
+      [1361, 1409],
+      [1362, 1410],
+      [1363, 1411],
+      [1364, 1412],
+      [1365, 1413],
+      [1366, 1414],
+      [1415, 1381, 1410],
+      [4256, 11520],
+      [4257, 11521],
+      [4258, 11522],
+      [4259, 11523],
+      [4260, 11524],
+      [4261, 11525],
+      [4262, 11526],
+      [4263, 11527],
+      [4264, 11528],
+      [4265, 11529],
+      [4266, 11530],
+      [4267, 11531],
+      [4268, 11532],
+      [4269, 11533],
+      [4270, 11534],
+      [4271, 11535],
+      [4272, 11536],
+      [4273, 11537],
+      [4274, 11538],
+      [4275, 11539],
+      [4276, 11540],
+      [4277, 11541],
+      [4278, 11542],
+      [4279, 11543],
+      [4280, 11544],
+      [4281, 11545],
+      [4282, 11546],
+      [4283, 11547],
+      [4284, 11548],
+      [4285, 11549],
+      [4286, 11550],
+      [4287, 11551],
+      [4288, 11552],
+      [4289, 11553],
+      [4290, 11554],
+      [4291, 11555],
+      [4292, 11556],
+      [4293, 11557],
+      [4295, 11559],
+      [4301, 11565],
+      [5112, 5104],
+      [5113, 5105],
+      [5114, 5106],
+      [5115, 5107],
+      [5116, 5108],
+      [5117, 5109],
+      [7296, 1074],
+      [7297, 1076],
+      [7298, 1086],
+      [7299, 1089],
+      [7300, 1090],
+      [7301, 1090],
+      [7302, 1098],
+      [7303, 1123],
+      [7304, 42571],
+      [7305, 7306],
+      [7312, 4304],
+      [7313, 4305],
+      [7314, 4306],
+      [7315, 4307],
+      [7316, 4308],
+      [7317, 4309],
+      [7318, 4310],
+      [7319, 4311],
+      [7320, 4312],
+      [7321, 4313],
+      [7322, 4314],
+      [7323, 4315],
+      [7324, 4316],
+      [7325, 4317],
+      [7326, 4318],
+      [7327, 4319],
+      [7328, 4320],
+      [7329, 4321],
+      [7330, 4322],
+      [7331, 4323],
+      [7332, 4324],
+      [7333, 4325],
+      [7334, 4326],
+      [7335, 4327],
+      [7336, 4328],
+      [7337, 4329],
+      [7338, 4330],
+      [7339, 4331],
+      [7340, 4332],
+      [7341, 4333],
+      [7342, 4334],
+      [7343, 4335],
+      [7344, 4336],
+      [7345, 4337],
+      [7346, 4338],
+      [7347, 4339],
+      [7348, 4340],
+      [7349, 4341],
+      [7350, 4342],
+      [7351, 4343],
+      [7352, 4344],
+      [7353, 4345],
+      [7354, 4346],
+      [7357, 4349],
+      [7358, 4350],
+      [7359, 4351],
+      [7680, 7681],
+      [7682, 7683],
+      [7684, 7685],
+      [7686, 7687],
+      [7688, 7689],
+      [7690, 7691],
+      [7692, 7693],
+      [7694, 7695],
+      [7696, 7697],
+      [7698, 7699],
+      [7700, 7701],
+      [7702, 7703],
+      [7704, 7705],
+      [7706, 7707],
+      [7708, 7709],
+      [7710, 7711],
+      [7712, 7713],
+      [7714, 7715],
+      [7716, 7717],
+      [7718, 7719],
+      [7720, 7721],
+      [7722, 7723],
+      [7724, 7725],
+      [7726, 7727],
+      [7728, 7729],
+      [7730, 7731],
+      [7732, 7733],
+      [7734, 7735],
+      [7736, 7737],
+      [7738, 7739],
+      [7740, 7741],
+      [7742, 7743],
+      [7744, 7745],
+      [7746, 7747],
+      [7748, 7749],
+      [7750, 7751],
+      [7752, 7753],
+      [7754, 7755],
+      [7756, 7757],
+      [7758, 7759],
+      [7760, 7761],
+      [7762, 7763],
+      [7764, 7765],
+      [7766, 7767],
+      [7768, 7769],
+      [7770, 7771],
+      [7772, 7773],
+      [7774, 7775],
+      [7776, 7777],
+      [7778, 7779],
+      [7780, 7781],
+      [7782, 7783],
+      [7784, 7785],
+      [7786, 7787],
+      [7788, 7789],
+      [7790, 7791],
+      [7792, 7793],
+      [7794, 7795],
+      [7796, 7797],
+      [7798, 7799],
+      [7800, 7801],
+      [7802, 7803],
+      [7804, 7805],
+      [7806, 7807],
+      [7808, 7809],
+      [7810, 7811],
+      [7812, 7813],
+      [7814, 7815],
+      [7816, 7817],
+      [7818, 7819],
+      [7820, 7821],
+      [7822, 7823],
+      [7824, 7825],
+      [7826, 7827],
+      [7828, 7829],
+      [7830, 104, 817],
+      [7831, 116, 776],
+      [7832, 119, 778],
+      [7833, 121, 778],
+      [7834, 97, 702],
+      [7835, 7777],
+      [7838, 115, 115],
+      [7840, 7841],
+      [7842, 7843],
+      [7844, 7845],
+      [7846, 7847],
+      [7848, 7849],
+      [7850, 7851],
+      [7852, 7853],
+      [7854, 7855],
+      [7856, 7857],
+      [7858, 7859],
+      [7860, 7861],
+      [7862, 7863],
+      [7864, 7865],
+      [7866, 7867],
+      [7868, 7869],
+      [7870, 7871],
+      [7872, 7873],
+      [7874, 7875],
+      [7876, 7877],
+      [7878, 7879],
+      [7880, 7881],
+      [7882, 7883],
+      [7884, 7885],
+      [7886, 7887],
+      [7888, 7889],
+      [7890, 7891],
+      [7892, 7893],
+      [7894, 7895],
+      [7896, 7897],
+      [7898, 7899],
+      [7900, 7901],
+      [7902, 7903],
+      [7904, 7905],
+      [7906, 7907],
+      [7908, 7909],
+      [7910, 7911],
+      [7912, 7913],
+      [7914, 7915],
+      [7916, 7917],
+      [7918, 7919],
+      [7920, 7921],
+      [7922, 7923],
+      [7924, 7925],
+      [7926, 7927],
+      [7928, 7929],
+      [7930, 7931],
+      [7932, 7933],
+      [7934, 7935],
+      [7944, 7936],
+      [7945, 7937],
+      [7946, 7938],
+      [7947, 7939],
+      [7948, 7940],
+      [7949, 7941],
+      [7950, 7942],
+      [7951, 7943],
+      [7960, 7952],
+      [7961, 7953],
+      [7962, 7954],
+      [7963, 7955],
+      [7964, 7956],
+      [7965, 7957],
+      [7976, 7968],
+      [7977, 7969],
+      [7978, 7970],
+      [7979, 7971],
+      [7980, 7972],
+      [7981, 7973],
+      [7982, 7974],
+      [7983, 7975],
+      [7992, 7984],
+      [7993, 7985],
+      [7994, 7986],
+      [7995, 7987],
+      [7996, 7988],
+      [7997, 7989],
+      [7998, 7990],
+      [7999, 7991],
+      [8008, 8e3],
+      [8009, 8001],
+      [8010, 8002],
+      [8011, 8003],
+      [8012, 8004],
+      [8013, 8005],
+      [8016, 965, 787],
+      [8018, 965, 787, 768],
+      [8020, 965, 787, 769],
+      [8022, 965, 787, 834],
+      [8025, 8017],
+      [8027, 8019],
+      [8029, 8021],
+      [8031, 8023],
+      [8040, 8032],
+      [8041, 8033],
+      [8042, 8034],
+      [8043, 8035],
+      [8044, 8036],
+      [8045, 8037],
+      [8046, 8038],
+      [8047, 8039],
+      [8064, 7936, 953],
+      [8065, 7937, 953],
+      [8066, 7938, 953],
+      [8067, 7939, 953],
+      [8068, 7940, 953],
+      [8069, 7941, 953],
+      [8070, 7942, 953],
+      [8071, 7943, 953],
+      [8072, 7936, 953],
+      [8073, 7937, 953],
+      [8074, 7938, 953],
+      [8075, 7939, 953],
+      [8076, 7940, 953],
+      [8077, 7941, 953],
+      [8078, 7942, 953],
+      [8079, 7943, 953],
+      [8080, 7968, 953],
+      [8081, 7969, 953],
+      [8082, 7970, 953],
+      [8083, 7971, 953],
+      [8084, 7972, 953],
+      [8085, 7973, 953],
+      [8086, 7974, 953],
+      [8087, 7975, 953],
+      [8088, 7968, 953],
+      [8089, 7969, 953],
+      [8090, 7970, 953],
+      [8091, 7971, 953],
+      [8092, 7972, 953],
+      [8093, 7973, 953],
+      [8094, 7974, 953],
+      [8095, 7975, 953],
+      [8096, 8032, 953],
+      [8097, 8033, 953],
+      [8098, 8034, 953],
+      [8099, 8035, 953],
+      [8100, 8036, 953],
+      [8101, 8037, 953],
+      [8102, 8038, 953],
+      [8103, 8039, 953],
+      [8104, 8032, 953],
+      [8105, 8033, 953],
+      [8106, 8034, 953],
+      [8107, 8035, 953],
+      [8108, 8036, 953],
+      [8109, 8037, 953],
+      [8110, 8038, 953],
+      [8111, 8039, 953],
+      [8114, 8048, 953],
+      [8115, 945, 953],
+      [8116, 940, 953],
+      [8118, 945, 834],
+      [8119, 945, 834, 953],
+      [8120, 8112],
+      [8121, 8113],
+      [8122, 8048],
+      [8123, 8049],
+      [8124, 945, 953],
+      [8126, 953],
+      [8130, 8052, 953],
+      [8131, 951, 953],
+      [8132, 942, 953],
+      [8134, 951, 834],
+      [8135, 951, 834, 953],
+      [8136, 8050],
+      [8137, 8051],
+      [8138, 8052],
+      [8139, 8053],
+      [8140, 951, 953],
+      [8146, 953, 776, 768],
+      [8147, 953, 776, 769],
+      [8150, 953, 834],
+      [8151, 953, 776, 834],
+      [8152, 8144],
+      [8153, 8145],
+      [8154, 8054],
+      [8155, 8055],
+      [8162, 965, 776, 768],
+      [8163, 965, 776, 769],
+      [8164, 961, 787],
+      [8166, 965, 834],
+      [8167, 965, 776, 834],
+      [8168, 8160],
+      [8169, 8161],
+      [8170, 8058],
+      [8171, 8059],
+      [8172, 8165],
+      [8178, 8060, 953],
+      [8179, 969, 953],
+      [8180, 974, 953],
+      [8182, 969, 834],
+      [8183, 969, 834, 953],
+      [8184, 8056],
+      [8185, 8057],
+      [8186, 8060],
+      [8187, 8061],
+      [8188, 969, 953],
+      [8486, 969],
+      [8490, 107],
+      [8491, 229],
+      [8498, 8526],
+      [8544, 8560],
+      [8545, 8561],
+      [8546, 8562],
+      [8547, 8563],
+      [8548, 8564],
+      [8549, 8565],
+      [8550, 8566],
+      [8551, 8567],
+      [8552, 8568],
+      [8553, 8569],
+      [8554, 8570],
+      [8555, 8571],
+      [8556, 8572],
+      [8557, 8573],
+      [8558, 8574],
+      [8559, 8575],
+      [8579, 8580],
+      [9398, 9424],
+      [9399, 9425],
+      [9400, 9426],
+      [9401, 9427],
+      [9402, 9428],
+      [9403, 9429],
+      [9404, 9430],
+      [9405, 9431],
+      [9406, 9432],
+      [9407, 9433],
+      [9408, 9434],
+      [9409, 9435],
+      [9410, 9436],
+      [9411, 9437],
+      [9412, 9438],
+      [9413, 9439],
+      [9414, 9440],
+      [9415, 9441],
+      [9416, 9442],
+      [9417, 9443],
+      [9418, 9444],
+      [9419, 9445],
+      [9420, 9446],
+      [9421, 9447],
+      [9422, 9448],
+      [9423, 9449],
+      [11264, 11312],
+      [11265, 11313],
+      [11266, 11314],
+      [11267, 11315],
+      [11268, 11316],
+      [11269, 11317],
+      [11270, 11318],
+      [11271, 11319],
+      [11272, 11320],
+      [11273, 11321],
+      [11274, 11322],
+      [11275, 11323],
+      [11276, 11324],
+      [11277, 11325],
+      [11278, 11326],
+      [11279, 11327],
+      [11280, 11328],
+      [11281, 11329],
+      [11282, 11330],
+      [11283, 11331],
+      [11284, 11332],
+      [11285, 11333],
+      [11286, 11334],
+      [11287, 11335],
+      [11288, 11336],
+      [11289, 11337],
+      [11290, 11338],
+      [11291, 11339],
+      [11292, 11340],
+      [11293, 11341],
+      [11294, 11342],
+      [11295, 11343],
+      [11296, 11344],
+      [11297, 11345],
+      [11298, 11346],
+      [11299, 11347],
+      [11300, 11348],
+      [11301, 11349],
+      [11302, 11350],
+      [11303, 11351],
+      [11304, 11352],
+      [11305, 11353],
+      [11306, 11354],
+      [11307, 11355],
+      [11308, 11356],
+      [11309, 11357],
+      [11310, 11358],
+      [11311, 11359],
+      [11360, 11361],
+      [11362, 619],
+      [11363, 7549],
+      [11364, 637],
+      [11367, 11368],
+      [11369, 11370],
+      [11371, 11372],
+      [11373, 593],
+      [11374, 625],
+      [11375, 592],
+      [11376, 594],
+      [11378, 11379],
+      [11381, 11382],
+      [11390, 575],
+      [11391, 576],
+      [11392, 11393],
+      [11394, 11395],
+      [11396, 11397],
+      [11398, 11399],
+      [11400, 11401],
+      [11402, 11403],
+      [11404, 11405],
+      [11406, 11407],
+      [11408, 11409],
+      [11410, 11411],
+      [11412, 11413],
+      [11414, 11415],
+      [11416, 11417],
+      [11418, 11419],
+      [11420, 11421],
+      [11422, 11423],
+      [11424, 11425],
+      [11426, 11427],
+      [11428, 11429],
+      [11430, 11431],
+      [11432, 11433],
+      [11434, 11435],
+      [11436, 11437],
+      [11438, 11439],
+      [11440, 11441],
+      [11442, 11443],
+      [11444, 11445],
+      [11446, 11447],
+      [11448, 11449],
+      [11450, 11451],
+      [11452, 11453],
+      [11454, 11455],
+      [11456, 11457],
+      [11458, 11459],
+      [11460, 11461],
+      [11462, 11463],
+      [11464, 11465],
+      [11466, 11467],
+      [11468, 11469],
+      [11470, 11471],
+      [11472, 11473],
+      [11474, 11475],
+      [11476, 11477],
+      [11478, 11479],
+      [11480, 11481],
+      [11482, 11483],
+      [11484, 11485],
+      [11486, 11487],
+      [11488, 11489],
+      [11490, 11491],
+      [11499, 11500],
+      [11501, 11502],
+      [11506, 11507],
+      [42560, 42561],
+      [42562, 42563],
+      [42564, 42565],
+      [42566, 42567],
+      [42568, 42569],
+      [42570, 42571],
+      [42572, 42573],
+      [42574, 42575],
+      [42576, 42577],
+      [42578, 42579],
+      [42580, 42581],
+      [42582, 42583],
+      [42584, 42585],
+      [42586, 42587],
+      [42588, 42589],
+      [42590, 42591],
+      [42592, 42593],
+      [42594, 42595],
+      [42596, 42597],
+      [42598, 42599],
+      [42600, 42601],
+      [42602, 42603],
+      [42604, 42605],
+      [42624, 42625],
+      [42626, 42627],
+      [42628, 42629],
+      [42630, 42631],
+      [42632, 42633],
+      [42634, 42635],
+      [42636, 42637],
+      [42638, 42639],
+      [42640, 42641],
+      [42642, 42643],
+      [42644, 42645],
+      [42646, 42647],
+      [42648, 42649],
+      [42650, 42651],
+      [42786, 42787],
+      [42788, 42789],
+      [42790, 42791],
+      [42792, 42793],
+      [42794, 42795],
+      [42796, 42797],
+      [42798, 42799],
+      [42802, 42803],
+      [42804, 42805],
+      [42806, 42807],
+      [42808, 42809],
+      [42810, 42811],
+      [42812, 42813],
+      [42814, 42815],
+      [42816, 42817],
+      [42818, 42819],
+      [42820, 42821],
+      [42822, 42823],
+      [42824, 42825],
+      [42826, 42827],
+      [42828, 42829],
+      [42830, 42831],
+      [42832, 42833],
+      [42834, 42835],
+      [42836, 42837],
+      [42838, 42839],
+      [42840, 42841],
+      [42842, 42843],
+      [42844, 42845],
+      [42846, 42847],
+      [42848, 42849],
+      [42850, 42851],
+      [42852, 42853],
+      [42854, 42855],
+      [42856, 42857],
+      [42858, 42859],
+      [42860, 42861],
+      [42862, 42863],
+      [42873, 42874],
+      [42875, 42876],
+      [42877, 7545],
+      [42878, 42879],
+      [42880, 42881],
+      [42882, 42883],
+      [42884, 42885],
+      [42886, 42887],
+      [42891, 42892],
+      [42893, 613],
+      [42896, 42897],
+      [42898, 42899],
+      [42902, 42903],
+      [42904, 42905],
+      [42906, 42907],
+      [42908, 42909],
+      [42910, 42911],
+      [42912, 42913],
+      [42914, 42915],
+      [42916, 42917],
+      [42918, 42919],
+      [42920, 42921],
+      [42922, 614],
+      [42923, 604],
+      [42924, 609],
+      [42925, 620],
+      [42926, 618],
+      [42928, 670],
+      [42929, 647],
+      [42930, 669],
+      [42931, 43859],
+      [42932, 42933],
+      [42934, 42935],
+      [42936, 42937],
+      [42938, 42939],
+      [42940, 42941],
+      [42942, 42943],
+      [42944, 42945],
+      [42946, 42947],
+      [42948, 42900],
+      [42949, 642],
+      [42950, 7566],
+      [42951, 42952],
+      [42953, 42954],
+      [42955, 612],
+      [42956, 42957],
+      [42958, 42959],
+      [42960, 42961],
+      [42962, 42963],
+      [42964, 42965],
+      [42966, 42967],
+      [42968, 42969],
+      [42970, 42971],
+      [42972, 411],
+      [42997, 42998],
+      [43888, 5024],
+      [43889, 5025],
+      [43890, 5026],
+      [43891, 5027],
+      [43892, 5028],
+      [43893, 5029],
+      [43894, 5030],
+      [43895, 5031],
+      [43896, 5032],
+      [43897, 5033],
+      [43898, 5034],
+      [43899, 5035],
+      [43900, 5036],
+      [43901, 5037],
+      [43902, 5038],
+      [43903, 5039],
+      [43904, 5040],
+      [43905, 5041],
+      [43906, 5042],
+      [43907, 5043],
+      [43908, 5044],
+      [43909, 5045],
+      [43910, 5046],
+      [43911, 5047],
+      [43912, 5048],
+      [43913, 5049],
+      [43914, 5050],
+      [43915, 5051],
+      [43916, 5052],
+      [43917, 5053],
+      [43918, 5054],
+      [43919, 5055],
+      [43920, 5056],
+      [43921, 5057],
+      [43922, 5058],
+      [43923, 5059],
+      [43924, 5060],
+      [43925, 5061],
+      [43926, 5062],
+      [43927, 5063],
+      [43928, 5064],
+      [43929, 5065],
+      [43930, 5066],
+      [43931, 5067],
+      [43932, 5068],
+      [43933, 5069],
+      [43934, 5070],
+      [43935, 5071],
+      [43936, 5072],
+      [43937, 5073],
+      [43938, 5074],
+      [43939, 5075],
+      [43940, 5076],
+      [43941, 5077],
+      [43942, 5078],
+      [43943, 5079],
+      [43944, 5080],
+      [43945, 5081],
+      [43946, 5082],
+      [43947, 5083],
+      [43948, 5084],
+      [43949, 5085],
+      [43950, 5086],
+      [43951, 5087],
+      [43952, 5088],
+      [43953, 5089],
+      [43954, 5090],
+      [43955, 5091],
+      [43956, 5092],
+      [43957, 5093],
+      [43958, 5094],
+      [43959, 5095],
+      [43960, 5096],
+      [43961, 5097],
+      [43962, 5098],
+      [43963, 5099],
+      [43964, 5100],
+      [43965, 5101],
+      [43966, 5102],
+      [43967, 5103],
+      [64256, 102, 102],
+      [64257, 102, 105],
+      [64258, 102, 108],
+      [64259, 102, 102, 105],
+      [64260, 102, 102, 108],
+      [64261, 115, 116],
+      [64262, 115, 116],
+      [64275, 1396, 1398],
+      [64276, 1396, 1381],
+      [64277, 1396, 1387],
+      [64278, 1406, 1398],
+      [64279, 1396, 1389],
+      [65313, 65345],
+      [65314, 65346],
+      [65315, 65347],
+      [65316, 65348],
+      [65317, 65349],
+      [65318, 65350],
+      [65319, 65351],
+      [65320, 65352],
+      [65321, 65353],
+      [65322, 65354],
+      [65323, 65355],
+      [65324, 65356],
+      [65325, 65357],
+      [65326, 65358],
+      [65327, 65359],
+      [65328, 65360],
+      [65329, 65361],
+      [65330, 65362],
+      [65331, 65363],
+      [65332, 65364],
+      [65333, 65365],
+      [65334, 65366],
+      [65335, 65367],
+      [65336, 65368],
+      [65337, 65369],
+      [65338, 65370],
+      [66560, 66600],
+      [66561, 66601],
+      [66562, 66602],
+      [66563, 66603],
+      [66564, 66604],
+      [66565, 66605],
+      [66566, 66606],
+      [66567, 66607],
+      [66568, 66608],
+      [66569, 66609],
+      [66570, 66610],
+      [66571, 66611],
+      [66572, 66612],
+      [66573, 66613],
+      [66574, 66614],
+      [66575, 66615],
+      [66576, 66616],
+      [66577, 66617],
+      [66578, 66618],
+      [66579, 66619],
+      [66580, 66620],
+      [66581, 66621],
+      [66582, 66622],
+      [66583, 66623],
+      [66584, 66624],
+      [66585, 66625],
+      [66586, 66626],
+      [66587, 66627],
+      [66588, 66628],
+      [66589, 66629],
+      [66590, 66630],
+      [66591, 66631],
+      [66592, 66632],
+      [66593, 66633],
+      [66594, 66634],
+      [66595, 66635],
+      [66596, 66636],
+      [66597, 66637],
+      [66598, 66638],
+      [66599, 66639],
+      [66736, 66776],
+      [66737, 66777],
+      [66738, 66778],
+      [66739, 66779],
+      [66740, 66780],
+      [66741, 66781],
+      [66742, 66782],
+      [66743, 66783],
+      [66744, 66784],
+      [66745, 66785],
+      [66746, 66786],
+      [66747, 66787],
+      [66748, 66788],
+      [66749, 66789],
+      [66750, 66790],
+      [66751, 66791],
+      [66752, 66792],
+      [66753, 66793],
+      [66754, 66794],
+      [66755, 66795],
+      [66756, 66796],
+      [66757, 66797],
+      [66758, 66798],
+      [66759, 66799],
+      [66760, 66800],
+      [66761, 66801],
+      [66762, 66802],
+      [66763, 66803],
+      [66764, 66804],
+      [66765, 66805],
+      [66766, 66806],
+      [66767, 66807],
+      [66768, 66808],
+      [66769, 66809],
+      [66770, 66810],
+      [66771, 66811],
+      [66928, 66967],
+      [66929, 66968],
+      [66930, 66969],
+      [66931, 66970],
+      [66932, 66971],
+      [66933, 66972],
+      [66934, 66973],
+      [66935, 66974],
+      [66936, 66975],
+      [66937, 66976],
+      [66938, 66977],
+      [66940, 66979],
+      [66941, 66980],
+      [66942, 66981],
+      [66943, 66982],
+      [66944, 66983],
+      [66945, 66984],
+      [66946, 66985],
+      [66947, 66986],
+      [66948, 66987],
+      [66949, 66988],
+      [66950, 66989],
+      [66951, 66990],
+      [66952, 66991],
+      [66953, 66992],
+      [66954, 66993],
+      [66956, 66995],
+      [66957, 66996],
+      [66958, 66997],
+      [66959, 66998],
+      [66960, 66999],
+      [66961, 67e3],
+      [66962, 67001],
+      [66964, 67003],
+      [66965, 67004],
+      [68736, 68800],
+      [68737, 68801],
+      [68738, 68802],
+      [68739, 68803],
+      [68740, 68804],
+      [68741, 68805],
+      [68742, 68806],
+      [68743, 68807],
+      [68744, 68808],
+      [68745, 68809],
+      [68746, 68810],
+      [68747, 68811],
+      [68748, 68812],
+      [68749, 68813],
+      [68750, 68814],
+      [68751, 68815],
+      [68752, 68816],
+      [68753, 68817],
+      [68754, 68818],
+      [68755, 68819],
+      [68756, 68820],
+      [68757, 68821],
+      [68758, 68822],
+      [68759, 68823],
+      [68760, 68824],
+      [68761, 68825],
+      [68762, 68826],
+      [68763, 68827],
+      [68764, 68828],
+      [68765, 68829],
+      [68766, 68830],
+      [68767, 68831],
+      [68768, 68832],
+      [68769, 68833],
+      [68770, 68834],
+      [68771, 68835],
+      [68772, 68836],
+      [68773, 68837],
+      [68774, 68838],
+      [68775, 68839],
+      [68776, 68840],
+      [68777, 68841],
+      [68778, 68842],
+      [68779, 68843],
+      [68780, 68844],
+      [68781, 68845],
+      [68782, 68846],
+      [68783, 68847],
+      [68784, 68848],
+      [68785, 68849],
+      [68786, 68850],
+      [68944, 68976],
+      [68945, 68977],
+      [68946, 68978],
+      [68947, 68979],
+      [68948, 68980],
+      [68949, 68981],
+      [68950, 68982],
+      [68951, 68983],
+      [68952, 68984],
+      [68953, 68985],
+      [68954, 68986],
+      [68955, 68987],
+      [68956, 68988],
+      [68957, 68989],
+      [68958, 68990],
+      [68959, 68991],
+      [68960, 68992],
+      [68961, 68993],
+      [68962, 68994],
+      [68963, 68995],
+      [68964, 68996],
+      [68965, 68997],
+      [71840, 71872],
+      [71841, 71873],
+      [71842, 71874],
+      [71843, 71875],
+      [71844, 71876],
+      [71845, 71877],
+      [71846, 71878],
+      [71847, 71879],
+      [71848, 71880],
+      [71849, 71881],
+      [71850, 71882],
+      [71851, 71883],
+      [71852, 71884],
+      [71853, 71885],
+      [71854, 71886],
+      [71855, 71887],
+      [71856, 71888],
+      [71857, 71889],
+      [71858, 71890],
+      [71859, 71891],
+      [71860, 71892],
+      [71861, 71893],
+      [71862, 71894],
+      [71863, 71895],
+      [71864, 71896],
+      [71865, 71897],
+      [71866, 71898],
+      [71867, 71899],
+      [71868, 71900],
+      [71869, 71901],
+      [71870, 71902],
+      [71871, 71903],
+      [93760, 93792],
+      [93761, 93793],
+      [93762, 93794],
+      [93763, 93795],
+      [93764, 93796],
+      [93765, 93797],
+      [93766, 93798],
+      [93767, 93799],
+      [93768, 93800],
+      [93769, 93801],
+      [93770, 93802],
+      [93771, 93803],
+      [93772, 93804],
+      [93773, 93805],
+      [93774, 93806],
+      [93775, 93807],
+      [93776, 93808],
+      [93777, 93809],
+      [93778, 93810],
+      [93779, 93811],
+      [93780, 93812],
+      [93781, 93813],
+      [93782, 93814],
+      [93783, 93815],
+      [93784, 93816],
+      [93785, 93817],
+      [93786, 93818],
+      [93787, 93819],
+      [93788, 93820],
+      [93789, 93821],
+      [93790, 93822],
+      [93791, 93823],
+      [93856, 93883],
+      [93857, 93884],
+      [93858, 93885],
+      [93859, 93886],
+      [93860, 93887],
+      [93861, 93888],
+      [93862, 93889],
+      [93863, 93890],
+      [93864, 93891],
+      [93865, 93892],
+      [93866, 93893],
+      [93867, 93894],
+      [93868, 93895],
+      [93869, 93896],
+      [93870, 93897],
+      [93871, 93898],
+      [93872, 93899],
+      [93873, 93900],
+      [93874, 93901],
+      [93875, 93902],
+      [93876, 93903],
+      [93877, 93904],
+      [93878, 93905],
+      [93879, 93906],
+      [93880, 93907],
+      [125184, 125218],
+      [125185, 125219],
+      [125186, 125220],
+      [125187, 125221],
+      [125188, 125222],
+      [125189, 125223],
+      [125190, 125224],
+      [125191, 125225],
+      [125192, 125226],
+      [125193, 125227],
+      [125194, 125228],
+      [125195, 125229],
+      [125196, 125230],
+      [125197, 125231],
+      [125198, 125232],
+      [125199, 125233],
+      [125200, 125234],
+      [125201, 125235],
+      [125202, 125236],
+      [125203, 125237],
+      [125204, 125238],
+      [125205, 125239],
+      [125206, 125240],
+      [125207, 125241],
+      [125208, 125242],
+      [125209, 125243],
+      [125210, 125244],
+      [125211, 125245],
+      [125212, 125246],
+      [125213, 125247],
+      [125214, 125248],
+      [125215, 125249],
+      [125216, 125250],
+      [125217, 125251]
+    ];
+  }
+});
+
+// node_modules/mthds/dist/method-tree/case-folding.js
+function foldingTable() {
+  if (foldings === void 0) {
+    foldings = /* @__PURE__ */ new Map();
+    for (const [codePoint, ...mapping] of FULL_CASE_FOLDING) {
+      foldings.set(codePoint, String.fromCodePoint(...mapping));
+    }
+  }
+  return foldings;
+}
+function fullCaseFold(text) {
+  const table = foldingTable();
+  let folded = "";
+  for (const character of text) {
+    folded += table.get(character.codePointAt(0)) ?? character;
+  }
+  return folded;
+}
+function caseFold(treePath) {
+  return fullCaseFold(treePath.normalize("NFC")).normalize("NFC");
+}
+var foldings;
+var init_case_folding = __esm({
+  "node_modules/mthds/dist/method-tree/case-folding.js"() {
+    init_case_folding_table();
+    init_case_folding_table();
+  }
+});
+
+// node_modules/mthds/dist/method-tree/tree-path.js
+function utf8Length(text) {
+  return encoder.encode(text).length;
+}
+function holdsLoneSurrogate(text) {
+  return LONE_SURROGATE.test(text);
+}
+function holdsControlCharacter(text) {
+  return CONTROL_CHARACTER.test(text);
+}
+function treePathViolation(candidate) {
+  if (candidate === "")
+    return "the path is empty";
+  if (holdsLoneSurrogate(candidate))
+    return "the path holds a code point UTF-8 cannot encode";
+  if (candidate.startsWith("/") || candidate.endsWith("/")) {
+    return "the path starts or ends with '/'";
+  }
+  for (const segment of candidate.split("/")) {
+    if (segment === "")
+      return "the path holds an empty segment";
+    if (segment === "." || segment === "..")
+      return `the path holds the segment '${segment}'`;
+    if (segment.includes("\\"))
+      return "the path holds a backslash";
+    if (segment.includes(":"))
+      return "the path holds a colon";
+    if (holdsControlCharacter(segment))
+      return "the path holds a control character";
+    if (utf8Length(segment) > MAX_SEGMENT_BYTES) {
+      return `a segment is longer than ${MAX_SEGMENT_BYTES} bytes`;
+    }
+  }
+  if (candidate.normalize("NFC") !== candidate) {
+    return "the path is not in Unicode Normalization Form C";
+  }
+  if (utf8Length(candidate) > MAX_TREE_PATH_BYTES) {
+    return `the path is longer than ${MAX_TREE_PATH_BYTES} bytes`;
+  }
+  return null;
+}
+function isTreePath(candidate) {
+  return treePathViolation(candidate) === null;
+}
+function compareUtf8(left, right) {
+  if (left === right)
+    return 0;
+  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+}
+function directoriesOf(treePath) {
+  const segments = treePath.split("/");
+  const directories = [];
+  for (let depth = 1; depth < segments.length; depth += 1) {
+    directories.push(segments.slice(0, depth).join("/"));
+  }
+  return directories;
+}
+function pathCollisions(treePaths) {
+  const byFolded = /* @__PURE__ */ new Map();
+  const underFoldedDirectory = /* @__PURE__ */ new Map();
+  for (const treePath of treePaths) {
+    const folded = caseFold(treePath);
+    const group = byFolded.get(folded) ?? /* @__PURE__ */ new Set();
+    group.add(treePath);
+    byFolded.set(folded, group);
+    for (const directory of directoriesOf(treePath)) {
+      const foldedDirectory = caseFold(directory);
+      const under = underFoldedDirectory.get(foldedDirectory) ?? /* @__PURE__ */ new Set();
+      under.add(treePath);
+      underFoldedDirectory.set(foldedDirectory, under);
+    }
+  }
+  const colliding = /* @__PURE__ */ new Set();
+  for (const group of byFolded.values()) {
+    if (group.size > 1)
+      for (const treePath of group)
+        colliding.add(treePath);
+  }
+  for (const treePath of treePaths) {
+    const under = underFoldedDirectory.get(caseFold(treePath));
+    if (under !== void 0 && under.size > 0) {
+      colliding.add(treePath);
+      for (const other of under)
+        colliding.add(other);
+    }
+  }
+  return [...colliding].sort(compareUtf8);
+}
+var MAX_SEGMENT_BYTES, MAX_TREE_PATH_BYTES, LONE_SURROGATE, CONTROL_CHARACTER, encoder;
+var init_tree_path = __esm({
+  "node_modules/mthds/dist/method-tree/tree-path.js"() {
+    init_case_folding();
+    MAX_SEGMENT_BYTES = 255;
+    MAX_TREE_PATH_BYTES = 1024;
+    LONE_SURROGATE = /[\uD800-\uDFFF]/u;
+    CONTROL_CHARACTER = new RegExp("\\p{Cc}", "u");
+    encoder = new TextEncoder();
+  }
+});
+
+// node_modules/mthds/dist/method-tree/digest.js
+import { createHash } from "node:crypto";
+function sha256Hex(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+function treeListing(files) {
+  return [...files].sort((left, right) => compareUtf8(left.path, right.path)).map((file) => `${file.sha256}  ${file.path}
+`).join("");
+}
+function treeDigest(files) {
+  return `${TREE_DIGEST_PREFIX}${sha256Hex(Buffer.from(treeListing(files), "utf8"))}`;
+}
+var TREE_DIGEST_PREFIX, TREE_DIGEST_PATTERN;
+var init_digest = __esm({
+  "node_modules/mthds/dist/method-tree/digest.js"() {
+    init_tree_path();
+    TREE_DIGEST_PREFIX = "sha256:";
+    TREE_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
+  }
+});
+
+// node_modules/mthds/dist/method-tree/exceptions.js
+function namesExcludedDirectory(rule) {
+  return rule === "nested_repository" || rule === "nested_package";
+}
+function limitMessage(root, limit, maximum, reached, path) {
+  switch (limit) {
+    case "maxFileSize":
+      return `The method tree at ${root} holds ${path ?? "a file"}, of ${reached} bytes, past the limit of ${maximum} bytes for one file; listing stopped there, before hashing any file.`;
+    case "maxFileCount":
+      return `The method tree at ${root} holds more than ${maximum} files, the limit; listing stopped at ${reached} files, before hashing any file. Hand over the method's own directory, or keep the rest out with a .gitignore file or the manifest's exclude patterns.`;
+    case "maxTotalSize":
+      return `The method tree at ${root} holds more than ${maximum} bytes, the limit for a whole tree; listing stopped at ${reached} bytes, before hashing any file. Hand over the method's own directory, or keep the rest out with a .gitignore file or the manifest's exclude patterns.`;
+  }
+}
+var MethodTreeError, TreeLimitExceededError;
+var init_exceptions3 = __esm({
+  "node_modules/mthds/dist/method-tree/exceptions.js"() {
+    MethodTreeError = class extends Error {
+      code;
+      /** What the refusal names: one offender, or every one for the codes that name them all. */
+      names;
+      /** For `lone_file_excluded`, the rule keeping the file out of its tree. */
+      excludedBy;
+      /** For a nested repository or a nested package, the directory the rule excludes. */
+      excludedDirectory;
+      constructor(code, message, options = {}) {
+        super(message);
+        this.name = "MethodTreeError";
+        this.code = code;
+        this.names = options.names ?? [];
+        if (options.excludedBy !== void 0)
+          this.excludedBy = options.excludedBy;
+        if (options.excludedDirectory !== void 0)
+          this.excludedDirectory = options.excludedDirectory;
+      }
+    };
+    TreeLimitExceededError = class extends MethodTreeError {
+      root;
+      limit;
+      maximum;
+      /** The count or size reached when the listing stopped. */
+      reached;
+      constructor(root, limit, maximum, reached, path) {
+        super("limit_exceeded", limitMessage(root, limit, maximum, reached, path), {
+          names: path === void 0 ? [] : [path]
+        });
+        this.name = "TreeLimitExceededError";
+        this.root = root;
+        this.limit = limit;
+        this.maximum = maximum;
+        this.reached = reached;
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/method-tree/file-reading.js
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
+import { createHash as createHash2 } from "node:crypto";
+function describe(err) {
+  return err instanceof Error ? err.message : String(err);
+}
+function errorCode(err) {
+  const code = err?.code;
+  return typeof code === "string" ? code : void 0;
+}
+function linkRefusal(path, where) {
+  return new MethodTreeError("symbolic_link", `'${path}' under ${where} is now a symbolic link, which a method tree never follows; replace it with the file itself and list the tree again.`, { names: [path] });
+}
+function specialRefusal(path, where) {
+  return new MethodTreeError("special_file", `'${path}' under ${where} is now neither a file nor a directory, such as a named pipe or a device; remove it and list the tree again.`, { names: [path] });
+}
+function unreadable(path, where, err) {
+  return new MethodTreeError("not_listable", `Cannot read '${path}' under ${where}: ${describe(err)}`, {
+    names: [path]
+  });
+}
+function refusalOfOpenError(err, path, where) {
+  switch (errorCode(err)) {
+    // `O_NOFOLLOW` on a link fails with ELOOP, or EMLINK on the BSDs.
+    case "ELOOP":
+    case "EMLINK":
+      return linkRefusal(path, where);
+    // A socket cannot be opened as a file.
+    case "ENXIO":
+    case "EOPNOTSUPP":
+      return specialRefusal(path, where);
+    default:
+      return unreadable(path, where, err);
+  }
+}
+function refusalOfStats(stats, path, where) {
+  if (stats.isDirectory()) {
+    return new MethodTreeError("not_listable", `'${path}' under ${where} is now a directory, not the file the method tree listed; list the tree again.`, { names: [path] });
+  }
+  return specialRefusal(path, where);
+}
+async function readMember(absolute, path, where, keepBytes) {
+  let handle;
+  try {
+    handle = await open(absolute, OPEN_FLAGS);
+  } catch (err) {
+    throw refusalOfOpenError(err, path, where);
+  }
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile())
+      throw refusalOfStats(stats, path, where);
+    const hash = createHash2("sha256");
+    const chunks = [];
+    let size = 0;
+    let buffer = Buffer.allocUnsafe(CHUNK_SIZE);
+    for (; ; ) {
+      const { bytesRead } = await handle.read(buffer, 0, CHUNK_SIZE, null);
+      if (bytesRead === 0)
+        break;
+      const chunk = buffer.subarray(0, bytesRead);
+      hash.update(chunk);
+      size += bytesRead;
+      if (keepBytes) {
+        chunks.push(chunk);
+        buffer = Buffer.allocUnsafe(CHUNK_SIZE);
+      }
+    }
+    return {
+      size,
+      sha256: hash.digest("hex"),
+      bytes: keepBytes ? Buffer.concat(chunks, size) : null
+    };
+  } catch (err) {
+    if (err instanceof MethodTreeError)
+      throw err;
+    throw unreadable(path, where, err);
+  } finally {
+    await handle.close().catch(() => void 0);
+  }
+}
+var OPEN_FLAGS, CHUNK_SIZE;
+var init_file_reading = __esm({
+  "node_modules/mthds/dist/method-tree/file-reading.js"() {
+    init_exceptions3();
+    OPEN_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
+    CHUNK_SIZE = 64 * 1024;
+  }
+});
+
+// node_modules/mthds/dist/method-tree/gitignore.js
+function isGlobSpecial(byte) {
+  return byte === STAR || byte === QUESTION || byte === OPEN_BRACKET || byte === BACKSLASH;
+}
+function inClass(className, byte) {
+  const isUpper = byte >= 65 && byte <= 90;
+  const isLower = byte >= 97 && byte <= 122;
+  const isDigit = byte >= 48 && byte <= 57;
+  const isAlpha = isUpper || isLower;
+  const isSpace = byte === 32 || byte >= 9 && byte <= 13;
+  const isControl2 = byte < 32 || byte === 127;
+  const isPrint = byte >= 32 && byte < 127;
+  switch (className) {
+    case "alnum":
+      return isAlpha || isDigit;
+    case "alpha":
+      return isAlpha;
+    case "blank":
+      return byte === 32 || byte === 9;
+    case "cntrl":
+      return isControl2;
+    case "digit":
+      return isDigit;
+    case "graph":
+      return isPrint && byte !== 32;
+    case "lower":
+      return isLower;
+    case "print":
+      return isPrint;
+    case "punct":
+      return isPrint && byte !== 32 && !isAlpha && !isDigit;
+    case "space":
+      return isSpace;
+    case "upper":
+      return isUpper;
+    case "xdigit":
+      return isDigit || byte >= 65 && byte <= 70 || byte >= 97 && byte <= 102;
+    default:
+      return void 0;
+  }
+}
+function doWild(pattern, patternStart, text, textStart, pathname) {
+  const at = (bytes, index) => index < bytes.length ? bytes[index] : 0;
+  let p = patternStart;
+  let t = textStart;
+  for (; at(pattern, p) !== 0; t += 1, p += 1) {
+    let pCh = at(pattern, p);
+    let tCh = at(text, t);
+    if (tCh === 0 && pCh !== STAR)
+      return WM_ABORT_ALL;
+    switch (pCh) {
+      case BACKSLASH:
+        p += 1;
+        pCh = at(pattern, p);
+        if (tCh !== pCh)
+          return WM_NOMATCH;
+        continue;
+      case QUESTION:
+        if (pathname && tCh === SLASH)
+          return WM_NOMATCH;
+        continue;
+      case STAR: {
+        let matchSlash;
+        p += 1;
+        if (at(pattern, p) === STAR) {
+          const prevP = p;
+          while (at(pattern, ++p) === STAR) {
+          }
+          if (!pathname) {
+            matchSlash = true;
+          } else if ((prevP - patternStart < 2 || at(pattern, prevP - 2) === SLASH) && (at(pattern, p) === 0 || at(pattern, p) === SLASH || at(pattern, p) === BACKSLASH && at(pattern, p + 1) === SLASH)) {
+            if (at(pattern, p) === SLASH && doWild(pattern, p + 1, text, t, pathname) === WM_MATCH) {
+              return WM_MATCH;
+            }
+            matchSlash = true;
+          } else {
+            matchSlash = false;
+          }
+        } else {
+          matchSlash = !pathname;
+        }
+        if (at(pattern, p) === 0) {
+          if (!matchSlash && text.indexOf(SLASH, t) !== -1)
+            return WM_ABORT_TO_STARSTAR;
+          return WM_MATCH;
+        } else if (!matchSlash && at(pattern, p) === SLASH) {
+          const slash = text.indexOf(SLASH, t);
+          if (slash === -1)
+            return WM_ABORT_ALL;
+          t = slash;
+          break;
+        }
+        for (; ; ) {
+          if (tCh === 0)
+            break;
+          if (!isGlobSpecial(at(pattern, p))) {
+            const literal = at(pattern, p);
+            while ((tCh = at(text, t)) !== 0 && (matchSlash || tCh !== SLASH)) {
+              if (tCh === literal)
+                break;
+              t += 1;
+            }
+            if (tCh !== literal)
+              return matchSlash ? WM_ABORT_ALL : WM_ABORT_TO_STARSTAR;
+          }
+          const matched = doWild(pattern, p, text, t, pathname);
+          if (matched !== WM_NOMATCH) {
+            if (!matchSlash || matched !== WM_ABORT_TO_STARSTAR)
+              return matched;
+          } else if (!matchSlash && tCh === SLASH) {
+            return WM_ABORT_TO_STARSTAR;
+          }
+          t += 1;
+          tCh = at(text, t);
+        }
+        return WM_ABORT_ALL;
+      }
+      case OPEN_BRACKET: {
+        p += 1;
+        pCh = at(pattern, p);
+        if (pCh === CARET)
+          pCh = EXCLAMATION;
+        const negated = pCh === EXCLAMATION;
+        if (negated) {
+          p += 1;
+          pCh = at(pattern, p);
+        }
+        let prevCh = 0;
+        let matched = false;
+        do {
+          if (pCh === 0)
+            return WM_ABORT_ALL;
+          if (pCh === BACKSLASH) {
+            p += 1;
+            pCh = at(pattern, p);
+            if (pCh === 0)
+              return WM_ABORT_ALL;
+            if (tCh === pCh)
+              matched = true;
+          } else if (pCh === HYPHEN && prevCh !== 0 && at(pattern, p + 1) !== 0 && at(pattern, p + 1) !== CLOSE_BRACKET) {
+            p += 1;
+            pCh = at(pattern, p);
+            if (pCh === BACKSLASH) {
+              p += 1;
+              pCh = at(pattern, p);
+              if (pCh === 0)
+                return WM_ABORT_ALL;
+            }
+            if (tCh <= pCh && tCh >= prevCh)
+              matched = true;
+            pCh = 0;
+          } else if (pCh === OPEN_BRACKET && at(pattern, p + 1) === COLON) {
+            const classStart = p + 2;
+            p = classStart;
+            while ((pCh = at(pattern, p)) !== 0 && pCh !== CLOSE_BRACKET)
+              p += 1;
+            if (pCh === 0)
+              return WM_ABORT_ALL;
+            const classLength = p - classStart - 1;
+            if (classLength < 0 || at(pattern, p - 1) !== COLON) {
+              p = classStart - 2;
+              pCh = OPEN_BRACKET;
+              if (tCh === pCh)
+                matched = true;
+            } else {
+              const className = asciiDecoder.decode(pattern.subarray(classStart, classStart + classLength));
+              const member = inClass(className, tCh);
+              if (member === void 0)
+                return WM_ABORT_ALL;
+              if (member)
+                matched = true;
+              pCh = 0;
+            }
+          } else if (tCh === pCh) {
+            matched = true;
+          }
+          prevCh = pCh;
+          p += 1;
+          pCh = at(pattern, p);
+        } while (pCh !== CLOSE_BRACKET);
+        if (matched === negated || pathname && tCh === SLASH)
+          return WM_NOMATCH;
+        continue;
+      }
+      default:
+        if (tCh !== pCh)
+          return WM_NOMATCH;
+        continue;
+    }
+  }
+  return t < text.length && text[t] !== 0 ? WM_NOMATCH : WM_MATCH;
+}
+function wildmatch(pattern, text, pathname) {
+  return doWild(pattern, 0, text, 0, pathname) === WM_MATCH;
+}
+function trimTrailingSpaces(line) {
+  let lastSpace = -1;
+  for (let index = 0; index < line.length; index += 1) {
+    const byte = line[index];
+    if (byte === SPACE) {
+      if (lastSpace === -1)
+        lastSpace = index;
+    } else if (byte === BACKSLASH) {
+      index += 1;
+      if (index >= line.length)
+        return line;
+      lastSpace = -1;
+    } else {
+      lastSpace = -1;
+    }
+  }
+  return lastSpace === -1 ? line : line.subarray(0, lastSpace);
+}
+function simpleLength(bytes) {
+  let length = 0;
+  while (length < bytes.length && !isGlobSpecial(bytes[length]))
+    length += 1;
+  return length;
+}
+function parsePattern(line, base, source) {
+  let bytes = line;
+  let negative = false;
+  if (bytes[0] === EXCLAMATION) {
+    negative = true;
+    bytes = bytes.subarray(1);
+  }
+  const endsWith = bytes[0] === STAR && simpleLength(bytes.subarray(1)) === bytes.length - 1;
+  let mustBeDirectory = false;
+  if (bytes.length > 0 && bytes[bytes.length - 1] === SLASH) {
+    bytes = bytes.subarray(0, bytes.length - 1);
+    mustBeDirectory = true;
+  }
+  if (bytes.length === 0)
+    return null;
+  const noDirectory = !bytes.includes(SLASH);
+  const noWildcardLength = Math.min(simpleLength(bytes), bytes.length);
+  return {
+    pattern: bytes,
+    noWildcardLength,
+    negative,
+    mustBeDirectory,
+    noDirectory,
+    endsWith,
+    base,
+    source
+  };
+}
+function nfcBytes(text) {
+  return encoder2.encode(text.normalize("NFC"));
+}
+function parseGitignore(text, base, source) {
+  const baseBytes = typeof base === "string" ? nfcBytes(base) : base;
+  const bytes = nfcBytes(text);
+  const patterns = [];
+  let start = 0;
+  const buffer = bytes.length > 0 && bytes[bytes.length - 1] !== LINE_FEED ? Uint8Array.from([...bytes, LINE_FEED]) : bytes;
+  for (let index = 0; index < buffer.length; index += 1) {
+    if (buffer[index] !== LINE_FEED)
+      continue;
+    if (index !== start && buffer[start] !== HASH) {
+      const end = index > start && buffer[index - 1] === CARRIAGE_RETURN ? index - 1 : index;
+      const pattern = parsePattern(trimTrailingSpaces(buffer.subarray(start, end)), baseBytes, source);
+      if (pattern !== null)
+        patterns.push(pattern);
+    }
+    start = index + 1;
+  }
+  return { patterns };
+}
+function parseExcludePatterns(entries) {
+  return parseGitignore(entries.map((entry) => `${entry}
+`).join(""), "", "package_exclude");
+}
+function bytesEqual(left, leftStart, right, rightStart, length) {
+  for (let index = 0; index < length; index += 1) {
+    if (left[leftStart + index] !== right[rightStart + index])
+      return false;
+  }
+  return true;
+}
+function matchBasename(basename4, pattern) {
+  const { pattern: bytes, noWildcardLength } = pattern;
+  if (noWildcardLength === bytes.length) {
+    return bytes.length === basename4.length && bytesEqual(bytes, 0, basename4, 0, bytes.length);
+  }
+  if (pattern.endsWith) {
+    const suffixLength = bytes.length - 1;
+    return suffixLength <= basename4.length && bytesEqual(bytes, 1, basename4, basename4.length - suffixLength, suffixLength);
+  }
+  return wildmatch(bytes, basename4, false);
+}
+function matchPathname(pathname, pattern) {
+  let bytes = pattern.pattern;
+  let prefix = pattern.noWildcardLength;
+  if (bytes[0] === SLASH) {
+    bytes = bytes.subarray(1);
+    prefix -= 1;
+  }
+  const base = pattern.base;
+  const baseLength = base.length;
+  if (pathname.length < baseLength + 1 || baseLength > 0 && pathname[baseLength] !== SLASH || !bytesEqual(pathname, 0, base, 0, baseLength)) {
+    return false;
+  }
+  let name = baseLength > 0 ? pathname.subarray(baseLength + 1) : pathname;
+  if (prefix > 0) {
+    if (prefix > name.length)
+      return false;
+    if (!bytesEqual(bytes, 0, name, 0, prefix))
+      return false;
+    bytes = bytes.subarray(prefix);
+    name = name.subarray(prefix);
+    if (bytes.length === 0 && name.length === 0)
+      return true;
+  }
+  return wildmatch(bytes, name, true);
+}
+function lastMatchingPattern(list, pathname, basename4, isDirectory2) {
+  for (let index = list.patterns.length - 1; index >= 0; index -= 1) {
+    const pattern = list.patterns[index];
+    if (pattern.mustBeDirectory && !isDirectory2)
+      continue;
+    if (pattern.noDirectory) {
+      if (matchBasename(basename4, pattern))
+        return pattern;
+      continue;
+    }
+    if (matchPathname(pathname, pattern))
+      return pattern;
+  }
+  return null;
+}
+function excludingSource(gitignoreLists, manifestList, pathname, basename4, isDirectory2) {
+  for (let index = gitignoreLists.length - 1; index >= 0; index -= 1) {
+    const matched = lastMatchingPattern(gitignoreLists[index], pathname, basename4, isDirectory2);
+    if (matched !== null)
+      return matched.negative ? null : matched.source;
+  }
+  if (manifestList !== null) {
+    const matched = lastMatchingPattern(manifestList, pathname, basename4, isDirectory2);
+    if (matched !== null)
+      return matched.negative ? null : matched.source;
+  }
+  return null;
+}
+var SLASH, BACKSLASH, STAR, QUESTION, OPEN_BRACKET, CLOSE_BRACKET, EXCLAMATION, CARET, HYPHEN, COLON, SPACE, HASH, CARRIAGE_RETURN, LINE_FEED, encoder2, asciiDecoder, WM_MATCH, WM_NOMATCH, WM_ABORT_ALL, WM_ABORT_TO_STARSTAR;
+var init_gitignore = __esm({
+  "node_modules/mthds/dist/method-tree/gitignore.js"() {
+    SLASH = 47;
+    BACKSLASH = 92;
+    STAR = 42;
+    QUESTION = 63;
+    OPEN_BRACKET = 91;
+    CLOSE_BRACKET = 93;
+    EXCLAMATION = 33;
+    CARET = 94;
+    HYPHEN = 45;
+    COLON = 58;
+    SPACE = 32;
+    HASH = 35;
+    CARRIAGE_RETURN = 13;
+    LINE_FEED = 10;
+    encoder2 = new TextEncoder();
+    asciiDecoder = new TextDecoder();
+    WM_MATCH = 0;
+    WM_NOMATCH = 1;
+    WM_ABORT_ALL = -1;
+    WM_ABORT_TO_STARSTAR = -2;
+  }
+});
+
+// node_modules/mthds/dist/method-tree/function-names.js
+function isValidSegment(segment) {
+  return PYTHON_IDENTIFIER.test(segment) && !PYTHON_KEYWORDS.has(segment) && segment.normalize("NFKC") === segment;
+}
+function locateFunction(functionName, isMember) {
+  const name = functionName.normalize("NFC");
+  if (!name.includes(".")) {
+    return { kind: "refused", code: "function_name_without_module", names: [functionName] };
+  }
+  const segments = name.split(".");
+  if (!segments.every(isValidSegment)) {
+    return { kind: "refused", code: "function_name_invalid_segment", names: [functionName] };
+  }
+  const modulePath = segments.slice(0, -1).join("/");
+  const held = [`${modulePath}.py`, `${modulePath}/__init__.py`].filter(isMember);
+  if (held.length === 0) {
+    return { kind: "refused", code: "module_not_in_tree", names: [functionName] };
+  }
+  if (held.length > 1)
+    return { kind: "refused", code: "module_ambiguous", names: held };
+  return { kind: "located", module: held[0], function: segments[segments.length - 1] };
+}
+var PYTHON_KEYWORDS, PYTHON_IDENTIFIER;
+var init_function_names = __esm({
+  "node_modules/mthds/dist/method-tree/function-names.js"() {
+    PYTHON_KEYWORDS = /* @__PURE__ */ new Set([
+      "False",
+      "None",
+      "True",
+      "and",
+      "as",
+      "assert",
+      "async",
+      "await",
+      "break",
+      "class",
+      "continue",
+      "def",
+      "del",
+      "elif",
+      "else",
+      "except",
+      "finally",
+      "for",
+      "from",
+      "global",
+      "if",
+      "import",
+      "in",
+      "is",
+      "lambda",
+      "nonlocal",
+      "not",
+      "or",
+      "pass",
+      "raise",
+      "return",
+      "try",
+      "while",
+      "with",
+      "yield"
+    ]);
+    PYTHON_IDENTIFIER = new RegExp("^[\\p{XID_Start}_]\\p{XID_Continue}*$", "u");
+  }
+});
+
+// node_modules/mthds/dist/method-tree/references.js
+function urlPathPart(reference) {
+  return reference.split("#", 1)[0].split("?", 1)[0];
+}
+function countControlCharacters(text) {
+  let count = 0;
+  for (const character of text)
+    if (holdsControlCharacter(character))
+      count += 1;
+  return count;
+}
+function isFileReference(reference, context) {
+  if (context === "path")
+    return true;
+  if (SCHEME.test(reference))
+    return false;
+  const pathPart = urlPathPart(reference);
+  return pathPart !== "" && !pathPart.startsWith("//");
+}
+function percentDecodeSegment(segment) {
+  if (MALFORMED_PERCENT_ESCAPE.test(segment))
+    return null;
+  let decoded = "";
+  let index = 0;
+  while (index < segment.length) {
+    if (segment[index] !== "%") {
+      decoded += segment[index];
+      index += 1;
+      continue;
+    }
+    const bytes = [];
+    while (index < segment.length && segment[index] === "%") {
+      bytes.push(Number.parseInt(segment.slice(index + 1, index + 3), 16));
+      index += 3;
+    }
+    try {
+      decoded += strictUtf82.decode(Uint8Array.from(bytes));
+    } catch {
+      return null;
+    }
+  }
+  return decoded;
+}
+function referencePath(reference, context) {
+  let path;
+  if (context === "path") {
+    if (reference === "")
+      return { code: "reference_not_a_tree_path" };
+    if (SCHEME.test(reference) || reference.startsWith("/") || reference.includes("\\")) {
+      return { code: "reference_invalid" };
+    }
+    path = reference;
+  } else {
+    const pathPart = urlPathPart(reference);
+    if (pathPart.startsWith("/") || pathPart.includes("\\"))
+      return { code: "reference_invalid" };
+    const segments = [];
+    for (const segment of pathPart.split("/")) {
+      const decoded = percentDecodeSegment(segment);
+      if (decoded === null)
+        return { code: "reference_invalid" };
+      const makesControl = countControlCharacters(decoded) > countControlCharacters(segment);
+      if (decoded.includes("/") || decoded.includes("\\") || makesControl) {
+        return { code: "reference_invalid" };
+      }
+      segments.push(decoded);
+    }
+    path = segments.join("/");
+  }
+  return { path: path.normalize("NFC") };
+}
+function lexicalJoin(holder, path) {
+  const resolved = [];
+  for (const segment of [...holder.split("/").slice(0, -1), ...path.split("/")]) {
+    if (segment === ".")
+      continue;
+    if (segment === "..") {
+      if (resolved.length === 0)
+        return null;
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+  return resolved;
+}
+function resolveFileReference(input) {
+  const { holder, reference, context, isMember } = input;
+  if (!isFileReference(reference, context))
+    return { kind: "not_a_reference" };
+  const named = referencePath(reference, context);
+  if ("code" in named)
+    return { kind: "refused", code: named.code, reference };
+  const segments = lexicalJoin(holder, named.path);
+  if (segments === null)
+    return { kind: "refused", code: "reference_leaves_tree", reference };
+  const namesRoot = segments.length === 0 || segments.length === 1 && segments[0] === "";
+  const joined = namesRoot ? "" : segments.join("/");
+  if (!namesRoot && treePathViolation(joined) !== null) {
+    return { kind: "refused", code: "reference_not_a_tree_path", reference, resolved: joined };
+  }
+  if (input.oneFileTree === true && (namesRoot || !isMember(joined))) {
+    return { kind: "refused", code: "reference_in_one_file_tree", reference };
+  }
+  if (namesRoot) {
+    return { kind: "refused", code: "reference_not_in_tree", reference, resolved: ROOT_RESOLVED };
+  }
+  if (!isMember(joined)) {
+    return { kind: "refused", code: "reference_not_in_tree", reference, resolved: joined };
+  }
+  return { kind: "tree_path", treePath: joined };
+}
+var ROOT_RESOLVED, SCHEME, MALFORMED_PERCENT_ESCAPE, strictUtf82;
+var init_references = __esm({
+  "node_modules/mthds/dist/method-tree/references.js"() {
+    init_tree_path();
+    ROOT_RESOLVED = ".";
+    SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+    MALFORMED_PERCENT_ESCAPE = /%(?![0-9A-Fa-f]{2})/;
+    strictUtf82 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  }
+});
+
+// node_modules/mthds/dist/method-tree/tree.js
+import { readdir } from "node:fs/promises";
+import { sep } from "node:path";
+function referenceMessage(refusal2) {
+  const { reference, resolved } = refusal2;
+  switch (refusal2.code) {
+    case "reference_invalid":
+      return `The reference '${reference}' is malformed: a file reference is a relative path, with no backslash, no scheme and no authority, and in a URL no malformed percent-escape.`;
+    case "reference_leaves_tree":
+      return `The reference '${reference}' climbs above the root of its method tree.`;
+    case "reference_not_a_tree_path":
+      return resolved === void 0 ? "The reference is empty." : `The reference '${reference}' resolves to '${resolved}', which is not a tree path.`;
+    case "reference_in_one_file_tree":
+      return `The reference '${reference}' names a file beside a .mthds file named alone, which travels without the files beside it: run the method's directory, or add a METHODS.toml to make that directory a method's root.`;
+    case "reference_not_in_tree": {
+      if (resolved === ROOT_RESOLVED) {
+        return `The reference '${reference}' names the root of the tree, not a file of it.`;
+      }
+      if (refusal2.excludedBy === void 0) {
+        return `The reference '${reference}' resolves to '${resolved}', which is not a file of the method tree.`;
+      }
+      const directory = refusal2.excludedDirectory === void 0 ? "" : ` in '${refusal2.excludedDirectory}'`;
+      const why = {
+        dot_segment: "a name starting with a dot is never part of a tree",
+        pycache_or_node_modules: "a __pycache__ or node_modules directory is never part of a tree",
+        virtual_environment: "a Python virtual environment is never part of a tree",
+        nested_repository: `the nested repository${directory} is out of the tree`,
+        nested_package: `the nested package${directory} is a tree of its own`,
+        run_inputs: "a file named inputs.json or inputs.toml is a run's inputs, never part of a tree",
+        gitignore: "a .gitignore file of the tree excludes it",
+        package_exclude: "the manifest's exclude patterns exclude it"
+      };
+      return `The reference '${reference}' resolves to '${resolved}', which the membership rule keeps out of the method tree: ${why[refusal2.excludedBy]}.`;
+    }
+  }
+}
+async function holdsFileBelow(absolute, segments) {
+  let current = absolute;
+  for (let index = 0; index < segments.length; index += 1) {
+    let dirents;
+    try {
+      dirents = await readdir(current, { withFileTypes: true, encoding: "buffer" });
+    } catch {
+      return false;
+    }
+    const last = index === segments.length - 1;
+    const found = dirents.find((dirent) => {
+      let name;
+      try {
+        name = strictUtf83.decode(dirent.name);
+      } catch {
+        return false;
+      }
+      return name.normalize("NFC") === segments[index];
+    });
+    if (found === void 0)
+      return false;
+    const kind = entryKindOf(found);
+    if (last)
+      return kind !== "directory";
+    if (kind !== "directory")
+      return false;
+    current = Buffer.concat([current, Buffer.from(sep), found.name]);
+  }
+  return false;
+}
+var strictUtf83, MethodTree;
+var init_tree = __esm({
+  "node_modules/mthds/dist/method-tree/tree.js"() {
+    init_exceptions3();
+    init_file_reading();
+    init_function_names();
+    init_references();
+    init_membership();
+    init_file_entry_encoding();
+    init_tree_path();
+    strictUtf83 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+    MethodTree = class {
+      /** The absolute path of the root, or `null` for the one-file tree of a `.mthds` file alone. */
+      root;
+      /** The tree path of the `.mthds` file handed over alone, or `null` for a directory. */
+      entry;
+      /** The tree's files, sorted by tree path byte for byte. */
+      files;
+      /** The tree digest, `sha256:` and 64 lowercase hexadecimal digits. */
+      digest;
+      /** The total of the files' sizes, in bytes. */
+      totalSize;
+      absolutes;
+      byPath;
+      exclusions;
+      constructor(init) {
+        this.root = init.root;
+        this.entry = init.entry;
+        this.files = init.files;
+        this.digest = init.digest;
+        this.totalSize = init.files.reduce((total, file) => total + file.size, 0);
+        this.absolutes = init.absolutes;
+        this.byPath = new Map(init.files.map((file) => [file.path, file]));
+        this.exclusions = init.exclusions;
+      }
+      /** Whether the tree is the one-file tree of a `.mthds` file named alone, with no manifest. */
+      get isOneFileTree() {
+        return this.root === null;
+      }
+      /** Whether `treePath` names a file of the tree. */
+      has(treePath) {
+        return this.absolutes.has(treePath);
+      }
+      /**
+       * The absolute path of a file of the tree as the file system spells it, which can differ from its
+       * tree path, normalized to NFC (a name written decomposed, for one), or `undefined` for a tree path
+       * the tree does not hold.
+       */
+      onDiskPath(treePath) {
+        return this.absolutes.get(treePath)?.toString();
+      }
+      /**
+       * A file's bytes, read again as the listing read them, never through a link, and checked against
+       * the hash the listing recorded.
+       */
+      async readFile(treePath) {
+        const absolute = this.absolutes.get(treePath);
+        const listed = this.byPath.get(treePath);
+        if (absolute === void 0 || listed === void 0) {
+          throw new MethodTreeError("not_found", `'${treePath}' is not a file of the method tree.`, {
+            names: [treePath]
+          });
+        }
+        const { bytes, sha256 } = await readMember(absolute, treePath, this.root ?? absolute.toString(), true);
+        if (sha256 !== listed.sha256 || bytes === null) {
+          throw new MethodTreeError("not_listable", `'${treePath}' changed since the method tree was listed; list it again.`, { names: [treePath] });
+        }
+        return bytes;
+      }
+      /**
+       * The tree as a map of file entries: a file whose bytes are UTF-8 as its text, any other in
+       * Base64.
+       */
+      async toMethodFiles() {
+        const entries = {};
+        for (const file of this.files) {
+          defineFileEntry(entries, file.path, inlineFileEntry(await this.readFile(file.path)));
+        }
+        return entries;
+      }
+      /** Locate a `PipeFunc`'s function, named by its import path from the root, among the files. */
+      locateFunction(functionName) {
+        return locateFunction(functionName, (treePath) => this.has(treePath));
+      }
+      /**
+       * Resolve a file reference written in one of the tree's files. A reference to a file the
+       * membership rule keeps out says which rule does, and for a nested repository or package, which
+       * directory.
+       */
+      async resolveReference(input) {
+        const bare = resolveFileReference({
+          ...input,
+          isMember: (treePath) => this.has(treePath),
+          oneFileTree: this.isOneFileTree
+        });
+        if (bare.kind !== "refused")
+          return bare;
+        let refusal2 = {
+          code: bare.code,
+          reference: bare.reference,
+          ...bare.resolved !== void 0 ? { resolved: bare.resolved } : {}
+        };
+        if (bare.code === "reference_not_in_tree" && bare.resolved !== void 0) {
+          const exclusion = await this.exclusionOfFileAt(bare.resolved);
+          if (exclusion !== null) {
+            refusal2 = {
+              ...refusal2,
+              excludedBy: exclusion.rule,
+              ...namesExcludedDirectory(exclusion.rule) && exclusion.directory !== null ? { excludedDirectory: exclusion.directory } : {}
+            };
+          }
+        }
+        return { kind: "refused", refusal: { ...refusal2, message: referenceMessage(refusal2) } };
+      }
+      /**
+       * The exclusion keeping out the file at `treePath`, or `null` when no file the rule excludes is
+       * there: the exclusion recorded at the path itself when it is not a directory, or at an excluded
+       * directory above it when a look inside that directory, never following a link, finds a file at
+       * the path.
+       */
+      async exclusionOfFileAt(treePath) {
+        if (treePath === ROOT_RESOLVED)
+          return null;
+        const prefixes = ["", ...directoriesOf(treePath)];
+        for (const prefix of prefixes) {
+          const exclusion2 = this.exclusions.get(prefix);
+          if (exclusion2 === void 0)
+            continue;
+          if (!exclusion2.isDirectory)
+            return null;
+          const below = (prefix === "" ? treePath : treePath.slice(prefix.length + 1)).split("/");
+          return await holdsFileBelow(exclusion2.absolute, below) ? exclusion2 : null;
+        }
+        const exclusion = this.exclusions.get(treePath);
+        return exclusion !== void 0 && !exclusion.isDirectory ? exclusion : null;
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/method-tree/lister.js
+import { lstat, readFile, readdir as readdir2, realpath, stat } from "node:fs/promises";
+import { basename as basename2, dirname as dirname2, join as join3, relative, resolve as resolve2, sep as sep2 } from "node:path";
+function joinPath(directory, name) {
+  return directory === "" ? name : `${directory}/${name}`;
+}
+function refusal(code, message, names, extra = {}) {
+  return new MethodTreeError(code, message, { names, ...extra });
+}
+function describeIoError(err) {
+  return err instanceof Error ? err.message : String(err);
+}
+async function lstatSize(absolute, path, where) {
+  try {
+    return (await lstat(absolute)).size;
+  } catch (err) {
+    throw new MethodTreeError("not_listable", `Cannot read '${path}' under ${where}: ${describeIoError(err)}`, { names: [path] });
+  }
+}
+async function readEntries(absolute, displayPath) {
+  let dirents;
+  try {
+    dirents = await readdir2(absolute, { withFileTypes: true, encoding: "buffer" });
+  } catch (err) {
+    throw new MethodTreeError("not_listable", `Cannot list the directory '${displayPath}': ${describeIoError(err)}`, { names: [displayPath] });
+  }
+  return dirents.map((dirent) => {
+    const nameBytes = dirent.name;
+    let rawName;
+    let validUtf8 = true;
+    try {
+      rawName = strictUtf84.decode(nameBytes);
+    } catch {
+      rawName = lenientUtf8.decode(nameBytes);
+      validUtf8 = false;
+    }
+    const name = validUtf8 ? rawName.normalize("NFC") : rawName;
+    return {
+      nameBytes,
+      name,
+      rawName,
+      validUtf8,
+      matchBytes: validUtf8 ? Buffer.from(name, "utf8") : nameBytes,
+      kind: entryKindOf(dirent)
+    };
+  }).sort((left, right) => Buffer.compare(left.nameBytes, right.nameBytes));
+}
+function findEntry(entries, name) {
+  return entries.find((entry) => entry.validUtf8 && entry.rawName === name);
+}
+function markerExclusion(entries, belowRoot) {
+  let found = null;
+  for (const entry of entries) {
+    if (!entry.validUtf8)
+      continue;
+    const rule = markerRule(entry.rawName, entry.kind, belowRoot);
+    if (rule !== null && (found === null || MARKER_RULES.indexOf(rule) < MARKER_RULES.indexOf(found))) {
+      found = rule;
+    }
+  }
+  return found;
+}
+async function tryReadEntries(absolute, displayPath) {
+  try {
+    return await readEntries(absolute, displayPath);
+  } catch (err) {
+    if (err instanceof MethodTreeError)
+      return null;
+    throw err;
+  }
+}
+async function readGitignore(directory, root) {
+  const entry = findEntry(directory.entries, GITIGNORE_NAME);
+  if (entry === void 0 || entry.kind !== "file")
+    return null;
+  const path = joinPath(directory.path, GITIGNORE_NAME);
+  let bytes;
+  try {
+    bytes = await readFile(Buffer.concat([directory.absolute, SEPARATOR, entry.nameBytes]));
+  } catch (err) {
+    throw new MethodTreeError("not_listable", `Cannot read '${path}' under ${root}: ${describeIoError(err)}`, { names: [path] });
+  }
+  const body = bytes.subarray(0, 3).equals(UTF8_BOM) ? bytes.subarray(3) : bytes;
+  let text;
+  try {
+    text = strictUtf84.decode(body);
+  } catch {
+    throw new MethodTreeError("gitignore_not_utf8", `The file '${path}' under ${root} is not UTF-8; a .gitignore file of a method tree is read as UTF-8, so re-save it in that encoding.`, { names: [path] });
+  }
+  return parseGitignore(text, directory.matchPath, "gitignore");
+}
+async function walk(listing, directory) {
+  const ownPatterns = await readGitignore(directory, listing.root);
+  const gitignoreLists = ownPatterns === null ? directory.gitignoreLists : [...directory.gitignoreLists, ownPatterns];
+  const byName = /* @__PURE__ */ new Map();
+  for (const entry of directory.entries) {
+    if (!entry.validUtf8)
+      continue;
+    const group = byName.get(entry.name) ?? /* @__PURE__ */ new Set();
+    group.add(entry.rawName);
+    byName.set(entry.name, group);
+  }
+  for (const [name, rawNames] of byName) {
+    if (rawNames.size < 2)
+      continue;
+    listing.spellings.set(joinPath(directory.path, name), new Set([...rawNames].map((rawName) => joinPath(directory.rawPath, rawName))));
+  }
+  for (const entry of directory.entries) {
+    const path = joinPath(directory.path, entry.name);
+    const rawPath = joinPath(directory.rawPath, entry.rawName);
+    const absolute = Buffer.concat([directory.absolute, SEPARATOR, entry.nameBytes]);
+    const matchPath = directory.matchPath.length === 0 ? entry.matchBytes : Buffer.concat([directory.matchPath, SLASH2, entry.matchBytes]);
+    const isDirectory2 = entry.kind === "directory";
+    let rule = null;
+    let children = null;
+    if (isDotSegment(entry.rawName)) {
+      rule = "dot_segment";
+    } else if (isDirectory2 && isDefaultExcludedDirectory(entry.rawName)) {
+      rule = "pycache_or_node_modules";
+    } else if (isRunInputsFile(entry.rawName, entry.kind)) {
+      rule = "run_inputs";
+    } else {
+      const patternRule = excludingSource(gitignoreLists, listing.manifestPatterns, matchPath, entry.matchBytes, isDirectory2);
+      if (isDirectory2) {
+        const displayPath = `${listing.root}${sep2}${rawPath}`;
+        children = patternRule === null ? await readEntries(absolute, displayPath) : await tryReadEntries(absolute, displayPath);
+        if (children !== null)
+          rule = markerExclusion(children, true);
+      }
+      rule ??= patternRule;
+    }
+    if (rule !== null) {
+      listing.exclusions.set(path, {
+        rule,
+        directory: isMarkerRule(rule) ? path : null,
+        isDirectory: isDirectory2,
+        absolute
+      });
+      continue;
+    }
+    switch (entry.kind) {
+      case "symlink":
+        throw refusal("symbolic_link", `The method tree at ${listing.root} holds a symbolic link, '${path}': a link is never followed. Replace it with the file itself, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+      case "other":
+        throw refusal("special_file", `The method tree at ${listing.root} holds '${path}', which is neither a file nor a directory, such as a named pipe or a device. Remove it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+      case "directory":
+        await walk(listing, {
+          absolute,
+          path,
+          rawPath,
+          matchPath,
+          invalidName: directory.invalidName || !entry.validUtf8,
+          gitignoreLists,
+          entries: children
+        });
+        continue;
+      case "file": {
+        const violation = directory.invalidName || !entry.validUtf8 ? "a name on the path is not UTF-8" : treePathViolation(path);
+        if (violation !== null) {
+          throw refusal("invalid_tree_path", `The method tree at ${listing.root} holds '${path}', which is not a tree path: ${violation}. Rename it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+        }
+        listing.count(path, await lstatSize(absolute, path, listing.root));
+        listing.members.push({ path, absolute });
+        continue;
+      }
+    }
+  }
+}
+async function readManifestPatterns(root) {
+  const manifestPath = join3(root, MANIFEST_NAME);
+  let raw;
+  try {
+    raw = parse(await readFile(manifestPath, "utf-8"));
+  } catch (err) {
+    throw new MethodTreeError("manifest_invalid", `Cannot read the exclude patterns of ${manifestPath}: ${describeIoError(err)}`, { names: [MANIFEST_NAME] });
+  }
+  const packageSection = raw["package"];
+  const exclude = packageSection !== null && typeof packageSection === "object" && !Array.isArray(packageSection) ? packageSection["exclude"] : void 0;
+  if (exclude === void 0)
+    return null;
+  if (!Array.isArray(exclude) || !exclude.every((pattern) => typeof pattern === "string" && isValidExcludePattern(pattern))) {
+    throw new MethodTreeError("manifest_invalid", `[package] exclude in ${manifestPath} must be an array of patterns, each a string without a line break.`, { names: [MANIFEST_NAME] });
+  }
+  return parseExcludePatterns(exclude);
+}
+function exclusionCovering(exclusions, treePath) {
+  for (const prefix of ["", ...directoriesOf(treePath), treePath]) {
+    const exclusion = exclusions.get(prefix);
+    if (exclusion !== void 0)
+      return exclusion;
+  }
+  return void 0;
+}
+async function hashMembers(members, where) {
+  const sorted = [...members].sort((left, right) => compareUtf8(left.path, right.path));
+  const files = [];
+  const absolutes = /* @__PURE__ */ new Map();
+  for (const member of sorted) {
+    const { size, sha256 } = await readMember(member.absolute, member.path, where, false);
+    files.push({ path: member.path, size, sha256 });
+    absolutes.set(member.path, member.absolute);
+  }
+  return { files, absolutes };
+}
+async function listOneFileTree(file, kind, limits) {
+  const name = basename2(file).normalize("NFC");
+  if (name.startsWith(".")) {
+    throw refusal("lone_file_excluded", `The file '${name}' starts with a dot, so the membership rule keeps it out of its own tree; rename it.`, [name], { excludedBy: "dot_segment" });
+  }
+  if (kind === "symlink") {
+    throw refusal("symbolic_link", `'${file}' is a symbolic link, which a method tree never follows; hand over the file it points to.`, [name]);
+  }
+  if (kind !== "file") {
+    throw refusal("special_file", `'${file}' is neither a file nor a directory, such as a named pipe or a device.`, [name]);
+  }
+  const violation = treePathViolation(name);
+  if (violation !== null) {
+    throw refusal("invalid_tree_path", `'${name}' is not a tree path: ${violation}.`, [name]);
+  }
+  const listing = new Listing(file, null, limits);
+  listing.count(name, await lstatSize(file, name, file));
+  const { files, absolutes } = await hashMembers([{ path: name, absolute: Buffer.from(file) }], file);
+  return new MethodTree({
+    root: null,
+    entry: name,
+    files,
+    digest: treeDigest(files),
+    absolutes,
+    exclusions: /* @__PURE__ */ new Map()
+  });
+}
+async function readHandedOver(handedOver) {
+  const absolute = resolve2(handedOver);
+  try {
+    const stats = await lstat(absolute);
+    if (stats.isDirectory() || stats.isSymbolicLink() && await isDirectoryBehind(absolute)) {
+      return { kind: "directory", directory: await realpath(absolute) };
+    }
+    const file = stats.isSymbolicLink() ? join3(await realpath(dirname2(absolute)), basename2(absolute)) : await realpath(absolute);
+    return { kind: "lone", file, entryKind: entryKindOf(stats) };
+  } catch (err) {
+    throw new MethodTreeError("not_found", `Cannot read '${handedOver}': ${describeIoError(err)}`, {
+      names: [handedOver]
+    });
+  }
+}
+async function isDirectoryBehind(link) {
+  try {
+    return (await stat(link)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+async function listMethodTree(handedOver, options = {}) {
+  const limits = options.limits ?? {};
+  const handed = await readHandedOver(handedOver);
+  if (handed.kind === "lone" && !handed.file.endsWith(".mthds")) {
+    throw new MethodTreeError("not_listable", `'${handedOver}' is not a .mthds file; hand over a method's directory or a .mthds file.`, { names: [handedOver] });
+  }
+  const start = handed.kind === "directory" ? handed.directory : dirname2(handed.file);
+  const manifestDirectory = handed.kind === "directory" && options.discover === false ? null : findManifestDirectory(start);
+  if (handed.kind === "lone" && manifestDirectory === null) {
+    return listOneFileTree(handed.file, handed.entryKind, limits);
+  }
+  const root = manifestDirectory ?? start;
+  const manifestPatterns = exactEntryKind(root, MANIFEST_NAME) === "file" ? await readManifestPatterns(root) : null;
+  const listing = new Listing(root, manifestPatterns, limits);
+  const rootAbsolute = Buffer.from(root);
+  const rootEntries = await readEntries(rootAbsolute, root);
+  if (markerExclusion(rootEntries, false) === "virtual_environment") {
+    listing.exclusions.set("", {
+      rule: "virtual_environment",
+      directory: ".",
+      isDirectory: true,
+      absolute: rootAbsolute
+    });
+  } else {
+    await walk(listing, {
+      absolute: rootAbsolute,
+      path: "",
+      rawPath: "",
+      matchPath: Buffer.alloc(0),
+      invalidName: false,
+      gitignoreLists: [],
+      entries: rootEntries
+    });
+  }
+  const memberPaths = listing.members.map((member) => member.path);
+  const collidingSpellings = /* @__PURE__ */ new Set();
+  for (const memberPath of memberPaths) {
+    for (const prefix of [...directoriesOf(memberPath), memberPath]) {
+      for (const spelling of listing.spellings.get(prefix) ?? [])
+        collidingSpellings.add(spelling);
+    }
+  }
+  if (collidingSpellings.size > 0) {
+    const names = [...collidingSpellings].sort(compareUtf8);
+    throw refusal("normalization_collision", `The method tree at ${root} holds names that are equal once normalized to NFC: ${names.join(", ")}. Keep one spelling.`, names);
+  }
+  const collisions = pathCollisions(memberPaths);
+  if (collisions.length > 0) {
+    throw refusal("path_collision", `The method tree at ${root} holds paths that collide once case-folded, which a case-insensitive file system cannot hold apart: ${collisions.join(", ")}. Rename them.`, collisions);
+  }
+  let entry = null;
+  if (handed.kind === "lone") {
+    entry = relative(root, handed.file).split(sep2).map((segment) => segment.normalize("NFC")).join("/");
+    if (!memberPaths.includes(entry)) {
+      const exclusion = exclusionCovering(listing.exclusions, entry);
+      throw refusal("lone_file_excluded", `The file '${entry}' is not part of the method tree at ${root}${exclusion === void 0 ? "" : `, which the membership rule's ${exclusion.rule} rule keeps out`}.`, [entry], exclusion === void 0 ? {} : {
+        excludedBy: exclusion.rule,
+        ...exclusion.directory !== null && namesExcludedDirectory(exclusion.rule) ? { excludedDirectory: exclusion.directory } : {}
+      });
+    }
+  }
+  if (memberPaths.length === 0) {
+    throw refusal("empty_tree", `The method tree at ${root} holds no file; a tree holds at least one.`, []);
+  }
+  const { files, absolutes } = await hashMembers(listing.members, root);
+  return new MethodTree({
+    root,
+    entry,
+    files,
+    digest: treeDigest(files),
+    absolutes,
+    exclusions: listing.exclusions
+  });
+}
+var UTF8_BOM, SEPARATOR, SLASH2, strictUtf84, lenientUtf8, Listing;
+var init_lister = __esm({
+  "node_modules/mthds/dist/method-tree/lister.js"() {
+    init_dist();
+    init_discovery();
+    init_digest();
+    init_exceptions3();
+    init_file_reading();
+    init_gitignore();
+    init_membership();
+    init_tree_path();
+    init_tree();
+    UTF8_BOM = Buffer.from([239, 187, 191]);
+    SEPARATOR = Buffer.from(sep2);
+    SLASH2 = Buffer.from("/");
+    strictUtf84 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+    lenientUtf8 = new TextDecoder("utf-8", { ignoreBOM: true });
+    Listing = class {
+      root;
+      manifestPatterns;
+      limits;
+      members = [];
+      exclusions = /* @__PURE__ */ new Map();
+      /** NFC paths that two or more spellings on disk normalize to, with those spellings. */
+      spellings = /* @__PURE__ */ new Map();
+      fileCount = 0;
+      totalSize = 0;
+      constructor(root, manifestPatterns, limits) {
+        this.root = root;
+        this.manifestPatterns = manifestPatterns;
+        this.limits = limits;
+      }
+      /** Count a member from its `lstat` size, stopping at the first limit passed. */
+      count(path, size) {
+        const { maxFileSize, maxFileCount, maxTotalSize } = this.limits;
+        if (maxFileSize !== void 0 && size > maxFileSize) {
+          throw new TreeLimitExceededError(this.root, "maxFileSize", maxFileSize, size, path);
+        }
+        this.fileCount += 1;
+        if (maxFileCount !== void 0 && this.fileCount > maxFileCount) {
+          throw new TreeLimitExceededError(this.root, "maxFileCount", maxFileCount, this.fileCount);
+        }
+        this.totalSize += size;
+        if (maxTotalSize !== void 0 && this.totalSize > maxTotalSize) {
+          throw new TreeLimitExceededError(this.root, "maxTotalSize", maxTotalSize, this.totalSize);
+        }
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/method-tree/json-document.js
+function parseJsonDocument(text) {
+  return new Parser(text).parseDocument();
+}
+var JsonDocumentError, MAX_DEPTH, NUMBER, HEX4, Parser;
+var init_json_document = __esm({
+  "node_modules/mthds/dist/method-tree/json-document.js"() {
+    JsonDocumentError = class extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "JsonDocumentError";
+      }
+    };
+    MAX_DEPTH = 512;
+    NUMBER = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
+    HEX4 = /^[0-9A-Fa-f]{4}$/;
+    Parser = class {
+      text;
+      index = 0;
+      constructor(text) {
+        this.text = text;
+      }
+      parseDocument() {
+        this.skipWhitespace();
+        const value = this.parseValue(0);
+        this.skipWhitespace();
+        if (this.index !== this.text.length)
+          this.fail("unexpected text after the JSON value");
+        return value;
+      }
+      fail(reason) {
+        throw new JsonDocumentError(`Invalid JSON at offset ${this.index}: ${reason}`);
+      }
+      skipWhitespace() {
+        while (this.index < this.text.length) {
+          const character = this.text[this.index];
+          if (character === " " || character === "	" || character === "\n" || character === "\r") {
+            this.index += 1;
+          } else {
+            return;
+          }
+        }
+      }
+      expectLiteral(literal) {
+        if (this.text.startsWith(literal, this.index)) {
+          this.index += literal.length;
+          return;
+        }
+        this.fail(`expected ${literal}`);
+      }
+      parseValue(depth) {
+        if (depth > MAX_DEPTH)
+          this.fail("nested too deeply");
+        const character = this.text[this.index];
+        switch (character) {
+          case "{":
+            return this.parseObject(depth);
+          case "[":
+            return this.parseArray(depth);
+          case '"':
+            return { kind: "string", value: this.parseString() };
+          case "t":
+            this.expectLiteral("true");
+            return { kind: "boolean", value: true };
+          case "f":
+            this.expectLiteral("false");
+            return { kind: "boolean", value: false };
+          case "n":
+            this.expectLiteral("null");
+            return { kind: "null" };
+          default: {
+            NUMBER.lastIndex = this.index;
+            const match = NUMBER.exec(this.text);
+            if (match === null)
+              this.fail("expected a JSON value");
+            this.index += match[0].length;
+            return { kind: "number", lexeme: match[0] };
+          }
+        }
+      }
+      parseObject(depth) {
+        this.index += 1;
+        const pairs = [];
+        this.skipWhitespace();
+        if (this.text[this.index] === "}") {
+          this.index += 1;
+          return { kind: "object", pairs };
+        }
+        for (; ; ) {
+          this.skipWhitespace();
+          if (this.text[this.index] !== '"')
+            this.fail("expected a string key");
+          const key = this.parseString();
+          this.skipWhitespace();
+          if (this.text[this.index] !== ":")
+            this.fail("expected ':'");
+          this.index += 1;
+          this.skipWhitespace();
+          pairs.push([key, this.parseValue(depth + 1)]);
+          this.skipWhitespace();
+          const separator = this.text[this.index];
+          this.index += 1;
+          if (separator === "}")
+            return { kind: "object", pairs };
+          if (separator !== ",")
+            this.fail("expected ',' or '}'");
+        }
+      }
+      parseArray(depth) {
+        this.index += 1;
+        const items = [];
+        this.skipWhitespace();
+        if (this.text[this.index] === "]") {
+          this.index += 1;
+          return { kind: "array", items };
+        }
+        for (; ; ) {
+          this.skipWhitespace();
+          items.push(this.parseValue(depth + 1));
+          this.skipWhitespace();
+          const separator = this.text[this.index];
+          this.index += 1;
+          if (separator === "]")
+            return { kind: "array", items };
+          if (separator !== ",")
+            this.fail("expected ',' or ']'");
+        }
+      }
+      parseString() {
+        this.index += 1;
+        let value = "";
+        let runStart = this.index;
+        for (; ; ) {
+          if (this.index >= this.text.length)
+            this.fail("unterminated string");
+          const code = this.text.charCodeAt(this.index);
+          if (code === 34) {
+            value += this.text.slice(runStart, this.index);
+            this.index += 1;
+            return value;
+          }
+          if (code < 32)
+            this.fail("a control character must be escaped in a string");
+          if (code !== 92) {
+            this.index += 1;
+            continue;
+          }
+          value += this.text.slice(runStart, this.index);
+          const escape = this.text[this.index + 1];
+          this.index += 2;
+          switch (escape) {
+            case '"':
+              value += '"';
+              break;
+            case "\\":
+              value += "\\";
+              break;
+            case "/":
+              value += "/";
+              break;
+            case "b":
+              value += "\b";
+              break;
+            case "f":
+              value += "\f";
+              break;
+            case "n":
+              value += "\n";
+              break;
+            case "r":
+              value += "\r";
+              break;
+            case "t":
+              value += "	";
+              break;
+            case "u": {
+              const hex = this.text.slice(this.index, this.index + 4);
+              if (!HEX4.test(hex))
+                this.fail("expected four hexadecimal digits after \\u");
+              value += String.fromCharCode(Number.parseInt(hex, 16));
+              this.index += 4;
+              break;
+            }
+            default:
+              this.index -= 2;
+              this.fail("invalid escape in a string");
+          }
+          runStart = this.index;
+        }
+      }
+    };
+  }
+});
+
+// node_modules/mthds/dist/method-tree/file-entries.js
+function isBase64Character(code) {
+  return code >= 65 && code <= 90 || // A-Z
+  code >= 97 && code <= 122 || // a-z
+  code >= 48 && code <= 57 || // 0-9
+  code === 43 || // +
+  code === 47;
+}
+function decodeCanonicalBase64(encoded) {
+  if (encoded.length % 4 !== 0)
+    return null;
+  let end = encoded.length;
+  for (let padding = 0; padding < 2 && end > 0 && encoded.charCodeAt(end - 1) === EQUALS_SIGN; padding += 1) {
+    end -= 1;
+  }
+  for (let index = 0; index < end; index += 1) {
+    if (!isBase64Character(encoded.charCodeAt(index)))
+      return null;
+  }
+  const bytes = Buffer.from(encoded, "base64");
+  return bytes.toString("base64") === encoded ? new Uint8Array(bytes) : null;
+}
+function readEntry(entry) {
+  if (entry.kind === "string") {
+    if (holdsLoneSurrogate(entry.value))
+      return { kind: "refused", code: "malformed_entry" };
+    return { kind: "bytes", bytes: new Uint8Array(Buffer.from(entry.value, "utf8")) };
+  }
+  if (entry.kind !== "object")
+    return { kind: "refused", code: "malformed_entry" };
+  const keys = entry.pairs.map(([key]) => key);
+  if (new Set(keys).size !== keys.length)
+    return { kind: "refused", code: "duplicate_key" };
+  const values = new Map(entry.pairs);
+  if (keys.length === 1 && keys[0] === "base64") {
+    const encoded = values.get("base64");
+    if (encoded.kind !== "string")
+      return { kind: "refused", code: "malformed_entry" };
+    const bytes = decodeCanonicalBase64(encoded.value);
+    return bytes === null ? { kind: "refused", code: "malformed_entry" } : { kind: "bytes", bytes };
+  }
+  if (keys.length === 2 && values.has("sha256") && values.has("size")) {
+    const sha256 = values.get("sha256");
+    const size = values.get("size");
+    if (sha256.kind !== "string" || !SHA256_HEX2.test(sha256.value)) {
+      return { kind: "refused", code: "malformed_entry" };
+    }
+    if (size.kind !== "number" || !INTEGER_LEXEME.test(size.lexeme)) {
+      return { kind: "refused", code: "malformed_entry" };
+    }
+    const value = BigInt(size.lexeme);
+    if (value < 0n)
+      return { kind: "refused", code: "malformed_entry" };
+    return { kind: "blob", sha256: sha256.value, size: value };
+  }
+  return { kind: "refused", code: "malformed_entry" };
+}
+function mapRefusalMessage(code, names) {
+  const first = names[0] ?? "";
+  switch (code) {
+    case "empty_tree":
+      return "The map of file entries holds no file; a tree holds at least one.";
+    case "duplicate_key":
+      return `The map of file entries gives the key '${first}' twice, or its entry gives one of its own keys twice.`;
+    case "invalid_tree_path":
+      return `The map of file entries holds the key '${first}', which is not a tree path.`;
+    case "excluded_name":
+      return `The map of file entries holds the key '${first}', a name the membership rule never admits to a tree.`;
+    case "path_collision":
+      return `The map of file entries holds paths that collide once case-folded: ${names.join(", ")}.`;
+    case "malformed_entry":
+      return `The entry of '${first}' is none of a string, { "base64": \u2026 } and { "sha256": \u2026, "size": \u2026 } as the standard writes them.`;
+    case "missing_blob":
+      return `The blob store does not hold, at the size stated, the blobs ${names.join(", ")}; upload them, then send the map again.`;
+  }
+}
+async function readFileEntryMapValue(document, blobStore = EMPTY_BLOB_STORE) {
+  if (document.kind !== "object") {
+    throw new MethodTreeError("malformed_document", "A map of file entries is a JSON object.");
+  }
+  const refusals = /* @__PURE__ */ new Map();
+  const refuse = (code, name) => {
+    const names = refusals.get(code) ?? [];
+    if (!names.includes(name))
+      names.push(name);
+    refusals.set(code, names);
+  };
+  if (document.pairs.length === 0)
+    refusals.set("empty_tree", []);
+  const seen = /* @__PURE__ */ new Set();
+  const validKeys = [];
+  const firstValues = /* @__PURE__ */ new Map();
+  for (const [key, value] of document.pairs) {
+    if (seen.has(key))
+      refuse("duplicate_key", key);
+    seen.add(key);
+    if (treePathViolation(key) !== null) {
+      refuse("invalid_tree_path", key);
+    } else if (isExcludedName(key)) {
+      refuse("excluded_name", key);
+    } else if (!firstValues.has(key)) {
+      validKeys.push(key);
+    }
+    if (!firstValues.has(key))
+      firstValues.set(key, value);
+  }
+  for (const colliding of pathCollisions(validKeys))
+    refuse("path_collision", colliding);
+  const blobs = [];
+  const contents = /* @__PURE__ */ new Map();
+  for (const key of validKeys) {
+    const reading = readEntry(firstValues.get(key));
+    if (reading.kind === "refused")
+      refuse(reading.code, key);
+    else if (reading.kind === "bytes")
+      contents.set(key, reading.bytes);
+    else
+      blobs.push({ path: key, sha256: reading.sha256, size: reading.size });
+  }
+  if (refusals.size === 0) {
+    for (const blob of blobs) {
+      const held = await blobStore.read(blob.sha256);
+      if (held === null || BigInt(held.length) !== blob.size || sha256Hex(held) !== blob.sha256) {
+        refuse("missing_blob", blob.sha256);
+      } else {
+        contents.set(blob.path, held);
+      }
+    }
+  }
+  for (const code of MAP_REFUSAL_PRIORITY) {
+    const names = refusals.get(code);
+    if (names === void 0)
+      continue;
+    const named = NAMES_ALL.has(code) ? [...names].sort(compareUtf8) : names.slice(0, 1);
+    throw new MethodTreeError(code, mapRefusalMessage(code, named), { names: named });
+  }
+  const files = [...contents.entries()].map(([path, bytes]) => ({ path, size: bytes.length, sha256: sha256Hex(bytes), bytes })).sort((left, right) => compareUtf8(left.path, right.path));
+  return { files, digest: treeDigest(files) };
+}
+async function readFileEntryMap(text, blobStore = EMPTY_BLOB_STORE) {
+  let document;
+  try {
+    document = parseJsonDocument(text);
+  } catch (err) {
+    if (err instanceof JsonDocumentError) {
+      throw new MethodTreeError("malformed_document", err.message);
+    }
+    throw err;
+  }
+  return readFileEntryMapValue(document, blobStore);
+}
+var EMPTY_BLOB_STORE, SHA256_HEX2, INTEGER_LEXEME, EQUALS_SIGN, MAP_REFUSAL_PRIORITY, NAMES_ALL;
+var init_file_entries = __esm({
+  "node_modules/mthds/dist/method-tree/file-entries.js"() {
+    init_tree_path();
+    init_digest();
+    init_exceptions3();
+    init_json_document();
+    init_membership();
+    EMPTY_BLOB_STORE = {
+      read: () => Promise.resolve(null)
+    };
+    SHA256_HEX2 = /^[0-9a-f]{64}$/;
+    INTEGER_LEXEME = /^-?(?:0|[1-9][0-9]*)$/;
+    EQUALS_SIGN = 61;
+    MAP_REFUSAL_PRIORITY = [
+      "empty_tree",
+      "duplicate_key",
+      "invalid_tree_path",
+      "excluded_name",
+      "path_collision",
+      "malformed_entry",
+      "missing_blob"
+    ];
+    NAMES_ALL = /* @__PURE__ */ new Set(["path_collision", "missing_blob"]);
+  }
+});
+
+// node_modules/mthds/dist/method-tree/index.js
+var init_method_tree = __esm({
+  "node_modules/mthds/dist/method-tree/index.js"() {
+    init_lister();
+    init_tree();
+    init_exceptions3();
+    init_tree_path();
+    init_case_folding();
+    init_digest();
+    init_references();
+    init_function_names();
+    init_file_entry_encoding();
+    init_file_entries();
+    init_json_document();
+    init_discovery();
+    init_membership();
+  }
+});
+
+// node_modules/mthds/dist/index.js
+var dist_exports = {};
+__export(dist_exports, {
+  ApiResponseError: () => ApiResponseError2,
+  ApiTransportError: () => ApiTransportError,
+  BlobUploadError: () => BlobUploadError,
+  CASE_FOLDING_UNICODE_VERSION: () => CASE_FOLDING_UNICODE_VERSION,
+  CORE_ERROR_BASE_URL: () => CORE_ERROR_BASE_URL,
+  CORE_REGISTRY: () => CORE_REGISTRY,
+  DEFAULT_API_BASE_URL: () => DEFAULT_API_BASE_URL,
+  DEFAULT_EXCLUDED_DIRECTORY_NAMES: () => DEFAULT_EXCLUDED_DIRECTORY_NAMES,
+  EMPTY_BLOB_STORE: () => EMPTY_BLOB_STORE,
+  EMPTY_METHOD_TREE_MESSAGE: () => EMPTY_METHOD_TREE_MESSAGE,
+  ERROR_CODES: () => ERROR_CODES,
+  ERROR_FAMILIES: () => ERROR_FAMILIES,
+  EXTENSION_PREFIXES: () => EXTENSION_PREFIXES,
+  FIELD_KINDS: () => FIELD_KINDS,
+  FIX_OP_KINDS: () => FIX_OP_KINDS,
+  FIX_SAFETIES: () => FIX_SAFETIES,
+  GIT_ENTRY_NAME: () => GIT_ENTRY_NAME,
+  HANDSHAKE_TTL_MS: () => HANDSHAKE_TTL_MS,
+  INLINE_TREE_MAX_BYTES: () => INLINE_TREE_MAX_BYTES,
+  INPUTS_TEMPLATE_FORMATS: () => INPUTS_TEMPLATE_FORMATS,
+  InputsTemplateError: () => InputsTemplateError,
+  JsonDocumentError: () => JsonDocumentError,
+  MANIFEST_NAME: () => MANIFEST_NAME,
+  MAX_BODY_NESTING: () => MAX_BODY_NESTING,
+  MAX_SEGMENT_BYTES: () => MAX_SEGMENT_BYTES,
+  MAX_TREE_PATH_BYTES: () => MAX_TREE_PATH_BYTES,
+  MODEL_CATEGORIES: () => MODEL_CATEGORIES,
+  MTHDS_ERROR_REGISTRY_TARGET_VERSION: () => MTHDS_ERROR_REGISTRY_TARGET_VERSION,
+  MTHDS_ERROR_REGISTRY_VERSION: () => MTHDS_ERROR_REGISTRY_VERSION,
+  MTHDS_JS_VERSION: () => MTHDS_JS_VERSION,
+  MTHDS_PROTOCOL_VERSION: () => MTHDS_PROTOCOL_VERSION,
+  MalformedBlobsAnswerError: () => MalformedBlobsAnswerError,
+  MethodTree: () => MethodTree,
+  MethodTreeError: () => MethodTreeError,
+  MthdsApiClient: () => MthdsApiClient,
+  PIPE_SELECTION_CODES: () => PIPE_SELECTION_CODES,
+  PROBLEM_CODE_PATTERN: () => PROBLEM_CODE_PATTERN,
+  PROBLEM_DOMAINS: () => PROBLEM_DOMAINS,
+  PipelineRequestError: () => PipelineRequestError,
+  ProblemError: () => ProblemError,
+  RETRY_VERDICTS: () => RETRY_VERDICTS,
+  ROOT_RESOLVED: () => ROOT_RESOLVED,
+  RUN_INPUTS_NAMES: () => RUN_INPUTS_NAMES,
+  RunStillRunningError: () => RunStillRunningError2,
+  STEP_KINDS: () => STEP_KINDS,
+  TREE_DIGEST_PATTERN: () => TREE_DIGEST_PATTERN,
+  TREE_DIGEST_PREFIX: () => TREE_DIGEST_PREFIX,
+  TemplateFloat: () => TemplateFloat,
+  TomlEmissionError: () => TomlEmissionError,
+  TreeLimitExceededError: () => TreeLimitExceededError,
+  VENV_MARKER_NAME: () => VENV_MARKER_NAME,
+  announcedTreeLimits: () => announcedTreeLimits,
+  argumentInvalid: () => argumentInvalid,
+  assertOneMethodSource: () => assertOneMethodSource,
+  buildProblem: () => buildProblem,
+  buildProblemFromEntry: () => buildProblemFromEntry,
+  caseFold: () => caseFold,
+  codeFamily: () => codeFamily,
+  compareUtf8: () => compareUtf8,
+  conceptRef: () => conceptRef,
+  declaresBlobStore: () => declaresBlobStore,
+  decodeCanonicalBase64: () => decodeCanonicalBase64,
+  defaultStepReader: () => defaultStepReader,
+  defineFileEntry: () => defineFileEntry,
+  encodeBase64: () => encodeBase64,
+  findManifestDirectory: () => findManifestDirectory,
+  fixSafety: () => fixSafety,
+  formatItem: () => formatItem,
+  formatLocation: () => formatLocation,
+  formatSlotSignature: () => formatSlotSignature,
+  formatSuggestedFix: () => formatSuggestedFix,
+  fullCaseFold: () => fullCaseFold,
+  hasMethodSource: () => hasMethodSource,
+  inlineFileEntry: () => inlineFileEntry,
+  isApplicableFix: () => isApplicableFix,
+  isCoreErrorCode: () => isCoreErrorCode,
+  isExcludedName: () => isExcludedName,
+  isFileReference: () => isFileReference,
+  isKnownFixOp: () => isKnownFixOp,
+  isProblem: () => isProblem,
+  isProblemError: () => isProblemError,
+  isProblemItem: () => isProblemItem,
+  isTreePath: () => isTreePath,
+  isValidExcludePattern: () => isValidExcludePattern,
+  itemDomain: () => itemDomain,
+  knownProblemDomain: () => knownProblemDomain,
+  listMethodTree: () => listMethodTree,
+  listerLimitsOf: () => listerLimitsOf,
+  locateFunction: () => locateFunction,
+  namesExcludedDirectory: () => namesExcludedDirectory,
+  parseJsonBody: () => parseJsonBody,
+  parseJsonDocument: () => parseJsonDocument,
+  parseMethodFiles: () => parseMethodFiles,
+  pathCollisions: () => pathCollisions,
+  problemDomain: () => problemDomain,
+  problemError: () => problemError,
+  problemErrorMessage: () => problemErrorMessage,
+  problemRequestId: () => problemRequestId,
+  problemRetry: () => problemRetry,
+  problemStepKind: () => problemStepKind,
+  projectConceptComments: () => projectConceptComments,
+  projectInputsTemplate: () => projectInputsTemplate,
+  readAnswer: () => readAnswer,
+  readErrorAnswer: () => readErrorAnswer,
+  readFileEntryMap: () => readFileEntryMap,
+  readFileEntryMapValue: () => readFileEntryMapValue,
+  readProblemBody: () => readProblemBody,
+  registryEntry: () => registryEntry,
+  renderInputsTemplate: () => renderInputsTemplate,
+  renderProblemLines: () => renderProblemLines,
+  renderProblemMarkdown: () => renderProblemMarkdown,
+  renderTemplate: () => renderTemplate,
+  reportedProblem: () => reportedProblem,
+  resolveFileReference: () => resolveFileReference,
+  retryAfterSeconds: () => retryAfterSeconds,
+  serializeMethodFiles: () => serializeMethodFiles,
+  sha256Hex: () => sha256Hex,
+  templateParams: () => templateParams,
+  treeDigest: () => treeDigest,
+  treeListing: () => treeListing,
+  treePathViolation: () => treePathViolation,
+  typeUriOf: () => typeUriOf,
+  unreadableAnswer: () => unreadableAnswer,
+  utf8TextOf: () => utf8TextOf
+});
+var init_dist2 = __esm({
+  "node_modules/mthds/dist/index.js"() {
+    init_protocol();
+    init_client();
+    init_tree_sending();
+    init_version();
+    init_types();
+    init_exceptions2();
+    init_method_tree();
+  }
+});
 
 // node_modules/@pipelex/tools-wasm/dist/index.js
 var require_dist = __commonJS({
@@ -553,7 +10675,7 @@ ${Q.stack}` : g;
 });
 
 // src/hooks/claude-mthds-check.ts
-import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve as resolvePath2 } from "node:path";
 
 // src/hooks/check-core.ts
@@ -653,9 +10775,9 @@ function readShellScript(script, sessionDir) {
   let quoted;
   try {
     const parser = new ScriptParser(script);
-    const walk = new DirectoryWalk(WALK_BUDGET_FLOOR + WALK_BUDGET_PER_CHARACTER * script.length);
-    walk.list(parser.parse(), sessionDir);
-    extents = walk.extents;
+    const walk2 = new DirectoryWalk(WALK_BUDGET_FLOOR + WALK_BUDGET_PER_CHARACTER * script.length);
+    walk2.list(parser.parse(), sessionDir);
+    extents = walk2.extents;
     quoted = parser.quoted;
   } catch {
     return "unparsed";
@@ -1849,11 +11971,11 @@ function extractCodexMthdsTargets(stdinJson, processCwd) {
   }
   return { fromShell, targets, unplaced };
 }
-function selectCodexTargets(extracted, readFile) {
+function selectCodexTargets(extracted, readFile2) {
   const targets = [];
   const unchecked = [...extracted.unplaced];
   for (const target of extracted.targets) {
-    const content = readFile(target.path);
+    const content = readFile2(target.path);
     const confirmed = content !== null && (target.confirm === null || target.addedLines.some(
       (addedLines) => carriesAddedLines(content, addedLines) || target.confirm === "unrefuted" && comparedLines(addedLines).length === 0
     ));
@@ -2015,3996 +12137,65 @@ function encodeOutcome(outcome, platform = "claude") {
 }
 
 // src/hooks/bundle-gather.ts
-import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve as resolve2, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { dirname as dirname3, isAbsolute as isAbsolute2, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
 
-// node_modules/smol-toml/dist/date.js
-var DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})?[T ]?(?:(\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?)?(Z|[-+]\d{2}:\d{2})?$/i;
-var TomlDate = class _TomlDate extends Date {
-  #hasDate = false;
-  #hasTime = false;
-  #offset = null;
-  constructor(date) {
-    let hasDate = true;
-    let hasTime = true;
-    let offset = "Z";
-    if (typeof date === "string") {
-      let match = date.match(DATE_TIME_RE);
-      if (match) {
-        if (!match[1]) {
-          hasDate = false;
-          date = `0000-01-01T${date}`;
-        }
-        hasTime = !!match[2];
-        hasTime && date[10] === " " && (date = date.replace(" ", "T"));
-        if (match[2] && +match[2] > 23) {
-          date = "";
-        } else {
-          offset = match[3] || null;
-          date = date.toUpperCase();
-          if (!offset && hasTime)
-            date += "Z";
-        }
-      } else {
-        date = "";
-      }
-    }
-    super(date);
-    if (!isNaN(this.getTime())) {
-      this.#hasDate = hasDate;
-      this.#hasTime = hasTime;
-      this.#offset = offset;
-    }
-  }
-  isDateTime() {
-    return this.#hasDate && this.#hasTime;
-  }
-  isLocal() {
-    return !this.#hasDate || !this.#hasTime || !this.#offset;
-  }
-  isDate() {
-    return this.#hasDate && !this.#hasTime;
-  }
-  isTime() {
-    return this.#hasTime && !this.#hasDate;
-  }
-  isValid() {
-    return this.#hasDate || this.#hasTime;
-  }
-  toISOString() {
-    let iso = super.toISOString();
-    if (this.isDate())
-      return iso.slice(0, 10);
-    if (this.isTime())
-      return iso.slice(11, 23);
-    if (this.#offset === null)
-      return iso.slice(0, -1);
-    if (this.#offset === "Z")
-      return iso;
-    let offset = +this.#offset.slice(1, 3) * 60 + +this.#offset.slice(4, 6);
-    offset = this.#offset[0] === "-" ? offset : -offset;
-    let offsetDate = new Date(this.getTime() - offset * 6e4);
-    return offsetDate.toISOString().slice(0, -1) + this.#offset;
-  }
-  static wrapAsOffsetDateTime(jsDate, offset = "Z") {
-    let date = new _TomlDate(jsDate);
-    date.#offset = offset;
-    return date;
-  }
-  static wrapAsLocalDateTime(jsDate) {
-    let date = new _TomlDate(jsDate);
-    date.#offset = null;
-    return date;
-  }
-  static wrapAsLocalDate(jsDate) {
-    let date = new _TomlDate(jsDate);
-    date.#hasTime = false;
-    date.#offset = null;
-    return date;
-  }
-  static wrapAsLocalTime(jsDate) {
-    let date = new _TomlDate(jsDate);
-    date.#hasDate = false;
-    date.#offset = null;
-    return date;
-  }
-};
+// src/method-trees.ts
+init_protocol();
 
-// node_modules/smol-toml/dist/error.js
-function getLineColFromPtr(string, ptr) {
-  let lines = string.slice(0, ptr).split(/\r\n|\n|\r/g);
-  return [lines.length, lines.pop().length + 1];
+// src/error-verdicts.ts
+init_protocol();
+var INPUT = Object.freeze({ errorDomain: "input", retryable: false });
+var CONFIG = Object.freeze({ errorDomain: "config", retryable: false });
+var TRANSIENT = Object.freeze({ errorDomain: "runtime", retryable: true });
+var FAULT = Object.freeze({ errorDomain: "runtime", retryable: false });
+var API_KEY_LIMIT_CODE = "pipelex_api_key_limit_reached";
+var IDEMPOTENCY_KEY_IN_USE_CODE = "idempotency_key_in_use";
+function fallbackVerdict(status, code, named) {
+  switch (status) {
+    case 401:
+    case 402:
+    case 403:
+      return CONFIG;
+    case 404:
+      return named ? INPUT : CONFIG;
+    case 405:
+      return CONFIG;
+    case 408:
+    case 429:
+      return TRANSIENT;
+    case 409:
+      if (code === API_KEY_LIMIT_CODE) return CONFIG;
+      if (code === IDEMPOTENCY_KEY_IN_USE_CODE) return TRANSIENT;
+      return INPUT;
+    case 501:
+      return CONFIG;
+  }
+  if (status >= 400 && status < 500) return INPUT;
+  if (status >= 500 && status < 600) return TRANSIENT;
+  return FAULT;
 }
-function makeCodeBlock(string, line, column) {
-  let lines = string.split(/\r\n|\n|\r/g);
-  let codeblock = "";
-  let numberLen = (Math.log10(line + 1) | 0) + 1;
-  for (let i = line - 1; i <= line + 1; i++) {
-    let l = lines[i - 1];
-    if (!l)
-      continue;
-    codeblock += i.toString().padEnd(numberLen, " ");
-    codeblock += ":  ";
-    codeblock += l;
-    codeblock += "\n";
-    if (i === line) {
-      codeblock += " ".repeat(numberLen + column + 2);
-      codeblock += "^\n";
-    }
-  }
-  return codeblock;
-}
-var TomlError = class extends Error {
-  line;
-  column;
-  codeblock;
-  constructor(message, options) {
-    const [line, column] = getLineColFromPtr(options.toml, options.ptr);
-    const codeblock = makeCodeBlock(options.toml, line, column);
-    super(`Invalid TOML document: ${message}
-
-${codeblock}`, options);
-    this.line = line;
-    this.column = column;
-    this.codeblock = codeblock;
-  }
-};
-
-// node_modules/smol-toml/dist/util.js
-function indexOfNewline(str, start = 0) {
-  let idx = str.indexOf("\n", start);
-  if (str.charCodeAt(idx - 1) === 13)
-    idx--;
-  return idx;
-}
-function skipComment(ctx) {
-  for (; ctx.p < ctx.s.length; ctx.p++) {
-    let c = ctx.s.charCodeAt(ctx.p);
-    if (c === 10)
-      break;
-    if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10) {
-      ctx.p++;
-      break;
-    }
-    if (c < 32 && c !== 9 || c === 127) {
-      throw new TomlError("control characters are not allowed in comments", {
-        toml: ctx.s,
-        ptr: ctx.p
-      });
-    }
-  }
-}
-function skipVoid(ctx, banNewLines, banComments) {
-  let c;
-  while (1) {
-    while ((c = ctx.s.charCodeAt(ctx.p)) === 32 || c === 9 || !banNewLines && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10))
-      ctx.p++;
-    if (banComments || c !== 35)
-      break;
-    skipComment(ctx);
-  }
-}
-function skipUntil(ctx, sep2, end) {
-  let ptr = ctx.p;
-  if (!end) {
-    ptr = indexOfNewline(ctx.s, ptr);
-    ctx.p = ptr < 0 ? ctx.s.length : ptr;
-    return;
-  }
-  for (; ctx.p < ctx.s.length; ctx.p++) {
-    let c = ctx.s.charCodeAt(ctx.p);
-    if (c === 35) {
-      skipComment(ctx);
-    } else if (c === end || c === sep2) {
-      return;
-    }
-  }
-  throw new TomlError("cannot find end of structure", {
-    toml: ctx.s,
-    ptr
-  });
+var ERROR_DOMAIN_OF = Object.freeze({
+  input: "input",
+  method: "input",
+  account: "config",
+  operator: "config",
+  runtime: "runtime"
+});
+var RETRYABLE_OF = Object.freeze({
+  yes: true,
+  no: false,
+  outcome_unknown: false
+});
+function problemVerdict(problem) {
+  return {
+    errorDomain: ERROR_DOMAIN_OF[problemDomain(problem)],
+    retryable: RETRYABLE_OF[problemRetry(problem)]
+  };
 }
 
-// node_modules/smol-toml/dist/primitive.js
-var INT_REGEX = /^((0x[0-9a-fA-F](_?[0-9a-fA-F])*)|(([+-]|0[ob])?\d(_?\d)*))$/;
-var FLOAT_REGEX = /^[+-]?\d(_?\d)*(\.\d(_?\d)*)?([eE][+-]?\d(_?\d)*)?$/;
-var LEADING_ZERO = /^[+-]?0[0-9_]/;
-function parseString(ctx) {
-  let start = ctx.p;
-  let c = ctx.s.charCodeAt(ctx.p++);
-  let first = c;
-  let isLiteral = c === 39;
-  let isMultiline = c === ctx.s.charCodeAt(ctx.p) && c === ctx.s.charCodeAt(ctx.p + 1);
-  if (isMultiline) {
-    if ((c = ctx.s.charCodeAt(ctx.p += 2)) === 10)
-      ctx.p++;
-    else if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)
-      ctx.p += 2;
-  }
-  let parsed = "";
-  let sliceStart = ctx.p;
-  let state = 0;
-  for (; ctx.p < ctx.s.length; ctx.p++) {
-    c = ctx.s.charCodeAt(ctx.p);
-    if (isMultiline && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)) {
-      state = state && 3;
-    } else if (c < 32 && c !== 9 || c === 127) {
-      throw new TomlError("control characters are not allowed in strings", {
-        toml: ctx.s,
-        ptr: ctx.p
-      });
-    } else if ((!state || state === 3) && c === first && (!isMultiline || ctx.s.charCodeAt(ctx.p + 1) === first && ctx.s.charCodeAt(ctx.p + 2) === first)) {
-      if (isMultiline) {
-        if (ctx.s.charCodeAt(ctx.p + 3) === first)
-          ctx.p++;
-        if (ctx.s.charCodeAt(ctx.p + 3) === first)
-          ctx.p++;
-      }
-      if (!state)
-        parsed += ctx.s.slice(sliceStart, ctx.p);
-      ctx.p += isMultiline ? 3 : 1;
-      return parsed;
-    } else if (!state) {
-      if (!isLiteral && c === 92) {
-        parsed += ctx.s.slice(sliceStart, sliceStart = ctx.p);
-        state = 1;
-      }
-    } else if (state === 1) {
-      if (c === 120 || c === 117 || c === 85) {
-        let value = 0;
-        let len = c === 120 ? 2 : c === 117 ? 4 : 8;
-        for (let j = 0; j < len; j++, ctx.p++) {
-          let hex = ctx.s.charCodeAt(ctx.p + 1);
-          let digit = (
-            /* 0-9 */
-            hex >= 48 && hex <= 57 ? hex - 48 : (
-              /* A-F */
-              hex >= 65 && hex <= 70 ? hex - 65 + 10 : (
-                /* a-f */
-                hex >= 97 && hex <= 102 ? hex - 97 + 10 : -1
-              )
-            )
-          );
-          if (digit < 0)
-            throw new TomlError("invalid non-hex character in unicode escape", { toml: ctx.s, ptr: ctx.p + 1 });
-          value = value << 4 | digit;
-        }
-        if (value < 0 || value > 1114111 || value >= 55296 && value <= 57343) {
-          throw new TomlError("invalid unicode escape", { toml: ctx.s, ptr: ctx.p });
-        }
-        parsed += String.fromCodePoint(value);
-        sliceStart = ctx.p + 1;
-        state = 0;
-      } else if (c === 32 || c === 9) {
-        state = 2;
-      } else {
-        if (c === 98)
-          parsed += "\b";
-        else if (c === 116)
-          parsed += "	";
-        else if (c === 110)
-          parsed += "\n";
-        else if (c === 102)
-          parsed += "\f";
-        else if (c === 114)
-          parsed += "\r";
-        else if (c === 101)
-          parsed += "\x1B";
-        else if (c === 34)
-          parsed += '"';
-        else if (c === 92)
-          parsed += "\\";
-        else
-          throw new TomlError("unrecognized escape sequence", { toml: ctx.s, ptr: ctx.p });
-        sliceStart = ctx.p + 1;
-        state = 0;
-      }
-    } else if (c !== 32 && c !== 9) {
-      if (state === 2) {
-        throw new TomlError("invalid escape: only line-ending whitespace may be escaped", {
-          toml: ctx.s,
-          ptr: sliceStart
-        });
-      }
-      state = !isLiteral && c === 92 ? 1 : 0;
-      sliceStart = ctx.p;
-    }
-  }
-  throw new TomlError("unfinished string", { toml: ctx.s, ptr: start });
-}
-function sliceAndTrimEndOf(ctx, start, end) {
-  let value = ctx.s.slice(start, end);
-  let commentIdx = value.indexOf("#");
-  if (commentIdx > 0) {
-    skipComment({ s: value, p: commentIdx, d: 0 });
-    value = value.slice(0, commentIdx);
-  }
-  return value.trimEnd();
-}
-function parseValue(ctx, integersAsBigInt, end) {
-  let ptr = ctx.p;
-  let err = { toml: ctx.s, ptr };
-  skipUntil(ctx, 44, end);
-  let value = sliceAndTrimEndOf(ctx, ptr, ctx.p);
-  if (!value)
-    throw new TomlError("incomplete declaration: value expected", err);
-  if (value === "-inf")
-    return -Infinity;
-  if (value === "inf" || value === "+inf")
-    return Infinity;
-  if (value === "nan" || value === "+nan" || value === "-nan")
-    return NaN;
-  if (value === "-0")
-    return integersAsBigInt ? 0n : 0;
-  let isInt = INT_REGEX.test(value);
-  if (isInt || FLOAT_REGEX.test(value)) {
-    if (LEADING_ZERO.test(value)) {
-      throw new TomlError("leading zeroes are not allowed", err);
-    }
-    value = value.replace(/_/g, "");
-    let numeric = +value;
-    if (isNaN(numeric)) {
-      throw new TomlError("invalid number", err);
-    }
-    if (isInt) {
-      if ((isInt = !Number.isSafeInteger(numeric)) && !integersAsBigInt) {
-        throw new TomlError("integer value cannot be represented losslessly", err);
-      }
-      if (isInt || integersAsBigInt === true)
-        numeric = BigInt(value);
-    }
-    return numeric;
-  }
-  const date = new TomlDate(value);
-  if (!date.isValid())
-    throw new TomlError("invalid value", err);
-  return date;
-}
-
-// node_modules/smol-toml/dist/extract.js
-function extractValue(ctx, end, integersAsBigInt) {
-  let ptr = ctx.p;
-  let c = ctx.s.charCodeAt(ptr);
-  if (c === 91 || c === 123) {
-    if (!ctx.d--) {
-      throw new TomlError("document contains excessively nested structures. aborting.", {
-        toml: ctx.s,
-        ptr
-      });
-    }
-    let value = c === 91 ? parseArray(ctx, integersAsBigInt) : parseInlineTable(ctx, integersAsBigInt);
-    ctx.d++;
-    return value;
-  }
-  if (c === 34 || c === 39) {
-    return parseString(ctx);
-  }
-  if (c === 116) {
-    if (ctx.s.charCodeAt(++ctx.p) !== 114 || ctx.s.charCodeAt(++ctx.p) !== 117 || ctx.s.charCodeAt(++ctx.p) !== 101)
-      throw new TomlError("invalid value", { toml: ctx.s, ptr });
-    ctx.p++;
-    return true;
-  }
-  if (c === 102) {
-    if (ctx.s.charCodeAt(++ctx.p) !== 97 || ctx.s.charCodeAt(++ctx.p) !== 108 || ctx.s.charCodeAt(++ctx.p) !== 115 || ctx.s.charCodeAt(++ctx.p) !== 101)
-      throw new TomlError("invalid value", { toml: ctx.s, ptr });
-    ctx.p++;
-    return false;
-  }
-  return parseValue(ctx, integersAsBigInt, end);
-}
-
-// node_modules/smol-toml/dist/struct.js
-var KEY_PART_RE = /^[a-zA-Z0-9-_]+[ \t]*$/;
-function parseKey(ctx, end = "=") {
-  let start = ctx.p;
-  let dot = start - 1;
-  let parsed = [];
-  let endPtr = ctx.s.indexOf(end, start);
-  if (endPtr < 0) {
-    throw new TomlError("incomplete key-value: cannot find end of key", {
-      toml: ctx.s,
-      ptr: start
-    });
-  }
-  do {
-    let c = ctx.s.charCodeAt(ctx.p = ++dot);
-    if (c !== 32 && c !== 9) {
-      if (c === 34 || c === 39) {
-        if (c === ctx.s.charCodeAt(ctx.p + 1) && c === ctx.s.charCodeAt(ctx.p + 2)) {
-          throw new TomlError("multiline strings are not allowed in keys", {
-            toml: ctx.s,
-            ptr: ctx.p
-          });
-        }
-        let part = parseString(ctx);
-        dot = ctx.s.indexOf(".", ctx.p);
-        let strEnd = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
-        let newLine = indexOfNewline(strEnd);
-        if (newLine > -1) {
-          throw new TomlError("newlines are not allowed in keys", {
-            toml: ctx.s,
-            ptr: newLine
-          });
-        }
-        if (strEnd.trimStart()) {
-          throw new TomlError("found extra tokens after the string part", {
-            toml: ctx.s,
-            ptr: ctx.p
-          });
-        }
-        if (endPtr < ctx.p) {
-          endPtr = ctx.s.indexOf(end, ctx.p);
-          if (endPtr < 0) {
-            throw new TomlError("incomplete key-value: cannot find end of key", {
-              toml: ctx.s,
-              ptr: start
-            });
-          }
-        }
-        parsed.push(part);
-      } else {
-        dot = ctx.s.indexOf(".", ctx.p);
-        let part = ctx.s.slice(ctx.p, dot < 0 || dot > endPtr ? endPtr : dot);
-        if (!KEY_PART_RE.test(part)) {
-          throw new TomlError("only letter, numbers, dashes and underscores are allowed in keys", {
-            toml: ctx.s,
-            ptr: ctx.p
-          });
-        }
-        parsed.push(part.trimEnd());
-      }
-    }
-  } while (dot + 1 && dot < endPtr);
-  ctx.p = endPtr + 1;
-  skipVoid(ctx, true, true);
-  return parsed;
-}
-function parseInlineTable(ctx, integersAsBigInt) {
-  let res = {};
-  let seen = /* @__PURE__ */ new Set();
-  let c;
-  ctx.p++;
-  while (ctx.p < ctx.s.length) {
-    skipVoid(ctx);
-    if ((c = ctx.s.charCodeAt(ctx.p)) === 125) {
-      ctx.p++;
-      return res;
-    }
-    let k;
-    let t = res;
-    let hasOwn = false;
-    let p = ctx.p;
-    let key = parseKey(ctx);
-    for (let i = 0; i < key.length; i++) {
-      if (i)
-        t = hasOwn ? t[k] : t[k] = {};
-      k = key[i];
-      if ((hasOwn = Object.hasOwn(t, k)) && (typeof t[k] !== "object" || seen.has(t[k]))) {
-        throw new TomlError("trying to redefine an already defined value", {
-          toml: ctx.s,
-          ptr: p
-        });
-      }
-      if (!hasOwn && k === "__proto__") {
-        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
-      }
-    }
-    if (hasOwn) {
-      throw new TomlError("trying to redefine an already defined value", {
-        toml: ctx.s,
-        ptr: ctx.p
-      });
-    }
-    let value = extractValue(ctx, 125, integersAsBigInt);
-    seen.add(t[k] = value);
-    skipVoid(ctx);
-    if ((c = ctx.s.charCodeAt(ctx.p++)) === 125) {
-      return res;
-    }
-    if (c !== 44) {
-      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
-    }
-  }
-  throw new TomlError("unfinished table encountered", {
-    toml: ctx.s,
-    ptr: ctx.p
-  });
-}
-function parseArray(ctx, integersAsBigInt) {
-  let res = [];
-  let c;
-  ctx.p++;
-  while (ctx.p < ctx.s.length) {
-    skipVoid(ctx);
-    if ((c = ctx.s.charCodeAt(ctx.p)) === 93) {
-      ctx.p++;
-      return res;
-    }
-    res.push(extractValue(ctx, 93, integersAsBigInt));
-    skipVoid(ctx);
-    if ((c = ctx.s.charCodeAt(ctx.p++)) === 93) {
-      return res;
-    }
-    if (c !== 44) {
-      throw new TomlError("expected comma or end of structure", { toml: ctx.s, ptr: ctx.p - 1 });
-    }
-  }
-  throw new TomlError("unfinished array encountered", {
-    toml: ctx.s,
-    ptr: ctx.p
-  });
-}
-
-// node_modules/smol-toml/dist/parse.js
-function peekTable(key, table, meta, type) {
-  let t = table;
-  let m = meta;
-  let k;
-  let hasOwn = false;
-  let state;
-  for (let i = 0; i < key.length; i++) {
-    if (i) {
-      t = hasOwn ? t[k] : t[k] = {};
-      m = (state = m[k]).c;
-      if (type === 0 && (state.t === 1 || state.t === 2)) {
-        return null;
-      }
-      if (state.t === 2) {
-        let l = t.length - 1;
-        t = t[l];
-        m = m[l].c;
-      }
-    }
-    k = key[i];
-    if ((hasOwn = Object.hasOwn(t, k)) && m[k]?.t === 0 && m[k]?.d) {
-      return null;
-    }
-    if (!hasOwn) {
-      if (k === "__proto__") {
-        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
-        Object.defineProperty(m, k, { enumerable: true, configurable: true, writable: true });
-      }
-      m[k] = {
-        t: i < key.length - 1 && type === 2 ? 3 : type,
-        d: false,
-        i: 0,
-        c: {}
-      };
-    }
-  }
-  state = m[k];
-  if (state.t !== type && !(type === 1 && state.t === 3)) {
-    return null;
-  }
-  if (type === 2) {
-    if (!state.d) {
-      state.d = true;
-      t[k] = [];
-    }
-    t[k].push(t = {});
-    state.c[state.i++] = state = { t: 1, d: false, i: 0, c: {} };
-  }
-  if (state.d) {
-    return null;
-  }
-  state.d = true;
-  if (type === 1) {
-    t = hasOwn ? t[k] : t[k] = {};
-  } else if (type === 0 && hasOwn) {
-    return null;
-  }
-  return [k, t, state.c];
-}
-function parse(toml, { maxDepth = 1e3, integersAsBigInt } = {}) {
-  let ctx = { s: toml, p: 0, d: maxDepth };
-  let res = {};
-  let meta = {};
-  let tmp;
-  let tbl = res;
-  let m = meta;
-  skipVoid(ctx);
-  while (ctx.p < toml.length) {
-    if (toml.charCodeAt(ctx.p) === 91) {
-      let isTableArray = toml.charCodeAt(++ctx.p) === 91;
-      tmp = ctx.p += +isTableArray;
-      let k = parseKey(ctx, "]");
-      if (isTableArray) {
-        if (toml.charCodeAt(ctx.p - 1) !== 93) {
-          throw new TomlError("expected end of table declaration", {
-            toml,
-            ptr: ctx.p - 1
-          });
-        }
-        ctx.p++;
-      }
-      let p = peekTable(
-        k,
-        res,
-        meta,
-        isTableArray ? 2 : 1
-        /* Type.EXPLICIT */
-      );
-      if (!p) {
-        throw new TomlError("trying to redefine an already defined table or value", {
-          toml,
-          ptr: tmp
-        });
-      }
-      m = p[2];
-      tbl = p[1];
-    } else {
-      tmp = ctx.p;
-      let k = parseKey(ctx);
-      let p = peekTable(
-        k,
-        tbl,
-        m,
-        0
-        /* Type.DOTTED */
-      );
-      if (!p) {
-        throw new TomlError("trying to redefine an already defined table or value", {
-          toml,
-          ptr: tmp
-        });
-      }
-      p[1][p[0]] = extractValue(ctx, void 0, integersAsBigInt);
-    }
-    skipVoid(ctx, true);
-    if (ctx.p < toml.length && (tmp = toml.charCodeAt(ctx.p)) !== 10 && tmp !== 13) {
-      throw new TomlError("each key-value declaration must be followed by an end-of-line", {
-        toml,
-        ptr: ctx.p
-      });
-    }
-    skipVoid(ctx);
-  }
-  return res;
-}
-
-// node_modules/mthds/dist/protocol/exceptions.js
-var PipelineRequestError = class extends Error {
-  constructor(message, options) {
-    super(message, options);
-    this.name = "PipelineRequestError";
-  }
-};
-
-// node_modules/mthds/dist/problems/registry.generated.js
-var CORE_ERROR_BASE_URL = "https://mthds.ai/errors";
-var EXTENSION_PREFIXES = [
-  { prefix: "pipelex", owner: "Pipelex", base_url: "https://docs.pipelex.com/errors" }
-];
-var CORE_REGISTRY = {
-  "request.malformed": {
-    code: "request.malformed",
-    title: "The request body cannot be parsed",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The runner cannot parse the request body (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Fix the body so that it parses, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must send a request body that parses."
-      }
-    },
-    params: { reason: { type: "enum", values: ["not_json", "not_utf8", "bad_base64", "bad_zip"] } }
-  },
-  "request.invalid": {
-    code: "request.invalid",
-    title: "The request does not match the route's schema",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The request's field '{field}' does not match the route's schema.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Correct the field '{field}' as the route's schema requires, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must correct the field '{field}' of the request."
-      }
-    },
-    params: { field: { type: "identifier" } }
-  },
-  "request.too_large": {
-    code: "request.too_large",
-    title: "The request exceeds a size limit",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 413,
-    detail: "The request reaches {size} bytes, past the runner's limit of {limit} bytes.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Make the request smaller than {limit} bytes, then send it again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must make the request smaller than {limit} bytes."
-      }
-    },
-    params: { limit: { type: "bytes" }, size: { type: "bytes" } }
-  },
-  "request.not_found": {
-    code: "request.not_found",
-    title: "No such route",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 404,
-    detail: "This runner serves no such route.",
-    steps: {
-      actor: {
-        kind: "upgrade",
-        detail: "Use a client written for the protocol version this runner reports in GET /version, or upgrade the runner."
-      },
-      other: {
-        kind: "upgrade",
-        detail: "Upgrade the client or the runner so that both implement the same protocol version."
-      }
-    },
-    params: {}
-  },
-  "request.method_not_allowed": {
-    code: "request.method_not_allowed",
-    title: "The route does not accept this HTTP method",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 405,
-    detail: "This route does not accept the request's HTTP method.",
-    steps: {
-      actor: {
-        kind: "upgrade",
-        detail: "Use a client written for the protocol version this runner reports in GET /version, which sends each route the HTTP method the protocol defines."
-      },
-      other: {
-        kind: "upgrade",
-        detail: "Upgrade the client or the runner so that both implement the same protocol version."
-      }
-    },
-    params: {}
-  },
-  "request.unsupported": {
-    code: "request.unsupported",
-    title: "The request uses a form this runtime does not accept",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "This runtime does not accept the form the request's field '{field}' uses (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Send the field '{field}' in a form this runtime accepts, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must send the field '{field}' in a form this runtime accepts."
-      }
-    },
-    params: { field: { type: "identifier" }, reason: { type: "identifier" } }
-  },
-  "request.idempotency_conflict": {
-    code: "request.idempotency_conflict",
-    title: "The idempotency key was used for a different request",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The request's idempotency key was already used with a different body.",
-    steps: {
-      actor: { kind: "change_input", detail: "Send this request with a new idempotency key." },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must send the request with a new idempotency key."
-      }
-    },
-    params: {}
-  },
-  "request.idempotency_key_in_use": {
-    code: "request.idempotency_key_in_use",
-    title: "A request under this idempotency key is still running",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 409,
-    detail: "An earlier request with the same idempotency key and the same body is still in flight.",
-    steps: {
-      actor: {
-        kind: "wait",
-        detail: "Wait for the earlier request to finish, then repeat this one unchanged."
-      },
-      other: {
-        kind: "wait",
-        detail: "Wait for the earlier request to finish, then repeat this one unchanged."
-      }
-    },
-    params: {}
-  },
-  "request.already_executed": {
-    code: "request.already_executed",
-    title: "The request already ran and its answer is not kept",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The request under this idempotency key already ran, and its answer is not kept.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read what the first request created, such as its run, rather than sending the request again."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read what the first request created, such as its run, rather than sending the request again."
-      }
-    },
-    params: {}
-  },
-  "request.pipe_not_found": {
-    code: "request.pipe_not_found",
-    title: "The selected pipe is not in the method",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method declares no pipe '{pipe}'.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Select a pipe the method declares, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must select a pipe the method declares."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      suggestions: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "request.pipe_ambiguous": {
-    code: "request.pipe_ambiguous",
-    title: "The pipe selection matches several pipes",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The pipe selection '{pipe}' matches several pipes: {candidates}.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Select one of the matching pipes by a reference that names it alone, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must select one of the matching pipes unambiguously."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      candidates: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "request.pipe_unspecified": {
-    code: "request.pipe_unspecified",
-    title: "No pipe is selected",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The request selects no pipe, and the method gives no main pipe to start from.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Select a pipe with pipe_code, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must select a pipe with pipe_code."
-      }
-    },
-    params: { candidates: { type: "list", items: { type: "identifier" } } }
-  },
-  "request.blobs_missing": {
-    code: "request.blobs_missing",
-    title: "The runner does not hold some files sent by hash",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "This runner does not hold a file the request sends by hash.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Upload each listed blob, or send its file inline if this runner keeps no blob store, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must upload each listed blob, or send its file inline if this runner keeps no blob store."
-      }
-    },
-    params: { missing_blobs: { type: "list", items: { type: "sha256" } } }
-  },
-  "auth.missing_credential": {
-    code: "auth.missing_credential",
-    title: "No credential was sent",
-    domain: "account",
-    retry: "no",
-    raised_as: "problem",
-    status: 401,
-    detail: "This route needs a credential, and the request carried none.",
-    steps: {
-      actor: {
-        kind: "check_credentials",
-        detail: "Send the request with a credential this runtime accepts."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the account's owner for a credential this runtime accepts."
-      }
-    },
-    params: {}
-  },
-  "auth.invalid_credential": {
-    code: "auth.invalid_credential",
-    title: "The credential was refused",
-    domain: "account",
-    retry: "no",
-    raised_as: "problem",
-    status: 401,
-    detail: "The runtime refused the request's credential.",
-    steps: {
-      actor: {
-        kind: "check_credentials",
-        detail: "Check that the credential is the one issued for this runtime and that it was not revoked, then send the request again."
-      },
-      other: { kind: "contact_owner", detail: "Ask the account's owner for a valid credential." }
-    },
-    params: {}
-  },
-  "auth.credential_expired": {
-    code: "auth.credential_expired",
-    title: "The credential has expired",
-    domain: "account",
-    retry: "no",
-    raised_as: "problem",
-    status: 401,
-    detail: "The request's credential has expired.",
-    steps: {
-      actor: {
-        kind: "refresh",
-        detail: "Fetch a fresh credential, then send the request again with it."
-      },
-      other: { kind: "contact_owner", detail: "Ask the account's owner for a fresh credential." }
-    },
-    params: {}
-  },
-  "auth.forbidden": {
-    code: "auth.forbidden",
-    title: "The credential does not permit this",
-    domain: "account",
-    retry: "no",
-    raised_as: "problem",
-    status: 403,
-    detail: "The request's identity lacks '{requirement}', which this operation needs.",
-    steps: {
-      actor: {
-        kind: "request_access",
-        detail: "Ask for '{requirement}' on this account, then send the request again."
-      },
-      other: { kind: "contact_owner", detail: "Ask the account's owner to grant '{requirement}'." }
-    },
-    params: { requirement: { type: "identifier" } }
-  },
-  "account.rate_limited": {
-    code: "account.rate_limited",
-    title: "The account is over its request rate",
-    domain: "account",
-    retry: "yes",
-    raised_as: "problem",
-    status: 429,
-    detail: "The account sent more than {limit} requests in {window} seconds.",
-    steps: {
-      actor: {
-        kind: "wait",
-        detail: "Wait for the rate window to pass, then send the request again."
-      },
-      other: {
-        kind: "wait",
-        detail: "Wait for the rate window to pass, then send the request again."
-      }
-    },
-    params: { limit: { type: "integer" }, window: { type: "seconds" } }
-  },
-  "account.quota_exhausted": {
-    code: "account.quota_exhausted",
-    title: "The account's quota is used up",
-    domain: "account",
-    retry: "no",
-    raised_as: "problem",
-    status: 429,
-    detail: "The account's quota '{quota}' is used up.",
-    steps: {
-      actor: {
-        kind: "check_account",
-        detail: "Check the account's quota '{quota}', and raise it or wait for it to renew."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the account's owner to raise the quota '{quota}'."
-      }
-    },
-    params: { quota: { type: "identifier" } }
-  },
-  "input.missing": {
-    code: "input.missing",
-    title: "A required input is missing",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The request does not give the input '{input}', which the method requires.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Add the input '{input}' to the request, then send it again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must add the input '{input}' to the request."
-      }
-    },
-    params: { input: { type: "identifier" } }
-  },
-  "input.unexpected": {
-    code: "input.unexpected",
-    title: "An input the method does not declare",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The request gives the input '{input}', which the method does not declare.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Remove the input '{input}' from the request, or give it under the name the method declares, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must remove the input '{input}' from the request."
-      }
-    },
-    params: { input: { type: "identifier" } }
-  },
-  "input.wrong_concept": {
-    code: "input.wrong_concept",
-    title: "An input is not the declared concept",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The input '{input}' is given as '{provided}', but the method accepts '{expected}' there.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give the input '{input}' as '{expected}', then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must give the input '{input}' as '{expected}'."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      expected: { type: "identifier" },
-      provided: { type: "identifier" }
-    }
-  },
-  "input.wrong_multiplicity": {
-    code: "input.wrong_multiplicity",
-    title: "An input has the wrong number of items",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The input '{input}' gives {provided_count} item or items, which does not fit the multiplicity the method declares ({expected}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give the input '{input}' with the multiplicity the method declares, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must give the input '{input}' with the multiplicity the method declares."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      expected: { type: "enum", values: ["single", "list", "count"] },
-      expected_count: { type: "integer", optional: true },
-      provided_count: { type: "integer" }
-    }
-  },
-  "input.invalid": {
-    code: "input.invalid",
-    title: "An input does not fit its concept's structure",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The input '{input}' does not fit its concept's structure at '{field}'.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Correct the field '{field}' of the input '{input}', then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must correct the field '{field}' of the input '{input}'."
-      }
-    },
-    params: { input: { type: "identifier" }, field: { type: "identifier" } }
-  },
-  "input.file_unreadable": {
-    code: "input.file_unreadable",
-    title: "An input file cannot be read",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The file of the input '{input}' cannot be read as '{file_type}' (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give a readable file as the input '{input}', then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must give a readable file as the input '{input}'."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      file_type: { type: "identifier" },
-      reason: { type: "identifier" }
-    }
-  },
-  "input.file_type_unsupported": {
-    code: "input.file_type_unsupported",
-    title: "An input file's type is not supported here",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model '{model}' cannot take the file of the input '{input}', whose format is '{format}'.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give the input '{input}' in a format the model '{model}' takes, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must give the input '{input}' in a format the model takes."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      format: { type: "identifier" },
-      model: { type: "identifier" }
-    }
-  },
-  "input.too_large": {
-    code: "input.too_large",
-    title: "An input exceeds a size limit",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The input '{input}' reaches {size}, past the limit of {limit}.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Make the input '{input}' smaller than {limit}, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must make the input '{input}' smaller."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      limit: { type: "integer" },
-      size: { type: "integer" }
-    }
-  },
-  "input.reference_not_found": {
-    code: "input.reference_not_found",
-    title: "An input refers to something that does not exist",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The input '{input}' refers to something that does not exist.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Point the input '{input}' at something that exists, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose input '{input}' refers to something that does not exist."
-      }
-    },
-    params: { input: { type: "identifier" } }
-  },
-  "input.url_unreachable": {
-    code: "input.url_unreachable",
-    title: "An input's URL could not be fetched",
-    domain: "input",
-    retry: "yes",
-    raised_as: "problem",
-    status: 422,
-    detail: "The URL of the input '{input}', on '{host}', did not answer or answered with an error.",
-    steps: {
-      actor: {
-        kind: "retry",
-        detail: "Send the request again later, or point the input '{input}' at a URL that answers."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose input '{input}' names a URL that did not answer."
-      }
-    },
-    params: { input: { type: "identifier" }, host: { type: "identifier" } }
-  },
-  "method.invalid": {
-    code: "method.invalid",
-    title: "The method does not validate",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method does not validate.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Fix each fault the problem's errors list, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the faults the problem's errors list."
-      }
-    },
-    params: {}
-  },
-  "method.syntax": {
-    code: "method.syntax",
-    title: "The method does not parse",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method does not parse ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Fix the syntax at the place the problem's location names, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the method's syntax."
-      }
-    },
-    params: { finding: { type: "caller_text" } }
-  },
-  "method.schema_violation": {
-    code: "method.schema_violation",
-    title: "The method breaks a rule of the language",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The declaration at '{field_path}' breaks a rule of the language ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the declaration at '{field_path}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the declaration at '{field_path}'."
-      }
-    },
-    params: { field_path: { type: "identifier" }, finding: { type: "caller_text" } }
-  },
-  "method.not_found": {
-    code: "method.not_found",
-    title: "No method at this address",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 404,
-    detail: "No method is found at '{method_ref}'.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Correct the method's address, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose request names a method that does not exist."
-      }
-    },
-    params: { method_ref: { type: "identifier" } }
-  },
-  "method.ambiguous": {
-    code: "method.ambiguous",
-    title: "The method address matches several methods",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method address '{method_ref}' matches several methods: {candidates}.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Name one of the matching methods by an address that matches it alone, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, who must name one of the matching methods unambiguously."
-      }
-    },
-    params: {
-      method_ref: { type: "identifier" },
-      candidates: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.fetch_failed": {
-    code: "method.fetch_failed",
-    title: "The method could not be fetched",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "The method '{method_ref}', or one of its dependencies, could not be fetched.",
-    steps: {
-      actor: {
-        kind: "retry",
-        detail: "Send the request again, since the host serving the method may answer later."
-      },
-      other: {
-        kind: "retry",
-        detail: "Send the request again, since the host serving the method may answer later."
-      }
-    },
-    params: { method_ref: { type: "identifier" } }
-  },
-  "method.package_invalid": {
-    code: "method.package_invalid",
-    title: "The method's package breaks a package rule",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method's package breaks a package rule (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Bring the method's tree within the package rules, then send it again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to bring the method's tree within the package rules."
-      }
-    },
-    params: {
-      reason: { type: "identifier" },
-      path: { type: "identifier", optional: true },
-      limit: { type: "integer", optional: true }
-    }
-  },
-  "method.dependency_missing": {
-    code: "method.dependency_missing",
-    title: "A dependency of the method is not available",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method depends on the {kind} '{name}', which is not available here (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare a dependency this runtime can satisfy in place of '{name}', then send the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare a dependency this runtime can satisfy in place of '{name}'."
-      }
-    },
-    params: {
-      kind: { type: "enum", values: ["package", "function", "requirement"] },
-      name: { type: "identifier" },
-      reason: { type: "enum", values: ["not_found", "no_matching_version", "cycle"] }
-    }
-  },
-  "method.dependency_invalid": {
-    code: "method.dependency_invalid",
-    title: "A dependency of the method does not load",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A file of the dependency '{package}' does not load ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Depend on a version of '{package}' whose files load, then send the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to depend on a version of '{package}' whose files load."
-      }
-    },
-    params: { package: { type: "identifier" }, finding: { type: "caller_text" } }
-  },
-  "method.resource_missing": {
-    code: "method.resource_missing",
-    title: "A file the method refers to is not in its tree",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The file reference '{file}' resolves to no file of the method's tree (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Point the reference '{file}' at a file of the method's tree, written as a relative path with forward slashes, then send the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to point the reference '{file}' at a file of the method's tree."
-      }
-    },
-    params: {
-      file: { type: "identifier" },
-      reason: {
-        type: "enum",
-        values: ["not_in_tree", "leaves_tree", "absolute", "backslash", "scheme"]
-      }
-    }
-  },
-  "method.concept_unresolved": {
-    code: "method.concept_unresolved",
-    title: "The method names a concept no library declares",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method names the concept '{concept}', which no library declares.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the concept '{concept}', or correct the reference, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare or correct the concept '{concept}'."
-      }
-    },
-    params: {
-      concept: { type: "identifier" },
-      suggestions: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.pipe_unresolved": {
-    code: "method.pipe_unresolved",
-    title: "The method names a pipe that does not exist",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' names the pipe '{missing}', which does not exist.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the pipe '{missing}', or correct the reference in pipe '{pipe}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare or correct the pipe '{missing}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      missing: { type: "identifier" },
-      candidates: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.pipe_not_exported": {
-    code: "method.pipe_not_exported",
-    title: "The method calls a pipe its dependency does not export",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method calls the pipe '{pipe}' of '{package}', which does not export it.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Call a pipe that '{package}' exports, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to call only the pipes '{package}' exports."
-      }
-    },
-    params: { pipe: { type: "identifier" }, package: { type: "identifier" } }
-  },
-  "method.ref_ambiguous": {
-    code: "method.ref_ambiguous",
-    title: "A reference matches several declarations",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The reference '{ref}' matches several declarations: {candidates}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Qualify the reference '{ref}' so that it names one declaration, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to qualify the reference '{ref}'."
-      }
-    },
-    params: {
-      ref: { type: "identifier" },
-      candidates: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.name_conflict": {
-    code: "method.name_conflict",
-    title: "A name is declared twice or collides with a reserved one",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The name '{name}' collides with another declaration (conflict: {conflict}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Rename '{name}' so that it is unique and reserved by nothing, then validate the method again."
-      },
-      other: { kind: "contact_owner", detail: "Ask the method's owner to rename '{name}'." }
-    },
-    params: {
-      name: { type: "identifier" },
-      conflict: {
-        type: "enum",
-        values: ["duplicate_declaration", "native_concept", "batch_item", "reserved_domain"]
-      }
-    }
-  },
-  "method.cycle": {
-    code: "method.cycle",
-    title: "Declarations form a cycle",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "These declarations form a cycle: {cycle}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Break the cycle by removing one of its links, then validate the method again."
-      },
-      other: { kind: "contact_owner", detail: "Ask the method's owner to break the cycle." }
-    },
-    params: {
-      kind: { type: "enum", values: ["refines", "structure", "pipe"] },
-      cycle: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.identifier_invalid": {
-    code: "method.identifier_invalid",
-    title: "A name is not a valid identifier",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The name '{name}' breaks the naming rules of a {identifier_kind}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Rename '{name}' to a plain snake_case identifier, then validate the method again."
-      },
-      other: { kind: "contact_owner", detail: "Ask the method's owner to rename '{name}'." }
-    },
-    params: {
-      identifier_kind: { type: "enum", values: ["pipe_code", "main_pipe", "input_name"] },
-      name: { type: "caller_text" }
-    }
-  },
-  "method.pipe_type_invalid": {
-    code: "method.pipe_type_invalid",
-    title: "A pipe's type is missing, unknown or retired",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' has no usable type (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Give pipe '{pipe}' one of the language's pipe types, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to give pipe '{pipe}' a valid type."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      reason: { type: "enum", values: ["missing", "unknown", "retired"] },
-      pipe_type: { type: "caller_text", optional: true }
-    }
-  },
-  "method.signature_mismatch": {
-    code: "method.signature_mismatch",
-    title: "A pipe differs from its signature",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' differs from the signature it implements ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make pipe '{pipe}' take the inputs and give the output its signature declares, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make pipe '{pipe}' match its signature."
-      }
-    },
-    params: { pipe: { type: "identifier" }, finding: { type: "caller_text" } }
-  },
-  "method.not_runnable": {
-    code: "method.not_runnable",
-    title: "The method still holds pipe signatures",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The run reached pipe '{pipe}', a signature with no implementation.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Implement the signature '{pipe}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to implement the signature '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" } }
-  },
-  "method.input_undeclared": {
-    code: "method.input_undeclared",
-    title: "A pipe reads an input it does not declare",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' reads names its inputs do not declare: {variables}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare what pipe '{pipe}' reads in its inputs, or stop reading it, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare the inputs pipe '{pipe}' reads."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      variables: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.input_unused": {
-    code: "method.input_unused",
-    title: "A pipe declares an input it never reads",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' declares inputs it never reads: {variables}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove the inputs pipe '{pipe}' never reads, or read them, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove the inputs pipe '{pipe}' never reads."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      variables: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.input_concept_mismatch": {
-    code: "method.input_concept_mismatch",
-    title: "A pipe's input concept does not fit its use",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' declares the input '{input}' as '{declared}', which its use does not accept. It accepts: {expected}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the input '{input}' of pipe '{pipe}' with a concept its use accepts, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare the input '{input}' of pipe '{pipe}' with a concept its use accepts."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      input: { type: "identifier" },
-      declared: { type: "identifier" },
-      expected: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.output_concept_mismatch": {
-    code: "method.output_concept_mismatch",
-    title: "A pipe's output concept does not fit",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}', a {pipe_type}, declares its output as '{declared}', which does not fit. It accepts: {expected}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the output of pipe '{pipe}' with a concept that fits, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to declare the output of pipe '{pipe}' with a concept that fits."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      declared: { type: "identifier" },
-      expected: { type: "list", items: { type: "identifier" } },
-      pipe_type: { type: "identifier" }
-    }
-  },
-  "method.output_multiplicity_mismatch": {
-    code: "method.output_multiplicity_mismatch",
-    title: "A pipe's declared multiplicity does not fit its use",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' declares its output with the multiplicity '{declared}', but its use expects '{expected}'.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the output of pipe '{pipe}' with the multiplicity '{expected}', or change its use, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the output multiplicity of pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      declared: { type: "identifier" },
-      expected: { type: "enum", values: ["single", "list", "fixed"] }
-    }
-  },
-  "method.wiring_invalid": {
-    code: "method.wiring_invalid",
-    title: "A pipe's wiring does not give it what it reads",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' reads '{variable_path}' in a shape its wiring does not give it ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Wire pipe '{pipe}' so that '{variable_path}' reaches it in the shape it reads, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the wiring of pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      variable_path: { type: "identifier" },
-      finding: { type: "caller_text" }
-    }
-  },
-  "method.field_path_unresolved": {
-    code: "method.field_path_unresolved",
-    title: "A path names a field its concept does not have",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "In pipe '{pipe}', the path '{path}' cannot follow '{segment}', which is not a field of the value before it.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the path '{path}' so that it names fields its concepts hold, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the path '{path}' in pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      path: { type: "identifier" },
-      segment: { type: "identifier" },
-      available_fields: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.binding_step_invalid": {
-    code: "method.binding_step_invalid",
-    title: "A binding step is malformed",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A binding step of pipe '{pipe}', at '{field_path}', is malformed.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the binding step at '{field_path}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the binding step at '{field_path}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, field_path: { type: "identifier" } }
-  },
-  "method.optional_marker_invalid": {
-    code: "method.optional_marker_invalid",
-    title: "An optional marker is misplaced",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' carries a presence marker at '{field_path}', where the language does not allow one.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove or move the marker at '{field_path}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the presence marker at '{field_path}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, field_path: { type: "identifier" } }
-  },
-  "method.optional_unhandled": {
-    code: "method.optional_unhandled",
-    title: "An optional value reaches a place that needs a required one",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "In pipe '{pipe}', the maybe-absent '{input}' reaches a place that needs a value (site: {site}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Guard '{input}' where it is used, or declare the receiving side optional, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to guard the optional '{input}' in pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      input: { type: "identifier" },
-      site: {
-        type: "enum",
-        values: ["sequence_step", "condition", "condition_output", "template", "parallel_branch"]
-      }
-    }
-  },
-  "method.template_invalid": {
-    code: "method.template_invalid",
-    title: "A template in the method is invalid",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The template '{template}' of pipe '{pipe}' is invalid ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the template '{template}' of pipe '{pipe}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the template '{template}' of pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      template: { type: "identifier" },
-      finding: { type: "caller_text" }
-    }
-  },
-  "method.template_private_name": {
-    code: "method.template_private_name",
-    title: "A template reads a name reserved to the runtime",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A template of pipe '{pipe}' reads names reserved to the runtime: {variables}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Stop reading the reserved names in the templates of pipe '{pipe}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove the reserved names from the templates of pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      variables: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "method.function_invalid": {
-    code: "method.function_invalid",
-    title: "A function the method declares cannot be used",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The function '{function}' of pipe '{pipe}' cannot be used ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the function '{function}' of pipe '{pipe}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the function '{function}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      function: { type: "identifier" },
-      finding: { type: "caller_text" }
-    }
-  },
-  "method.concept_invalid": {
-    code: "method.concept_invalid",
-    title: "A concept's structure cannot be built or described",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The structure of the concept '{concept}' cannot be built ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the structure of the concept '{concept}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the concept '{concept}'."
-      }
-    },
-    params: { concept: { type: "identifier" }, finding: { type: "caller_text" } }
-  },
-  "method.model_setting_invalid": {
-    code: "method.model_setting_invalid",
-    title: "A model setting in the method is invalid",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model setting '{field}' is invalid ({finding}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the model setting '{field}', then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the model setting '{field}'."
-      }
-    },
-    params: { field: { type: "identifier" }, finding: { type: "caller_text" } }
-  },
-  "method.mock_unsatisfiable": {
-    code: "method.mock_unsatisfiable",
-    title: "The dry run cannot mock an output concept",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The dry run cannot mock the concept '{concept}', since no value satisfies its constraints.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Loosen the constraints of the concept '{concept}' so that a value can satisfy them, then validate the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make the concept '{concept}' satisfiable."
-      }
-    },
-    params: { concept: { type: "identifier" } }
-  },
-  "method.changed_concurrently": {
-    code: "method.changed_concurrently",
-    title: "A method file changed while it was being fixed",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 409,
-    detail: "A file of the method changed after the fix read it and before the fix wrote it.",
-    steps: {
-      actor: {
-        kind: "refresh",
-        detail: "Read the method's files again, then apply the fix to their current content."
-      },
-      other: {
-        kind: "refresh",
-        detail: "Read the method's files again, then apply the fix to their current content."
-      }
-    },
-    params: {}
-  },
-  "method.hint_invalid": {
-    code: "method.hint_invalid",
-    title: "A hint is not understood",
-    domain: "method",
-    retry: "no",
-    raised_as: "warning",
-    detail: "The hint '{hint}' is not understood (reason: {reason}).",
-    steps: {
-      actor: { kind: "change_method", detail: "Correct or remove the hint '{hint}'." },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to correct the hint '{hint}'."
-      }
-    },
-    params: {
-      reason: { type: "enum", values: ["unknown_key", "unknown_intent", "inapplicable_intent"] },
-      hint: { type: "caller_text" }
-    }
-  },
-  "method.input_presence_vacuous": {
-    code: "method.input_presence_vacuous",
-    title: "A presence check always holds",
-    domain: "method",
-    retry: "no",
-    raised_as: "warning",
-    detail: "Pipe '{pipe}' checks whether '{input}' is present, and it always is.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove the presence check on '{input}' in pipe '{pipe}'."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove the presence check on '{input}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, input: { type: "identifier" } }
-  },
-  "method.optional_force_redundant": {
-    code: "method.optional_force_redundant",
-    title: "An optional force is redundant",
-    domain: "method",
-    retry: "no",
-    raised_as: "warning",
-    detail: "The force marker on '{input}' in pipe '{pipe}' changes nothing.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove the force marker on '{input}' in pipe '{pipe}'."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove the redundant force marker on '{input}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, input: { type: "identifier" } }
-  },
-  "pipe.output_multiplicity": {
-    code: "pipe.output_multiplicity",
-    title: "A pipe's output does not have the declared multiplicity",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' produced an output of the multiplicity '{produced}', but its output '{output}' is declared '{declared}'.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Declare the output '{output}' as '{produced}', or make pipe '{pipe}' produce '{declared}'."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make the output '{output}' of pipe '{pipe}' match its declared multiplicity."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      output: { type: "identifier" },
-      declared: { type: "enum", values: ["single", "list"] },
-      produced: { type: "enum", values: ["single", "list"] }
-    }
-  },
-  "pipe.output_invalid": {
-    code: "pipe.output_invalid",
-    title: "A pipe's output does not fit its concept",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' produced an output that does not fit the concept '{output_concept}', at the fields {fields}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make pipe '{pipe}' produce an output that fits '{output_concept}', or loosen the concept, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make pipe '{pipe}' produce an output that fits its concept."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      output_concept: { type: "identifier" },
-      fields: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "pipe.function_raised": {
-    code: "pipe.function_raised",
-    title: "The method's function raised",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The function '{function}' of pipe '{pipe}' raised an error.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Fix the function '{function}' so that it does not raise on these inputs, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the function '{function}' of pipe '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, function: { type: "identifier" } }
-  },
-  "pipe.function_timed_out": {
-    code: "pipe.function_timed_out",
-    title: "The method's function ran past its time limit",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The function '{function}' of pipe '{pipe}' ran past its limit of {timeout} seconds.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make the function '{function}' finish within {timeout} seconds, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make the function '{function}' finish in time."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      function: { type: "identifier" },
-      timeout: { type: "seconds" }
-    }
-  },
-  "pipe.template_render_failed": {
-    code: "pipe.template_render_failed",
-    title: "A template failed to render",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A template of pipe '{pipe}' failed to render at '{variable}'.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Fix the template of pipe '{pipe}' where it reads '{variable}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the template of pipe '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
-  },
-  "pipe.template_budget_exceeded": {
-    code: "pipe.template_budget_exceeded",
-    title: "A template exceeded its render budget",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A template of pipe '{pipe}' passed its render budget in a {operation} operation (limit {limit}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make the template of pipe '{pipe}' do less in one render, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make the template of pipe '{pipe}' do less in one render."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      operation: { type: "enum", values: ["repeat", "pad", "join", "loop", "recursion", "output"] },
-      limit: { type: "integer" }
-    }
-  },
-  "pipe.condition_unmatched": {
-    code: "pipe.condition_unmatched",
-    title: "A condition matched no outcome",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The condition of pipe '{pipe}' rendered a value that no outcome maps.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Map every value the condition of pipe '{pipe}' can render to an outcome, or give it a default outcome."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to map every value of the condition of pipe '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" } }
-  },
-  "pipe.condition_refused": {
-    code: "pipe.condition_refused",
-    title: "The method refused these inputs",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' chose the outcome '{outcome}', which the method maps to a refusal of these inputs.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Change the inputs so that the method accepts them, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose inputs the method refuses."
-      }
-    },
-    params: { pipe: { type: "identifier" }, outcome: { type: "identifier" } }
-  },
-  "pipe.binding_failed": {
-    code: "pipe.binding_failed",
-    title: "A binding step could not bind its value",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The binding '{binding}' of pipe '{pipe}' could not follow '{segment}' in this run's value.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Correct the binding '{binding}' of pipe '{pipe}', or the structure it reads, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to fix the binding '{binding}' of pipe '{pipe}'."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      binding: { type: "identifier" },
-      segment: { type: "identifier" }
-    }
-  },
-  "pipe.input_unresolved": {
-    code: "pipe.input_unresolved",
-    title: "A pipe could not read a value it needs",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' could not read '{variable}', which an earlier step should have produced.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make an earlier step produce '{variable}' for pipe '{pipe}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make an earlier step produce '{variable}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
-  },
-  "pipe.forced_input_absent": {
-    code: "pipe.forced_input_absent",
-    title: "A forced input was absent",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' forces '{variable}' with '!', and it was absent in this run.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove the '!' on '{variable}' and handle its absence, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to handle the absence of '{variable}' in pipe '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
-  },
-  "pipe.prompt_empty": {
-    code: "pipe.prompt_empty",
-    title: "A pipe's prompt is empty",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The {part} of pipe '{pipe}' rendered empty from these inputs.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give the inputs that the prompt of pipe '{pipe}' is written from, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose inputs leave the prompt of pipe '{pipe}' empty."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      part: { type: "enum", values: ["user_text", "system_text", "image_prompt"] }
-    }
-  },
-  "pipe.stack_overflow": {
-    code: "pipe.stack_overflow",
-    title: "The run nested pipes deeper than the limit",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The run nested pipes deeper than the limit of {limit}.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Find the pipes that call each other without end, and break the loop, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to stop the method's pipes from nesting without end."
-      }
-    },
-    params: { limit: { type: "integer" } }
-  },
-  "model.unknown": {
-    code: "model.unknown",
-    title: "The method names a model that does not exist",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The method names the {model_type} model '{model}', which no catalog knows.",
-    steps: {
-      actor: {
-        kind: "change_model",
-        detail: "Name a model that exists in place of '{model}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to name a model that exists in place of '{model}'."
-      }
-    },
-    params: {
-      model: { type: "identifier" },
-      model_type: { type: "identifier" },
-      suggestions: { type: "list", items: { type: "identifier" } }
-    }
-  },
-  "model.unavailable": {
-    code: "model.unavailable",
-    title: "This deployment serves no backend for the model",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 501,
-    detail: "The {model_type} model '{model}' exists, but this deployment does not serve it (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Configure a backend for the model '{model}' on this deployment."
-      },
-      other: {
-        kind: "change_model",
-        detail: "Use a model this deployment serves in place of '{model}', or ask whoever runs the runtime to serve it."
-      }
-    },
-    params: {
-      model: { type: "identifier" },
-      model_type: { type: "identifier" },
-      reason: {
-        type: "enum",
-        values: [
-          "not_served",
-          "not_allowed",
-          "unknown_at_provider",
-          "fallback_disabled",
-          "no_fallback_served"
-        ]
-      }
-    }
-  },
-  "model.unspecified": {
-    code: "model.unspecified",
-    title: "No model is named for this step",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The step names no {model_type} model, and the deployment names no default for that kind.",
-    steps: {
-      actor: {
-        kind: "change_model",
-        detail: "Name a {model_type} model on the step, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to name a model on the step."
-      }
-    },
-    params: { model_type: { type: "identifier" } }
-  },
-  "model.capability_unsupported": {
-    code: "model.capability_unsupported",
-    title: "The model cannot do what the step asks",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model '{model}' does not support {capability}, which the step needs.",
-    steps: {
-      actor: {
-        kind: "change_model",
-        detail: "Use a model that supports {capability}, or change what the step asks, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to use a model that supports {capability}."
-      }
-    },
-    params: { model: { type: "identifier" }, capability: { type: "identifier" } }
-  },
-  "model.context_exceeded": {
-    code: "model.context_exceeded",
-    title: "The inputs exceed what the model can read",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The prompt for the model '{model}' reaches {count} against a {limit} of {max}.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Send smaller inputs, or fewer images, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose inputs exceed what the model '{model}' can read."
-      }
-    },
-    params: {
-      model: { type: "identifier" },
-      limit: { type: "enum", values: ["context_window", "prompt_images"] },
-      count: { type: "integer" },
-      max: { type: "integer" }
-    }
-  },
-  "model.output_truncated": {
-    code: "model.output_truncated",
-    title: "The answer was cut at the method's token cap",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model '{model}' stopped at the step's cap of {max_tokens} tokens, after {output_tokens} tokens.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Raise the step's max_tokens above {max_tokens}, or ask for a shorter answer, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to raise the step's token cap."
-      }
-    },
-    params: {
-      model: { type: "identifier" },
-      max_tokens: { type: "integer" },
-      output_tokens: { type: "integer" }
-    }
-  },
-  "model.output_schema_mismatch": {
-    code: "model.output_schema_mismatch",
-    title: "The model's structured output did not match its schema",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "The model '{model}' gave an answer that does not fit the concept '{concept}', after the runtime asked again.",
-    steps: {
-      actor: { kind: "retry", detail: "Run the method again, since another answer may fit." },
-      other: { kind: "retry", detail: "Run the method again, since another answer may fit." }
-    },
-    params: { model: { type: "identifier" }, concept: { type: "identifier" } }
-  },
-  "model.content_refused": {
-    code: "model.content_refused",
-    title: "The provider refused the content",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model '{model}' or its provider refused the request's content on policy grounds.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Change the inputs so that they meet the provider's content policy, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose inputs the provider refused."
-      }
-    },
-    params: { model: { type: "identifier" } }
-  },
-  "model.no_result": {
-    code: "model.no_result",
-    title: "The model found nothing for this request",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The model '{model}' returned no result for the query built from the inputs.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Broaden the inputs the query is built from, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose query found nothing."
-      }
-    },
-    params: { model: { type: "identifier" } }
-  },
-  "provider.rate_limited": {
-    code: "provider.rate_limited",
-    title: "The provider is rate limiting this deployment",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 429,
-    detail: "The provider '{provider}' is rate limiting this deployment's calls to the model '{model}'.",
-    steps: {
-      actor: { kind: "wait", detail: "Wait, then run the method again." },
-      other: { kind: "wait", detail: "Wait, then run the method again." }
-    },
-    params: { provider: { type: "identifier" }, model: { type: "identifier" } }
-  },
-  "provider.unavailable": {
-    code: "provider.unavailable",
-    title: "The provider is unavailable",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "The provider '{provider}' is unavailable.",
-    steps: {
-      actor: { kind: "retry", detail: "Run the method again, since the provider may be back." },
-      other: { kind: "retry", detail: "Run the method again, since the provider may be back." }
-    },
-    params: { provider: { type: "identifier" } }
-  },
-  "provider.timeout": {
-    code: "provider.timeout",
-    title: "The provider did not answer in time",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 504,
-    detail: "The provider '{provider}' did not answer in time.",
-    steps: {
-      actor: { kind: "retry", detail: "Run the method again." },
-      other: { kind: "retry", detail: "Run the method again." }
-    },
-    params: { provider: { type: "identifier" } }
-  },
-  "provider.failed": {
-    code: "provider.failed",
-    title: "The provider failed",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "The provider '{provider}' failed with the HTTP status {status}.",
-    steps: {
-      actor: { kind: "retry", detail: "Run the method again." },
-      other: { kind: "retry", detail: "Run the method again." }
-    },
-    params: { provider: { type: "identifier" }, status: { type: "integer" } }
-  },
-  "provider.response_invalid": {
-    code: "provider.response_invalid",
-    title: "The provider's answer could not be used",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "The provider '{provider}' gave an answer the runtime cannot use ({defect}).",
-    steps: {
-      actor: { kind: "retry", detail: "Run the method again." },
-      other: { kind: "retry", detail: "Run the method again." }
-    },
-    params: {
-      provider: { type: "identifier" },
-      defect: { type: "enum", values: ["empty", "malformed"] }
-    }
-  },
-  "provider.credential_refused": {
-    code: "provider.credential_refused",
-    title: "The provider refused this deployment's credential",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 502,
-    detail: "The provider '{provider}' refused this deployment's credential.",
-    steps: {
-      actor: {
-        kind: "check_credentials",
-        detail: "Check the credential this deployment holds for the provider '{provider}'."
-      },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { provider: { type: "identifier" } }
-  },
-  "provider.quota_exhausted": {
-    code: "provider.quota_exhausted",
-    title: "This deployment's provider account is out of quota",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 502,
-    detail: "This deployment's account with the provider '{provider}' is out of quota.",
-    steps: {
-      actor: {
-        kind: "check_account",
-        detail: "Check this deployment's account with the provider '{provider}', and raise its quota or its credit."
-      },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { provider: { type: "identifier" } }
-  },
-  "provider.outcome_unknown": {
-    code: "provider.outcome_unknown",
-    title: "The provider call may have taken effect",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 502,
-    detail: "A call to the model '{model}' of the provider '{provider}' failed after it was sent, so its work may exist and be billed.",
-    steps: {
-      actor: {
-        kind: "retry",
-        detail: "Run the method again if a repeat of the work is acceptable, since a new run may bill that work again."
-      },
-      other: {
-        kind: "check_account",
-        detail: "Check the account's usage before running the method again, since the work may have been billed."
-      }
-    },
-    params: { provider: { type: "identifier" }, model: { type: "identifier" } }
-  },
-  "run.not_found": {
-    code: "run.not_found",
-    title: "No such run",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 404,
-    detail: "No run '{pipeline_run_id}' is visible to this caller.",
-    steps: {
-      actor: { kind: "change_input", detail: "Check the run id, then read the run again." },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose run id names no run it can read."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "run.failed": {
-    code: "run.failed",
-    title: "The run did not succeed",
-    domain: "runtime",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run '{pipeline_run_id}' ended as '{run_status}', without success.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run's own problem in run_error to see why it did not succeed."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run's own problem in run_error to see why it did not succeed."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
-  },
-  "run.not_finished": {
-    code: "run.not_finished",
-    title: "The run has not finished",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run '{pipeline_run_id}' has not finished yet.",
-    steps: {
-      actor: { kind: "wait", detail: "Wait, then read the run's results again." },
-      other: { kind: "wait", detail: "Wait, then read the run's results again." }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "run.cancelled": {
-    code: "run.cancelled",
-    title: "The run was cancelled by its caller",
-    domain: "input",
-    retry: "yes",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run was cancelled by its caller before it ended.",
-    steps: {
-      actor: { kind: "retry", detail: "Start the run again if its result is still wanted." },
-      other: { kind: "read_run", detail: "Read the run to see when it was cancelled." }
-    },
-    params: {}
-  },
-  "run.timed_out": {
-    code: "run.timed_out",
-    title: "The run passed its time limit",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The run did not end within the deployment's run limit of {timeout} seconds.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make the method do less work per run, so that it ends within {timeout} seconds."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to make the method end within the deployment's run limit."
-      }
-    },
-    params: { timeout: { type: "seconds" } }
-  },
-  "run.lost": {
-    code: "run.lost",
-    title: "The run's outcome is lost",
-    domain: "runtime",
-    retry: "outcome_unknown",
-    raised_as: "problem",
-    status: 500,
-    detail: "The runtime lost track of the run '{pipeline_run_id}', and its outcome is unknown.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "run.outcome_unknown": {
-    code: "run.outcome_unknown",
-    title: "The runtime cannot tell whether the run started or finished",
-    domain: "runtime",
-    retry: "outcome_unknown",
-    raised_as: "problem",
-    status: 502,
-    detail: "The run '{pipeline_run_id}' was sent on, and its answer was lost.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "run.already_ended": {
-    code: "run.already_ended",
-    title: "The run has already ended",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run '{pipeline_run_id}' has already ended as '{run_status}', so it cannot be changed.",
-    steps: {
-      actor: { kind: "read_run", detail: "Read the run's final outcome rather than change it." },
-      other: { kind: "read_run", detail: "Read the run's final outcome rather than change it." }
-    },
-    params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
-  },
-  "run.answer_not_kept": {
-    code: "run.answer_not_kept",
-    title: "The run's answer was not kept",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run '{pipeline_run_id}' under this idempotency key ended as '{run_status}', and its answer was not kept.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' rather than repeat the request."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' rather than repeat the request."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" }, run_status: { type: "identifier" } }
-  },
-  "run.results_not_stored": {
-    code: "run.results_not_stored",
-    title: "The run's results were not stored",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 404,
-    detail: "The run '{pipeline_run_id}' completed, and its results were delivered with its answer rather than stored.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the results from the answer the run was started with."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the results from the answer the run was started with."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "run.terminated": {
-    code: "run.terminated",
-    title: "The run was stopped by an operator or an erasure",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 409,
-    detail: "The run was stopped before it ended (ended by: {ended_by}).",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run's record to see when and why it was stopped."
-      },
-      other: {
-        kind: "report",
-        detail: "Report this to whoever runs the runtime if the run was still wanted."
-      }
-    },
-    params: { ended_by: { type: "enum", values: ["operator", "erasure"] } }
-  },
-  "security.input_url_refused": {
-    code: "security.input_url_refused",
-    title: "A URL in the request was refused",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The URL of the input '{input}' points at a {target_class} target, which a security rule forbids (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Give the input '{input}' a URL on the public internet, or send the file itself, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose input '{input}' names a URL a security rule forbids."
-      }
-    },
-    params: {
-      input: { type: "identifier" },
-      target_class: {
-        type: "enum",
-        values: ["loopback", "private", "link_local", "metadata", "scheme"]
-      },
-      reason: { type: "identifier" }
-    }
-  },
-  "security.method_url_refused": {
-    code: "security.method_url_refused",
-    title: "A URL the method names was refused",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' names a URL that points at a {target_class} target, which a security rule forbids (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make pipe '{pipe}' name a URL on the public internet, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to change the URL pipe '{pipe}' names."
-      }
-    },
-    params: {
-      pipe: { type: "identifier" },
-      target_class: {
-        type: "enum",
-        values: ["loopback", "private", "link_local", "metadata", "scheme"]
-      },
-      reason: { type: "identifier" }
-    }
-  },
-  "security.provider_url_refused": {
-    code: "security.provider_url_refused",
-    title: "A URL a provider returned was refused",
-    domain: "runtime",
-    retry: "no",
-    raised_as: "problem",
-    status: 502,
-    detail: "The provider '{provider}' returned a URL that points at a private address, and the runtime did not fetch it.",
-    steps: {
-      actor: { kind: "report", detail: "Report this to whoever runs the runtime." },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { provider: { type: "identifier" } }
-  },
-  "security.input_path_refused": {
-    code: "security.input_path_refused",
-    title: "A path the caller supplied was refused",
-    domain: "input",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A path in the request could escape its root (rule: {rule}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Write every path of the request relative to its root, with forward slashes, then send the request again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Pass this to the caller, whose request holds a path that could escape its root."
-      }
-    },
-    params: {
-      rule: {
-        type: "enum",
-        values: ["absolute", "parent_segment", "outside_root", "backslash", "colon", "empty"]
-      }
-    }
-  },
-  "security.method_path_refused": {
-    code: "security.method_path_refused",
-    title: "A path the method names was refused",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "Pipe '{pipe}' names the path '{file}', which would open a file outside the method on the runtime's disk.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Make pipe '{pipe}' name a file inside the method's tree, then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to change the path pipe '{pipe}' names."
-      }
-    },
-    params: { pipe: { type: "identifier" }, file: { type: "identifier" } }
-  },
-  "security.template_refused": {
-    code: "security.template_refused",
-    title: "A template was refused by the template sandbox",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "A template of pipe '{pipe}' reached for '{name}', which the template sandbox forbids.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove '{name}' from the templates of pipe '{pipe}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove '{name}' from the templates of pipe '{pipe}'."
-      }
-    },
-    params: { pipe: { type: "identifier" }, name: { type: "identifier" } }
-  },
-  "security.schema_refused": {
-    code: "security.schema_refused",
-    title: "An output schema was refused",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The schema of the concept '{concept}' carries extensions or imports the runtime refuses to execute.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Remove the code-generation extensions and imports from the concept '{concept}', then run the method again."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to remove the extensions from the concept '{concept}'."
-      }
-    },
-    params: { concept: { type: "identifier" } }
-  },
-  "security.integrity_mismatch": {
-    code: "security.integrity_mismatch",
-    title: "A dependency's content differs from its lock",
-    domain: "method",
-    retry: "no",
-    raised_as: "problem",
-    status: 422,
-    detail: "The content of the dependency '{dependency}' differs from the hash its lock pins.",
-    steps: {
-      actor: {
-        kind: "change_method",
-        detail: "Check where the dependency '{dependency}' changed, then update its lock only if the change is trusted."
-      },
-      other: {
-        kind: "contact_owner",
-        detail: "Ask the method's owner to check the dependency '{dependency}'."
-      }
-    },
-    params: { dependency: { type: "identifier" } }
-  },
-  "runtime.unexpected": {
-    code: "runtime.unexpected",
-    title: "An unexpected error occurred",
-    domain: "runtime",
-    retry: "no",
-    raised_as: "problem",
-    status: 500,
-    detail: "The runtime met an unexpected error.",
-    steps: {
-      actor: { kind: "report", detail: "Report this to whoever runs the runtime." },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: {}
-  },
-  "runtime.misconfigured": {
-    code: "runtime.misconfigured",
-    title: "The runtime is misconfigured",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 500,
-    detail: "The runtime is misconfigured, so it cannot serve this request.",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Set or correct the configuration of '{component}', then restart the runtime."
-      },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { component: { type: "identifier", operator_only: true } }
-  },
-  "runtime.unavailable": {
-    code: "runtime.unavailable",
-    title: "The runtime or a service it depends on is unavailable",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "problem",
-    status: 503,
-    detail: "The runtime, or a service it depends on, is unavailable.",
-    steps: {
-      actor: { kind: "retry", detail: "Send the request again after a while." },
-      other: { kind: "wait", detail: "Wait, then send the request again." }
-    },
-    params: { dependency: { type: "identifier", operator_only: true } }
-  },
-  "runtime.unsupported": {
-    code: "runtime.unsupported",
-    title: "This runtime cannot do what was asked",
-    domain: "operator",
-    retry: "no",
-    raised_as: "problem",
-    status: 501,
-    detail: "This runtime lacks {capability}, which the request needs.",
-    steps: {
-      actor: { kind: "fix_configuration", detail: "Enable {capability} on this runtime." },
-      other: {
-        kind: "change_input",
-        detail: "Send a request that does not need {capability}, or use a runtime that offers it."
-      }
-    },
-    params: { capability: { type: "identifier" } }
-  },
-  "client.unreachable": {
-    code: "client.unreachable",
-    title: "The runtime could not be reached",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "client",
-    detail: "The client could not connect to the runtime at {base_url}.",
-    steps: {
-      actor: {
-        kind: "retry",
-        detail: "Check that the runtime at {base_url} is up and reachable, then try again."
-      },
-      other: { kind: "retry", detail: "Try again once the runtime at {base_url} is reachable." }
-    },
-    params: { base_url: { type: "identifier" } }
-  },
-  "client.timeout": {
-    code: "client.timeout",
-    title: "The runtime did not answer in time",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "client",
-    detail: "The runtime did not answer within {seconds} seconds.",
-    steps: {
-      actor: { kind: "retry", detail: "Try the call again, or raise the client's time limit." },
-      other: { kind: "retry", detail: "Try the call again." }
-    },
-    params: { seconds: { type: "seconds" } }
-  },
-  "client.response_unreadable": {
-    code: "client.response_unreadable",
-    title: "The runtime's answer could not be read",
-    domain: "runtime",
-    retry: "no",
-    raised_as: "client",
-    detail: "The runtime answered with the HTTP status {status} and a body that is not a problem document the client can read.",
-    steps: {
-      actor: {
-        kind: "report",
-        detail: "Report this to whoever runs the runtime, with the status and the body."
-      },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { status: { type: "integer" } }
-  },
-  "client.outcome_unknown": {
-    code: "client.outcome_unknown",
-    title: "The call may have created a run",
-    domain: "runtime",
-    retry: "outcome_unknown",
-    raised_as: "client",
-    detail: "The connection was lost after a request that creates a run had left, so the run may exist.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier", optional: true } }
-  },
-  "client.follow_failed": {
-    code: "client.follow_failed",
-    title: "Following a started run stopped",
-    domain: "runtime",
-    retry: "outcome_unknown",
-    raised_as: "client",
-    detail: "The client stopped following the run '{pipeline_run_id}', which may still be going.",
-    steps: {
-      actor: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' by its id rather than start it again."
-      },
-      other: {
-        kind: "read_run",
-        detail: "Read the run '{pipeline_run_id}' by its id rather than start it again."
-      }
-    },
-    params: { pipeline_run_id: { type: "identifier" } }
-  },
-  "client.not_configured": {
-    code: "client.not_configured",
-    title: "The client has no usable configuration",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The client's setting '{setting}' is missing or unusable.",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Set '{setting}' in the client's configuration."
-      },
-      other: {
-        kind: "fix_configuration",
-        detail: "Set '{setting}' in the client's configuration."
-      }
-    },
-    params: { setting: { type: "identifier" } }
-  },
-  "client.argument_invalid": {
-    code: "client.argument_invalid",
-    title: "An argument was refused before sending",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The argument '{argument}' was refused before any request left (reason: {reason}).",
-    steps: {
-      actor: { kind: "change_input", detail: "Correct the argument '{argument}', then try again." },
-      other: { kind: "change_input", detail: "Correct the argument '{argument}', then try again." }
-    },
-    params: { argument: { type: "identifier" }, reason: { type: "identifier" } }
-  },
-  "client.file_unreadable": {
-    code: "client.file_unreadable",
-    title: "A local file cannot be read",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The local file '{path}' cannot be read (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Check that '{path}' exists and is readable, then try again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Check that '{path}' exists and is readable, then try again."
-      }
-    },
-    params: { path: { type: "caller_text" }, reason: { type: "identifier" } }
-  },
-  "client.write_failed": {
-    code: "client.write_failed",
-    title: "A local file could not be written",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The client could not write '{path}' (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Make '{path}' writable, or choose another place to write, then try again."
-      },
-      other: {
-        kind: "fix_configuration",
-        detail: "Make '{path}' writable, or choose another place to write, then try again."
-      }
-    },
-    params: { path: { type: "caller_text" }, reason: { type: "identifier" } }
-  },
-  "client.target_exists": {
-    code: "client.target_exists",
-    title: "The target already exists",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "'{path}' already holds something the client will not overwrite.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Choose another target, or remove what '{path}' holds, then try again."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Choose another target, or remove what '{path}' holds, then try again."
-      }
-    },
-    params: { path: { type: "caller_text" } }
-  },
-  "client.workspace_busy": {
-    code: "client.workspace_busy",
-    title: "Local files changed underneath the client",
-    domain: "runtime",
-    retry: "yes",
-    raised_as: "client",
-    detail: "Another process holds or changed '{path}', which this call read.",
-    steps: {
-      actor: { kind: "retry", detail: "Try again once the other process is done with '{path}'." },
-      other: { kind: "retry", detail: "Try again once the other process is done with '{path}'." }
-    },
-    params: { path: { type: "caller_text" } }
-  },
-  "client.output_mismatch": {
-    code: "client.output_mismatch",
-    title: "An output does not match the generated types",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The output field '{field}' does not match the generated type of the concept '{concept}'.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Generate the types again from the method as it is now."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Generate the types again from the method as it is now."
-      }
-    },
-    params: { field: { type: "identifier" }, concept: { type: "identifier" } }
-  },
-  "client.link_refused": {
-    code: "client.link_refused",
-    title: "A download link was refused",
-    domain: "operator",
-    retry: "no",
-    raised_as: "client",
-    detail: "The client refused a download link the runtime's storage handed out (reason: {reason}).",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Make the runtime's storage hand out https links that need no redirect."
-      },
-      other: { kind: "report", detail: "Report this to whoever runs the runtime." }
-    },
-    params: { reason: { type: "enum", values: ["plain_http", "unsupported_scheme", "redirect"] } }
-  },
-  "client.download_limit_exceeded": {
-    code: "client.download_limit_exceeded",
-    title: "A download passed the client's limit",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "A download passed the client's limit of {limit} bytes.",
-    steps: {
-      actor: {
-        kind: "change_input",
-        detail: "Raise the client's download limit, or download fewer files at once."
-      },
-      other: {
-        kind: "change_input",
-        detail: "Raise the client's download limit, or download fewer files at once."
-      }
-    },
-    params: { limit: { type: "bytes" } }
-  },
-  "client.aborted": {
-    code: "client.aborted",
-    title: "The call was stopped by the caller",
-    domain: "input",
-    retry: "yes",
-    raised_as: "client",
-    detail: "The caller stopped the call before it finished, and the call created nothing.",
-    steps: {
-      actor: { kind: "retry", detail: "Make the call again if its result is still wanted." },
-      other: { kind: "retry", detail: "Make the call again if its result is still wanted." }
-    },
-    params: {}
-  },
-  "client.tool_missing": {
-    code: "client.tool_missing",
-    title: "A local tool the client needs is missing",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The program '{tool}', which the client needs, is missing or cannot be started.",
-    steps: {
-      actor: {
-        kind: "fix_configuration",
-        detail: "Install '{tool}' and put it on the PATH, then try again."
-      },
-      other: {
-        kind: "fix_configuration",
-        detail: "Install '{tool}' and put it on the PATH, then try again."
-      }
-    },
-    params: { tool: { type: "identifier" } }
-  },
-  "client.tool_outdated": {
-    code: "client.tool_outdated",
-    title: "A local tool is too old",
-    domain: "input",
-    retry: "no",
-    raised_as: "client",
-    detail: "The program '{tool}' is at version {version}, older than the client requires.",
-    steps: {
-      actor: { kind: "upgrade", detail: "Upgrade '{tool}', then try again." },
-      other: { kind: "upgrade", detail: "Upgrade '{tool}', then try again." }
-    },
-    params: { tool: { type: "identifier" }, version: { type: "identifier" } }
-  }
-};
-
-// node_modules/mthds/dist/problems/vocabulary.js
-var PROBLEM_DOMAINS = ["input", "method", "account", "operator", "runtime"];
-var RETRY_VERDICTS = ["no", "yes", "outcome_unknown"];
-var STEP_KINDS = [
-  "retry",
-  "wait",
-  "read_run",
-  "refresh",
-  "change_input",
-  "change_method",
-  "change_model",
-  "check_credentials",
-  "request_access",
-  "check_account",
-  "fix_configuration",
-  "upgrade",
-  "contact_owner",
-  "report"
-];
-var FIX_OP_KINDS = [
-  "set_key",
-  "ensure_table",
-  "delete_key",
-  "delete_table",
-  "rename_table_key",
-  "move_key",
-  "remap_value"
-];
-
-// node_modules/mthds/dist/problems/registry.js
-var PROBLEM_CODE_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$/;
-function codeFamily(code) {
-  const last = code.lastIndexOf(".");
-  return last === -1 ? code : code.slice(0, last);
-}
-var entriesByFamily;
-function familyEntries(family) {
-  if (entriesByFamily === void 0) {
-    const index = /* @__PURE__ */ new Map();
-    for (const entry of Object.values(CORE_REGISTRY)) {
-      const name = codeFamily(entry.code);
-      index.set(name, [...index.get(name) ?? [], entry]);
-    }
-    entriesByFamily = index;
-  }
-  return [...entriesByFamily.get(family) ?? []];
-}
-function typeUriOf(code) {
-  const segments = code.split(".");
-  if (segments.length === 2)
-    return `${CORE_ERROR_BASE_URL}/${code}`;
-  const prefix = EXTENSION_PREFIXES.find((candidate) => candidate.prefix === segments[0]);
-  return prefix === void 0 ? void 0 : `${prefix.base_url}/${code}`;
-}
-
-// node_modules/mthds/dist/problems/reading.js
-function isOneOf(values, value) {
-  return typeof value === "string" && values.includes(value);
-}
-function shared(values) {
-  if (values.length === 0)
-    return void 0;
-  return values.every((value) => value === values[0]) ? values[0] : void 0;
-}
-function familyDomain(code) {
-  return shared(familyEntries(codeFamily(code)).map((entry) => entry.domain));
-}
-function familyStepKind(code) {
-  return shared(familyEntries(codeFamily(code)).flatMap((entry) => [
-    entry.steps.actor.kind,
-    entry.steps.other.kind
-  ]));
-}
-function knownProblemDomain(problem) {
-  if (isOneOf(PROBLEM_DOMAINS, problem.domain))
-    return problem.domain;
-  return familyDomain(problem.code);
-}
-function problemDomain(problem) {
-  return knownProblemDomain(problem) ?? "runtime";
-}
-function problemRetry(problem) {
-  return isOneOf(RETRY_VERDICTS, problem.retry) ? problem.retry : "no";
-}
-function problemStepKind(problem) {
-  if (isOneOf(STEP_KINDS, problem.next_step.kind))
-    return problem.next_step.kind;
-  return familyStepKind(problem.code) ?? "report";
-}
-
-// node_modules/mthds/dist/problems/build.js
-function defaultStepReader(domain) {
-  return domain === "input" || domain === "runtime" ? "actor" : "other";
-}
-function writeValue(value) {
-  if (Array.isArray(value))
-    return value.map(writeValue).join(", ");
-  if (typeof value === "string")
-    return value;
-  return JSON.stringify(value) ?? String(value);
-}
-var TEMPLATE_TOKEN = /\{\{|\}\}|\{([a-z][a-z0-9_]*)\}|[{}]/g;
-function renderTemplate(template, params) {
-  return template.replace(TEMPLATE_TOKEN, (match, name, offset) => {
-    if (match === "{{")
-      return "{";
-    if (match === "}}")
-      return "}";
-    if (name === void 0) {
-      throw new Error(`A lone brace at ${offset} makes the template malformed: ${template}`);
-    }
-    if (params[name] === void 0) {
-      throw new Error(`The template names the parameter '${name}', which is not given: ${template}`);
-    }
-    return writeValue(params[name]);
-  });
-}
-function buildProblemFromEntry(entry, params, options = {}) {
-  const step = entry.steps[options.reader ?? defaultStepReader(entry.domain)];
-  const problem = { type: typeUriOf(entry.code) ?? entry.code, title: entry.title };
-  if (options.status !== void 0)
-    problem.status = options.status;
-  problem.detail = renderTemplate(entry.detail, params);
-  problem.code = entry.code;
-  problem.domain = entry.domain;
-  problem.retry = entry.retry;
-  if (options.retryAfter !== void 0 && entry.retry === "yes")
-    problem.retry_after = options.retryAfter;
-  problem.next_step = { kind: step.kind, detail: renderTemplate(step.detail, params) };
-  const declared = Object.entries(entry.params);
-  if (declared.length > 0) {
-    const visible = {};
-    for (const [name, spec] of declared) {
-      if (spec.operator_only === true || params[name] === void 0)
-        continue;
-      visible[name] = params[name];
-    }
-    problem.params = visible;
-  }
-  if (options.location !== void 0)
-    problem.location = options.location;
-  if (options.errors !== void 0 && options.errors.length > 0)
-    problem.errors = options.errors;
-  if (options.pipeline_run_id !== void 0)
-    problem.pipeline_run_id = options.pipeline_run_id;
-  for (const [name, value] of Object.entries(options.extra ?? {})) {
-    if (value !== void 0 && !(name in problem))
-      problem[name] = value;
-  }
-  return problem;
-}
-function buildProblem(code, params, options = {}) {
-  return buildProblemFromEntry(CORE_REGISTRY[code], params, options);
-}
-
-// node_modules/mthds/dist/problems/read.js
-var MAX_BODY_NESTING = 512;
-function nestsDeeperThan(text, limit) {
-  let depth = 0;
-  let inString = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text.charCodeAt(index);
-    if (inString) {
-      if (char === 92)
-        index += 1;
-      else if (char === 34)
-        inString = false;
-      continue;
-    }
-    if (char === 34)
-      inString = true;
-    else if (char === 91 || char === 123) {
-      depth += 1;
-      if (depth > limit)
-        return true;
-    } else if (char === 93 || char === 125)
-      depth -= 1;
-  }
-  return false;
-}
-var NonFiniteNumber = class extends Error {
-};
-function refuseNonFinite(_key, value) {
-  if (typeof value === "number" && !Number.isFinite(value))
-    throw new NonFiniteNumber();
-  return value;
-}
-function parseJsonBody(text) {
-  if (nestsDeeperThan(text, MAX_BODY_NESTING))
-    return { ok: false };
-  try {
-    return { ok: true, value: JSON.parse(text, refuseNonFinite) };
-  } catch {
-    return { ok: false };
-  }
-}
-function isObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isString(value) {
-  return typeof value === "string";
-}
-function isStringArray(value, minItems = 0) {
-  return Array.isArray(value) && value.length >= minItems && value.every(isString);
-}
-function isIntegerAtLeast(value, minimum, maximum = Infinity) {
-  return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum;
-}
-function optional(object, name, check) {
-  return !(name in object) || check(object[name]);
-}
-function isCode(value) {
-  return isString(value) && PROBLEM_CODE_PATTERN.test(value);
-}
-var SHA256_PATTERN = /^[0-9a-f]{64}$/;
-function isParams(value) {
-  if (!isObject(value))
-    return false;
-  return optional(value, "missing_blobs", (blobs) => Array.isArray(blobs) && blobs.every((hash) => isString(hash) && SHA256_PATTERN.test(hash)));
-}
-function isLocation(value) {
-  if (!isObject(value))
-    return false;
-  return optional(value, "pipe", isString) && optional(value, "path", (path) => isStringArray(path)) && optional(value, "input", isString) && optional(value, "field", isString) && optional(value, "item", (item) => isIntegerAtLeast(item, 0)) && optional(value, "attempt", (attempt) => isIntegerAtLeast(attempt, 1)) && optional(value, "file", isString) && optional(value, "line", (line) => isIntegerAtLeast(line, 1)) && optional(value, "column", (column) => isIntegerAtLeast(column, 1));
-}
-function isScalar(value) {
-  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-}
-function isTomlValue(value) {
-  return isScalar(value) || isObject(value) && Object.values(value).every(isScalar);
-}
-var KNOWN_OP_KINDS = new Set(FIX_OP_KINDS);
-function isFixOp(value) {
-  if (!isObject(value) || !isString(value.kind))
-    return false;
-  if (!KNOWN_OP_KINDS.has(value.kind))
-    return true;
-  const tablePath = (minItems) => isStringArray(value.table_path, minItems);
-  const key = isString(value.key);
-  switch (value.kind) {
-    case "set_key":
-      return tablePath(0) && key && "value" in value && isTomlValue(value.value);
-    case "ensure_table":
-    case "delete_table":
-      return tablePath(1);
-    case "delete_key":
-      return tablePath(0) && key;
-    case "rename_table_key":
-      return tablePath(0) && key && isString(value.new_key);
-    case "move_key":
-      return tablePath(0) && key && isStringArray(value.new_table_path) && isString(value.new_key);
-    case "remap_value":
-      return tablePath(0) && key && isObject(value.mapping) && Object.keys(value.mapping).length > 0 && Object.values(value.mapping).every(isString);
-    default:
-      return false;
-  }
-}
-var FIX_CODE_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-function isSuggestedFix(value) {
-  return isObject(value) && isString(value.fix_code) && FIX_CODE_PATTERN.test(value.fix_code) && isString(value.description) && isString(value.safety) && optional(value, "file", isString) && Array.isArray(value.ops) && value.ops.length > 0 && value.ops.every(isFixOp);
-}
-function isProblemItem(value) {
-  return isObject(value) && isCode(value.code) && isString(value.detail) && optional(value, "params", isParams) && optional(value, "location", isLocation) && optional(value, "suggestions", (suggestions) => isStringArray(suggestions)) && optional(value, "suggested_fix", isSuggestedFix);
-}
-function isNextStep(value) {
-  return isObject(value) && isString(value.kind) && isString(value.detail);
-}
-function isProblem(value) {
-  return isObject(value) && isString(value.type) && isString(value.title) && isString(value.detail) && isCode(value.code) && isString(value.domain) && isString(value.retry) && isNextStep(value.next_step) && optional(value, "status", (status) => isIntegerAtLeast(status, 100, 599)) && optional(value, "retry_after", (seconds) => typeof seconds === "number" && seconds >= 0) && optional(value, "params", isParams) && optional(value, "location", isLocation) && optional(value, "errors", (errors) => Array.isArray(errors) && errors.length > 0 && errors.every(isProblemItem)) && optional(value, "pipeline_run_id", isString);
-}
-function readProblemBody(body) {
-  const reading = parseJsonBody(body);
-  return reading.ok && isProblem(reading.value) ? reading.value : void 0;
-}
-function header(headers, name) {
-  if (typeof headers.get === "function") {
-    return headers.get(name) ?? void 0;
-  }
-  const map = headers;
-  const found = Object.keys(map).find((key) => key.toLowerCase() === name);
-  return found === void 0 ? void 0 : map[found];
-}
-var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-var MONTH = `(${MONTHS.join("|")})`;
-var DAY_NAME = "(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)";
-var DAY_NAME_LONG = "(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)";
-var TIME_OF_DAY = "([0-9]{2}):([0-9]{2}):([0-9]{2})";
-var IMF_FIXDATE = new RegExp(`^${DAY_NAME}, ([0-9]{2}) ${MONTH} ([0-9]{4}) ${TIME_OF_DAY} GMT$`);
-var RFC850_DATE = new RegExp(`^${DAY_NAME_LONG}, ([0-9]{2})-${MONTH}-([0-9]{2}) ${TIME_OF_DAY} GMT$`);
-var ASCTIME_DATE = new RegExp(`^${DAY_NAME} ${MONTH} ([0-9]{2}| [0-9]) ${TIME_OF_DAY} ([0-9]{4})$`);
-var LEAP_SECOND = 60;
-var FIRST_YEAR = 1;
-var LAST_YEAR = 9999;
-function isLeapYear(year) {
-  return year % 4 === 0 && year % 100 !== 0 || year % 400 === 0;
-}
-function daysInMonth(year, monthIndex) {
-  const days = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return days[monthIndex] ?? 0;
-}
-function rfc850Year(twoDigits, currentYear) {
-  const year = currentYear - currentYear % 100 + twoDigits;
-  if (year > currentYear + 50)
-    return year - 100;
-  if (year <= currentYear - 50)
-    return year + 100;
-  return year;
-}
-function parseHttpDate(text, now = Date.now()) {
-  let day;
-  let month;
-  let year;
-  let time;
-  const imf = IMF_FIXDATE.exec(text);
-  const asctime = imf === null ? ASCTIME_DATE.exec(text) : null;
-  const rfc850 = imf === null && asctime === null ? RFC850_DATE.exec(text) : null;
-  if (imf !== null) {
-    [, day, month] = imf;
-    year = Number(imf[3]);
-    time = [imf[4], imf[5], imf[6]];
-  } else if (asctime !== null) {
-    [, month, day] = asctime;
-    time = [asctime[3], asctime[4], asctime[5]];
-    year = Number(asctime[6]);
-  } else if (rfc850 !== null) {
-    [, day, month] = rfc850;
-    year = rfc850Year(Number(rfc850[3]), new Date(now).getUTCFullYear());
-    time = [rfc850[4], rfc850[5], rfc850[6]];
-  } else {
-    return void 0;
-  }
-  const monthIndex = MONTHS.indexOf(month);
-  const dayOfMonth = Number(day.trim());
-  const [hour, minute, second] = time.map(Number);
-  if (year < FIRST_YEAR || year > LAST_YEAR || dayOfMonth < 1 || dayOfMonth > daysInMonth(year, monthIndex) || hour > 23 || minute > 59 || second > LEAP_SECOND) {
-    return void 0;
-  }
-  const moment = /* @__PURE__ */ new Date(0);
-  moment.setUTCFullYear(year, monthIndex, dayOfMonth);
-  moment.setUTCHours(hour, minute, 0, 0);
-  const instant = moment.getTime() + second * 1e3;
-  return new Date(instant).getUTCFullYear() > LAST_YEAR ? void 0 : instant;
-}
-function retryAfterSeconds(headers, now = Date.now()) {
-  const raw = header(headers, "retry-after")?.trim();
-  if (!raw)
-    return void 0;
-  if (/^[0-9]+$/.test(raw)) {
-    const seconds = Number(raw);
-    return Number.isSafeInteger(seconds) ? seconds : void 0;
-  }
-  const date = parseHttpDate(raw, now);
-  if (date === void 0)
-    return void 0;
-  return Math.max(0, Math.ceil((date - now) / 1e3));
-}
-var soleCodesByStatus;
-function soleCodeOfStatus(status) {
-  if (soleCodesByStatus === void 0) {
-    const byStatus = /* @__PURE__ */ new Map();
-    for (const entry of Object.values(CORE_REGISTRY)) {
-      if (entry.raised_as !== "problem" || entry.status === void 0)
-        continue;
-      byStatus.set(entry.status, [...byStatus.get(entry.status) ?? [], entry]);
-    }
-    soleCodesByStatus = /* @__PURE__ */ new Map();
-    for (const [code, entries] of byStatus) {
-      const [only] = entries;
-      if (entries.length !== 1 || only === void 0)
-        continue;
-      const callerStatable = Object.values(only.params).every((param) => param.optional === true || param.operator_only === true);
-      if (callerStatable)
-        soleCodesByStatus.set(code, only);
-    }
-  }
-  return soleCodesByStatus.get(status);
-}
-function unreadableAnswer(status) {
-  return buildProblem("client.response_unreadable", { status });
-}
-function isHttpStatus(status) {
-  return Number.isInteger(status) && status >= 100 && status <= 599;
-}
-function readAnswer(answer, options = {}) {
-  const received = readProblemBody(answer.body);
-  if (received !== void 0) {
-    let problem = received;
-    if (problem.status === void 0 && isHttpStatus(answer.status)) {
-      const { type, title, ...rest } = problem;
-      problem = { type, title, status: answer.status, ...rest };
-    }
-    if (problem.retry_after === void 0 && problem.retry === "yes") {
-      const seconds = retryAfterSeconds(answer.headers);
-      if (seconds !== void 0)
-        problem.retry_after = seconds;
-    }
-    return { problem, fromBody: true };
-  }
-  return { problem: readAnswerByStatus(answer, options), fromBody: false };
-}
-function readAnswerByStatus(answer, options) {
-  if (answer.status >= 200 && answer.status < 300)
-    return unreadableAnswer(answer.status);
-  if (options.createsRun === true && answer.status >= 500 && answer.status <= 599) {
-    return buildProblem("client.outcome_unknown", {});
-  }
-  const entry = soleCodeOfStatus(answer.status);
-  if (entry === void 0 || options.createsRun === true && entry.retry === "yes") {
-    return unreadableAnswer(answer.status);
-  }
-  return buildProblemFromEntry(entry, {}, { status: answer.status, retryAfter: retryAfterSeconds(answer.headers) });
-}
-
-// node_modules/mthds/dist/problems/render.js
-function problemRequestId(problem) {
-  const id = problem.request_id;
-  return typeof id === "string" && id.length > 0 ? id : void 0;
-}
-
-// node_modules/mthds/dist/problems/errors.js
-function problemSentence(problem) {
-  return typeof problem.message === "string" && problem.message.length > 0 ? problem.message : problem.detail;
-}
-function problemErrorMessage(problem) {
-  const sentence = problemSentence(problem);
-  const step = problem.next_step.detail;
-  return step.length > 0 && !sentence.endsWith(step) ? `${sentence} ${step}` : sentence;
-}
-var ProblemError = class extends PipelineRequestError {
-  /** The problem, as received from the runtime or as the client built it. */
-  problem;
-  constructor(problem, options) {
-    super(problemErrorMessage(problem), options);
-    this.name = "ProblemError";
-    this.problem = problem;
-  }
-  /** The problem's code, the member a caller branches on. */
-  get code() {
-    return this.problem.code;
-  }
-  /** Who must act, read into the closed list (`problemDomain`). */
-  get domain() {
-    return problemDomain(this.problem);
-  }
-  /** Whether a repeat can succeed, read into the closed list (`problemRetry`): never repeat on `outcome_unknown`. */
-  get retry() {
-    return problemRetry(this.problem);
-  }
-  /** The next step as received, its kind read into the closed list. */
-  get nextStep() {
-    return { ...this.problem.next_step, kind: problemStepKind(this.problem) };
-  }
-  /** Seconds to wait before a repeat, when the problem gives them. */
-  get retryAfter() {
-    return this.problem.retry_after;
-  }
-  /** The runtime's id for the request that failed, to hand to whoever runs it. */
-  get requestId() {
-    return problemRequestId(this.problem);
-  }
-};
-function problemError(code, params, options = {}) {
-  return new ProblemError(buildProblem(code, params, { reader: options.reader, extra: { message: options.message } }), options.cause === void 0 ? void 0 : { cause: options.cause });
-}
-function argumentInvalid(argument, reason, message) {
-  return problemError("client.argument_invalid", { argument, reason }, { message });
-}
-
-// node_modules/mthds/dist/protocol/options.js
-function assertExclusiveRunSources(options) {
-  const hasFiles = options.files != null;
-  const hasZip = options.bundle_b64 != null;
-  const hasContents = options.mthds_contents != null && options.mthds_contents.length > 0;
-  if (hasFiles && hasZip) {
-    throw argumentInvalid("bundle_b64", "conflicts_with_files", "files and bundle_b64 are two encodings of the same bundle and are mutually exclusive; provide one.");
-  }
-  if ((hasFiles || hasZip) && hasContents) {
-    throw argumentInvalid("mthds_contents", "conflicts_with_bundle", "A method bundle (files/bundle_b64) is self-contained; it cannot be combined with mthds_contents.");
-  }
-}
-function hasBundlePayload(options) {
-  const hasFiles = options.files != null && Object.keys(options.files).length > 0;
-  const hasZip = options.bundle_b64 != null && options.bundle_b64.length > 0;
-  return hasFiles || hasZip;
-}
-
-// node_modules/mthds/dist/protocol/method_files.js
-function isBlank(content) {
-  return content.trim().length === 0;
-}
-function serializeMethodFiles(files) {
-  const kept = files.filter((file) => !isBlank(file.content));
-  if (kept.length === 0)
-    return "";
-  return JSON.stringify(kept.map(({ name, content }) => ({ name, content })));
-}
-function parseMethodFiles(source) {
-  if (source == null || source.trim().length === 0)
-    return [];
-  let parsed;
-  try {
-    parsed = JSON.parse(source);
-  } catch (cause) {
-    throw methodFilesInvalid("not_json", "Method file source is not valid JSON; expected a [{ name, content }] array.", cause);
-  }
-  if (!Array.isArray(parsed)) {
-    throw methodFilesInvalid("not_an_array", "Method file source must be a JSON array of { name, content } entries.");
-  }
-  const files = [];
-  for (const entry of parsed) {
-    if (!isMethodFileEntry(entry)) {
-      throw methodFilesInvalid("entry_invalid", "Each method file entry must be an object with string `name` and string `content`.");
-    }
-    if (!isBlank(entry.content))
-      files.push({ name: entry.name, content: entry.content });
-  }
-  return files;
-}
-function methodFilesInvalid(reason, message, cause) {
-  return problemError("client.argument_invalid", { argument: "files", reason }, { message, cause });
-}
-function isMethodFileEntry(value) {
-  return typeof value === "object" && value !== null && typeof value.name === "string" && typeof value.content === "string";
-}
+// src/errors.ts
+init_protocol();
 
 // src/error-models.ts
 var REPORT_STRING_FIELDS = [
@@ -6091,56 +12282,6 @@ function readNested(record, field, read) {
   const kept = isPlainObject(value) ? read(value) : void 0;
   if (kept === void 0) delete record[field];
   else record[field] = kept;
-}
-
-// src/error-verdicts.ts
-var INPUT = Object.freeze({ errorDomain: "input", retryable: false });
-var CONFIG = Object.freeze({ errorDomain: "config", retryable: false });
-var TRANSIENT = Object.freeze({ errorDomain: "runtime", retryable: true });
-var FAULT = Object.freeze({ errorDomain: "runtime", retryable: false });
-var API_KEY_LIMIT_CODE = "pipelex_api_key_limit_reached";
-var IDEMPOTENCY_KEY_IN_USE_CODE = "idempotency_key_in_use";
-function fallbackVerdict(status, code, named) {
-  switch (status) {
-    case 401:
-    case 402:
-    case 403:
-      return CONFIG;
-    case 404:
-      return named ? INPUT : CONFIG;
-    case 405:
-      return CONFIG;
-    case 408:
-    case 429:
-      return TRANSIENT;
-    case 409:
-      if (code === API_KEY_LIMIT_CODE) return CONFIG;
-      if (code === IDEMPOTENCY_KEY_IN_USE_CODE) return TRANSIENT;
-      return INPUT;
-    case 501:
-      return CONFIG;
-  }
-  if (status >= 400 && status < 500) return INPUT;
-  if (status >= 500 && status < 600) return TRANSIENT;
-  return FAULT;
-}
-var ERROR_DOMAIN_OF = Object.freeze({
-  input: "input",
-  method: "input",
-  account: "config",
-  operator: "config",
-  runtime: "runtime"
-});
-var RETRYABLE_OF = Object.freeze({
-  yes: true,
-  no: false,
-  outcome_unknown: false
-});
-function problemVerdict(problem) {
-  return {
-    errorDomain: ERROR_DOMAIN_OF[problemDomain(problem)],
-    retryable: RETRYABLE_OF[problemRetry(problem)]
-  };
 }
 
 // src/run-may-have-started.ts
@@ -6260,14 +12401,6 @@ var InputPreparationError = class extends PipelexRequestError {
   constructor(message, options) {
     super(message, options?.verdict ?? makeVerdict("input", false), options);
     this.name = "InputPreparationError";
-  }
-};
-var EmptyMethodSourceError = class extends InputPreparationError {
-  methodId;
-  constructor(methodId, options) {
-    super(`Method "${methodId}" has no MTHDS source yet.`, options);
-    this.name = "EmptyMethodSourceError";
-    this.methodId = methodId;
   }
 };
 var InvalidLocalSourceError = class extends InputPreparationError {
@@ -6450,6 +12583,32 @@ var ArtifactAuthenticationError = class extends ArtifactOperationError {
     this.verdict = verdict;
   }
 };
+var MethodFileTransferError = class extends PipelexRequestError {
+  operation;
+  code;
+  sha256;
+  path;
+  status;
+  constructor(message, details) {
+    super(message, methodFileTransferVerdict(details.code));
+    this.name = "MethodFileTransferError";
+    this.operation = details.operation;
+    this.code = details.code;
+    this.sha256 = details.sha256;
+    this.path = details.path;
+    this.status = details.status;
+  }
+};
+function methodFileTransferVerdict(code) {
+  switch (code) {
+    case "unreachable":
+    case "storage_error":
+    case "mismatch":
+      return makeVerdict("runtime", true);
+    default:
+      return makeVerdict("runtime", false);
+  }
+}
 var ApiUnreachableError = class extends PipelexRequestError {
   apiUrl;
   code;
@@ -6919,7 +13078,7 @@ function sleep(ms, signal) {
     throwIfAborted(signal);
     return Promise.resolve();
   }
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
       reject(abortError(signal));
@@ -6927,7 +13086,7 @@ function sleep(ms, signal) {
     const timer = setTimeout(
       () => {
         signal?.removeEventListener("abort", onAbort);
-        resolve3();
+        resolve4();
       },
       Math.min(ms, MAX_TIMER_DELAY_MS)
     );
@@ -6940,6 +13099,778 @@ function sleep(ms, signal) {
       signal.addEventListener("abort", onAbort, { once: true });
     }
   });
+}
+
+// src/method-trees.ts
+function treeShapeFault(value) {
+  if (value !== null && typeof value === "object" && Array.isArray(value.files) && typeof value.digest === "string" && typeof value.readFile === "function") {
+    return void 0;
+  }
+  if (Array.isArray(value)) return "a list";
+  return value !== null && typeof value === "object" ? "an object without them" : typeof value;
+}
+var INLINE_TREE_MAX_BYTES2 = 256 * 1024;
+var HANDSHAKE_TTL_MS2 = 5 * 6e4;
+var MAX_CONCURRENT_TRANSFERS = 8;
+var SAVE_SENDING = {
+  unsent: "the method was not saved",
+  emptyRemedy: "give files: null for an empty draft"
+};
+var REQUEST_SENDING = { unsent: "the request was not sent" };
+function presentMap(value) {
+  if (value === void 0 || value === null) return void 0;
+  const isEmptyObject = Object.prototype.toString.call(value) === "[object Object]" && Object.keys(value).length === 0;
+  return isEmptyObject ? void 0 : value;
+}
+function emptyTreeRefusal(call, what, sending) {
+  const remedy = sending.emptyRemedy === void 0 ? "." : `; ${sending.emptyRemedy}.`;
+  return new RequestArgumentError(
+    `${call}() got ${what} holding no file, and a method tree holds at least one${remedy}`
+  );
+}
+function declaresBlobStore2(version) {
+  return version.blob_store === true;
+}
+function announcedTreeLimits2(version) {
+  const limits = objectMember2(version, "limits");
+  const tree = limits === void 0 ? void 0 : objectMember2(limits, "method_tree");
+  if (tree === void 0) return {};
+  const read = (name) => {
+    const value = tree[name];
+    return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : void 0;
+  };
+  const announced = {};
+  const maxFiles = read("max_files");
+  const maxFileBytes = read("max_file_bytes");
+  const maxTotalBytes = read("max_total_bytes");
+  const maxInlineBytes = read("max_inline_bytes");
+  if (maxFiles !== void 0) announced.maxFiles = maxFiles;
+  if (maxFileBytes !== void 0) announced.maxFileBytes = maxFileBytes;
+  if (maxTotalBytes !== void 0) announced.maxTotalBytes = maxTotalBytes;
+  if (maxInlineBytes !== void 0) announced.maxInlineBytes = maxInlineBytes;
+  return announced;
+}
+function listerLimitsOf2(announced) {
+  const limits = {};
+  if (announced.maxFiles !== void 0) limits.maxFileCount = announced.maxFiles;
+  if (announced.maxFileBytes !== void 0) limits.maxFileSize = announced.maxFileBytes;
+  if (announced.maxTotalBytes !== void 0) limits.maxTotalSize = announced.maxTotalBytes;
+  return limits;
+}
+function inlineThreshold(announced) {
+  return Math.min(INLINE_TREE_MAX_BYTES2, announced.maxInlineBytes ?? Number.POSITIVE_INFINITY);
+}
+function inlineMapBytes2(files) {
+  return UTF8_ENCODER.encode(JSON.stringify(files)).length;
+}
+function treeTotalSize2(tree) {
+  return tree.files.reduce((total, file) => total + file.size, 0);
+}
+async function readTreeBytesInto(tree, read, signal) {
+  for (const file of tree.files) {
+    if (read.has(file.path)) continue;
+    throwIfAborted(signal);
+    read.set(file.path, await tree.readFile(file.path));
+  }
+  return read;
+}
+function inlineFilesOf2(tree, bytesByPath) {
+  const files = {};
+  for (const file of tree.files) {
+    const bytes = bytesByPath.get(file.path);
+    if (bytes === void 0) throw new Error(`No bytes were read for '${file.path}'.`);
+    defineFileEntry2(files, file.path, inlineFileEntry2(bytes));
+  }
+  return files;
+}
+function hashMethodFiles2(tree) {
+  const files = {};
+  for (const file of tree.files) {
+    defineFileEntry2(files, file.path, { sha256: file.sha256, size: file.size });
+  }
+  return files;
+}
+function uniqueBlobs2(tree) {
+  const seen = /* @__PURE__ */ new Set();
+  const blobs = [];
+  for (const file of tree.files) {
+    if (seen.has(file.sha256)) continue;
+    seen.add(file.sha256);
+    blobs.push({ sha256: file.sha256, size: file.size });
+  }
+  return blobs;
+}
+function fileByBlob2(tree) {
+  const files = /* @__PURE__ */ new Map();
+  for (const file of tree.files) {
+    if (!files.has(file.sha256)) files.set(file.sha256, file);
+  }
+  return files;
+}
+async function forEachConcurrently2(items, limit, task) {
+  const controller = new AbortController();
+  let next = 0;
+  let failure;
+  const worker = async () => {
+    while (failure === void 0 && next < items.length) {
+      const item = items[next];
+      next += 1;
+      try {
+        await task(item, controller.signal);
+      } catch (error) {
+        if (failure === void 0) {
+          failure = { error };
+          controller.abort(error);
+        }
+        return;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  if (failure !== void 0) throw failure.error;
+}
+function isMethodTreeTooLarge2(status, body) {
+  if (status !== 422) return false;
+  const reading = parseJsonBody(body);
+  if (!reading.ok || !isJsonObject(reading.value)) return false;
+  const answer = reading.value;
+  if (answer["code"] === "method.package_invalid") {
+    const params = answer["params"];
+    return isJsonObject(params) && typeof params["limit"] === "number";
+  }
+  return answer["code"] === "method_tree_too_large" || answer["error_type"] === "MethodTreeTooLarge";
+}
+function missingBlobsOf2(status, body) {
+  if (status !== 422) return void 0;
+  const problem = readProblemBody(body);
+  if (problem === void 0 || problem.code !== "request.blobs_missing") return void 0;
+  const listed = problem.params?.["missing_blobs"];
+  if (!Array.isArray(listed) || !listed.every((entry) => typeof entry === "string")) {
+    return void 0;
+  }
+  return listed;
+}
+function eitherSignal(first, second) {
+  if (second === void 0 || first.aborted) return { signal: first, dispose: () => void 0 };
+  if (second.aborted) return { signal: second, dispose: () => void 0 };
+  const controller = new AbortController();
+  const dispose = () => {
+    first.removeEventListener("abort", onFirst);
+    second.removeEventListener("abort", onSecond);
+  };
+  const onFirst = () => {
+    dispose();
+    controller.abort(first.reason);
+  };
+  const onSecond = () => {
+    dispose();
+    controller.abort(second.reason);
+  };
+  first.addEventListener("abort", onFirst, { once: true });
+  second.addEventListener("abort", onSecond, { once: true });
+  return { signal: controller.signal, dispose };
+}
+function isJsonObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+async function contentsTreeSource(contents, call, sending) {
+  const bytesByPath = /* @__PURE__ */ new Map();
+  for (const [treePath, content] of Object.entries(contents)) {
+    if (typeof content === "string") {
+      if (LONE_SURROGATE2.test(content)) {
+        throw new RequestArgumentError(
+          `${call}() got contents['${treePath}'] holding a lone surrogate, which is no text a file can hold: give its bytes instead.`
+        );
+      }
+      bytesByPath.set(treePath, UTF8_ENCODER.encode(content));
+    } else if (content instanceof Uint8Array) {
+      bytesByPath.set(treePath, content);
+    } else {
+      throw new RequestArgumentError(
+        `${call}() got contents['${treePath}'] that is neither a string nor a Uint8Array.`
+      );
+    }
+  }
+  if (bytesByPath.size === 0) throw emptyTreeRefusal(call, "contents", sending);
+  const files = [];
+  for (const [treePath, bytes] of bytesByPath) {
+    files.push({ path: treePath, size: bytes.length, sha256: await sha256Hex2(bytes) });
+  }
+  files.sort((left, right) => compareUtf82(left.path, right.path));
+  const digest = await treeDigestOf(files);
+  return {
+    files,
+    digest,
+    readFile: async (treePath) => {
+      const bytes = bytesByPath.get(treePath);
+      if (bytes === void 0) throw new Error(`The tree holds no file '${treePath}'.`);
+      return bytes;
+    }
+  };
+}
+async function listDirectoryTree(directory, limits, call) {
+  const { listMethodTree: listMethodTree2, MethodTreeError: MethodTreeError2 } = await Promise.resolve().then(() => (init_dist2(), dist_exports));
+  try {
+    return await listMethodTree2(directory, { limits });
+  } catch (err) {
+    if (err instanceof MethodTreeError2) {
+      throw new RequestArgumentError(
+        `${call}() could not list the method's tree at '${directory}': ${err.message}`,
+        { cause: err }
+      );
+    }
+    throw err;
+  }
+}
+async function treeDigestOf(files) {
+  const sorted = [...files].sort((left, right) => compareUtf82(left.path, right.path));
+  const listing = sorted.map((file) => `${file.sha256}  ${file.path}
+`).join("");
+  return `sha256:${await sha256Hex2(UTF8_ENCODER.encode(listing))}`;
+}
+async function sha256Hex2(bytes) {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function compareUtf82(left, right) {
+  if (left === right) return 0;
+  const leftBytes = UTF8_ENCODER.encode(left);
+  const rightBytes = UTF8_ENCODER.encode(right);
+  const shared2 = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < shared2; index += 1) {
+    const difference = leftBytes[index] - rightBytes[index];
+    if (difference !== 0) return difference;
+  }
+  return leftBytes.length - rightBytes.length;
+}
+function inlineFileEntry2(bytes) {
+  const text = utf8TextOf2(bytes);
+  return text ?? { base64: encodeBase642(bytes) };
+}
+function defineFileEntry2(files, treePath, entry) {
+  Object.defineProperty(files, treePath, {
+    value: entry,
+    enumerable: true,
+    writable: true,
+    configurable: true
+  });
+}
+function utf8TextOf2(bytes) {
+  try {
+    return STRICT_UTF8.decode(bytes);
+  } catch {
+    return null;
+  }
+}
+function encodeBase642(bytes) {
+  const chunks = [];
+  let line = "";
+  const full = bytes.length - bytes.length % 3;
+  for (let index = 0; index < full; index += 3) {
+    const triple = bytes[index] << 16 | bytes[index + 1] << 8 | bytes[index + 2];
+    line += BASE64_ALPHABET2[triple >> 18 & 63] + BASE64_ALPHABET2[triple >> 12 & 63] + BASE64_ALPHABET2[triple >> 6 & 63] + BASE64_ALPHABET2[triple & 63];
+    if (line.length >= 8192) {
+      chunks.push(line);
+      line = "";
+    }
+  }
+  const rest = bytes.length - full;
+  if (rest === 1) {
+    const value = bytes[full] << 16;
+    line += BASE64_ALPHABET2[value >> 18 & 63] + BASE64_ALPHABET2[value >> 12 & 63] + "==";
+  } else if (rest === 2) {
+    const value = bytes[full] << 16 | bytes[full + 1] << 8;
+    line += BASE64_ALPHABET2[value >> 18 & 63] + BASE64_ALPHABET2[value >> 12 & 63] + BASE64_ALPHABET2[value >> 6 & 63] + "=";
+  }
+  chunks.push(line);
+  return chunks.join("");
+}
+async function uploadBlob(blob, bytes, options) {
+  const { sha256, upload } = blob;
+  const host = hostOf(upload.url);
+  await storageExchange(
+    upload.url,
+    {
+      method: upload.method,
+      headers: { ...upload.headers },
+      body: bytes
+    },
+    options,
+    (code) => new MethodFileTransferError(
+      `Uploading the file with SHA-256 ${sha256} to ${host} failed: no answer came back (${code}), so ${options.unsent}.`,
+      { operation: "upload", code: "unreachable", sha256 }
+    ),
+    async (response) => {
+      await response.arrayBuffer().catch(() => void 0);
+      if (response.ok || response.status === 412 && isCreateOnly(upload.headers)) return;
+      throw new MethodFileTransferError(
+        `Uploading the file with SHA-256 ${sha256} to ${host} failed (${statusLine(response)}), so ${options.unsent}.`,
+        {
+          operation: "upload",
+          code: methodFileTransferCodeOfStatus(response.status),
+          sha256,
+          status: response.status
+        }
+      );
+    }
+  );
+}
+function methodFileTransferCodeOfStatus(status) {
+  return fallbackVerdict(status, void 0, true).retryable ? "storage_error" : "refused";
+}
+async function writeMethodTreeTo(files, destination, options) {
+  refuseUnwritableListing(files);
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const target = path.resolve(destination);
+  await refuseOccupiedDestination(fs, target);
+  const parent = path.dirname(target);
+  await fs.mkdir(parent, { recursive: true });
+  const staging = path.join(parent, `.${path.basename(target)}.${randomHex(8)}.writing`);
+  await fs.mkdir(staging);
+  let inPlace = false;
+  try {
+    await forEachConcurrently2(files, MAX_CONCURRENT_TRANSFERS, async (file, signal) => {
+      const bytes = await downloadMethodFile(file, { timeoutMs: options.timeoutMs, signal });
+      const filePath = path.join(staging, ...file.path.split("/"));
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, bytes, { flag: "wx" });
+    });
+    if (await isDirectory(fs, target)) await fs.rmdir(target);
+    await fs.rename(staging, target);
+    inPlace = true;
+  } finally {
+    if (!inPlace) await fs.rm(staging, { recursive: true, force: true }).catch(() => void 0);
+  }
+}
+async function downloadMethodFile(file, options) {
+  const host = hostOf(file.url);
+  const unreachable = (code) => new MethodFileTransferError(
+    `Downloading '${file.path}' from ${host} failed: no answer came back (${code}).`,
+    { operation: "download", code: "unreachable", sha256: file.sha256, path: file.path }
+  );
+  const received = await storageExchange(
+    file.url,
+    { method: "GET" },
+    options,
+    unreachable,
+    async (response, failureCode) => {
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => void 0);
+        throw new MethodFileTransferError(
+          `Downloading '${file.path}' from ${host} failed (${statusLine(response)}). A refused link may have expired: read the method again for fresh links.`,
+          {
+            operation: "download",
+            code: methodFileTransferCodeOfStatus(response.status),
+            sha256: file.sha256,
+            path: file.path,
+            status: response.status
+          }
+        );
+      }
+      try {
+        return await readAtMost(response, file.size + 1);
+      } catch (cause) {
+        throw unreachable(failureCode(cause));
+      }
+    }
+  );
+  const receivedSha256 = await sha256Hex2(received);
+  if (received.length !== file.size || receivedSha256 !== file.sha256) {
+    const cameBack = received.length > file.size ? "more than that came back." : `${received.length} bytes came back, hashing to ${receivedSha256}.`;
+    throw new MethodFileTransferError(
+      `The bytes downloaded for '${file.path}' are not the file listed: the listing names ${file.size} bytes hashing to ${file.sha256}, and ${cameBack}`,
+      { operation: "download", code: "mismatch", sha256: file.sha256, path: file.path }
+    );
+  }
+  return received;
+}
+async function storageExchange(url, init, options, unreachable, consume) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("The transfer timed out.", "TimeoutError"));
+  }, options.timeoutMs);
+  const callerSignal = options.signal;
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted === true) controller.abort(callerSignal.reason);
+  else callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+  const failureCode = (cause) => {
+    if (timedOut) return "ABORT_TIMEOUT";
+    if (callerSignal?.aborted === true) return "stopped";
+    return networkCodeOf(cause);
+  };
+  try {
+    let response;
+    try {
+      response = await fetch(url, {
+        ...init,
+        credentials: "omit",
+        redirect: "manual",
+        signal: controller.signal
+      });
+    } catch (cause) {
+      throw unreachable(failureCode(cause));
+    }
+    return await consume(response, failureCode);
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", onCallerAbort);
+  }
+}
+async function readAtMost(response, limit) {
+  const body = response.body;
+  if (body === null) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      length += value.length;
+      if (length >= limit) break;
+    }
+  } finally {
+    await reader.cancel().catch(() => void 0);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
+}
+function refuseUnwritableListing(files) {
+  const seen = /* @__PURE__ */ new Set();
+  for (const file of files) {
+    const violation = treePathViolation2(file.path);
+    if (violation !== null) {
+      throw new RequestArgumentError(
+        `The listing holds '${file.path}', which is not a tree path (${violation}), so the tree cannot be written.`
+      );
+    }
+    if (seen.has(file.path)) {
+      throw new RequestArgumentError(
+        `The listing holds '${file.path}' twice, so the tree cannot be written.`
+      );
+    }
+    seen.add(file.path);
+  }
+  const colliding = pathCollisions2([...seen]);
+  if (colliding.length > 0) {
+    throw new RequestArgumentError(
+      `The listing holds paths that collide once case-folded, or where one names a directory of another: ${colliding.join(", ")}.`
+    );
+  }
+}
+function treePathViolation2(candidate) {
+  if (candidate === "") return "the path is empty";
+  if (LONE_SURROGATE2.test(candidate)) return "the path holds a code point UTF-8 cannot encode";
+  if (candidate.startsWith("/") || candidate.endsWith("/")) {
+    return "the path starts or ends with '/'";
+  }
+  for (const segment of candidate.split("/")) {
+    if (segment === "") return "the path holds an empty segment";
+    if (segment === "." || segment === "..") return `the path holds the segment '${segment}'`;
+    if (segment.includes("\\")) return "the path holds a backslash";
+    if (segment.includes(":")) return "the path holds a colon";
+    if (CONTROL_CHARACTER2.test(segment)) return "the path holds a control character";
+    if (UTF8_ENCODER.encode(segment).length > MAX_SEGMENT_BYTES2) {
+      return `a segment is longer than ${MAX_SEGMENT_BYTES2} bytes`;
+    }
+  }
+  if (candidate.normalize("NFC") !== candidate) {
+    return "the path is not in Unicode Normalization Form C";
+  }
+  if (UTF8_ENCODER.encode(candidate).length > MAX_TREE_PATH_BYTES2) {
+    return `the path is longer than ${MAX_TREE_PATH_BYTES2} bytes`;
+  }
+  return null;
+}
+function pathCollisions2(treePaths) {
+  const fold = (text) => text.toUpperCase().toLowerCase();
+  const byFolded = /* @__PURE__ */ new Map();
+  const underFoldedDirectory = /* @__PURE__ */ new Map();
+  for (const treePath of treePaths) {
+    const folded = fold(treePath);
+    const group = byFolded.get(folded) ?? /* @__PURE__ */ new Set();
+    group.add(treePath);
+    byFolded.set(folded, group);
+    const segments = treePath.split("/");
+    for (let depth = 1; depth < segments.length; depth += 1) {
+      const directory = fold(segments.slice(0, depth).join("/"));
+      const under = underFoldedDirectory.get(directory) ?? /* @__PURE__ */ new Set();
+      under.add(treePath);
+      underFoldedDirectory.set(directory, under);
+    }
+  }
+  const colliding = /* @__PURE__ */ new Set();
+  for (const group of byFolded.values()) {
+    if (group.size > 1) for (const treePath of group) colliding.add(treePath);
+  }
+  for (const treePath of treePaths) {
+    const under = underFoldedDirectory.get(fold(treePath));
+    if (under !== void 0) {
+      colliding.add(treePath);
+      for (const other of under) colliding.add(other);
+    }
+  }
+  return [...colliding].sort(compareUtf82);
+}
+async function refuseOccupiedDestination(fs, target) {
+  let entries;
+  try {
+    const found = await fs.lstat(target);
+    if (!found.isDirectory()) throw occupied(target);
+    entries = await fs.readdir(target);
+  } catch (err) {
+    if (err.code === "ENOENT") return;
+    throw err;
+  }
+  if (entries.length > 0) throw occupied(target);
+}
+function occupied(target) {
+  return new RequestArgumentError(
+    `Cannot write a method tree at '${target}': it already exists and is not an empty directory, and a written tree holds nothing but its files.`
+  );
+}
+async function isDirectory(fs, target) {
+  try {
+    return (await fs.lstat(target)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+var UTF8_ENCODER = new TextEncoder();
+var STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+var BASE64_ALPHABET2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+var LONE_SURROGATE2 = /[\uD800-\uDFFF]/u;
+var CONTROL_CHARACTER2 = new RegExp("\\p{Cc}", "u");
+var MAX_SEGMENT_BYTES2 = 255;
+var REDACTED = "[redacted]";
+var LINK_QUERY = /(\bhttps?:\/\/[^\s"'<>?#]*)\?[^\s"'<>]*/gi;
+var MAX_TREE_PATH_BYTES2 = 1024;
+function objectMember2(holder, name) {
+  const value = holder[name];
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+}
+function isCreateOnly(headers) {
+  return Object.keys(headers).some((name) => name.toLowerCase() === "if-none-match");
+}
+function hostOf(url) {
+  try {
+    return new URL(url).host || "storage";
+  } catch {
+    return "storage";
+  }
+}
+function redactSignedLinks(text) {
+  let redacted = text;
+  try {
+    redacted = JSON.stringify(withUrlMembersRedacted(JSON.parse(text)));
+  } catch {
+  }
+  return redacted.replace(LINK_QUERY, "$1?[redacted]");
+}
+function withUrlMembersRedacted(value) {
+  if (Array.isArray(value)) return value.map(withUrlMembersRedacted);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([name, member]) => [
+        name,
+        name === "url" ? REDACTED : withUrlMembersRedacted(member)
+      ])
+    );
+  }
+  return value;
+}
+function statusLine(response) {
+  return `${response.status} ${response.statusText}`.trimEnd();
+}
+function networkCodeOf(err) {
+  if (err instanceof DOMException && err.name === "TimeoutError") return "ABORT_TIMEOUT";
+  if (err instanceof Error) {
+    const cause = err.cause;
+    if (cause !== null && typeof cause === "object" && "code" in cause) {
+      const code = cause.code;
+      if (typeof code === "string") return code;
+    }
+    if (err.name === "TimeoutError") return "ABORT_TIMEOUT";
+  }
+  return "network error";
+}
+function randomHex(byteCount) {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(byteCount));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// src/hooks/bundle-gather.ts
+var DEFAULT_GATHER_CAPS = {
+  maxFiles: 100,
+  maxFileBytes: 5 * 1024 * 1024,
+  maxTotalBytes: 12 * 1024 * 1024
+};
+async function gatherMethodTree(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
+  const editedAbs = resolve3(editedFilePath);
+  let tree;
+  try {
+    tree = await listDirectoryTree(
+      dirname3(editedAbs),
+      {
+        maxFileCount: caps.maxFiles,
+        maxFileSize: caps.maxFileBytes,
+        maxTotalSize: caps.maxTotalBytes
+      },
+      "validate"
+    );
+  } catch (err) {
+    return { ok: false, reason: isLimitExceeded(err) ? "overflow" : "unreadable" };
+  }
+  const treePath = treePathOf(editedAbs, tree.root);
+  if (treePath === void 0 || !tree.files.some((file) => file.path === treePath)) {
+    return { ok: false, reason: "outside" };
+  }
+  return { ok: true, tree };
+}
+function treePathOf(editedAbs, root) {
+  if (root === null) return void 0;
+  let real;
+  try {
+    real = realpathSync(editedAbs);
+  } catch {
+    return void 0;
+  }
+  const relativePath = relative2(root, real);
+  if (relativePath === "" || relativePath === ".." || relativePath.startsWith(`..${sep3}`) || isAbsolute2(relativePath)) {
+    return void 0;
+  }
+  return relativePath.split(sep3).join("/").normalize("NFC");
+}
+function isLimitExceeded(err) {
+  const cause = err instanceof Error ? err.cause : void 0;
+  return typeof cause === "object" && cause !== null && cause.code === "limit_exceeded";
+}
+
+// src/client.ts
+init_protocol();
+
+// src/version.ts
+var SDK_VERSION = "0.48.0";
+
+// src/user-agent.ts
+var SDK_TOKEN_NAME = "pipelex-sdk-js";
+var MAX_USER_AGENT_LENGTH = 512;
+var TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+var DETAIL_VALUE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+)?$/;
+var COMMENT_URL = /^[!-~]+$/;
+var COMMENT_BREAKERS = /[()\\;]/;
+function isToken2(value) {
+  return TOKEN.test(value);
+}
+function isDetail(detail) {
+  const eq = detail.indexOf("=");
+  if (eq === -1) return isToken2(detail);
+  return isToken2(detail.slice(0, eq)) && DETAIL_VALUE.test(detail.slice(eq + 1));
+}
+function validateAppInfo2(appInfo) {
+  if (typeof appInfo !== "object" || appInfo === null) {
+    throw new TypeError("appInfo must be an object with at least a `name`.");
+  }
+  if (typeof appInfo.name !== "string" || !isToken2(appInfo.name)) {
+    throw new TypeError(
+      `appInfo.name ${JSON.stringify(appInfo.name)} is not an RFC 9110 token (letters, digits and !#$%&'*+-.^_\`|~ only, non-empty).`
+    );
+  }
+  if (appInfo.version !== void 0 && appInfo.version !== "") {
+    if (typeof appInfo.version !== "string" || !isToken2(appInfo.version)) {
+      throw new TypeError(
+        `appInfo.version ${JSON.stringify(appInfo.version)} is not an RFC 9110 token.`
+      );
+    }
+  }
+  if (appInfo.url !== void 0 && appInfo.url !== "") {
+    if (typeof appInfo.url !== "string" || !COMMENT_URL.test(appInfo.url) || COMMENT_BREAKERS.test(appInfo.url)) {
+      throw new TypeError(
+        `appInfo.url ${JSON.stringify(appInfo.url)} cannot sit in a User-Agent comment (visible ASCII only, no whitespace, parentheses, backslash or semicolon).`
+      );
+    }
+  }
+  if (appInfo.details !== void 0) {
+    if (!Array.isArray(appInfo.details)) {
+      throw new TypeError("appInfo.details must be an array of strings.");
+    }
+    for (const detail of appInfo.details) {
+      if (typeof detail !== "string" || !isDetail(detail)) {
+        throw new TypeError(
+          `appInfo.details entry ${JSON.stringify(detail)} is neither a token nor token=value.`
+        );
+      }
+    }
+  }
+}
+function renderAppInfo2(appInfo) {
+  let product = appInfo.name;
+  if (appInfo.version) product += `/${appInfo.version}`;
+  const params = [...appInfo.details ?? []];
+  if (appInfo.url) params.push(`+${appInfo.url}`);
+  return params.length > 0 ? `${product} (${params.join("; ")})` : product;
+}
+function detectRuntime2(scope = globalThis) {
+  const win = scope["window"];
+  if (win !== void 0 && win !== null && win.document !== void 0 || typeof scope["importScripts"] === "function") {
+    return { kind: "browser" };
+  }
+  const deno = scope["Deno"];
+  if (deno?.version?.deno) {
+    return {
+      kind: "server",
+      name: "deno",
+      version: deno.version.deno,
+      os: deno.build?.os,
+      arch: deno.build?.arch
+    };
+  }
+  const proc = scope["process"];
+  const bun = proc?.versions?.["bun"];
+  if (bun) {
+    return { kind: "server", name: "bun", version: bun, os: proc.platform, arch: proc.arch };
+  }
+  const node = proc?.versions?.["node"];
+  if (node) {
+    return { kind: "server", name: "node", version: node, os: proc.platform, arch: proc.arch };
+  }
+  return { kind: "server" };
+}
+function renderRuntime(runtime) {
+  if (!runtime.name || !isToken2(runtime.name)) return void 0;
+  if (!runtime.version || !isToken2(runtime.version)) return void 0;
+  const token = `${runtime.name}/${runtime.version}`;
+  const platform = [runtime.os, runtime.arch].filter(
+    (part) => typeof part === "string" && isToken2(part)
+  );
+  return platform.length > 0 ? `${token} (${platform.join("; ")})` : token;
+}
+function buildUserAgent2(appInfo, runtime = detectRuntime2()) {
+  if (appInfo !== void 0) validateAppInfo2(appInfo);
+  const parts = [];
+  if (appInfo !== void 0) parts.push(renderAppInfo2(appInfo));
+  parts.push(`${SDK_TOKEN_NAME}/${SDK_VERSION}`);
+  if (runtime.kind === "server") {
+    const runtimePart = renderRuntime(runtime);
+    if (runtimePart) parts.push(runtimePart);
+  }
+  const value = parts.join(" ");
+  if (value.length > MAX_USER_AGENT_LENGTH) {
+    throw new RangeError(
+      `The User-Agent built from appInfo is ${value.length} characters; the ceiling is ${MAX_USER_AGENT_LENGTH}. Shorten appInfo.details or appInfo.url.`
+    );
+  }
+  if (runtime.kind === "browser") return void 0;
+  return value;
 }
 
 // src/upload.ts
@@ -6964,7 +13895,7 @@ var EXTENSION_MIME = {
 function isNodeRuntime() {
   return typeof process !== "undefined" && process.versions != null && process.versions.node != null;
 }
-function basename2(path) {
+function basename3(path) {
   const parts = path.split(/[\\/]/);
   return parts[parts.length - 1] || path;
 }
@@ -6982,8 +13913,8 @@ async function readLocalPath(path) {
     );
   }
   try {
-    const { readFile } = await import("node:fs/promises");
-    return await readFile(path);
+    const { readFile: readFile2 } = await import("node:fs/promises");
+    return await readFile2(path);
   } catch (cause) {
     throw new InvalidLocalSourceError(
       `Local file cannot be read: "${path}" (${cause.code ?? "read error"}).`,
@@ -7006,7 +13937,7 @@ function bytesToBase64(bytes) {
 async function toAssetBytes(asset, options) {
   if (typeof asset === "string") {
     const bytes2 = await readLocalPath(asset);
-    const filename2 = options.filename ?? basename2(asset);
+    const filename2 = options.filename ?? basename3(asset);
     return { bytes: bytes2, filename: filename2, contentType: options.contentType ?? guessContentType(filename2) };
   }
   if (asset instanceof Uint8Array) {
@@ -7098,432 +14029,6 @@ function mapUploadError(error, filename) {
   });
 }
 
-// src/bundle-resources.ts
-function isResourceMap(resources) {
-  if (typeof resources !== "object" || resources === null) return false;
-  const prototype = Object.getPrototypeOf(resources);
-  return prototype === Object.prototype || prototype === null;
-}
-function hasBundleResources(resources) {
-  return isResourceMap(resources) && Object.keys(resources).length > 0;
-}
-var PYTHON_WHITESPACE = /* @__PURE__ */ new Set([
-  9,
-  10,
-  11,
-  12,
-  13,
-  28,
-  29,
-  30,
-  31,
-  32,
-  133,
-  160,
-  5760,
-  8192,
-  8193,
-  8194,
-  8195,
-  8196,
-  8197,
-  8198,
-  8199,
-  8200,
-  8201,
-  8202,
-  8232,
-  8233,
-  8239,
-  8287,
-  12288
-]);
-function isBlankForPython(path) {
-  for (const character of path) {
-    if (!PYTHON_WHITESPACE.has(character.codePointAt(0))) return false;
-  }
-  return true;
-}
-function bundleResourcePathRefusal(path) {
-  if (isBlankForPython(path)) return "it is empty";
-  if (path.includes("\\")) return "it holds a backslash; write the path with forward slashes";
-  if (path.includes(":")) return "it holds a colon";
-  if (path.includes("\0")) return "it holds a NUL character";
-  if (path.startsWith("/")) return "it is absolute; write it relative to the bundle";
-  const segments = pathSegments(path);
-  if (segments.includes("..")) return "it leaves the bundle through a '..' segment";
-  if (segments.length === 0) return "it names no file";
-  return void 0;
-}
-function canonicalBundleResourcePath(path) {
-  return pathSegments(path).join("/");
-}
-function pathSegments(path) {
-  return path.split("/").filter((segment) => segment !== "" && segment !== ".");
-}
-async function encodeBundleResources(resources) {
-  if (resources === void 0 || resources === null) return void 0;
-  if (!isResourceMap(resources)) {
-    throw new RequestArgumentError(
-      `resources must be a plain object mapping each file's path, as the step names it, to the file's bytes; got ${describeValue(resources)}.`
-    );
-  }
-  const entries = Object.entries(resources);
-  if (entries.length === 0) return void 0;
-  const pathByCanonical = /* @__PURE__ */ new Map();
-  for (const [path] of entries) {
-    const refusal = bundleResourcePathRefusal(path);
-    if (refusal !== void 0) {
-      throw new RequestArgumentError(
-        `resources key ${JSON.stringify(path)} cannot name a file inside the bundle: ${refusal}.`
-      );
-    }
-    const canonical = canonicalBundleResourcePath(path);
-    const first = pathByCanonical.get(canonical);
-    if (first !== void 0) {
-      throw new RequestArgumentError(
-        `resources keys ${JSON.stringify(first)} and ${JSON.stringify(path)} name the same file "${canonical}": send it once.`
-      );
-    }
-    pathByCanonical.set(canonical, path);
-  }
-  const wire = /* @__PURE__ */ Object.create(null);
-  for (const [path, value] of entries) {
-    wire[path] = bytesToBase64(await resourceBytes(path, value));
-  }
-  return wire;
-}
-async function resourceBytes(path, value) {
-  if (value instanceof Uint8Array) return value;
-  if (value instanceof ArrayBuffer) return new Uint8Array(value);
-  if (typeof Blob !== "undefined" && value instanceof Blob) {
-    return new Uint8Array(await value.arrayBuffer());
-  }
-  throw new RequestArgumentError(
-    `resources[${JSON.stringify(path)}] must be the file's bytes (a Uint8Array, an ArrayBuffer or a Blob); got ${describeValue(value)}.` + (typeof value === "string" ? " A string is read neither as a path nor as base64: read the file and pass its bytes." : "")
-  );
-}
-function describeValue(value) {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "an array";
-  if (value instanceof Map) return "a Map; pass Object.fromEntries(map)";
-  if (typeof value === "string") return "a string";
-  if (typeof value === "object") {
-    const name = Object.getPrototypeOf(value)?.constructor?.name;
-    return typeof name === "string" && name !== "" ? `an instance of ${name}` : "an object";
-  }
-  return `a value of type ${typeof value}`;
-}
-
-// src/hooks/bundle-gather.ts
-var EXCLUDED_DIRS = /* @__PURE__ */ new Set([
-  "venv",
-  "env",
-  "virtualenv",
-  "__pycache__",
-  "node_modules",
-  "results"
-]);
-var DEFAULT_MAX_RESOURCE_FILES = 32;
-var DEFAULT_MAX_RESOURCE_FILE_BYTES = 5 * 1024 * 1024;
-var DEFAULT_MAX_RESOURCE_BYTES = 10 * 1024 * 1024;
-var DEFAULT_GATHER_CAPS = {
-  maxFiles: 50,
-  maxTotalBytes: 2 * 1024 * 1024,
-  maxResourceFiles: DEFAULT_MAX_RESOURCE_FILES,
-  maxResourceFileBytes: DEFAULT_MAX_RESOURCE_FILE_BYTES,
-  maxResourceBytes: DEFAULT_MAX_RESOURCE_BYTES
-};
-function walkMthdsFiles(dir, collected) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith(".") || EXCLUDED_DIRS.has(entry.name)) {
-      continue;
-    }
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkMthdsFiles(full, collected);
-    } else if (entry.isFile() && entry.name.endsWith(".mthds")) {
-      collected.push(full);
-    }
-  }
-}
-function gatherBundle(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
-  const editedAbs = resolve2(editedFilePath);
-  const parentDir = dirname(editedAbs);
-  const paths = [];
-  try {
-    walkMthdsFiles(parentDir, paths);
-  } catch {
-    return { ok: false, reason: "unreadable" };
-  }
-  const ordered = [editedAbs, ...paths.filter((path) => resolve2(path) !== editedAbs)];
-  if (ordered.length > caps.maxFiles) {
-    return { ok: false, reason: "overflow" };
-  }
-  let totalBytes = 0;
-  for (const path of ordered) {
-    try {
-      totalBytes += statSync(path).size;
-    } catch {
-      return { ok: false, reason: "unreadable" };
-    }
-  }
-  if (totalBytes > caps.maxTotalBytes) {
-    return { ok: false, reason: "overflow" };
-  }
-  const files = [];
-  for (const path of ordered) {
-    try {
-      files.push({ content: readFileSync(path, "utf-8"), uri: relative(parentDir, path) });
-    } catch {
-      return { ok: false, reason: "unreadable" };
-    }
-  }
-  const gathered = gatherTemplateFiles(parentDir, ordered, files, caps);
-  if (!gathered.ok) return gathered;
-  return { ok: true, files, resources: gathered.resources };
-}
-function templateFilesNamedBy(mthdsContent) {
-  let document;
-  try {
-    document = parse(mthdsContent);
-  } catch {
-    return [];
-  }
-  const pipes = isRecord(document) ? document["pipe"] : void 0;
-  if (!isRecord(pipes)) return [];
-  const named = [];
-  for (const pipe of Object.values(pipes)) {
-    if (isRecord(pipe) && pipe["type"] === "PipeDocGen" && typeof pipe["template_file"] === "string") {
-      named.push(pipe["template_file"]);
-    }
-  }
-  return named;
-}
-function gatherTemplateFiles(parentDir, paths, files, caps) {
-  const maxFiles = caps.maxResourceFiles ?? DEFAULT_MAX_RESOURCE_FILES;
-  const maxFileBytes = caps.maxResourceFileBytes ?? DEFAULT_MAX_RESOURCE_FILE_BYTES;
-  const maxBytes = caps.maxResourceBytes ?? DEFAULT_MAX_RESOURCE_BYTES;
-  let root;
-  try {
-    root = realpathSync(parentDir);
-  } catch {
-    return { ok: false, reason: "unreadable" };
-  }
-  const located = /* @__PURE__ */ new Map();
-  let fileCount = 0;
-  let totalBytes = 0;
-  for (const [index, mthdsPath] of paths.entries()) {
-    for (const named of templateFilesNamedBy(files[index].content)) {
-      if (bundleResourcePathRefusal(named) !== void 0) continue;
-      const key = canonicalBundleResourcePath(named);
-      const found = locateRegularFile(join(dirname(mthdsPath), key));
-      if (found !== null) {
-        if (!found.real.startsWith(root + sep)) return { ok: false, reason: "unreadable" };
-        if (found.size > maxFileBytes) return { ok: false, reason: "overflow" };
-      }
-      if (!located.has(key)) {
-        located.set(key, found);
-        if (found === null) continue;
-        fileCount += 1;
-        if (fileCount > maxFiles) return { ok: false, reason: "overflow" };
-        totalBytes += found.size;
-        if (totalBytes > maxBytes) return { ok: false, reason: "overflow" };
-        continue;
-      }
-      const known = located.get(key);
-      if (known === null || found === null) {
-        if (known !== found) return { ok: false, reason: "conflict" };
-        continue;
-      }
-      if (!sameFileContent(known, found)) return { ok: false, reason: "conflict" };
-    }
-  }
-  const resources = /* @__PURE__ */ Object.create(null);
-  let readBytes = 0;
-  for (const [key, found] of located) {
-    if (found === null) continue;
-    try {
-      const bytes = readFileSync(found.real);
-      readBytes += bytes.length;
-      if (bytes.length > maxFileBytes || readBytes > maxBytes) {
-        return { ok: false, reason: "overflow" };
-      }
-      resources[key] = bytes;
-    } catch {
-      return { ok: false, reason: "unreadable" };
-    }
-  }
-  return { ok: true, resources };
-}
-function locateRegularFile(path) {
-  try {
-    const real = realpathSync(path);
-    const stats = statSync(real);
-    return stats.isFile() ? { real, size: stats.size } : null;
-  } catch {
-    return null;
-  }
-}
-function sameFileContent(left, right) {
-  if (left.real === right.real) return true;
-  if (left.size !== right.size) return false;
-  try {
-    return Buffer.compare(readFileSync(left.real), readFileSync(right.real)) === 0;
-  } catch {
-    return false;
-  }
-}
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// src/method-source.ts
-function methodSourceToContents(mthds) {
-  if (!mthds) {
-    return [];
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(mthds);
-  } catch {
-    return rawBundle(mthds);
-  }
-  if (Array.isArray(parsed)) {
-    if (parsed.length === 0) {
-      return [];
-    }
-    if (parsed.every(isFileEntry)) {
-      return parsed.map((entry) => entry.content).filter(
-        (content) => typeof content === "string" && content.trim() !== ""
-      );
-    }
-  }
-  return rawBundle(mthds);
-}
-function rawBundle(mthds) {
-  return mthds.trim() === "" ? [] : [mthds];
-}
-function isFileEntry(entry) {
-  return typeof entry === "object" && entry !== null && "name" in entry && "content" in entry;
-}
-
-// src/version.ts
-var SDK_VERSION = "0.46.1";
-
-// src/user-agent.ts
-var SDK_TOKEN_NAME = "pipelex-sdk-js";
-var MAX_USER_AGENT_LENGTH = 512;
-var TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-var DETAIL_VALUE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+)?$/;
-var COMMENT_URL = /^[!-~]+$/;
-var COMMENT_BREAKERS = /[()\\;]/;
-function isToken(value) {
-  return TOKEN.test(value);
-}
-function isDetail(detail) {
-  const eq = detail.indexOf("=");
-  if (eq === -1) return isToken(detail);
-  return isToken(detail.slice(0, eq)) && DETAIL_VALUE.test(detail.slice(eq + 1));
-}
-function validateAppInfo(appInfo) {
-  if (typeof appInfo !== "object" || appInfo === null) {
-    throw new TypeError("appInfo must be an object with at least a `name`.");
-  }
-  if (typeof appInfo.name !== "string" || !isToken(appInfo.name)) {
-    throw new TypeError(
-      `appInfo.name ${JSON.stringify(appInfo.name)} is not an RFC 9110 token (letters, digits and !#$%&'*+-.^_\`|~ only, non-empty).`
-    );
-  }
-  if (appInfo.version !== void 0 && appInfo.version !== "") {
-    if (typeof appInfo.version !== "string" || !isToken(appInfo.version)) {
-      throw new TypeError(
-        `appInfo.version ${JSON.stringify(appInfo.version)} is not an RFC 9110 token.`
-      );
-    }
-  }
-  if (appInfo.url !== void 0 && appInfo.url !== "") {
-    if (typeof appInfo.url !== "string" || !COMMENT_URL.test(appInfo.url) || COMMENT_BREAKERS.test(appInfo.url)) {
-      throw new TypeError(
-        `appInfo.url ${JSON.stringify(appInfo.url)} cannot sit in a User-Agent comment (visible ASCII only, no whitespace, parentheses, backslash or semicolon).`
-      );
-    }
-  }
-  if (appInfo.details !== void 0) {
-    if (!Array.isArray(appInfo.details)) {
-      throw new TypeError("appInfo.details must be an array of strings.");
-    }
-    for (const detail of appInfo.details) {
-      if (typeof detail !== "string" || !isDetail(detail)) {
-        throw new TypeError(
-          `appInfo.details entry ${JSON.stringify(detail)} is neither a token nor token=value.`
-        );
-      }
-    }
-  }
-}
-function renderAppInfo(appInfo) {
-  let product = appInfo.name;
-  if (appInfo.version) product += `/${appInfo.version}`;
-  const params = [...appInfo.details ?? []];
-  if (appInfo.url) params.push(`+${appInfo.url}`);
-  return params.length > 0 ? `${product} (${params.join("; ")})` : product;
-}
-function detectRuntime(scope = globalThis) {
-  const win = scope["window"];
-  if (win !== void 0 && win !== null && win.document !== void 0 || typeof scope["importScripts"] === "function") {
-    return { kind: "browser" };
-  }
-  const deno = scope["Deno"];
-  if (deno?.version?.deno) {
-    return {
-      kind: "server",
-      name: "deno",
-      version: deno.version.deno,
-      os: deno.build?.os,
-      arch: deno.build?.arch
-    };
-  }
-  const proc = scope["process"];
-  const bun = proc?.versions?.["bun"];
-  if (bun) {
-    return { kind: "server", name: "bun", version: bun, os: proc.platform, arch: proc.arch };
-  }
-  const node = proc?.versions?.["node"];
-  if (node) {
-    return { kind: "server", name: "node", version: node, os: proc.platform, arch: proc.arch };
-  }
-  return { kind: "server" };
-}
-function renderRuntime(runtime) {
-  if (!runtime.name || !isToken(runtime.name)) return void 0;
-  if (!runtime.version || !isToken(runtime.version)) return void 0;
-  const token = `${runtime.name}/${runtime.version}`;
-  const platform = [runtime.os, runtime.arch].filter(
-    (part) => typeof part === "string" && isToken(part)
-  );
-  return platform.length > 0 ? `${token} (${platform.join("; ")})` : token;
-}
-function buildUserAgent(appInfo, runtime = detectRuntime()) {
-  if (appInfo !== void 0) validateAppInfo(appInfo);
-  const parts = [];
-  if (appInfo !== void 0) parts.push(renderAppInfo(appInfo));
-  parts.push(`${SDK_TOKEN_NAME}/${SDK_VERSION}`);
-  if (runtime.kind === "server") {
-    const runtimePart = renderRuntime(runtime);
-    if (runtimePart) parts.push(runtimePart);
-  }
-  const value = parts.join(" ");
-  if (value.length > MAX_USER_AGENT_LENGTH) {
-    throw new RangeError(
-      `The User-Agent built from appInfo is ${value.length} characters; the ceiling is ${MAX_USER_AGENT_LENGTH}. Shorten appInfo.details or appInfo.url.`
-    );
-  }
-  if (runtime.kind === "browser") return void 0;
-  return value;
-}
-
 // src/prepare-inputs.ts
 var PIPELEX_STORAGE_SCHEME = "pipelex-storage://";
 var HTTP_URL_RE = /^https?:\/\//i;
@@ -7548,7 +14053,7 @@ var PIPE_SELECTION_ERROR_TYPES = /* @__PURE__ */ new Set([
 function isPlainObject2(value) {
   return Object.prototype.toString.call(value) === "[object Object]";
 }
-function nonEmptyString(value) {
+function nonEmptyString2(value) {
   if (typeof value !== "string") return void 0;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : void 0;
@@ -7707,41 +14212,121 @@ async function resolveNode(ctx, node, callerValue, at) {
     }
   }
 }
-function isEmptyResourceMap(resources) {
-  return isResourceMap(resources) && !hasBundleResources(resources);
+function nonEmptyMap(value) {
+  return isPlainObject2(value) && Object.keys(value).length > 0 ? value : void 0;
+}
+function describeNonMap(value) {
+  if (Array.isArray(value)) return "a list";
+  if (value instanceof Uint8Array) return "bytes";
+  return typeof value;
+}
+function refuseNonMap(name, value, holds, isValue) {
+  if (value === void 0 || value === null) return;
+  if (!isPlainObject2(value)) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`${name}\` must be ${holds}, got ${describeNonMap(value)}.`
+    );
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (!isValue(entry)) {
+      throw new InputPreparationError(
+        `Cannot prepare inputs: \`${name}\` must be ${holds}, and "${key}" holds ${entry === null ? "null" : describeNonMap(entry)}.`
+      );
+    }
+  }
+}
+function checkedTree(value) {
+  if (value === void 0 || value === null) return void 0;
+  const fault2 = treeShapeFault(value);
+  if (fault2 !== void 0) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`tree\` must be a listed method tree \u2014 its \`files\`, its \`digest\` and a \`readFile\` \u2014 such as the \`MethodTree\` the client's \`listMethodTree\` returns, got ${fault2}.`
+    );
+  }
+  const tree = value;
+  if (tree.files.length === 0) {
+    throw new InputPreparationError(
+      "Cannot prepare inputs: `tree` holds no file, and a method tree holds at least one."
+    );
+  }
+  return tree;
 }
 function resolveSelector(request) {
   const raw = request;
-  const files = Array.isArray(raw["files"]) && raw["files"].length > 0 ? raw["files"] : void 0;
-  const methodRef = nonEmptyString(raw["method_ref"]);
-  const methodId = nonEmptyString(raw["method_id"]);
-  const rawResources = raw["resources"];
-  const resources = rawResources === void 0 || rawResources === null ? void 0 : rawResources;
-  const given = [];
-  if (files !== void 0) given.push("`files`");
+  const rawFiles = raw["files"];
+  if (rawFiles !== void 0 && rawFiles !== null && !isPlainObject2(rawFiles)) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`files\` must be the method's tree as a map from tree path to file entry, got ${Array.isArray(rawFiles) ? "a list" : typeof rawFiles}.`
+    );
+  }
+  refuseNonMap(
+    "contents",
+    raw["contents"],
+    "the method's files as a map from tree path to bytes or text",
+    (entry) => typeof entry === "string" || entry instanceof Uint8Array
+  );
+  refuseNonMap(
+    "dependencies",
+    raw["dependencies"],
+    "the method packages as a map from package address to its map of file entries",
+    isPlainObject2
+  );
+  const rawDirectory = raw["directory"];
+  if (rawDirectory !== void 0 && rawDirectory !== null && typeof rawDirectory !== "string") {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`directory\` must be the method's directory as a path, got ${describeNonMap(rawDirectory)}.`
+    );
+  }
+  const directory = typeof rawDirectory === "string" && rawDirectory !== "" ? rawDirectory : void 0;
+  const files = nonEmptyMap(rawFiles);
+  const tree = checkedTree(raw["tree"]);
+  const contents = nonEmptyMap(raw["contents"]);
+  const dependencies = nonEmptyMap(raw["dependencies"]);
+  const methodRef = nonEmptyString2(raw["method_ref"]);
+  const methodId = nonEmptyString2(raw["method_id"]);
+  const treeForms = [];
+  if (directory !== void 0) treeForms.push("`directory`");
+  if (contents !== void 0) treeForms.push("`contents`");
+  if (tree !== void 0) treeForms.push("`tree`");
+  if (files !== void 0) treeForms.push("`files`");
+  if (treeForms.length > 1) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: the method's tree was given as ${treeForms.join(" and ")}. Give it in one form \u2014 \`directory\`, \`contents\`, \`tree\` or \`files\`.`
+    );
+  }
+  const given = [...treeForms];
   if (methodRef !== void 0) given.push("`method_ref`");
   if (methodId !== void 0) given.push("`method_id`");
   if (given.length === 0) {
     throw new InputPreparationError(
-      "Cannot prepare inputs: no method selector. Supply exactly one of `files` (an inline MTHDS closure), `method_ref` (a published method's address) or `method_id` (a stored method's catalog id)."
+      "Cannot prepare inputs: no method selector. Supply exactly one of the method's tree (`directory`, `contents`, `tree` or `files`), `method_ref` (a published method's address) or `method_id` (a stored method's catalog id)."
     );
   }
   if (given.length > 1) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 \`files\`, \`method_ref\` or \`method_id\`.`
+      `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 the method's tree, \`method_ref\` or \`method_id\`.`
     );
   }
-  if (files !== void 0) return resources === void 0 ? { files } : { files, resources };
-  if (resources !== void 0 && !isEmptyResourceMap(resources)) {
+  if (treeForms.length === 1) {
+    return {
+      ...directory === void 0 ? {} : { directory },
+      ...contents === void 0 ? {} : { contents },
+      ...tree === void 0 ? {} : { tree },
+      ...files === void 0 ? {} : { files },
+      ...dependencies === void 0 ? {} : { dependencies }
+    };
+  }
+  const owner = methodRef !== void 0 ? "published" : "stored";
+  if (dependencies !== void 0) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`resources\` accompany inline \`files\`; a ${methodRef !== void 0 ? "published" : "stored"} method's files are its own.`
+      `Cannot prepare inputs: \`dependencies\` accompany the method's own tree; a ${owner} method's packages are its own.`
     );
   }
   if (methodRef !== void 0) return { method_ref: methodRef };
   return { method_id: methodId };
 }
 function normalizePipeRef(raw) {
-  const pipeRef = nonEmptyString(raw);
+  const pipeRef = nonEmptyString2(raw);
   if (pipeRef === void 0) return void 0;
   if (pipeRef.includes("->")) {
     throw new InputPreparationError(
@@ -7762,11 +14347,11 @@ function resolveAllowUploads(raw) {
     `Cannot prepare inputs: \`allowUploads\` must be a boolean, got ${raw === null ? "null" : typeof raw}.`
   );
 }
-async function fetchSignature(client, selector, pipeRef) {
+async function fetchSignature(client, selector, pipeRef, signal) {
   const request = pipeRef === void 0 ? { ...selector } : { ...selector, pipe_ref: pipeRef };
   let result;
   try {
-    result = await client.pipeIo(request);
+    result = await client.pipeIo(request, signal === void 0 ? {} : { signal });
   } catch (error) {
     if (error instanceof ApiResponseError && error.status === 422 && error.errorType !== void 0 && PIPE_SELECTION_ERROR_TYPES.has(error.errorType)) {
       const detail = error.serverMessage ?? error.message;
@@ -7800,7 +14385,7 @@ function invalidReason(answer) {
   return typeof answer.message === "string" ? answer.message : "the answer gives no reason";
 }
 function selectedDescriptor(report) {
-  const pipeRef = nonEmptyString(report.pipe_ref);
+  const pipeRef = nonEmptyString2(report.pipe_ref);
   const inputForm = report.input_form;
   if (pipeRef === void 0 || !isPlainObject2(inputForm) || !Object.hasOwn(inputForm, pipeRef)) {
     const describedPipes = isPlainObject2(inputForm) ? Object.keys(inputForm).join(", ") || "none" : "none";
@@ -7885,7 +14470,7 @@ async function prepareInputs(client, request) {
   const pipeRef = normalizePipeRef(request.pipe_ref);
   const allowUploads = resolveAllowUploads(request.allowUploads);
   throwIfAborted(request.signal);
-  const report = await fetchSignature(client, selector, pipeRef);
+  const report = await fetchSignature(client, selector, pipeRef, request.signal);
   throwIfAborted(request.signal);
   const descriptor = selectedDescriptor(report);
   const declared = new Map(
@@ -7982,9 +14567,9 @@ function walkReferences(value, withPaths = true) {
   return [...byUri.values()];
 }
 function renderLocation(located) {
-  return { uri: located.uri, found_at: located.paths.map(renderPath) };
+  return { uri: located.uri, found_at: located.paths.map(renderPath2) };
 }
-function renderPath(segments) {
+function renderPath2(segments) {
   let path = "$";
   for (const segment of segments) {
     if (typeof segment === "number") path += `[${segment}]`;
@@ -8204,11 +14789,11 @@ async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
     releaseOnce();
     throw failure(err);
   }
-  const refusal = statusRefusal(uri, response);
-  if (refusal !== void 0) {
+  const refusal2 = statusRefusal(uri, response);
+  if (refusal2 !== void 0) {
     await discard(response);
     releaseOnce();
-    throw refusal;
+    throw refusal2;
   }
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > bounds.maxBytes) {
@@ -8855,7 +15440,7 @@ async function* followCursor(route, readPage) {
     cursor = page.nextCursor;
   }
 }
-var STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
+var STRICT_UTF82 = new TextDecoder("utf-8", { fatal: true });
 var LENIENT_UTF8 = new TextDecoder("utf-8");
 var readJson = (text) => JSON.parse(text);
 function jsonParseFailure(text) {
@@ -8867,27 +15452,14 @@ function jsonParseFailure(text) {
   return void 0;
 }
 var STARTS_RUN = Object.freeze({ mayStartRun: true });
-var DEFAULT_API_BASE_URL = "https://api.pipelex.com";
-var API_PREFIX = "v1";
+var DEFAULT_API_BASE_URL2 = "https://api.pipelex.com";
+var API_PREFIX2 = "v1";
 var RUNS = "runs";
-var DEFAULT_REQUEST_TIMEOUT_MS = 12e5;
-var POLL_REQUEST_TIMEOUT_MS = 3e4;
+var DEFAULT_REQUEST_TIMEOUT_MS2 = 12e5;
+var POLL_REQUEST_TIMEOUT_MS2 = 3e4;
 var DEFAULT_DEGRADED_RETRY_SECONDS = 5;
-var VALIDATE_MARKDOWN_RENDER_FORMAT = "markdown";
+var VALIDATE_MARKDOWN_RENDER_FORMAT2 = "markdown";
 var BARE_RUNNER_IMPLEMENTATION = "pipelex-api";
-function withParsedPython(wire, unreadable) {
-  const { python, ...rest } = wire;
-  if (python == null) return rest;
-  try {
-    return { ...rest, python: parseMethodFiles(python) };
-  } catch (err) {
-    throw unreadable(err);
-  }
-}
-function withWirePython(input) {
-  const { python, ...rest } = input;
-  return python === void 0 ? rest : { ...rest, python: serializeMethodFiles(python) };
-}
 function requestBodyText(method, url, body) {
   try {
     return stringifyExactJson(body);
@@ -8984,15 +15556,25 @@ var PipelexApiClient = class {
   /** Cached `/v1/version` handshake outcome — whether the durable lifecycle is served. */
   lifecycleAvailable;
   /**
+   * The last `/v1/version` handshake that answered and when it was asked, kept for
+   * `HANDSHAKE_TTL_MS` as `mthds`'s `MthdsApiClient` keeps it: what sending a tree reads from it
+   * (`blob_store`, the tree limits) changes only with a deploy. A handshake that failed is not
+   * kept, so the next call asks again, and a refusal showing it stale drops it sooner
+   * (`forgetHandshake`).
+   */
+  versionCache;
+  /** The client's request ceiling (`PipelexApiClientOptions.requestTimeoutMs`). */
+  requestTimeoutMs;
+  /**
    * The `User-Agent` sent on every API request, computed once at construction;
    * `undefined` in a browser, where no header may be set.
    */
   userAgent;
   constructor(options = {}) {
-    this.userAgent = buildUserAgent(options.appInfo);
+    this.userAgent = buildUserAgent2(options.appInfo);
     this.apiKey = options.apiKey ?? process.env.PIPELEX_API_KEY;
-    const normalizedBaseUrl = (options.baseUrl ?? process.env.PIPELEX_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
-    if (!isValidBaseUrl(normalizedBaseUrl)) {
+    const normalizedBaseUrl = (options.baseUrl ?? process.env.PIPELEX_BASE_URL ?? DEFAULT_API_BASE_URL2).replace(/\/+$/, "");
+    if (!isValidBaseUrl2(normalizedBaseUrl)) {
       throw new RequestArgumentError(
         `Invalid API base URL ${describeRefusedBaseUrl(normalizedBaseUrl)}: it must be host-only (http/https, no path, query, fragment, or credentials). Endpoints compose as {base}/v1/{endpoint}.`,
         { verdict: { errorDomain: "config", retryable: false } }
@@ -9000,11 +15582,18 @@ var PipelexApiClient = class {
     }
     this.baseUrl = normalizedBaseUrl;
     this.originUrl = new URL("/", this.baseUrl).origin;
+    const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS2;
+    if (!isTimerDelay(requestTimeoutMs)) {
+      throw new RangeError(
+        `"requestTimeoutMs" must be a positive number no larger than ${MAX_TIMER_DELAY_MS}, got ${String(requestTimeoutMs)}.`
+      );
+    }
+    this.requestTimeoutMs = requestTimeoutMs;
   }
   // ── URL resolution ───────────────────────────────────────────────────
   /** Build an API URL: `<base>/v1/<endpoint>`. */
   url(endpoint) {
-    return `${this.baseUrl}/${API_PREFIX}/${endpoint.replace(/^\/+/, "")}`;
+    return `${this.baseUrl}/${API_PREFIX2}/${endpoint.replace(/^\/+/, "")}`;
   }
   // ── Transport ──────────────────────────────────────────────────────
   /**
@@ -9042,7 +15631,7 @@ var PipelexApiClient = class {
     const hasBody = options.body !== void 0;
     const bodyText = hasBody ? requestBodyText(method, url, options.body) : void 0;
     const headers = this.requestHeaders(hasBody, options.idempotencyKey);
-    const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs;
     if (!isTimerDelay(timeoutMs)) {
       throw new RangeError(
         `"timeoutMs" must be a positive number no larger than ${MAX_TIMER_DELAY_MS}, got ${String(timeoutMs)}.`
@@ -9087,7 +15676,7 @@ var PipelexApiClient = class {
     let body;
     let utf8 = true;
     try {
-      body = STRICT_UTF8.decode(bytes);
+      body = STRICT_UTF82.decode(bytes);
     } catch {
       utf8 = false;
       body = LENIENT_UTF8.decode(bytes);
@@ -9124,42 +15713,32 @@ var PipelexApiClient = class {
     return this.readObjectAnswer(method, endpoint, res);
   }
   /**
-   * A methods-catalog route answering one stored method (`getMethod`, `createMethod`,
-   * `writeDraft`, `renameMethod`), parsed into the public shape by `readStoredSources`.
+   * A methods-catalog route answering one stored method (`createMethod`, `writeDraft`,
+   * `renameMethod`), read as `readObjectAnswer` reads it.
    */
-  async requestMethodData(method, endpoint, body) {
-    const res = await this.requestProductAnswer(method, endpoint, body);
-    const wire = this.readObjectAnswer(method, endpoint, res);
-    return this.readStoredSources(method, endpoint, res, wire, "a stored method");
+  async requestMethodData(method, endpoint, body, options = {}) {
+    const res = await this.requestProductAnswer(method, endpoint, body, options);
+    return this.readObjectAnswer(method, endpoint, res);
   }
   /**
-   * The stored sources of a method or of a published version, read from the answer `res`
-   * carried, into the public shape. A stored `mthds` that is neither a string nor absent (`null`
-   * stays "no source", which `getMethodClosure` reports), and a stored `python` the SDK cannot
-   * parse, are an answer it cannot read, so each throws an `ApiResponseError` built from that
-   * answer, the latter with `mthds`'s refusal as `cause`: `runtime`, not retryable, since no
-   * change to the call fixes it. `subject` names what carried them in the message.
+   * A route answering a saved tree's listing beside what names it (`getMethod`,
+   * `getMethodVersion`), read as `readObjectAnswer` reads it, then its `files` checked: a listing
+   * that is not an array of `{ path, sha256, size, url, expires_at }`, each a string but `size`, a
+   * non-negative integer, is an answer the SDK cannot read, since `writeMethodTree` would write
+   * from it. Throws the `ApiResponseError` `unreadableAnswer` builds, `subject` naming the answer.
    */
-  readStoredSources(method, endpoint, res, wire, subject) {
-    const source = wire.mthds;
-    if (source != null && typeof source !== "string") {
+  readSavedTree(method, endpoint, res, subject) {
+    const answer = this.readObjectAnswer(method, endpoint, res);
+    const fault2 = savedFilesFault(answer.files);
+    if (fault2 !== null) {
       throw this.unreadableAnswer(
         method,
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
-        `${subject} whose \`mthds\` field is not a string`
+        `${subject} whose \`files\` ${fault2}`
       );
     }
-    return withParsedPython(
-      wire,
-      (cause) => this.unreadableAnswer(
-        method,
-        `/${API_PREFIX}/${endpoint}`,
-        res,
-        `${subject} whose \`python\` field could not be read`,
-        cause
-      )
-    );
+    return answer;
   }
   /**
    * A verdict, the `200` a route answers discriminated on `outcome` with the object the verdict
@@ -9190,7 +15769,7 @@ var PipelexApiClient = class {
       );
       throw this.unreadableAnswer(
         method,
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
         `${shape.verdict} whose \`outcome\` is not ${expected}`
       );
@@ -9201,7 +15780,7 @@ var PipelexApiClient = class {
     if (!isPlainObject(subject)) {
       throw this.unreadableAnswer(
         method,
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
         `${shape.verdict} whose \`${shape.member}\` is not an object`
       );
@@ -9231,7 +15810,7 @@ var PipelexApiClient = class {
     if (!Array.isArray(items)) {
       throw this.unreadableAnswer(
         "GET",
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
         "a page whose `items` is not an array"
       );
@@ -9239,7 +15818,7 @@ var PipelexApiClient = class {
     if (nextCursor !== null && typeof nextCursor !== "string") {
       throw this.unreadableAnswer(
         "GET",
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
         "a page whose `next_cursor` is neither a string nor null"
       );
@@ -9273,7 +15852,7 @@ var PipelexApiClient = class {
    * member included.
    */
   readMethodExample(method, endpoint, res, value, where) {
-    const path = `/${API_PREFIX}/${endpoint}`;
+    const path = `/${API_PREFIX2}/${endpoint}`;
     if (!isPlainObject(value)) {
       throw this.unreadableAnswer(method, path, res, `${where} that is not an object`);
     }
@@ -9289,11 +15868,14 @@ var PipelexApiClient = class {
     }
     return value;
   }
-  /** Issue a product request and return its 2xx answer, a non-2xx thrown as `ApiResponseError`. */
+  /**
+   * Issue a product request and return its 2xx answer, a non-2xx thrown as `ApiResponseError`.
+   * The request takes the poll timeout unless `options.timeoutMs` gives another.
+   */
   async requestProductAnswer(method, endpoint, body, options = {}) {
     const res = await this.requestRaw(method, this.url(endpoint), {
       body,
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+      timeoutMs: options.timeoutMs ?? POLL_REQUEST_TIMEOUT_MS2,
       signal: options.signal
     });
     if (res.status < 200 || res.status >= 300) {
@@ -9302,15 +15884,15 @@ var PipelexApiClient = class {
     return res;
   }
   throwApiResponseError(method, endpoint, res, run = {}) {
-    this.throwApiResponseErrorAt(method, `/${API_PREFIX}/${endpoint}`, res, run);
+    this.throwApiResponseErrorAt(method, `/${API_PREFIX2}/${endpoint}`, res, run);
   }
   /** The JSON body of a `/v1` route's 2xx answer; see `readAnswerAt`. */
   readAnswer(method, endpoint, res) {
-    return this.readAnswerAt(method, `/${API_PREFIX}/${endpoint}`, res);
+    return this.readAnswerAt(method, `/${API_PREFIX2}/${endpoint}`, res);
   }
   /** The JSON object body of a `/v1` route's 2xx answer; see `readObjectAnswerAt`. */
   readObjectAnswer(method, endpoint, res, run = {}, parse2 = readJson) {
-    return this.readObjectAnswerAt(method, `/${API_PREFIX}/${endpoint}`, res, run, parse2);
+    return this.readObjectAnswerAt(method, `/${API_PREFIX2}/${endpoint}`, res, run, parse2);
   }
   /**
    * The JSON body of a 2xx answer, naming the route by its `path` from the origin as a refusal
@@ -9371,21 +15953,23 @@ var PipelexApiClient = class {
    * `API <method> <path> answered <status> with <what>`: the answer's status, its raw text as
    * `responseBody`, no hosted problem member but the `X-Request-ID` header, the failure that made it
    * unreadable as `cause`, and the verdict the fallback gives a 2xx, `runtime` and not retryable.
-   * On a request that may create a run, the run may have started: the server accepted it.
+   * An answer that carries signed links (`RawResponse.carriesLinks`) is held with every link
+   * hidden, and with no `cause`, which could quote one. On a request that may create a run, the run may have started: the server accepted it.
    */
   unreadableAnswer(method, path, res, what, cause, run = {}) {
+    const carriesLinks = res.carriesLinks === true;
     return new ApiResponseError(
       `API ${method} ${path} answered ${res.status} with ${what}`,
       this.baseUrl,
       res.status,
       res.statusText,
-      res.body,
+      carriesLinks ? redactSignedLinks(res.body) : res.body,
       void 0,
       void 0,
       void 0,
       void 0,
       {
-        cause,
+        cause: carriesLinks ? void 0 : cause,
         details: { requestId: nonEmptyHeader(res.headers, REQUEST_ID_HEADER) },
         headers: res.headers,
         mayStartRun: run.mayStartRun === true
@@ -9430,7 +16014,7 @@ var PipelexApiClient = class {
     if (res.status !== 404) return;
     if (!isMissingRoute404(res.body)) return;
     throw new RunLifecycleUnavailableError(
-      `The durable run lifecycle is not available: ${url} returned 404. Run polling is a hosted-API extension (/${API_PREFIX}/${RUNS}/*), not part of the MTHDS Protocol; ` + explanation,
+      `The durable run lifecycle is not available: ${url} returned 404. Run polling is a hosted-API extension (/${API_PREFIX2}/${RUNS}/*), not part of the MTHDS Protocol; ` + explanation,
       this.baseUrl
     );
   }
@@ -9457,7 +16041,7 @@ var PipelexApiClient = class {
     if (typeof runId !== "string" || runId === "") {
       throw this.unreadableAnswer(
         "POST",
-        `/${API_PREFIX}/execute`,
+        `/${API_PREFIX2}/execute`,
         res,
         "a body that is not the answer the route returns",
         void 0,
@@ -9484,7 +16068,7 @@ var PipelexApiClient = class {
    */
   async health() {
     const res = await this.requestRaw("GET", `${this.originUrl}/health`, {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseErrorAt("GET", "/health", res);
@@ -9507,41 +16091,47 @@ var PipelexApiClient = class {
    *
    * The answer is read with `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in the
    * working memory, the main output included, is a `bigint` holding its exact digits.
+   *
+   * The method's tree, given as a `directory`, `contents` or `tree`, is prepared before the
+   * request: listed, read, and sent inline or by hash after uploading the files the API lacks (see
+   * `PipelexRunOptions`). A tree this client refuses (two forms, no file, a directory it cannot
+   * list) is a `RequestArgumentError`, and a file that fails to upload a `MethodFileTransferError`,
+   * each before the run is asked.
    */
   async execute(options) {
-    const extensions = buildExtensions(options.extra);
-    const api = buildApiRunExtensions(options);
-    const hosted = buildHostedRunExtensions(options);
-    if (!options.pipe_code && (!options.mthds_contents || options.mthds_contents.length === 0) && !hasBundlePayload(options) && Object.keys(api).length === 0 && Object.keys(hosted).length === 0 && Object.keys(extensions).length === 0) {
-      throw new RequestArgumentError(
-        "Either pipe_code, mthds_contents, a method bundle (files/bundle_b64), a method_ref, a hosted method_id or a server-specific extension arg (extra) must be provided to execute()."
-      );
-    }
-    assertRunSourcesExclusive(options);
-    assertMethodRefPairsWithNothing(options);
-    assertLinkageMethodIdIsBare(options);
-    assertResourcesAccompanyABundle(options);
-    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
-    const request = {
-      pipe_code: options.pipe_code,
-      mthds_contents: options.mthds_contents,
-      inputs: options.inputs,
-      output_name: options.output_name,
-      output_multiplicity: options.output_multiplicity,
-      dynamic_output_concept_ref: options.dynamic_output_concept_ref,
-      files: nonEmptyFiles(options.files),
-      bundle_b64: nonEmptyString2(options.bundle_b64),
-      resources,
-      ...api,
-      ...hosted,
-      ...extensions
-    };
-    const startedAt = performance.now();
+    return this.executeRun(options);
+  }
+  /**
+   * `execute`, stopped by `signal` before each step of the tree's preparation and right before the
+   * request is sent, never during it, since a request sent may have started a run. `sending` is
+   * the tree already prepared, which the blocking fallback of `startAndWaitForResult` sends as the
+   * start sent it rather than preparing it again.
+   */
+  async executeRun(options, signal, sending) {
+    const parts = this.runParts("execute", options);
+    const source = sending?.source ?? await this.treeToSend("execute", parts.forms, REQUEST_SENDING, signal);
+    let sentAt = 0;
+    const res = await this.postMethodRequest(
+      source,
+      "execute",
+      REQUEST_SENDING,
+      { signal },
+      async (files) => {
+        const request = runRequestBody2("execute", options, files, parts);
+        throwIfAborted(signal);
+        sentAt = performance.now();
+        try {
+          return await this.requestRaw("POST", this.url("execute"), {
+            body: request,
+            ...STARTS_RUN
+          });
+        } catch (err) {
+          throw executeCutOff(err, sentAt);
+        }
+      },
+      sending?.initial
+    );
     try {
-      const res = await this.requestRaw("POST", this.url("execute"), {
-        body: request,
-        ...STARTS_RUN
-      });
       this.throwIfExecuteDegraded(res);
       if (res.status < 200 || res.status >= 300) {
         this.throwApiResponseError("POST", "execute", res, STARTS_RUN);
@@ -9556,7 +16146,7 @@ var PipelexApiClient = class {
       if (!isCompletedRunAnswer(answer)) {
         throw this.unreadableAnswer(
           "POST",
-          `/${API_PREFIX}/execute`,
+          `/${API_PREFIX2}/execute`,
           res,
           "a body that is not the answer the route returns",
           void 0,
@@ -9565,12 +16155,7 @@ var PipelexApiClient = class {
       }
       return new PipelexExecuteResult(answer);
     } catch (err) {
-      if (err instanceof RunStillRunningError) throw err;
-      const elapsedMs = performance.now() - startedAt;
-      if (isGatewayCutOff(err, elapsedMs)) {
-        throw new PipelineExecuteTimeoutError(elapsedMs, { cause: err });
-      }
-      throw err;
+      throw executeCutOff(err, sentAt);
     }
   }
   /**
@@ -9592,44 +16177,43 @@ var PipelexApiClient = class {
    * `runMayHaveStarted` is true can be retried unchanged (see
    * `PipelexStartRequestOptions`). A malformed key is a `RequestArgumentError`
    * before anything is sent.
+   *
+   * The method's tree is prepared before the request as `execute` prepares it. The prepared body
+   * is the same for the same tree, so a start retried under its idempotency key sends the body the
+   * key was bound to. A start whose hash entries name a blob the API does not hold yet is refused
+   * with a `422` `missing_blobs`, which releases its key: send it again unchanged, which asks the
+   * blob route and uploads what is missing first.
    */
   async start(options) {
+    return this.startRun(options);
+  }
+  /**
+   * `start`, stopped by `signal` as `executeRun` is, `sending` being the tree already prepared.
+   */
+  async startRun(options, signal, sending) {
     const idempotencyKey = idempotencyKeyOf(options);
-    const extensions = buildExtensions(options.extra);
-    const api = buildApiRunExtensions(options);
-    const hosted = buildHostedRunExtensions(options);
-    if (!options.pipe_code && (!options.mthds_contents || options.mthds_contents.length === 0) && !hasBundlePayload(options) && Object.keys(api).length === 0 && Object.keys(hosted).length === 0 && Object.keys(extensions).length === 0) {
-      throw new RequestArgumentError(
-        "Either pipe_code, mthds_contents, a method bundle (files/bundle_b64), a method_ref, a hosted method_id or a server-specific extension arg (extra) must be provided to start()."
-      );
-    }
-    assertRunSourcesExclusive(options);
-    assertMethodRefPairsWithNothing(options);
-    assertLinkageMethodIdIsBare(options);
-    assertResourcesAccompanyABundle(options);
-    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
-    const request = {
-      pipe_code: options.pipe_code ?? void 0,
-      mthds_contents: options.mthds_contents ?? void 0,
-      inputs: options.inputs ?? void 0,
-      output_name: options.output_name ?? void 0,
-      output_multiplicity: options.output_multiplicity ?? void 0,
-      dynamic_output_concept_ref: options.dynamic_output_concept_ref ?? void 0,
-      files: nonEmptyFiles(options.files),
-      bundle_b64: nonEmptyString2(options.bundle_b64),
-      resources,
-      ...api,
-      ...hosted,
-      ...extensions
-    };
+    const parts = this.runParts("start", options);
+    const source = sending?.source ?? await this.treeToSend("start", parts.forms, REQUEST_SENDING, signal);
     const url = this.url("start");
-    const needsLongCeiling = hasBundlePayload(options) || (options.mthds_contents?.length ?? 0) > 0 || resources !== void 0 || nonEmptyString2(options.method_ref) !== void 0;
-    const res = await this.requestRaw("POST", url, {
-      body: request,
-      timeoutMs: needsLongCeiling ? DEFAULT_REQUEST_TIMEOUT_MS : POLL_REQUEST_TIMEOUT_MS,
-      idempotencyKey,
-      ...STARTS_RUN
-    });
+    const res = await this.postMethodRequest(
+      source,
+      "start",
+      REQUEST_SENDING,
+      // A start under a key is bound to the refusal the platform stores, so it is not sent again.
+      { signal, retryTooLarge: idempotencyKey === void 0 },
+      async (files) => {
+        const request = runRequestBody2("start", options, files, parts);
+        const needsLongCeiling = files !== void 0 || parts.api.method_ref !== void 0 || carriesExtraBundle(parts.extensions);
+        throwIfAborted(signal);
+        return this.requestRaw("POST", url, {
+          body: request,
+          timeoutMs: needsLongCeiling ? this.requestTimeoutMs : POLL_REQUEST_TIMEOUT_MS2,
+          idempotencyKey,
+          ...STARTS_RUN
+        });
+      },
+      sending?.initial
+    );
     this.throwIfLifecycleUnavailable(res, url);
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", "start", res, STARTS_RUN);
@@ -9638,7 +16222,7 @@ var PipelexApiClient = class {
     if (typeof ack.pipeline_run_id !== "string" || ack.pipeline_run_id === "") {
       throw this.unreadableAnswer(
         "POST",
-        `/${API_PREFIX}/start`,
+        `/${API_PREFIX2}/start`,
         res,
         "a body that is not the answer the route returns",
         void 0,
@@ -9648,30 +16232,38 @@ var PipelexApiClient = class {
     return ack;
   }
   /**
-   * Parse, validate, and dry-run an MTHDS bundle — `POST /v1/validate`.
+   * Parse, validate, and dry-run a method — `POST /v1/validate`.
    *
    * `/validate` is a diagnostic endpoint: every produced verdict rides a **200**,
    * discriminated on `is_valid`. This returns the `PipelexValidationResult` union
    * verbatim — `is_valid: true` ⇒ the typed `PipelexValidationReport` (structural
    * artifacts), `is_valid: false` ⇒ a `PipelexInvalidReport` (`validation_errors[]`).
-   * An invalid bundle is NOT thrown — the caller pattern-matches `is_valid`. Only a
-   * *no-verdict* condition (a malformed request, an `mthds_sources` length mismatch,
-   * auth, a server fault) is non-2xx and surfaces as `ApiResponseError`.
+   * An invalid method is NOT thrown — the caller pattern-matches `is_valid`. Only a
+   * *no-verdict* condition (a malformed request, a tree the route refuses, auth, a
+   * server fault) is non-2xx and surfaces as `ApiResponseError`.
    *
-   * `source` selects WHAT is validated, in exactly one of three forms — the
-   * strict tooling XOR (the routes are stateless, so there is no linkage
-   * exception; a second selector is a request-shape `422`):
+   * `source` names WHAT is validated, in exactly one form — the strict tooling XOR
+   * (the routes are stateless, so there is no linkage exception; a second selector
+   * is a request-shape `422`, refused here first with a `RequestArgumentError`):
    *
-   * - **inline contents** (a `string[]`) — the protocol's own envelope;
+   * - **the method's tree**, in one of the four forms of `MethodTreeForms`: a
+   *   `directory` the `mthds` package's lister lists under the standard's
+   *   membership rule (Node only), `contents` by tree path, a listed `tree`, or the
+   *   protocol's `files` map, sent as given. A `directory`, `contents` or `tree` is
+   *   sent as the `files` map, inline or by hash, exactly as a run sends it (see
+   *   `PipelexRunOptions`). Every `.mthds` file of the tree is judged, named by its
+   *   tree path in the diagnostics' `source`, and every other file is one a step may
+   *   read, such as a `PipeDocGen` step's template file, whose template check's
+   *   findings ride the valid arm's `warnings`;
    * - **`{ method_ref }`** — a published method's address, resolved by the
    *   server (pipelex-api >= 0.21.0) through the same fetch path as a
-   *   `method_ref` run, the package's real file names feeding the diagnostics'
+   *   `method_ref` run, the package's real tree paths feeding the diagnostics'
    *   source labels;
    * - **`{ method_id }`** — a stored method's catalog id, hosted-only: the
-   *   platform resolves the version it names and injects that version's `.mthds`
-   *   files before the runner sees the request (a bare runner rejects the request
-   *   as carrying no source it understands). A bare `mt_…` validates the latest
-   *   published version, `mt_…@<n>` version `n` and `mt_…@draft` the draft.
+   *   platform resolves the version it names and sends that version's tree to the
+   *   runner (a bare runner rejects the request as carrying no source it
+   *   understands). A bare `mt_…` validates the latest published version,
+   *   `mt_…@<n>` version `n` and `mt_…@draft` the draft.
    *
    * A selector-resolution failure (fetch failure, no package at the address, an
    * unknown or foreign-org id, a bare id of a method never published, `409`
@@ -9680,40 +16272,23 @@ var PipelexApiClient = class {
    * `ApiResponseError` — never an `is_valid: false` verdict, which is reserved
    * for actual MTHDS content.
    *
-   * `mthdsSources` (optional, parallel to inline contents) names each submitted
-   * content — a Pipelex-API extension threaded onto `blueprint.source`, so
-   * cross-file diagnostics name the owning file (an unnamed content yields
-   * `source: null`). The server 422s a length mismatch; this client sends the
-   * arrays verbatim and surfaces that as an `ApiResponseError`. It is an
-   * inline-contents companion only: a `method_ref` / `method_id` validation gets
-   * its source labels from the package's (or the stored method's) real file
-   * names, so supplying it beside a selector is rejected client-side.
+   * `allowSignatures` tolerates unimplemented pipe signatures, as the protocol's
+   * `validate(source, allowSignatures)` does: they surface as `pending_signatures`
+   * and `is_runnable`, never as an error.
    *
-   * `render` is the Pipelex-API presentation hint — a list of view-format tokens.
-   * This client always asks for Markdown so both valid results and produced
-   * validation-error verdicts carry `rendered_markdown`; callers may add more
-   * tokens. Unknown tokens are server-side lenient-ignored (never a 422).
+   * `options.render` is the Pipelex-API presentation hint — a list of view-format
+   * tokens. This client always asks for Markdown so both valid results and produced
+   * validation-error verdicts carry `rendered_markdown`; callers may add more tokens.
+   * Unknown tokens are server-side lenient-ignored (never a 422).
    *
-   * `views` is the sibling opt-in for *structured* views where `render` carries
-   * *rendered text*. The two lists are independent, each resolving its own tokens
-   * against its own supported set, and each supported token adds a same-named
-   * top-level field to the valid arm — `input_form` and `output_form`. Unlike `render`,
-   * this client sends `views` ONLY when the caller asks: the point of an opt-in view
-   * is that the default response stays byte-identical, and the highest-frequency
-   * consumers (hook pipelines, CI gates, agent loops) never pay for bytes they
-   * discard. `pipelex-api` gates `input_form` on this token as of 0.18.0; a 0.17.0
-   * runner resolved no token (the key is silently ignored, never a 422) and emitted
-   * the field regardless — which is why `PipelexValidationReport.input_form` is typed
-   * optional rather than required.
-   *
-   * `options.resources` sends the files the bundle's steps read, such as a
-   * `PipeDocGen` step's `template_file`, keyed by the path the step names, each as
-   * its bytes (see {@link ValidateOptions}). A step whose template file was not sent
-   * is an `is_valid: false` verdict saying so, and a template check's findings in an
-   * office template file ride the valid arm's `warnings`. A key no step names, or
-   * files over the server's limits, are no-verdict refusals: a `422`
-   * `BundleResourceNotNamedError`, a `413` `PayloadTooLarge` or
-   * `BundleResourcesTooLargeError`.
+   * `options.views` is the sibling opt-in for *structured* views where `render`
+   * carries *rendered text*. The two lists are independent, each resolving its own
+   * tokens against its own supported set, and each supported token adds a same-named
+   * top-level field to the valid arm — `input_form` and `output_form`. Unlike
+   * `render`, this client sends `views` ONLY when the caller asks: the point of an
+   * opt-in view is that the default response stays byte-identical, and the
+   * highest-frequency consumers (hook pipelines, CI gates, agent loops) never pay for
+   * bytes they discard.
    *
    * A `{ method_ref }` source makes the server clone a repository before it
    * validates anything, and it needs no special budget here: this route already
@@ -9723,88 +16298,51 @@ var PipelexApiClient = class {
    * exists to RAISE routes whose default is the ~30s poll ceiling; applying it here
    * would lower this one.
    */
-  async validate(source, allowSignatures = false, mthdsSources, render, views, options = {}) {
-    const body = {
-      allow_signatures: allowSignatures
-    };
-    if (Array.isArray(source)) {
-      body.mthds_contents = source;
-      if (mthdsSources !== void 0) {
-        body.mthds_sources = mthdsSources;
-      }
-    } else {
-      if (source === null || source === void 0 || typeof source !== "object") {
-        throw new RequestArgumentError(
-          "validate() takes inline contents (a string[]) or a method selector object ({ method_ref } or { method_id })."
-        );
-      }
-      const methodRef = nonEmptyString2(source.method_ref);
-      const methodId = nonEmptyString2(source.method_id);
-      if (methodRef === void 0 === (methodId === void 0)) {
-        throw new RequestArgumentError(
-          "validate() takes exactly one method selector: inline contents, { method_ref }, or { method_id }."
-        );
-      }
-      if (mthdsSources !== void 0) {
-        throw new RequestArgumentError(
-          "mthds_sources labels inline mthds_contents; a method_ref / method_id validation gets its source labels from the package's (or the stored method's) real file names."
-        );
-      }
-      if (methodRef !== void 0 && hasBundleResources(options.resources)) {
-        throw new RequestArgumentError(
-          "resources accompany inline mthds_contents; a method_ref's files are the package's own."
-        );
-      }
-      if (methodRef !== void 0) body.method_ref = methodRef;
-      if (methodId !== void 0) body.method_id = methodId;
+  async validate(source, allowSignatures = false, options = {}) {
+    if (source === null || typeof source !== "object" || Array.isArray(source)) {
+      throw new RequestArgumentError(
+        "validate() takes the method as an object naming exactly one of directory, contents, tree, files, method_ref or method_id."
+      );
     }
-    body.render = withValidateMarkdownRender(render);
-    if (views !== void 0) {
-      body.views = views;
+    const forms = protocolTreeForms("validate", source);
+    const methodRef = nonEmptyString3(source.method_ref);
+    const methodId = nonEmptyString3(source.method_id);
+    const given = treeFormsGiven(forms);
+    if (methodRef !== void 0) given.push("method_ref");
+    if (methodId !== void 0) given.push("method_id");
+    if (given.length !== 1) {
+      throw new RequestArgumentError(
+        `validate() takes exactly one of the method's tree (directory, contents, tree or files), method_ref or method_id; got ${given.length === 0 ? "none" : given.join(" and ")}.`
+      );
     }
-    const resources = options.resources == null ? void 0 : await encodeBundleResources(options.resources);
-    if (resources !== void 0) {
-      body.resources = resources;
-    }
-    const res = await this.requestRaw("POST", this.url("validate"), {
-      body,
-      timeoutMs: options.timeoutMs,
-      signal: options.signal
-    });
+    const signal = options.signal;
+    const sent = await this.treeToSend("validate", forms, REQUEST_SENDING, signal);
+    const res = await this.postMethodRequest(
+      sent,
+      "validate",
+      REQUEST_SENDING,
+      { signal },
+      (files) => {
+        const body = { allow_signatures: allowSignatures };
+        if (files != null) body.files = files;
+        if (methodRef !== void 0) body.method_ref = methodRef;
+        if (methodId !== void 0) body.method_id = methodId;
+        body.render = withValidateMarkdownRender2(options.render);
+        if (options.views !== void 0) {
+          body.views = options.views;
+        }
+        throwIfAborted(signal);
+        return this.requestRaw("POST", this.url("validate"), {
+          body,
+          timeoutMs: options.timeoutMs,
+          signal
+        });
+      }
+    );
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", "validate", res);
     }
     return this.readObjectAnswer("POST", "validate", res);
-  }
-  /**
-   * Validate paired MTHDS files while preserving URI attribution for diagnostics.
-   *
-   * This adapter intentionally keeps the low-level `validate(...)` payload shape
-   * intact for existing consumers. When any file has a URI, every content gets a
-   * parallel source label; inline labels are deterministic so the server never
-   * sees a length-mismatched `mthds_sources` array.
-   */
-  async validateFiles(files, options = {}) {
-    if (files.length === 0) {
-      throw new RequestArgumentError(
-        "At least one MTHDS file must be provided to validateFiles()."
-      );
-    }
-    const mthdsContents = files.map((file) => file.content);
-    const hasAnyUri = files.some((file) => file.uri !== void 0);
-    const mthdsSources = hasAnyUri ? files.map((file, index) => file.uri ?? `inline://file-${index + 1}.mthds`) : void 0;
-    return this.validate(
-      mthdsContents,
-      options.allowSignatures ?? false,
-      mthdsSources,
-      options.render,
-      options.views,
-      {
-        resources: options.resources,
-        timeoutMs: options.timeoutMs,
-        signal: options.signal
-      }
-    );
   }
   // ── Tools extensions (Pipelex API — `/v1/lint`, `/v1/format`) ─────────
   //
@@ -9876,11 +16414,10 @@ var PipelexApiClient = class {
    * never on a message.
    *
    * All of these are static and inference-free, so they default to the management-call
-   * timeout. The internal raises are `crateRequestTimeoutMs`'s: the fetch-sized budget a
+   * timeout. The internal raise is `crateRequestTimeoutMs`'s: the fetch-sized budget a
    * crate route gets when its closure is a `method_ref`, because the server may clone a
-   * repository before it answers, and the execute ceiling it gets when the request
-   * carries `resources`, whose upload alone can outlast the default. Each is matched to
-   * what the request costs, not a caller-facing parameter.
+   * repository before it answers. It is matched to what the request costs, not a
+   * caller-facing parameter.
    *
    * **These routes deliberately expose no `timeoutMs` / `signal`, and that is not an
    * oversight to be "fixed" per route.** Automated reviewers have proposed adding them
@@ -9891,11 +16428,11 @@ var PipelexApiClient = class {
    *    ceiling and takes caller transport options; every extension route rides the
    *    static core. Giving one static route an override while its siblings lack one is
    *    the inconsistency.
-   * 2. The input is **bounded server-side** — the runner's `pipelex_api/limits.py` caps the
-   *    `.mthds` files of a request and the files sent with them in `resources`, each by a
-   *    count, a size per file and, for `resources`, a total, all configurable per
-   *    deployment — and none of these routes runs inference. The upload those limits allow
-   *    is what `crateRequestTimeoutMs` budgets for, not the server's work.
+   * 2. The input is **bounded server-side** — the deployment caps a request's tree by its
+   *    count of files, a size per file, a total and the bytes it carries inline, all
+   *    announced by its `/v1/version` handshake — and none of these routes runs inference.
+   *    The upload those limits allow is what `crateRequestTimeoutMs` budgets for, not the
+   *    server's work.
    * 3. On the hosted path an override would be **inert**: the gateway caps responses at
    *    ~30s (see `POLL_REQUEST_TIMEOUT_MS` above), so raising `timeoutMs` would still be
    *    cut off upstream, just with a less honest error.
@@ -9903,11 +16440,17 @@ var PipelexApiClient = class {
    * If a static route ever genuinely needs longer, give the WHOLE static family one
    * uniform transport-options parameter in a single pass — do not bolt it onto one
    * route.
+   *
+   * The one exception is the crate family's `signal` (`CrateRouteOptions`), given to all three
+   * crate routes at once: a `directory`, `tree` or `contents` can cost the listing, the version
+   * handshake, the blob route and uploads before the request, client-side work a caller such as
+   * `prepareInputs` must be able to stop. It is read between those steps and stops nothing in flight, so it is no
+   * transport option and the reasons above still hold.
    */
   async requestExtension(endpoint, body, options = {}) {
     const res = await this.requestRaw("POST", this.url(endpoint), {
       body,
-      timeoutMs: options.timeoutMs ?? POLL_REQUEST_TIMEOUT_MS
+      timeoutMs: options.timeoutMs ?? POLL_REQUEST_TIMEOUT_MS2
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", endpoint, res);
@@ -9918,7 +16461,7 @@ var PipelexApiClient = class {
   async models(category) {
     const endpoint = category ? `models?type=${encodeURIComponent(category)}` : "models";
     const res = await this.requestRaw("GET", this.url(endpoint), {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("GET", endpoint, res);
@@ -9951,7 +16494,7 @@ var PipelexApiClient = class {
     }
     const endpoint = `models/check?${query.toString()}`;
     const res = await this.requestRaw("GET", this.url(endpoint), {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("GET", endpoint, res);
@@ -9963,8 +16506,13 @@ var PipelexApiClient = class {
    * The handshake for feature detection (hosted extensions or not).
    */
   async version() {
+    return this.requestVersion();
+  }
+  /** `GET /v1/version`, as `version` asks it, stopped by `signal`. */
+  async requestVersion(signal) {
     const res = await this.requestRaw("GET", this.url("version"), {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2,
+      signal
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("GET", "version", res);
@@ -9991,8 +16539,10 @@ var PipelexApiClient = class {
   // `docs/crate-routes.md`).
   //
   // All three are STATIC routes (no dry-run sweep), so like every static sibling they
-  // take no `timeoutMs`/`signal` — see the policy note on `requestExtension` before
-  // adding one here.
+  // take no `timeoutMs` — see the policy note on `requestExtension` before adding one
+  // here. Their `signal` (`CrateRouteOptions`) is that note's one exception: it is read
+  // between the steps that prepare a `directory`, `tree` or `contents`, and stops nothing in
+  // flight.
   /**
    * Resolve a closure into its normalized library crate — `POST /v1/resolve`.
    *
@@ -10011,15 +16561,23 @@ var PipelexApiClient = class {
    * (fetch failure, no package at the address, an unknown or foreign-org id) is
    * non-2xx too — never an `is_valid: false` verdict.
    *
-   * The closure arrives in exactly one of three forms: inline `files`, an
-   * address-form `method_ref` (server-resolved, pipelex-api >= 0.21.0; the
-   * registry form stays a `501`), or a hosted `method_id` (platform-resolved —
-   * see {@link PipelexHostedToolingExtensions}).
+   * The closure arrives in exactly one of three forms: the method's tree, as the
+   * protocol's `files` map or as a `directory`, `tree` or `contents` the client sends
+   * inline when small and by hash otherwise (see {@link CrateRequestBase}); an
+   * address-form `method_ref` (server-resolved, pipelex-api >= 0.21.0; the registry form
+   * stays a `501`); or a hosted `method_id` (platform-resolved — see
+   * {@link PipelexHostedToolingExtensions}). An empty map or string is absent.
+   *
+   * `options.signal` stops the call between the steps a `directory`, `tree` or `contents`
+   * costs before the request — the listing, the version handshake, the blob route, each
+   * read and upload of a missing blob — and before the request itself, throwing the
+   * abort; a request already sent runs to its end. A blob that fails to upload throws
+   * `MethodFileTransferError`, and a tree this client refuses to send (no file, two
+   * forms, a directory it cannot list, a `contents` value that is neither text nor
+   * bytes) `RequestArgumentError`, each before the route is asked.
    */
-  async resolve(request) {
-    return this.requestExtension("resolve", await wireCrateRequest(request), {
-      timeoutMs: crateRequestTimeoutMs(request)
-    });
+  async resolve(request, options = {}) {
+    return this.crateRequest("resolve", "resolve", request, options);
   }
   /**
    * Project a closure's crate into stamped typed artifacts — `POST /v1/codegen`.
@@ -10036,10 +16594,8 @@ var PipelexApiClient = class {
    * unknown `kind`/`target`, a `pipe_ref` on the concept-set-wide `types` kind, or
    * a malformed selector is a 422; a registry-form `method_ref` is a `501`.
    */
-  async codegen(request) {
-    return this.requestExtension("codegen", await wireCrateRequest(request), {
-      timeoutMs: crateRequestTimeoutMs(request)
-    });
+  async codegen(request, options = {}) {
+    return this.crateRequest("codegen", "codegen", request, options);
   }
   /**
    * Read a method's three I/O artifacts — `POST /v1/pipe-io`.
@@ -10052,19 +16608,20 @@ var PipelexApiClient = class {
    * dry-runs every pipe; a caller that shows a method, prepares its inputs or generates
    * types for it reads this, and one that needs the dry-run verdict stays on `validate`.
    *
-   * Selection: the request's qualified `pipe_ref`, else a fetched package's manifest
-   * `main_pipe`, else the closure's single `main_pipe` declaration. `all_pipes: true`
-   * describes every pipe instead, and never refuses for want of an entry pipe.
-   * `include_files: true` echoes the resolved closure's `.mthds` files as `files`.
+   * Selection: the request's qualified `pipe_ref`, else the `main_pipe` of the
+   * `METHODS.toml` at the tree's root, sent in the tree or fetched with a package, else the
+   * closure's single `main_pipe` declaration. `all_pipes: true` describes every pipe
+   * instead, and never refuses for want of an entry pipe. `include_files: true` echoes the
+   * method's own `.mthds` bundles as `files`, a map from tree path to each bundle's text,
+   * in the shape of the request's `files` map.
    *
-   * Beside inline `files`, `resources` sends the files the closure's steps read, such as a
-   * `PipeDocGen` step's `template_file`, keyed by the path the step names, each as its bytes;
-   * a step whose template file was not sent makes the closure invalid. `resolve` and `codegen`
-   * take it too (see {@link CrateRequestBase}).
+   * The files the closure's steps read, such as a `PipeDocGen` step's `template_file`, are
+   * files of the method's tree like any other; a step whose template file is not in the tree
+   * makes the closure invalid (see {@link CrateRequestBase}).
    *
-   * Same 200-verdict discipline and same three-form closure selector as {@link resolve}
-   * (the request is posted as given, its `resources` encoded to base64, and the selector XOR
-   * and the `resources` pairing are the server's to enforce).
+   * Same 200-verdict discipline, same three-form closure selector and same `options` as
+   * {@link resolve} (the request's members are posted as given, its `directory`, `tree` or
+   * `contents` as the `files` map, and the selector XOR is the server's to enforce).
    * Only a no-verdict condition throws `ApiResponseError`: a malformed selector and an
    * over-limit file are `ValidationError` `422`s; a selection the route refuses is a
    * `422` whose `errorType` is `EntryPipeNotFoundError` (an unknown `pipe_ref`, no entry
@@ -10072,16 +16629,78 @@ var PipelexApiClient = class {
    * candidates in its `serverMessage`; a registry-form `method_ref` is a `501`; a pipe
    * whose artifacts cannot be derived is a `500`.
    *
-   * A `method_ref` gets the fetch-sized budget, as on the other crate routes, and a
-   * request carrying `resources` the execute ceiling, since their upload alone can
-   * outlast the default. On the hosted API the gateway caps a request at about 30
-   * seconds whatever the client allows, so a cold `method_ref` clone can answer a `502`
-   * that a retry clears once the runner has cached the clone.
+   * A `method_ref` gets the fetch-sized budget, as on the other crate routes. On the
+   * hosted API the gateway caps a request at about 30 seconds whatever the client allows,
+   * so a cold `method_ref` clone can answer a `502` that a retry clears once the runner
+   * has cached the clone.
    */
-  async pipeIo(request) {
-    return this.requestExtension("pipe-io", await wireCrateRequest(request), {
-      timeoutMs: crateRequestTimeoutMs(request)
-    });
+  async pipeIo(request, options = {}) {
+    return this.crateRequest("pipe-io", "pipeIo", request, options);
+  }
+  /**
+   * Post a crate request: its members as given, and its tree as the `files` map a save would
+   * send, each key left off when there is nothing to send. An empty map or string is absent, as in
+   * the Python SDK: `files: {}` or `null`, `contents: {}`, `directory: ""` and `dependencies: {}`
+   * are not sent, so an empty one never reaches the wire as a second selector; a `directory` that
+   * is not a string is refused, as on a run. A `directory`, `tree` or `contents` is prepared
+   * through the path every request and save sends a tree by (`postMethodRequest`), inline when
+   * small and by hash otherwise, uploading the files the API lacks first; the blob route is asked
+   * under the request's `read_scope`, the scope its hash entries are read in. `signal` is read
+   * before each step and right before the request (see `TreeSendOptions`). The request gets the
+   * budget `crateRequestTimeoutMs` gives it for the `files` it carries.
+   */
+  async crateRequest(endpoint, call, request, options) {
+    const signal = options.signal;
+    throwIfAborted(signal);
+    if (typeof request !== "object" || request === null) {
+      return this.requestExtension(endpoint, request);
+    }
+    const { directory, contents, tree, files, dependencies, ...rest } = request;
+    const source = await this.treeToSend(
+      call,
+      {
+        directory: typeof directory === "string" ? nonEmptyString3(directory) : directory,
+        contents: presentMap(contents),
+        tree: tree ?? void 0,
+        files: presentMap(files)
+      },
+      REQUEST_SENDING,
+      signal
+    );
+    const packages = presentMap(dependencies);
+    const res = await this.postMethodRequest(
+      source,
+      call,
+      REQUEST_SENDING,
+      { signal, readScope: nonEmptyString3(request.read_scope) },
+      (sent) => {
+        const body = { ...rest };
+        if (sent != null) body.files = sent;
+        if (packages !== void 0) body.dependencies = packages;
+        throwIfAborted(signal);
+        return this.requestRaw("POST", this.url(endpoint), {
+          body,
+          timeoutMs: this.crateRequestTimeoutMs(request, sent)
+        });
+      }
+    );
+    if (res.status < 200 || res.status >= 300) {
+      this.throwApiResponseError("POST", endpoint, res);
+    }
+    return this.readObjectAnswer("POST", endpoint, res);
+  }
+  /**
+   * The request budget for a crate route's closure (`resolve`, `codegen`, `pipeIo`): the
+   * static-route default, unless the closure is a `method_ref`, which may make the server clone a
+   * repository first and gets the fetch-sized budget, or its `files` carry more inline than
+   * `INLINE_TREE_MAX_BYTES`, which gets the client's request ceiling (`requestTimeoutMs`): a tree
+   * sent to an API keeping no blob store travels inline whatever its weight, and so does a `files`
+   * map given as is, and the upload of the body is charged against the budget. A tree sent by
+   * hash keeps the default, its files uploaded before the request under the client's own ceiling.
+   */
+  crateRequestTimeoutMs(request, files) {
+    if (nonEmptyString3(request.method_ref) !== void 0) return METHOD_REF_FETCH_TIMEOUT_MS2;
+    return carriesLargeInlineTree(files) ? this.requestTimeoutMs : POLL_REQUEST_TIMEOUT_MS2;
   }
   // ── Hosted extension: durable run lifecycle (NOT part of the protocol) ──
   /**
@@ -10104,7 +16723,7 @@ var PipelexApiClient = class {
     const endpoint = `${RUNS}/${idPathSegment(runId, "getRunStatus", RUN_ID_ARGUMENT)}/status`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2,
       signal: options.signal
     });
     this.throwIfLifecycleUnavailable(res, url);
@@ -10141,7 +16760,7 @@ var PipelexApiClient = class {
     const endpoint = `${RUNS}/${idPathSegment(runId, "getRunProgress", RUN_ID_ARGUMENT)}/progress`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2,
       signal: options.signal
     });
     this.throwIfLifecycleUnavailable(
@@ -10157,7 +16776,7 @@ var PipelexApiClient = class {
     if (fault2 !== void 0) {
       throw this.unreadableAnswer(
         "GET",
-        `/${API_PREFIX}/${endpoint}`,
+        `/${API_PREFIX2}/${endpoint}`,
         res,
         `a snapshot whose ${fault2}`
       );
@@ -10197,7 +16816,7 @@ var PipelexApiClient = class {
     const endpoint = options.artifacts === void 0 ? base : `${base}?artifacts=${[...new Set(options.artifacts)].join(",")}`;
     const url = this.url(endpoint);
     const res = await this.requestRaw("GET", url, {
-      timeoutMs: POLL_REQUEST_TIMEOUT_MS,
+      timeoutMs: POLL_REQUEST_TIMEOUT_MS2,
       signal: options.signal
     });
     if (res.status === 202 || res.status === 503) {
@@ -10250,17 +16869,22 @@ var PipelexApiClient = class {
    * gzip stream, which `requestRaw` reports as an `ApiUnreachableError` carrying
    * the decompressor's code (see `isUndecodableBody`).
    *
+   * `signal` stops the handshake: its abort is thrown as is and nothing is cached.
+   *
    * @throws {ApiUnreachableError} The handshake got no answer. Nothing is cached,
    *   so the next call asks again, and no start is sent to a host that did not
    *   answer: sending it would wait a second time for the same silence.
    */
-  async supportsRunLifecycle() {
+  async supportsRunLifecycle(signal) {
     if (this.lifecycleAvailable === void 0) {
       try {
-        const info = await this.version();
+        const askedAt = Date.now();
+        const info = await this.requestVersion(signal);
+        this.versionCache = { info, askedAt };
         const impl = info.implementation;
         this.lifecycleAvailable = !(typeof impl === "string" && impl === BARE_RUNNER_IMPLEMENTATION);
       } catch (error) {
+        if (signal?.aborted === true) throw signal.reason;
         if (error instanceof ApiUnreachableError && !isUndecodableBody(error)) throw error;
         this.lifecycleAvailable = true;
       }
@@ -10282,9 +16906,15 @@ var PipelexApiClient = class {
    * run, so the caller knows until then that none exists (see
    * `StartAndWaitForResultOptions`).
    *
-   * `pollOptions.signal` is also read before the run is created: a caller that aborts while the
-   * version handshake is in flight gets its abort, and neither the start nor the blocking execute
-   * is sent. Once one of them is sent, the abort stops only the wait.
+   * `pollOptions.signal` also stops everything before the run is created: the version handshake,
+   * the listing of a `directory`, and the reads, the blob route and the uploads of a tree sent by
+   * hash, each of them stopped in flight. It is read again right before the start and before the
+   * blocking execute, so a caller that aborts before then gets its abort and no run is created.
+   * Once one of them is sent, the abort stops only the wait.
+   *
+   * The method's tree is prepared once, before the start: when a runner turns out to lack the
+   * durable routes, the blocking execute sends the same `files` map, its blobs already uploaded,
+   * rather than listing, reading and hashing the tree again.
    *
    * An error from the start, or from the blocking execute, says whether that request may still
    * have started a run whose id never reached the caller (`runMayHaveStarted`); when it may have,
@@ -10303,25 +16933,42 @@ var PipelexApiClient = class {
     assertWaitOptions(pollOptions);
     idempotencyKeyOf(options);
     const { onStarted, onStarting, ...waitOptions } = pollOptions ?? {};
-    const hosted = await this.supportsRunLifecycle();
-    throwIfAborted(waitOptions.signal);
+    const signal = waitOptions.signal;
+    const hosted = await this.supportsRunLifecycle(signal);
+    throwIfAborted(signal);
+    const sending = await this.prepareRunTree(hosted ? "start" : "execute", options, signal);
     if (hosted) {
       let ack;
       try {
+        throwIfAborted(signal);
         onStarting?.();
-        ack = await this.start(options);
+        ack = await this.startRun(options, signal, sending);
       } catch (err) {
         if (!(err instanceof RunLifecycleUnavailableError)) throw err;
         this.lifecycleAvailable = false;
-        throwIfAborted(waitOptions.signal);
+        throwIfAborted(signal);
         onStarting?.();
-        return this.executeBlocking(options);
+        return this.executeBlocking(options, signal, sending);
       }
       onStarted?.(ack);
       return this.waitForResult(ack.pipeline_run_id, waitOptions);
     }
+    throwIfAborted(signal);
     onStarting?.();
-    return this.executeBlocking(options);
+    return this.executeBlocking(options, signal, sending);
+  }
+  /**
+   * A run's tree prepared once for `startAndWaitForResult`, under `call`'s refusals: the run's
+   * arguments checked, the tree listed or read, and its `files` prepared, uploads included, under
+   * `signal`. A `files` map given as is, or no tree, needs no preparation.
+   */
+  async prepareRunTree(call, options, signal) {
+    const parts = this.runParts(call, options);
+    const source = await this.treeToSend(call, parts.forms, REQUEST_SENDING, signal);
+    if (source === void 0 || !("tree" in source)) return { source, initial: void 0 };
+    const read = /* @__PURE__ */ new Map();
+    const prepared = await this.prepareFiles(source, call, REQUEST_SENDING, { signal }, read);
+    return { source, initial: { prepared, read } };
   }
   // ── Pipelex product surface (hosted management routes) ─────────────────
   //
@@ -10390,10 +17037,13 @@ var PipelexApiClient = class {
     yield* followCursor("listMethods", (cursor) => this.listMethods({ ...query, cursor }));
   }
   /**
-   * Read one method — `GET /v1/methods/{id}`: its identity, its draft (`mthds`, `python`,
-   * `input_data`) with the draft's token (`updated_at`) and digest (`draft_digest`), and its
-   * latest published version's summary (`latest_version`, `latest_published`), whatever the
-   * publish state. A method never published reads with both `null`, never as an error.
+   * Read one method with its draft's files — `GET /v1/methods/{id}`: its identity, its draft
+   * (`files`, `input_data`) with the draft's token (`updated_at`) and digest (`draft_digest`),
+   * and its latest published version's summary (`latest_version`, `latest_published`), whatever
+   * the publish state. A method never published reads with both `null`, never as an error.
+   * `files` lists the draft's tree in tree path order, each file with its SHA-256, its size and a
+   * link to its bytes valid for about fifteen minutes, and is empty for an empty draft;
+   * `writeMethodTree` brings the tree to disk.
    *
    * Takes a bare catalog id: the method routes address the method itself, never a version of
    * it. A caller holding `mt_…@3` strips the suffix with `parseMethodSelector` and reads that
@@ -10401,54 +17051,45 @@ var PipelexApiClient = class {
    * suffixed id, before any request, rather than read back the `404` the platform would answer,
    * and for an id that is empty, `.` or `..`, which the URL would resolve into another route's
    * path.
+   *
+   * Throws `ApiResponseError`: `404` `not_found` for an unknown or foreign-org method, `409`
+   * `method_being_deleted` while its erasure runs, and a `409` whose verdict is `runtime` for a
+   * method whose draft names a tree the platform holds no record of. An answer whose `files` is
+   * not a listing is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
    */
   async getMethod(methodId) {
-    return this.requestMethodData("GET", methodPath(methodId, "getMethod"));
+    const endpoint = methodPath(methodId, "getMethod");
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    return this.readSavedTree("GET", endpoint, withLinks(res), "a stored method");
   }
   /**
-   * Resolve a stored method's id into the runnable MTHDS closure of its DRAFT — a
-   * client-side semantic layer over `getMethod` (the platform has no route that
-   * returns a parsed closure). Fetches the method, parses its draft's polymorphic
-   * `mthds` source with `methodSourceToContents`, and labels each resulting file
-   * with the `method_id` as its `source` provenance.
+   * Create a method — `POST /v1/methods`. The new method holds its tree as its draft and has no
+   * published version, so its bare id answers `409 method_not_published` on the run and tooling
+   * routes until its first `publishMethod`; its draft runs as `mt_…@draft` at once.
    *
-   * **This is the draft, not what a bare id runs.** A run, a validation or a pipe I/O
-   * read by a bare `method_id` resolves to the latest PUBLISHED version, which the
-   * draft may be ahead of. For the closure of a version, read it with
-   * `getMethodVersion` and parse its `mthds` with `methodSourceToContents`.
+   * The tree is `files`, sent as given, or `tree` or `contents`, which the client sends inline
+   * when its inline map weighs 256 KiB or less, or when the platform keeps no blob store, and
+   * otherwise every file by hash, after asking `POST /v1/blobs/missing` which files the
+   * organization lacks and uploading those: a file uploaded once is never uploaded again. With
+   * none of the three, the draft is empty (see `docs/method-trees.md`).
    *
-   * This is the LOCAL expansion utility — for callers that want the files in
-   * hand (to edit, to diff, or to send to a bare runner, which has no catalog to
-   * resolve an id against). The operations that accept `method_id`
-   * natively (`execute`/`start`, `validate`/`resolve`/`codegen`/`pipeIo`, and
-   * `prepareInputs`, which composes a `pipeIo` of its own) take the id as a
-   * pass-through instead; nothing in this client expands an id behind your back.
-   *
-   * Takes a bare catalog id, as `getMethod` does. Requires an API key: the methods
-   * catalog is org-scoped to the key's org, so an unknown OR foreign-org id is a
-   * `getMethod` `404` (`ApiResponseError` `not_found`), which propagates unchanged. A
-   * real, in-org method whose draft parses to nothing throws `EmptyMethodSourceError`
-   * (distinct from the 404) — the row exists but has no runnable source yet.
-   */
-  async getMethodClosure(methodId) {
-    const method = await this.getMethod(methodId);
-    const contents = methodSourceToContents(method.mthds);
-    if (contents.length === 0) {
-      throw new EmptyMethodSourceError(methodId);
-    }
-    return contents.map((content) => ({ content, source: methodId }));
-  }
-  /**
-   * Create a method — `POST /v1/methods`. The new method holds the input as its draft and has
-   * no published version, so its bare id answers `409 method_not_published` on the run and
-   * tooling routes until its first `publishMethod`; its draft runs as `mt_…@draft` at once.
-   *
-   * Throws `ApiResponseError`: `413` `payload_too_large` for a method that would leave no room
-   * for a publish, measured as a draft write is, and `422` `validation_failed` for Python files
-   * no run could import or for text holding a lone surrogate.
+   * Throws `RequestArgumentError` for two forms of the tree, or `contents` holding no file, before
+   * any request; `MethodFileTransferError` when a file the organization lacks could not be
+   * uploaded, and nothing is saved. Throws `ApiResponseError`: `422` `invalid_method_files` for a
+   * map the standard refuses, with its `tree_refusal`; `422` `method_tree_too_large` for a tree
+   * past one of the deployment's limits, named in its `limit`; `422` `blob_mismatch` for a hash
+   * stated at another size than the one held; `422` `missing_blobs` for a hash entry whose bytes
+   * the organization does not hold; `413` `payload_too_large` for a method that would leave no
+   * room for a publish.
    */
   async createMethod(input) {
-    return this.requestMethodData("POST", "methods", withWirePython(input));
+    const source = await this.treeToSend("createMethod", input, SAVE_SENDING);
+    return this.saveMethodTree("POST", "methods", "createMethod", source, (files) => {
+      const body = { name: input.name };
+      if (files != null) body.files = files;
+      if (input.input_data !== void 0) body.input_data = input.input_data;
+      return body;
+    });
   }
   /**
    * Replace a method's draft — `PUT /v1/methods/{id}/draft` — and return the method with the
@@ -10456,25 +17097,370 @@ var PipelexApiClient = class {
    *
    * The draft is never validated on write, and writing it changes nothing for the callers of
    * the method's bare id, who run the latest published version until the next `publishMethod`.
-   * `python` and `input_data` are three-way (see `MethodDraftInput`). With
+   * The write replaces the draft's whole tree, given in exactly one form: `files`, sent as given,
+   * `files: null` emptying the draft, or `tree` or `contents`, sent inline or by hash as
+   * `createMethod` sends them. `input_data` is three-way (see `MethodDraftInput`). With
    * `expected_updated_at`, the write is a compare-and-swap on the draft token: a draft that
    * moved since is refused with a `409` whose `code` is `method_update_conflict`, and nothing is
    * written. Without it, last writer wins.
    *
-   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404` `not_found`
-   * for an unknown or foreign-org method, `409` `method_being_deleted` while its erasure runs,
-   * `413` `payload_too_large` for a draft that would grow the method past the room a publish
-   * needs, which keeps a draft that saves publishable, `422` `validation_failed` for Python
-   * files no run could import or for text holding a lone surrogate, `403` for a read-only key,
-   * and a `503` that wrote nothing, safe to retry, when the method kept changing under the
-   * write.
+   * Takes a bare catalog id, as `getMethod` does. Throws `RequestArgumentError` for a draft that
+   * gives its tree in no form or in two, or `contents` holding no file, before any request;
+   * `MethodFileTransferError` when a file the organization lacks could not be uploaded. Throws
+   * `ApiResponseError`: `404` `not_found` for an unknown or foreign-org method, `409`
+   * `method_being_deleted` while its erasure runs, the `422` refusals of a tree `createMethod`
+   * lists, `413` `payload_too_large` for a draft that would grow the method past the room a
+   * publish needs, `403` for a read-only key, and a `503` that wrote nothing, safe to retry,
+   * when the method kept changing under the write.
    */
   async writeDraft(methodId, input) {
-    return this.requestMethodData(
-      "PUT",
-      `${methodPath(methodId, "writeDraft")}/draft`,
-      withWirePython(input)
+    const endpoint = `${methodPath(methodId, "writeDraft")}/draft`;
+    if (treeFormsGiven(input).length === 0) {
+      throw new RequestArgumentError(
+        "writeDraft() replaces the draft's whole tree: give it as directory, contents, tree or files (files: null empties the draft)."
+      );
+    }
+    const source = await this.treeToSend("writeDraft", input, SAVE_SENDING);
+    return this.saveMethodTree("PUT", endpoint, "writeDraft", source, (files) => {
+      const body = { files: files ?? null };
+      if (input.input_data !== void 0) body.input_data = input.input_data;
+      if (input.expected_updated_at !== void 0) {
+        body.expected_updated_at = input.expected_updated_at;
+      }
+      return body;
+    });
+  }
+  /**
+   * Send a save carrying a method's tree (`createMethod`, `writeDraft`) through the path every
+   * request sends a tree by (`postMethodRequest`), its body built by `bodyOf` from the `files`
+   * prepared, under `saveTimeoutMs`, and read the stored method it answers as
+   * `requestMethodData` reads it.
+   */
+  async saveMethodTree(method, endpoint, call, source, bodyOf) {
+    const res = await this.postMethodRequest(
+      source,
+      call,
+      SAVE_SENDING,
+      {},
+      (files) => this.requestRaw(method, this.url(endpoint), {
+        body: bodyOf(files),
+        timeoutMs: this.saveTimeoutMs(files)
+      })
     );
+    if (res.status < 200 || res.status >= 300) {
+      this.throwApiResponseError(method, endpoint, res);
+    }
+    return this.readObjectAnswer(method, endpoint, res);
+  }
+  /**
+   * The time limit of a save carrying `files`: the client's request ceiling, as for a `start`
+   * carrying its method, since a tree sent inline to a deployment with no blob store weighs up to
+   * its `max_inline_bytes`, a `files` map given as is whatever it weighs, and the whole upload is
+   * charged against the limit; the poll timeout for a save sending no tree.
+   */
+  saveTimeoutMs(files) {
+    return files != null && Object.keys(files).length > 0 ? this.requestTimeoutMs : POLL_REQUEST_TIMEOUT_MS2;
+  }
+  /**
+   * The limits the deployment holds a method's tree to — `GET /v1/version`, read from
+   * `limits.method_tree` of the public handshake — in the shape the `mthds` package's
+   * `listMethodTree` takes as its `limits` option, so a tree the platform would refuse is refused
+   * while it is listed, before any file is hashed. A `directory` given to any route is listed under
+   * them already; they serve a caller listing a tree of its own:
+   *
+   * ```ts
+   * import { listMethodTree } from "mthds";
+   * const tree = await listMethodTree("methods/receipts", { limits: await client.methodTreeLimits() });
+   * await client.createMethod({ name: "Receipts", tree });
+   * ```
+   *
+   * A limit the server does not announce is absent, so a bare runner, which announces none,
+   * yields no limit, and none is ever assumed. A value that is not a positive integer is left out
+   * rather than trusted. The inline limit, `max_inline_bytes`, is no listing limit: the client
+   * applies it itself when it chooses how a tree travels.
+   */
+  async methodTreeLimits() {
+    return listerLimitsOf2(announcedTreeLimits2(await this.cachedVersion()));
+  }
+  /**
+   * The version handshake, asked once per `HANDSHAKE_TTL_MS`: an answer is kept that long (see
+   * `versionCache`), and a failure is thrown and not kept, so the next call asks again. `signal`
+   * stops the ask, its abort thrown as is.
+   */
+  async cachedVersion(signal) {
+    const cached = this.versionCache;
+    if (cached !== void 0 && Date.now() - cached.askedAt < HANDSHAKE_TTL_MS2) return cached.info;
+    const askedAt = Date.now();
+    const info = await this.requestVersion(signal);
+    this.versionCache = { info, askedAt };
+    return info;
+  }
+  /** Drop the kept handshake, which a refusal has shown to be stale. */
+  forgetHandshake() {
+    this.versionCache = void 0;
+  }
+  /**
+   * Write a saved method's tree to disk: each file of a listing `getMethod` or `getMethodVersion`
+   * served, at its tree path under `options.destination`. **Node only.**
+   *
+   * Each file is downloaded through its link, at most eight at a time, with no credential of this
+   * client, and checked against the listing: its size and its SHA-256 must be the ones listed, so
+   * what lands on disk is the tree the method's digest names. The files are written into a fresh
+   * hidden directory beside the destination, which takes its name only once every file is
+   * written: an interrupted or failed write never leaves a partial tree under that name. The
+   * destination must not exist, or be an empty directory; one holding anything is refused rather
+   * than written into or replaced. An empty listing writes an empty directory.
+   *
+   * The links expire about fifteen minutes after the read that served them: write the tree soon
+   * after reading the method, and read it again for fresh links when a download is refused.
+   *
+   * Throws `RequestArgumentError` before any download when the destination exists and is not an
+   * empty directory, or the listing holds a path that is not a tree path, the same path twice, or
+   * paths that collide once case-folded or where one names a directory of another;
+   * `MethodFileTransferError` when a file could not be downloaded, or its bytes are not the file
+   * listed, and nothing is left under the destination.
+   */
+  async writeMethodTree(files, options) {
+    await writeMethodTreeTo(files, options.destination, { timeoutMs: this.requestTimeoutMs });
+  }
+  /**
+   * The method's tree a call was given, made ready to prepare: a `directory` listed, `contents`
+   * turned into a tree, a `tree` checked, `files` kept as given; `undefined` when the input gives
+   * none. Two forms are refused with `RequestArgumentError` before any request, naming `call`, and
+   * so are a `directory` that is not a string and a `tree` that is not a listed tree. A
+   * `directory` is listed by the `mthds` package's lister under the limits the deployment
+   * announces, so a tree past one is refused while it is listed, before any file is hashed; the
+   * handshake that announces them is asked under `signal`. It is listed once per call: a request
+   * sent again sends the tree this listing read.
+   */
+  async treeToSend(call, input, sending, signal) {
+    const given = treeFormsGiven(input);
+    if (given.length > 1) {
+      throw new RequestArgumentError(
+        `${call}() takes the method's tree in one form, directory, contents, tree or files; got ${given.join(" and ")}.`
+      );
+    }
+    if (given[0] === "directory") {
+      const directory = input.directory;
+      if (typeof directory !== "string") throw directoryRefusal(call);
+      throwIfAborted(signal);
+      const limits = listerLimitsOf2(announcedTreeLimits2(await this.cachedVersion(signal)));
+      throwIfAborted(signal);
+      return { tree: await listDirectoryTree(directory, limits, call) };
+    }
+    if (input.tree != null) return { tree: checkedTreeSource(call, input.tree) };
+    if (input.contents != null) {
+      return { tree: await contentsTreeSource(input.contents, call, sending) };
+    }
+    return input.files === void 0 ? void 0 : { files: input.files };
+  }
+  /**
+   * Post a request carrying a method's tree, by `mthds`'s `MthdsApiClient` rule: prepare the
+   * tree's `files` (`prepareFiles`), hand them to `post`, which builds the body and sends it, and
+   * answer the two refusals that call for sending the same request once more, as `mthds` does.
+   *
+   * - A `422` coded `request.blobs_missing` whose `missing_blobs` the tree sent by hash holds, such
+   *   as a blob dropped since the check: the blob route is asked again for those, they are
+   *   uploaded, and the request is sent once more (`postWithBlobRetry`).
+   * - A `422` refusing a tree the client prepared as past one of the receiver's limits
+   *   (`isMethodTreeTooLarge`): the handshake that announced the limits may be stale, so it is
+   *   forgotten, and the tree prepared again on a fresh one and sent once more. A `files` map
+   *   given as is was not prepared, so it is never sent again; nor is a request whose
+   *   `options.retryTooLarge` is `false`, a start under an idempotency key, which the platform
+   *   binds to the refusal it stores.
+   *
+   * A `422` created nothing, so the request sent again is no repeat of one whose outcome is
+   * unknown. `initial`, when given, is the tree already prepared for the first send, with the
+   * bytes it read, so a caller sending one tree on two routes prepares it once. `options.signal`
+   * is read before each step of the preparation and before each send. Answers the last answer
+   * whole, its status unread, with the `files` it carried.
+   */
+  async postMethodRequest(source, call, sending, options, post, initial) {
+    const read = initial?.read ?? /* @__PURE__ */ new Map();
+    let ready = initial?.prepared;
+    const send = async () => {
+      const prepared = ready ?? await this.prepareFiles(source, call, sending, options, read);
+      ready = void 0;
+      throwIfAborted(options.signal);
+      return this.postWithBlobRetry(prepared, read, post, sending, options);
+    };
+    const res = await send();
+    if (source === void 0 || !("tree" in source) || options.retryTooLarge === false || !isMethodTreeTooLarge2(res.status, res.body)) {
+      return res;
+    }
+    this.forgetHandshake();
+    return send();
+  }
+  /**
+   * Send a request whose tree may have travelled by hash. When it did and the receiver answers a
+   * `422` coded `request.blobs_missing` whose `missing_blobs` the tree holds, the client asks the
+   * blob route where to upload them, uploads them and sends the same request once more, which the
+   * refusal left uncreated; any other answer, or a list naming a blob the tree does not hold, is
+   * answered as it came.
+   */
+  async postWithBlobRetry(prepared, read, post, sending, options) {
+    const res = await post(prepared.files);
+    const tree = prepared.byHashTree;
+    if (tree === void 0) return res;
+    const missing = missingBlobsOf2(res.status, res.body);
+    if (missing === void 0 || missing.length === 0) return res;
+    const byBlob = fileByBlob2(tree);
+    const files = missing.map((sha256) => byBlob.get(sha256));
+    if (files.some((file) => file === void 0)) return res;
+    throwIfAborted(options.signal);
+    const asked = await this.findMissingBlobs(
+      { blobs: files.map((file) => ({ sha256: file.sha256, size: file.size })) },
+      options.readScope,
+      options.signal
+    );
+    await this.uploadMissing(tree, asked, read, sending, options.signal);
+    throwIfAborted(options.signal);
+    return post(prepared.files);
+  }
+  /**
+   * The `files` a request or a save sends for `source`: a `files` map as given, a tree prepared
+   * (`prepareTree`), or none.
+   */
+  async prepareFiles(source, call, sending, options, read) {
+    if (source === void 0) return { files: void 0, byHashTree: void 0 };
+    if ("files" in source) return { files: source.files, byHashTree: void 0 };
+    return this.prepareTree(source.tree, call, sending, options, read);
+  }
+  /**
+   * The `files` map that sends `tree`: inline, or by hash once the receiver holds every file —
+   * `mthds`'s `MthdsApiClient` rule, read from the version handshake the client keeps.
+   *
+   * When the handshake declares a blob store, a tree whose inline map weighs no more than the
+   * inline threshold travels inline, measured as the request spends it, its JSON with no
+   * whitespace in UTF-8; the threshold is the lower of 256 KiB (`INLINE_TREE_MAX_BYTES`) and the
+   * `max_inline_bytes` the handshake announces, and a tree whose files alone pass it is not read
+   * to be weighed. A heavier tree travels by hash: `POST /v1/blobs/missing` is asked which files
+   * the receiver lacks, naming the tree's digest, each one it lacks is uploaded once, and every
+   * file travels by hash. A `404` from the blob route says the handshake that declared the store
+   * is stale, so it is forgotten and the tree prepared once more on a fresh one. When the
+   * handshake declares no blob store, the whole tree travels inline whatever its weight, held to
+   * the announced `max_inline_bytes` (`inlineWithin`). Each file is read at most once into `read`,
+   * so a file read to be weighed is uploaded from memory. A tree holding no file is refused with
+   * `RequestArgumentError` before any request, `call` naming the caller's method.
+   * `options.readScope` is the scope the blob route is asked under, and `options.signal` is read
+   * before each read, the handshake, the blob route and each upload, and is passed to each of
+   * them, so an abort also stops a request or an upload under way.
+   */
+  async prepareTree(tree, call, sending, options, read, retried = false) {
+    const { signal, readScope } = options;
+    if (tree.files.length === 0) throw emptyTreeRefusal(call, "a tree", sending);
+    throwIfAborted(signal);
+    const version = await this.cachedVersion(signal);
+    throwIfAborted(signal);
+    const announced = announcedTreeLimits2(version);
+    if (!declaresBlobStore2(version)) {
+      const files = await inlineWithin(tree, call, sending, announced.maxInlineBytes, read, signal);
+      return { files, byHashTree: void 0 };
+    }
+    const threshold = inlineThreshold(announced);
+    if (treeTotalSize2(tree) <= threshold) {
+      const inline = inlineFilesOf2(tree, await readTreeBytesInto(tree, read, signal));
+      if (inlineMapBytes2(inline) <= threshold) return { files: inline, byHashTree: void 0 };
+    }
+    throwIfAborted(signal);
+    let asked;
+    try {
+      asked = await this.findMissingBlobs(
+        { blobs: uniqueBlobs2(tree), digest: tree.digest },
+        readScope,
+        signal
+      );
+    } catch (err) {
+      if (!retried && err instanceof ApiResponseError && err.status === 404) {
+        this.forgetHandshake();
+        return this.prepareTree(tree, call, sending, options, read, true);
+      }
+      throw err;
+    }
+    await this.uploadMissing(tree, asked, read, sending, signal);
+    return { files: hashMethodFiles2(tree), byHashTree: tree };
+  }
+  /**
+   * Which of these blobs the organization lacks, and where to upload each —
+   * `POST /v1/blobs/missing` — with the answer it was read from, which carries signed links. A
+   * blob held is left out, and an empty `missing` means nothing to upload. An answer whose
+   * `missing` is not a list of blobs, each with its upload target, is an answer the SDK cannot
+   * read, thrown as an `ApiResponseError` holding the answer with its links hidden.
+   *
+   * `readScope`, a crate request's `read_scope`, is sent as the route's `read_scope` query, the
+   * Pipelex API's extension naming the blob store asked, so the blobs are uploaded into the store
+   * the request's hash entries are read from; each upload target is signed for that scope. The
+   * hosted platform's own route reads the caller's organization instead. `signal` stops the
+   * request, its abort thrown as is.
+   */
+  async findMissingBlobs(request, readScope, signal) {
+    const endpoint = readScope === void 0 ? "blobs/missing" : `blobs/missing?${new URLSearchParams({ read_scope: readScope }).toString()}`;
+    const res = withLinks(await this.requestProductAnswer("POST", endpoint, request, { signal }));
+    const answer = this.readObjectAnswer("POST", endpoint, res);
+    const missing = answer.missing;
+    if (!Array.isArray(missing) || !missing.every(isMissingBlob)) {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a body whose `missing` is not a list of blobs, each with its upload target"
+      );
+    }
+    return { result: answer, res };
+  }
+  /**
+   * Upload each missing blob from the tree's bytes, a few at a time, stopping at the first
+   * failure. A blob the platform asks for that the tree does not hold, or holds at another size,
+   * is the platform's fault, thrown before anything is sent as the `ApiResponseError` of an answer
+   * the SDK cannot read. The bytes the tree reads for a blob are checked against it before they
+   * are sent, since storage keeps a blob under the hash it is named by: bytes of another hash or
+   * size are refused with `RequestArgumentError`, and nothing more is uploaded. `userSignal` is
+   * read before each blob's read and before its upload, and reaches each upload under way: once it
+   * has aborted, no further blob is read or sent, the uploads in flight are stopped, and the abort
+   * is thrown rather than a transfer failure.
+   */
+  async uploadMissing(tree, asked, read, sending, userSignal) {
+    const missing = asked.result.missing;
+    const byBlob = fileByBlob2(tree);
+    const strangers = missing.filter((blob) => byBlob.get(blob.sha256)?.size !== blob.size).map((blob) => blob.sha256);
+    if (strangers.length > 0) {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/blobs/missing`,
+        asked.res,
+        `a body asking for blobs this tree does not hold: ${[...new Set(strangers)].sort().join(", ")}`
+      );
+    }
+    let linked;
+    try {
+      await forEachConcurrently2(missing, MAX_CONCURRENT_TRANSFERS, async (blob, signal) => {
+        linked ??= eitherSignal(signal, userSignal);
+        await this.uploadOne(tree, blob, byBlob, read, sending, linked.signal, userSignal);
+      });
+    } catch (err) {
+      if (userSignal?.aborted === true) throw userSignal.reason;
+      throw err;
+    } finally {
+      linked?.dispose();
+    }
+  }
+  /** Read, check and upload one missing blob (see `uploadMissing`). */
+  async uploadOne(tree, blob, byBlob, read, sending, signal, userSignal) {
+    const file = byBlob.get(blob.sha256);
+    throwIfAborted(userSignal);
+    const bytes = read?.get(file.path) ?? await tree.readFile(file.path);
+    const bytesSha256 = await sha256Hex2(bytes);
+    if (bytes.length !== blob.size || bytesSha256 !== blob.sha256) {
+      throw new RequestArgumentError(
+        `The tree read ${bytes.length} bytes hashing to ${bytesSha256} for '${file.path}', which its listing names as ${blob.size} bytes hashing to ${blob.sha256}, so they were not uploaded and ${sending.unsent}.`
+      );
+    }
+    throwIfAborted(userSignal);
+    await uploadBlob(blob, bytes, {
+      timeoutMs: this.requestTimeoutMs,
+      signal,
+      unsent: sending.unsent
+    });
   }
   /**
    * Rename a method — `PATCH /v1/methods/{id}` — and return it. The name belongs to the method,
@@ -10540,17 +17526,10 @@ var PipelexApiClient = class {
       outcomes: ["published", "unchanged", "refused"],
       member: "method"
     });
-    const method = this.readStoredSources(
-      "POST",
-      endpoint,
-      res,
-      subject,
-      "a stored method"
-    );
-    return { ...answer, outcome, method };
+    return { ...answer, outcome, method: subject };
   }
   /**
-   * One page of a method's published versions, newest first, without their sources —
+   * One page of a method's published versions, newest first, without their files —
    * `GET /v1/methods/{id}/versions`.
    *
    * Pass the page's `nextCursor` back as `cursor` to continue; `null` is the last page. A page
@@ -10568,14 +17547,16 @@ var PipelexApiClient = class {
     return this.requestPage(`${endpoint}${search}`);
   }
   /**
-   * One published version of a method, with its sources —
-   * `GET /v1/methods/{id}/versions/{n}`. Its `python` is parsed into `MethodFile[]` as a
-   * method's is.
+   * One published version of a method, with its files — `GET /v1/methods/{id}/versions/{n}`.
+   * `files` lists the version's tree as `getMethod` lists the draft's, each file with a link to
+   * its bytes valid for about fifteen minutes, which `writeMethodTree` writes to disk.
    *
    * Takes a bare catalog id, as `getMethod` does, and the version number. Throws
    * `RequestArgumentError` for a `version` that is not a positive integer, before any request.
    * Throws `ApiResponseError`: `404` `method_version_not_found` for a version the method never
-   * published, `404` `not_found` for an unknown method, `409` `method_being_deleted`.
+   * published, `404` `not_found` for an unknown method, `409` `method_being_deleted`, and `409`
+   * `conflict`, whose verdict is `runtime`, for a version stored before methods were trees and
+   * never rewritten as one, which names no tree to serve.
    */
   async getMethodVersion(methodId, version) {
     if (!Number.isSafeInteger(version) || version < 1) {
@@ -10587,8 +17568,12 @@ var PipelexApiClient = class {
     }
     const endpoint = `${methodPath(methodId, "getMethodVersion")}/versions/${version}`;
     const res = await this.requestProductAnswer("GET", endpoint, void 0);
-    const wire = this.readObjectAnswer("GET", endpoint, res);
-    return this.readStoredSources("GET", endpoint, res, wire, "a published version");
+    return this.readSavedTree(
+      "GET",
+      endpoint,
+      withLinks(res),
+      "a published version"
+    );
   }
   /**
    * Erase a method and everything it produced — `DELETE /v1/methods/{id}`.
@@ -10954,7 +17939,7 @@ var PipelexApiClient = class {
     if (typeof uploaded.uri !== "string" || uploaded.uri === "") {
       throw this.unreadableAnswer(
         "POST",
-        `/${API_PREFIX}/upload`,
+        `/${API_PREFIX2}/upload`,
         res,
         "an answer with no string `uri`"
       );
@@ -11001,8 +17986,9 @@ var PipelexApiClient = class {
    * Name the method exactly one of three ways, all server-resolved through the
    * one `pipeIo` call this composes:
    *
-   * - `files` — the inline MTHDS closure, with the `resources` its steps read
-   *   (a `PipeDocGen` step's `template_file`), keyed by the path a step names;
+   * - the method's tree — a `directory`, `contents`, a listed `tree` or the `files`
+   *   map, sent as `pipeIo` sends it, with the files its steps read (a `PipeDocGen`
+   *   step's `template_file`) among its files;
    * - `method_ref` — a published method's address, fetched by the runner;
    * - `method_id` — a stored method's catalog id, resolved by the platform
    *   (hosted only; requires an API key).
@@ -11105,9 +18091,8 @@ var PipelexApiClient = class {
   /**
    * The whole record for one run — `GET /v1/runs/{id}`.
    *
-   * The ONLY call that returns `mthds_contents` (what the run actually
-   * executed) and `inputs`. Kept off the status read, which pollers hit every
-   * few seconds. A failed run's stored report, `error`, is checked field by
+   * The ONLY call that returns what the run actually executed and its
+   * `inputs`. Kept off the status read, which pollers hit every few seconds. A failed run's stored report, `error`, is checked field by
    * field (see `RunErrorReport`).
    *
    * Read with `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in the inputs is a
@@ -11127,6 +18112,28 @@ var PipelexApiClient = class {
     await this.requestProduct("PUT", `runs/${segment}`, input);
   }
   /**
+   * A run's arguments checked before anything is listed, read or sent, `call` naming the caller's
+   * method in each refusal: the generic `extra` passthrough, the Pipelex API's and the hosted
+   * API's own selectors, and the method's tree in its forms as the standard checks them; then the
+   * "something to run" precondition, the `method_ref` pairings and the linkage form's bare
+   * `method_id`.
+   */
+  runParts(call, options) {
+    const extensions = buildExtensions2(options.extra);
+    const api = buildApiRunExtensions(options);
+    const hosted = buildHostedRunExtensions(options);
+    const forms = protocolTreeForms(call, options);
+    const treeForms = treeFormsGiven(forms);
+    if (!options.pipe_code && treeForms.length === 0 && Object.keys(api).length === 0 && Object.keys(hosted).length === 0 && Object.keys(extensions).length === 0) {
+      throw new RequestArgumentError(
+        `Either pipe_code, the method's tree (directory, contents, tree or files), a method_ref, a hosted method_id or a server-specific extension arg (extra) must be provided to ${call}().`
+      );
+    }
+    assertMethodRefPairsWithNothing(options, treeForms);
+    assertLinkageMethodIdIsBare(options, treeForms);
+    return { forms, extensions, api, hosted };
+  }
+  /**
    * Blocking `POST /v1/execute` adapted onto `RunResults` — the bare-runner
    * path. Forwards every protocol field PLUS every extension surface: the
    * runner-resolved `method_ref`, the hosted `method_id`, and the generic
@@ -11137,28 +18144,32 @@ var PipelexApiClient = class {
    * so a runner that cannot resolve it says so (Rule 4) instead of the client
    * silently dropping it.
    */
-  async executeBlocking(options) {
-    const response = await this.execute({
-      pipe_code: options.pipe_code ?? void 0,
-      mthds_contents: options.mthds_contents ?? void 0,
-      inputs: options.inputs ?? void 0,
-      output_name: options.output_name ?? void 0,
-      output_multiplicity: options.output_multiplicity ?? void 0,
-      dynamic_output_concept_ref: options.dynamic_output_concept_ref ?? void 0,
-      // The bundle must survive the fallback too — a bare runner reached through
-      // this path runs the same method as the durable one, or it runs nothing.
-      files: options.files ?? void 0,
-      bundle_b64: options.bundle_b64 ?? void 0,
-      // And so must the files its steps read, or the same method fails to load here.
-      resources: options.resources ?? void 0,
-      method_ref: options.method_ref ?? void 0,
-      method_id: options.method_id ?? void 0,
-      extra: options.extra ?? void 0
-    });
+  async executeBlocking(options, signal, sending) {
+    const response = await this.executeRun(
+      {
+        pipe_code: options.pipe_code ?? void 0,
+        inputs: options.inputs ?? void 0,
+        output_name: options.output_name ?? void 0,
+        output_multiplicity: options.output_multiplicity ?? void 0,
+        dynamic_output_concept_ref: options.dynamic_output_concept_ref ?? void 0,
+        // The method's tree must survive the fallback too — a bare runner reached through this path
+        // runs the same method as the durable one, or it runs nothing. Its forms are checked here as
+        // the start checked them, and `sending` carries the tree the start prepared, sent as is.
+        directory: options.directory ?? void 0,
+        contents: options.contents ?? void 0,
+        tree: options.tree ?? void 0,
+        files: options.files ?? void 0,
+        method_ref: options.method_ref ?? void 0,
+        method_id: options.method_id ?? void 0,
+        extra: options.extra ?? void 0
+      },
+      signal,
+      sending
+    );
     return resultsFromExecute(response);
   }
 };
-function isValidBaseUrl(value) {
+function isValidBaseUrl2(value) {
   let parsed;
   try {
     parsed = new URL(value);
@@ -11191,24 +18202,23 @@ function describeRefusedBaseUrl(value) {
 }
 var PROTOCOL_REQUEST_KEYS = [
   "pipe_code",
-  "mthds_contents",
   "inputs",
   "output_name",
   "output_multiplicity",
   "dynamic_output_concept_ref",
-  "files",
-  "bundle_b64"
+  "files"
 ];
-var PIPELEX_API_REQUEST_KEYS = ["method_ref", "resources"];
+var PIPELEX_API_REQUEST_KEYS = ["method_ref"];
 var HOSTED_REQUEST_KEYS = ["method_id"];
+var CLIENT_ONLY_KEYS = ["directory", "contents", "tree", "bundleMain"];
 var RESERVED_EXTRA_KEYS = /* @__PURE__ */ new Set([
   ...PROTOCOL_REQUEST_KEYS,
   ...PIPELEX_API_REQUEST_KEYS,
   ...HOSTED_REQUEST_KEYS,
-  "bundleMain"
+  ...CLIENT_ONLY_KEYS
 ]);
 var POLLUTION_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
-function buildExtensions(extra) {
+function buildExtensions2(extra) {
   if (!extra) return {};
   const snapshot = { ...extra };
   const reserved = Object.keys(snapshot).filter((key) => RESERVED_EXTRA_KEYS.has(key));
@@ -11223,82 +18233,136 @@ function buildExtensions(extra) {
   }
   return result;
 }
-var METHOD_REF_FETCH_TIMEOUT_MS = 18e4;
-function crateRequestTimeoutMs(request) {
-  if (hasBundleResources(request.resources)) return DEFAULT_REQUEST_TIMEOUT_MS;
-  return nonEmptyString2(request.method_ref) !== void 0 ? METHOD_REF_FETCH_TIMEOUT_MS : void 0;
+var METHOD_REF_FETCH_TIMEOUT_MS2 = 18e4;
+function carriesLargeInlineTree(files) {
+  if (files === null || files === void 0 || !isPlainObject(files)) return false;
+  try {
+    return inlineMapBytes2(files) > INLINE_TREE_MAX_BYTES2;
+  } catch {
+    return false;
+  }
+}
+function runRequestBody2(call, options, files, parts) {
+  const dropNull = call === "start";
+  return {
+    pipe_code: dropNull ? options.pipe_code ?? void 0 : options.pipe_code,
+    inputs: dropNull ? options.inputs ?? void 0 : options.inputs,
+    output_name: dropNull ? options.output_name ?? void 0 : options.output_name,
+    output_multiplicity: dropNull ? options.output_multiplicity ?? void 0 : options.output_multiplicity,
+    dynamic_output_concept_ref: dropNull ? options.dynamic_output_concept_ref ?? void 0 : options.dynamic_output_concept_ref,
+    files: files ?? void 0,
+    ...parts.api,
+    ...parts.hosted,
+    ...parts.extensions
+  };
+}
+function executeCutOff(err, sentAt) {
+  if (err instanceof RunStillRunningError) return err;
+  const elapsedMs = performance.now() - sentAt;
+  return isGatewayCutOff(err, elapsedMs) ? new PipelineExecuteTimeoutError(elapsedMs, { cause: err }) : err;
+}
+function carriesExtraBundle(extensions) {
+  const contents = extensions["mthds_contents"];
+  const carriesContents = Array.isArray(contents) ? contents.length > 0 : Boolean(contents);
+  return carriesContents || Boolean(extensions["bundle_b64"]);
+}
+function directoryRefusal(call) {
+  return new RequestArgumentError(
+    `${call}() got a directory that is not a path: give the method's directory as a string.`
+  );
+}
+function checkedTreeSource(call, value) {
+  const fault2 = treeShapeFault(value);
+  if (fault2 !== void 0) {
+    throw new RequestArgumentError(
+      `${call}() got a tree that is not a listed method tree \u2014 its files, its digest and a readFile \u2014 such as the MethodTree listMethodTree returns; got ${fault2}.`
+    );
+  }
+  return value;
+}
+async function inlineWithin(tree, call, sending, maxInlineBytes, read, signal) {
+  if (maxInlineBytes !== void 0 && treeTotalSize2(tree) > maxInlineBytes) {
+    throw inlineLimitRefusal(
+      call,
+      sending,
+      "its files alone weigh",
+      treeTotalSize2(tree),
+      maxInlineBytes
+    );
+  }
+  const inline = inlineFilesOf2(tree, await readTreeBytesInto(tree, read, signal));
+  if (maxInlineBytes !== void 0) {
+    const weight = inlineMapBytes2(inline);
+    if (weight > maxInlineBytes) {
+      throw inlineLimitRefusal(call, sending, "its inline map weighs", weight, maxInlineBytes);
+    }
+  }
+  return inline;
+}
+function inlineLimitRefusal(call, sending, measured, weight, limit) {
+  return new RequestArgumentError(
+    `${call}() cannot send the method's tree: the API keeps no blob store, so the tree travels inline, and ${measured} ${weight} bytes, past the ${limit} bytes it takes inline (its max_inline_bytes), so ${sending.unsent}.`
+  );
 }
 function buildApiRunExtensions(options) {
-  const methodRef = nonEmptyString2(options.method_ref);
+  const methodRef = nonEmptyString3(options.method_ref);
   return methodRef === void 0 ? {} : { method_ref: methodRef };
 }
 function buildHostedRunExtensions(options) {
-  const methodId = nonEmptyString2(options.method_id);
+  const methodId = nonEmptyString3(options.method_id);
   return methodId === void 0 ? {} : { method_id: methodId };
 }
-function assertRunSourcesExclusive(options) {
+function protocolTreeForms(call, options) {
+  if (options.tree != null) checkedTreeSource(call, options.tree);
   try {
-    assertExclusiveRunSources(options);
+    assertOneMethodSource({ files: options.files ?? null, tree: options.tree ?? null });
   } catch (err) {
     if (err instanceof PipelineRequestError) {
       throw new RequestArgumentError(err.message, { cause: err });
     }
     throw err;
   }
+  const contents = options.contents ?? void 0;
+  if (contents !== void 0 && typeof contents === "object" && Object.keys(contents).length === 0) {
+    throw emptyTreeRefusal(call, "contents", REQUEST_SENDING);
+  }
+  return {
+    directory: typeof options.directory === "string" ? nonEmptyString3(options.directory) : options.directory ?? void 0,
+    contents,
+    tree: options.tree ?? void 0,
+    files: options.files ?? void 0
+  };
 }
-function assertMethodRefPairsWithNothing(options) {
-  if (nonEmptyString2(options.method_ref) === void 0) return;
-  if (options.mthds_contents != null && options.mthds_contents.length > 0) {
+function treeFormsGiven(input) {
+  const given = [];
+  if (input.directory != null && input.directory !== "") given.push("directory");
+  if (input.contents != null) given.push("contents");
+  if (input.tree != null) given.push("tree");
+  if (input.files !== void 0) given.push("files");
+  return given;
+}
+function assertMethodRefPairsWithNothing(options, treeForms) {
+  if (nonEmptyString3(options.method_ref) === void 0) return;
+  if (treeForms.length > 0) {
     throw new RequestArgumentError(
-      "method_ref and inline mthds_contents are mutually exclusive; send one or the other."
+      `method_ref and the method's tree (${treeForms.join(", ")}) are mutually exclusive: a published method's tree is its package's own. Send one or the other.`
     );
   }
-  if (options.files != null || options.bundle_b64 != null) {
-    throw new RequestArgumentError(
-      "method_ref and a method bundle (bundle_b64 / files) are mutually exclusive; send one or the other."
-    );
-  }
-  if (nonEmptyString2(options.method_id) !== void 0) {
+  if (nonEmptyString3(options.method_id) !== void 0) {
     throw new RequestArgumentError(
       "method_ref and method_id are mutually exclusive: an address run carries its own provenance and takes no run-history linkage id. Send exactly one method selector."
     );
   }
 }
-function assertLinkageMethodIdIsBare(options) {
-  const methodId = nonEmptyString2(options.method_id);
+function assertLinkageMethodIdIsBare(options, treeForms) {
+  const methodId = nonEmptyString3(options.method_id);
   if (methodId === void 0 || !methodId.includes("@")) return;
-  const hasInlineSource = options.mthds_contents != null && options.mthds_contents.length > 0 || hasBundlePayload(options);
-  if (!hasInlineSource) return;
+  if (treeForms.length === 0) return;
   throw new RequestArgumentError(
-    `method_id "${methodId}" beside an inline source is run-history linkage and must be a bare catalog id: the inline source is what runs, so a version suffix would claim a version that did not. Send the bare id (parseMethodSelector(...).method_id), or drop the inline source to run the version the selector names.`
+    `method_id "${methodId}" beside the method's tree is run-history linkage and must be a bare catalog id: the tree is what runs, so a version suffix would claim a version that did not. Send the bare id (parseMethodSelector(...).method_id), or drop the tree to run the version the selector names.`
   );
 }
-function assertResourcesAccompanyABundle(options) {
-  if (!hasBundleResources(options.resources)) return;
-  if (nonEmptyString2(options.method_ref) !== void 0) {
-    throw new RequestArgumentError(
-      "resources accompany inline mthds_contents or a method bundle; a method_ref's files are the package's own."
-    );
-  }
-  const hasInlineSource = options.mthds_contents != null && options.mthds_contents.length > 0 || hasBundlePayload(options);
-  if (!hasInlineSource && nonEmptyString2(options.method_id) === void 0) {
-    throw new RequestArgumentError(
-      "resources accompany the bundle whose steps read them: send them with mthds_contents or a method bundle."
-    );
-  }
-}
-async function wireCrateRequest(request) {
-  if (typeof request !== "object" || request === null || !("resources" in request)) {
-    return request;
-  }
-  const { resources, ...rest } = request;
-  const encoded = await encodeBundleResources(resources);
-  return encoded === void 0 ? rest : { ...rest, resources: encoded };
-}
-function nonEmptyFiles(files) {
-  return files != null && Object.keys(files).length > 0 ? files : void 0;
-}
-function nonEmptyString2(value) {
+function nonEmptyString3(value) {
   return value != null && value.length > 0 ? value : void 0;
 }
 var IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
@@ -11322,9 +18386,9 @@ function idempotencyKeyFault(key) {
   if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) return `is ${key.length} characters long`;
   return void 0;
 }
-function withValidateMarkdownRender(render) {
+function withValidateMarkdownRender2(render) {
   const formats = new Set(render ?? []);
-  formats.add(VALIDATE_MARKDOWN_RENDER_FORMAT);
+  formats.add(VALIDATE_MARKDOWN_RENDER_FORMAT2);
   return [...formats];
 }
 var GATEWAY_TIMEOUT_THRESHOLD_MS = 28e3;
@@ -11337,6 +18401,40 @@ function isGatewayCutOff(error, elapsedMs) {
 var UNDECODABLE_BODY_CODE = /^(Z_|ERR__ERROR_|ZSTD_error_)/;
 function isUndecodableBody(error) {
   return error.code !== void 0 && UNDECODABLE_BODY_CODE.test(error.code);
+}
+var SHA256_HEX3 = /^[0-9a-f]{64}$/;
+function withLinks(res) {
+  return { ...res, carriesLinks: true };
+}
+function isMissingBlob(entry) {
+  if (!isPlainObject(entry)) return false;
+  const { sha256, size, upload } = entry;
+  if (typeof sha256 !== "string" || !SHA256_HEX3.test(sha256)) return false;
+  if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0) return false;
+  if (!isPlainObject(upload)) return false;
+  if (typeof upload.method !== "string" || typeof upload.url !== "string") return false;
+  const headers = upload.headers;
+  return isPlainObject(headers) && Object.values(headers).every((value) => typeof value === "string");
+}
+function savedFilesFault(files) {
+  if (!Array.isArray(files)) return "is not an array";
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+    if (!isPlainObject(file)) return `holds an entry that is not an object, at [${index}]`;
+    for (const member of ["path", "sha256", "url", "expires_at"]) {
+      if (typeof file[member] !== "string") {
+        return `holds an entry whose \`${member}\` is not a string, at [${index}]`;
+      }
+    }
+    if (!SHA256_HEX3.test(file.sha256)) {
+      return `holds an entry whose \`sha256\` is not 64 lowercase hex digits, at [${index}]`;
+    }
+    const size = file.size;
+    if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0) {
+      return `holds an entry whose \`size\` is not a non-negative integer, at [${index}]`;
+    }
+  }
+  return null;
 }
 function extractNetworkErrorCode(err) {
   if (err instanceof DOMException && err.name === "TimeoutError") {
@@ -11467,8 +18565,41 @@ function createHookClient() {
   return new PipelexApiClient({ appInfo: HOOK_APP_INFO });
 }
 
-// src/hooks/claude-mthds-check.ts
+// src/hooks/validate-stage.ts
 var VALIDATE_TIMEOUT_MS = 1e4;
+async function runValidateStage(filePath, options = {}) {
+  if (options.client === void 0 && !process.env.PIPELEX_API_KEY) {
+    return { status: "unavailable" };
+  }
+  const deadline = AbortSignal.timeout(options.timeoutMs ?? VALIDATE_TIMEOUT_MS);
+  const gathered = await gatherMethodTree(filePath);
+  if (!gathered.ok) {
+    return { status: "unavailable" };
+  }
+  try {
+    const client = options.client ?? createHookClient();
+    const result = await client.validate({ tree: gathered.tree }, true, { signal: deadline });
+    if (result.is_valid === true) {
+      return {
+        status: "valid",
+        pendingSignatures: Array.isArray(result.pending_signatures) ? result.pending_signatures : []
+      };
+    }
+    if (result.is_valid === false) {
+      return {
+        status: "invalid",
+        message: result.message,
+        validationErrors: Array.isArray(result.validation_errors) ? result.validation_errors : [],
+        renderedMarkdown: result.rendered_markdown
+      };
+    }
+    return { status: "unavailable" };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+// src/hooks/claude-mthds-check.ts
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -11489,7 +18620,7 @@ function parsePlatform(argv) {
 }
 function readFileOrNull(filePath) {
   try {
-    return readFileSync2(filePath, "utf-8");
+    return readFileSync(filePath, "utf-8");
   } catch {
     return null;
   }
@@ -11527,40 +18658,6 @@ async function loadEngine() {
     console.warn = originalWarn;
   }
   return engine;
-}
-async function runValidateStage(filePath) {
-  if (!process.env.PIPELEX_API_KEY) {
-    return { status: "unavailable" };
-  }
-  const gathered = gatherBundle(filePath);
-  if (!gathered.ok) {
-    return { status: "unavailable" };
-  }
-  try {
-    const client = createHookClient();
-    const result = await client.validateFiles(gathered.files, {
-      allowSignatures: true,
-      resources: gathered.resources,
-      timeoutMs: VALIDATE_TIMEOUT_MS
-    });
-    if (result.is_valid === true) {
-      return {
-        status: "valid",
-        pendingSignatures: Array.isArray(result.pending_signatures) ? result.pending_signatures : []
-      };
-    }
-    if (result.is_valid === false) {
-      return {
-        status: "invalid",
-        message: result.message,
-        validationErrors: Array.isArray(result.validation_errors) ? result.validation_errors : [],
-        renderedMarkdown: result.rendered_markdown
-      };
-    }
-    return { status: "unavailable" };
-  } catch {
-    return { status: "unavailable" };
-  }
 }
 function emit(outcome, platform) {
   const encoded = encodeOutcome(outcome, platform);
