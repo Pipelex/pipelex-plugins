@@ -20,7 +20,7 @@ not importable or failing while it loads). Precedence across directories: 2 > 1 
 
 It is the twin of `codegen-check.mjs`, which does the same for a TypeScript project over `@pipelex/sdk`,
 and the two fail closed on the same malformed sidecars. It imports only the standard library and
-`pipelex-sdk` (0.10.2 or later), and writes through `sys.stdout` / `sys.stderr` so a no-print lint rule
+`pipelex-sdk` (0.48.0 or later), and writes through `sys.stdout` / `sys.stderr` so a no-print lint rule
 stays quiet. When `pipelex-sdk` ships this check as a command, replace this file with that one line.
 """
 
@@ -46,7 +46,7 @@ except ImportError as import_error:
     # A gate that cannot run has no verdict to give. Letting the import fail would exit 1, which reads as
     # drift, and the likeliest cause is an interpreter outside the project's environment, not the tree.
     sys.stderr.write(
-        f"codegen-check: no verdict — pipelex-sdk 0.10.2 or later is not importable ({import_error}). "
+        f"codegen-check: no verdict — pipelex-sdk 0.48.0 or later is not importable ({import_error}). "
         "Run this script with the project's own environment, e.g. `uv run python scripts/codegen_check.py …`.\n"
     )
     sys.exit(2)  # EXIT_NO_VERDICT, which a linter will not let this file define above its imports
@@ -290,7 +290,7 @@ def _check_templates(*, recorded: Recorded, bundle: Bundle, project_root: Path) 
 
 
 def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
-    """List the .mthds files the call site loads, the way it lists them: `rglob("*.mthds")` under the bundle directory."""
+    """List the .mthds files under the bundle directory the call site sends as its tree, by `rglob("*.mthds")`."""
     root = project_root / bundle_dir
     # Asked first because `rglob` answers a missing directory and a file alike with an empty list, while the
     # TypeScript twin's `readdir` raises for both; asking here makes the two gates say the same thing.

@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **`pipelex-integrate` sends the method's tree (Breaking)**: the call site the skill writes runs the method with its whole bundle directory as the method's tree, `directory: BUNDLE_DIR` on `@pipelex/sdk` 0.48.0 and `tree=BUNDLE_DIR` on `pipelex-sdk` 0.48.0, the floors step 8 now installs, so the template files a bundle's `PipeDocGen` steps name travel with every run in either language, and its docstring names `prepareInputs` with the same tree. A refresh raises an older pin and rewrites a module that still sends `mthds_contents` or `resources`; a `python-structures` project whose `pipelex` still pins a `pipelex-sdk` from before the tree keeps the older module, and over a bundle naming template files the skill stops there as before.
 - **The validation hook sends the method's tree**: the `check.mjs` bundle every target runs on a `.mthds` edit is rebuilt on `@pipelex/sdk` 0.48.0, with `@pipelex/tools-wasm` still at 0.6.0, so a validation sends the edited file's method as the tree a run would send, rooted at the nearest `METHODS.toml`, every file of it rather than only its `.mthds` files and the templates its steps name, while hidden files such as `.env`, what a `.gitignore` keeps out and a run's inputs file stay on your machine. A tree holding a symbolic link, or past the hook's size caps, still passes the validation silently.
 
 ## [0.16.0] - 2026-10-20

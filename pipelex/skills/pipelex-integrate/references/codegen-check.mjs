@@ -46,7 +46,7 @@ const SDK_EXPORTS = ["CodegenLockError", "isStampableArtifactPath", "runCodegenC
 // A `template_file` key at the start of a line of a .mthds file: how a bundle file names a template, read only for
 // a sidecar written before the skill recorded `templates`, where it says the call site may not send that file.
 const TEMPLATE_FILE_KEY = /^\s*["']?template_file["']?\s*=/m;
-const SDK_MINIMUM = "0.18.0";
+const SDK_MINIMUM = "0.48.0";
 
 // `ignoreBOM: true` keeps a leading BOM in the decoded string. The default strips it, so an
 // artifact given a BOM would hash as its un-BOM'd self, match the lock, and report current while
@@ -288,9 +288,9 @@ async function checkTemplates(sidecar, loaded) {
 }
 
 /**
- * The .mthds files the call site loads, listed the way it lists them: `readdir` with `recursive`, every
- * name ending in `.mthds`. Returns { paths, lines }: `paths` maps each file's resolved path to the path
- * shown for it, and is null when the directory cannot be listed, which `lines` then explains.
+ * The .mthds files under the bundle directory the call site sends as its tree, listed by `readdir` with
+ * `recursive`, every name ending in `.mthds`. Returns { paths, lines }: `paths` maps each file's resolved
+ * path to the path shown for it, and is null when the directory cannot be listed, which `lines` then explains.
  */
 async function listBundle(bundleDir) {
   const root = path.resolve(process.cwd(), bundleDir);

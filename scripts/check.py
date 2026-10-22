@@ -94,14 +94,14 @@ VERSION_FLOOR_STATIC_REFS: list[tuple[str, str, str]] = [
         "pipelex_sdk_js",
     ),
     (
-        "skills/pipelex-integrate/references/typescript.md",
-        r"the SDK's own Node floor \(>= (\d+\.\d+)\)",
-        "node",
-    ),
-    (
         "skills/pipelex-integrate/references/codegen-check.mjs",
         r'const SDK_MINIMUM = "(\d+\.\d+\.\d+)";',
         "pipelex_sdk_js",
+    ),
+    (
+        "skills/pipelex-integrate/references/python.md",
+        r"checked against `pipelex-sdk` (\d+\.\d+\.\d+), the floor step 8 installs for `python-pydantic`",
+        "pipelex_sdk_py",
     ),
     (
         "skills/pipelex-integrate/references/python.md",

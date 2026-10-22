@@ -1,6 +1,6 @@
 # Integrating into a TypeScript project
 
-Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.18.0, the floor the skill's step 8 installs, and move only when that package does.
+Companion to `/pipelex-integrate` for a project that has a `package.json`. Everything here follows the shape the Pipelex JS starter converged on; the SDK facts were checked against `@pipelex/sdk` 0.48.0, the floor the skill's step 8 installs, and move only when that package does.
 
 ## Detecting the project
 
@@ -38,7 +38,6 @@ One module per method. `summarize-pdf` with a `document: native.Document` input,
 
 ```ts
 // src/pipelex/summarizePdf.ts
-import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunResults } from "@pipelex/sdk";
 import { parseDocumentSummary } from "../generated/summarize-pdf/binder";
@@ -46,21 +45,17 @@ import type { DocumentSummary } from "../generated/summarize-pdf/types";
 import { getPipelexClient } from "./client";
 
 const PIPE_CODE = "summarize.summarize_pdf";
+/** The method's tree, sent whole with every run. A bundle is one closure: a main file that
+ *  imports a sibling needs that sibling sent with it, or the run fails to load what the
+ *  generated types were projected from. The SDK lists this directory under the MTHDS
+ *  standard's membership rule, so every `.mthds` file travels, and every file a step reads,
+ *  such as a `PipeDocGen` step's template, while hidden files, what a `.gitignore` keeps out
+ *  and a run's `inputs.json` stay home. */
 const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");
-
-/** Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`. A bundle is one
- *  closure: a main file that imports a sibling needs that sibling submitted with it, or the
- *  run fails to load what the generated types were projected from. `recursive` needs Node
- *  >= 20.1, which the SDK's own Node floor (>= 22.12) already guarantees, and the
- *  drift gate lists the bundle with this same call, so keep it rather than a walk of your own. */
-async function readBundle(): Promise<string[]> {
-  const names = (await readdir(BUNDLE_DIR, { recursive: true })).filter((name) => name.endsWith(".mthds")).sort();
-  return Promise.all(names.map((name) => readFile(path.join(BUNDLE_DIR, name), "utf8")));
-}
 
 export type SummarizePdfInputs = {
   /** An http(s) URL or a pipelex-storage:// reference. For a local file or bytes,
-   *  run `getPipelexClient().prepareInputs({ files: (await readBundle()).map((c) => ({ content: c })), inputs })` first —
+   *  run `getPipelexClient().prepareInputs({ directory: BUNDLE_DIR, inputs })` first —
    *  it uploads and rewrites the value. Note: prepareInputs treats any string it does not
    *  recognise as data:, http(s):// or pipelex-storage:// as a LOCAL FILE PATH it reads and
    *  uploads, so a public endpoint must gate schemes before handing values to it. */
@@ -76,7 +71,7 @@ export type SummarizePdfRun = { output: DocumentSummary; results: RunResults };
 export async function summarizePdf(inputs: SummarizePdfInputs): Promise<SummarizePdfRun> {
   const results: RunResults = await getPipelexClient().startAndWaitForResult({
     pipe_code: PIPE_CODE,
-    mthds_contents: await readBundle(),
+    directory: BUNDLE_DIR,
     inputs,
   });
   return { output: parseDocumentSummary(results.main_stuff), results };
@@ -104,34 +99,11 @@ return { output, results };
 
 Codegen emits a parser per concept and no wrapper type for the envelope, so nothing in the generated tree names it. `main_stuff` is `unknown`, so the type checker does not catch a wrong narrowing either. For `fixed`, the declared `item_count` is not checked unless you check it, and the report says so.
 
-**A bundle whose `PipeDocGen` steps name template files sends them with every run.** A bundle sent as content has no directory, so the runner loads it only with those files, sent as `resources`: each keyed by the step's `template_file` exactly as written, and read from beside the `.mthds` file holding that step. Without them every run is refused, the step's template file not supplied. `resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it. **Write the map from the sidecar's `templates`, entry for entry**: the key is the step's `template_file` and the path is the recorded `path` with the `bundle_dir` prefix taken off, the two differing only when the step's file sits in a subdirectory of the bundle. `@pipelex/sdk` exports nothing that reads the steps, so the map is written down rather than derived at call time:
-
-```ts
-/** Written from sources.json's `templates`, and rewritten by /pipelex-integrate's refresh: each `PipeDocGen` step's
- *  `template_file`, and where its file is under BUNDLE_DIR. */
-const TEMPLATE_FILES: Record<string, string> = { "templates/invoice.xlsx": "templates/invoice.xlsx" };
-
-async function readTemplates(): Promise<Record<string, Uint8Array>> {
-  const entries = await Promise.all(
-    Object.entries(TEMPLATE_FILES).map(async ([key, file]) => [key, await readFile(path.join(BUNDLE_DIR, file))] as const),
-  );
-  return Object.fromEntries(entries);
-}
-
-// In the exported function, beside `mthds_contents`:
-const results: RunResults = await getPipelexClient().startAndWaitForResult({
-  pipe_code: PIPE_CODE,
-  mthds_contents: await readBundle(),
-  resources: await readTemplates(),
-  inputs,
-});
-```
-
-The same `resources` go to a `prepareInputs` call over the bundle's `files`, the one the module's docstring names. The generated types read the `.mthds` files alone, since a template file changes what a run prints and never the types, but the map cannot be left to drift: a renamed `template_file` changes a `.mthds` file the sidecar hashes and a moved or edited template changes one it records in `templates`, so the drift gate fails on either, and refresh rewrites the map from the steps before it rewrites the sidecar. A call site written before the skill sent template files has no map and sends no `resources`, and refresh gives it both.
+**`directory` sends the method's tree, which is everything the run needs from disk.** The SDK lists `BUNDLE_DIR`, rooted at the nearest `METHODS.toml` at or above it, else at the directory itself, sends the tree inline when it is small and by hash otherwise, uploading only the files the API lacks, and refuses a missing or empty directory before any run starts. A bundle whose `PipeDocGen` steps name template files therefore needs nothing more: each template travels at its own place in the tree, so the runner finds it where a load from disk would, and no map of template files is written into the module. The same tree goes to the `prepareInputs` call the module's docstring names. A call site written by an earlier version of this skill, against an `@pipelex/sdk` below step 8's floor, sends the bundle as `mthds_contents` from a `readBundle` helper, and its template files, if any, as `resources` from a `TEMPLATE_FILES` map. Neither field exists on the floor, so that module stops type-checking once the pin is raised, and refresh rewrites it to the template above, `readBundle`, `TEMPLATE_FILES` and `readTemplates` removed.
 
 Follow the project's conventions where you can see them — module style, quoting, error handling — and the SDK's defaults where you cannot.
 
-Variants by selector, replacing the `mthds_contents` line and dropping `BUNDLE_DIR` and `readBundle`:
+Variants by selector, replacing the `directory` line and dropping `BUNDLE_DIR`, the docstring's `prepareInputs` call taking the same selector in its place (`prepareInputs({ method_ref: "…", inputs })`, `prepareInputs({ method_id: "…", inputs })`):
 
 - **`method_ref`**, a published address: `{ method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]", pipe_code: PIPE_CODE, inputs }` — omit `pipe_code` to run the package's declared pipe. The tag is optional and is the pin; without one the address resolves to the default branch at its head on every run, so the call site can run a method the committed types were never generated from; when the address carries no tag, the module's header says it floats.
 - **`method_id`**: `{ method_id: "mt_…@<n>", inputs }` — the platform resolves the id: `mt_…@<n>` runs published version n for good, a bare `mt_…` the latest published version and `mt_…@draft` the draft. The module's header names the id it runs and, for a bare or `@draft` id, says that a publish or a save changes what runs under the committed types.
@@ -184,11 +156,11 @@ Copy `references/codegen-check.mjs` to `scripts/codegen-check.mjs` with step 10'
 }
 ```
 
-Add every method's directory to the `codegen:check` line as it is integrated, and on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. A refresh also re-copies the script, with the same `cp`, when the project's copy differs from this reference, and installs it when the project has none, so a project integrated by an older version of the skill gets the current gate. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with the same recursive `readdir` the call site's `readBundle` uses — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. It runs from the project root because `sources.json` records its source paths and `bundle_dir` relative to it, and `bundle_dir` is the call site's `BUNDLE_DIR` expressed that way. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.18.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
+Add every method's directory to the `codegen:check` line as it is integrated, and on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. A refresh also re-copies the script, with the same `cp`, when the project's copy differs from this reference, and installs it when the project has none, so a project integrated by an older version of the skill gets the current gate. Exit codes: `0` current, `1` drift or stale source, `2` no verdict (no lock, an unreadable file, a symlink in the tree, a check that throws, `@pipelex/sdk` not importable). It compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with a recursive `readdir`, the set step 7 records — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. It runs from the project root because `sources.json` records its source paths and `bundle_dir` relative to it, and `bundle_dir` is the call site's `BUNDLE_DIR` expressed that way. It resolves `@pipelex/sdk` from its own location, so it stays inside the project and runs where the dependencies are installed — in CI, after the install step. An SDK that is missing, fails to load, or predates the offline check is no verdict with the fix on stderr, never an uncaught error, which would exit `1` and read as drift; a too-old one is raised to 0.48.0 or later, the floor step 8 installs. When `@pipelex/sdk` ships this as a command of its own, the script is replaced by that one line.
 
 ## The Node-only boundary
 
-`readFile`, `node:path` and `process.cwd()` in the call site are server-side facts. In a framework with a client/server split (Next.js, Remix, SvelteKit), the module belongs on the server side — a Server Action, a route handler, a loader — and the JS starter marks such modules with `import "server-only"`. Never import it from a component that renders in the browser: the API key would leave the server.
+`directory`, which the SDK lists from disk in Node alone, `node:path` and `process.cwd()` in the call site are server-side facts. In a framework with a client/server split (Next.js, Remix, SvelteKit), the module belongs on the server side — a Server Action, a route handler, a loader — and the JS starter marks such modules with `import "server-only"`. Never import it from a component that renders in the browser: the API key would leave the server.
 
 The key is not the only thing that must not cross. **`RunResults` is a server-side value: pick the fields the client needs rather than returning it whole.** A Server Action's return value is serialized to the browser, so `return { output, results }` from one ships `results.working_memory` — every named stuff of the run, which is the inputs it was given and every intermediate — along with `graph_spec` and the run's usage records, to anyone with the page open. Return the narrowed `output`, and beside it only what the UI actually renders: `results.pipeline_run_id` for a durable handle, `summarizeUsage(results)` folded on the server if the cost is shown, a resolved link for a produced file. Where the graph really is the feature, `graph_spec` crosses on its own and the rest does not.
 

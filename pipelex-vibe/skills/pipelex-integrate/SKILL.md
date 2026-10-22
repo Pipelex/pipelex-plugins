@@ -84,7 +84,7 @@ Write this unstamped `sources.json` beside the lock:
 
 ```json
 {
-  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `bundle_dir` is what the call site loads, and `sources` and `templates` hash its .mthds and template files, so a bundle changed without a regeneration is detectable.",
+  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `bundle_dir` is what the call site sends, and `sources` and `templates` hash its .mthds and template files, so a bundle changed without a regeneration is detectable.",
   "generator": "pipelex-integrate",
   "method": { "files": ["methods/summarize-pdf/main.mthds"] },
   "target": "ts-zod",
@@ -95,15 +95,15 @@ Write this unstamped `sources.json` beside the lock:
 }
 ```
 
-`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes every `.mthds` file beneath it with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none; the call site's map is written from it. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
+`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes every `.mthds` file beneath it with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
 
 ### 8. Dependencies
 
-With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
+With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.48.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.48.0 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
 
 ### 9. The call site
 
-One module per method from the language reference's template, in the project's service layer, loading **every `.mthds` file under `bundle_dir`** at call time, with the template files its steps name, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
+One module per method from the language reference's template, in the project's service layer, sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
 
 ### 10. The offline gate
 
@@ -132,7 +132,7 @@ What was generated and where, the target and why, the call site's signature, the
 | `input_domain` at `output_dir`, outside the server's directory | step 1's containment: STOP, relaunch, say what is already written |
 | `is_current: false`, not step 6's orphans case | report `drifts[]` verbatim and stop; commit nothing |
 | no signature, by address or id | STOP as the fallback reference says; never guess the output concept |
-| a Python target over a bundle naming template files | STOP, nothing generated, as [python.md](references/python.md) says |
+| `python-structures` below step 8's `pipelex-sdk` floor, over a bundle naming template files | STOP, nothing generated, as [python.md](references/python.md) says |
 | `TS2835` | the TypeScript reference: yours in your module, the emitter's in `binder.ts` |
 | a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md) |
 | `stale-source`: a file added, or no `bundle_dir` | [refresh mode](references/refresh.md); never add its hash to `sources` by hand |

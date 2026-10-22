@@ -52,7 +52,7 @@ class TestPipelexIntegrateSkill:
         # The run route takes the qualified ref, the same value the verdict and the sidecar carry.
         "**The run's `pipe_code` is its `pipe_ref` verbatim (`summarize.summarize_pdf`)**",
         # A bundle is one closure: the call site submits every file, not just main.mthds.
-        "loading **every `.mthds` file under `bundle_dir`** at call time",
+        "sending **the whole `bundle_dir` as the method's tree** at call time",
         # The containment reading is lexically wrong in both directions without resolving.
         "both resolved (`pwd -P`, `realpath`)",
         # A lock with no sidecar is also what this method's own interrupted run leaves.
@@ -526,15 +526,21 @@ class TestPipelexIntegrateSkill:
         """Generation takes every `.mthds` file of the bundle, so the run must too.
 
         A call site that submits `main.mthds` alone type-checks, passes the offline gate, and then
-        fails at load time on exactly the multi-file methods codegen handled correctly.
+        fails at load time on exactly the multi-file methods codegen handled correctly. Since the SDKs
+        take the method's tree, the call site sends the whole bundle directory and the SDK lists it, so
+        the module reads no file itself; only a `python-structures` project whose `pipelex` brings an SDK
+        from before the tree still reads every `.mthds` file of the bundle by hand.
         """
         typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
-        assert "mthds_contents: await readBundle()," in typescript
+        call_site = self.typescript_call_site(typescript)
+        assert "    directory: BUNDLE_DIR,\n" in call_site
+        assert "prepareInputs({ directory: BUNDLE_DIR, inputs })" in call_site
+        for retired in ("mthds_contents", "readBundle", "readdir", "readFile", "resources", "TEMPLATE_FILES"):
+            assert retired not in call_site, f"the TypeScript call site still carries the retired {retired!r}"
         # An interface has no implicit index signature, so it is not assignable to Record<string, unknown>.
         assert "export type SummarizePdfInputs = {" in typescript
         assert "export interface SummarizePdfInputs" not in typescript
         assert "**`SummarizePdfInputs` is a `type`, not an `interface`, and that is load-bearing.**" in typescript
-        assert 'name.endsWith(".mthds")' in typescript
         assert "mthds_contents: [bundle]" not in typescript
         # Its own relative imports need extensions on the resolution that meets the emitter defect.
         assert (
@@ -543,9 +549,29 @@ class TestPipelexIntegrateSkill:
         ) in typescript
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
-        assert "mthds_contents=_read_bundle()," in python
-        assert 'sorted(BUNDLE_DIR.rglob("*.mthds"))' in python
+        call_site = self.python_call_site(python)
+        assert "            tree=BUNDLE_DIR,\n" in call_site
+        assert "client.prepare_inputs(tree=BUNDLE_DIR, inputs=...)" in call_site
+        for retired in ("mthds_contents", "_read_bundle", "rglob", "MthdsFileItem"):
+            assert retired not in call_site, f"the Python call site still carries the retired {retired!r}"
         assert "BUNDLE_PATH" not in python
+        # The branch for an SDK from before the tree still sends the whole bundle, read by hand.
+        branch = python[python.index("**A `python-structures` project on a `pipelex-sdk` below step 8's `python-pydantic` floor**") :]
+        assert "# In the async function: `mthds_contents=_read_bundle(),` in place of `tree=BUNDLE_DIR,`." in branch
+        assert 'sorted(BUNDLE_DIR.rglob("*.mthds"))' in branch
+        assert "from pipelex_sdk.crate_models import MthdsFileItem" in branch
+
+    @staticmethod
+    def typescript_call_site(typescript: str) -> str:
+        """The TypeScript reference's call-site module, the fenced block that opens on its path."""
+        start = typescript.index("```ts\n// src/pipelex/summarizePdf.ts\n")
+        return typescript[start : typescript.index("```\n", start + len("```ts\n"))]
+
+    @staticmethod
+    def python_call_site(python: str) -> str:
+        """The Python reference's call-site module, from its fence to the fence that closes it."""
+        start = python.index("```python\n", python.index("## The call site"))
+        return python[start : python.index("```\n", start + len("```python\n"))]
 
     def test_a_script_merely_named_codegen_is_not_a_harness(self) -> None:
         """A `codegen` script is the first signal of a harness, and the name alone is not evidence of a
@@ -765,12 +791,17 @@ class TestPipelexIntegrateSkill:
         assert no_crash.returncode == 1, self.explain(no_crash)
 
     def test_the_python_call_site_refuses_an_empty_bundle(self) -> None:
-        """`Path.rglob` on a missing or empty directory returns nothing and raises nothing, so a
-        wrong `BUNDLE_DIR` would submit `mthds_contents=[]` and fail server-side against the pipe
-        instead of locally against the path. The TypeScript twin gets this free from `readdir`'s
-        ENOENT; the Python one has to ask.
+        """A wrong `BUNDLE_DIR` must fail locally against the path, never server-side against the pipe. The SDK's
+        `tree=` refuses a missing directory and an empty one before any run starts, and the reference says so. The
+        branch for an SDK from before the tree reads the bundle with `Path.rglob`, which returns nothing and raises
+        nothing on a missing or empty directory, so it has to ask.
         """
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
+        assert (
+            "a missing directory raises `TreeSourceError` and an empty one `EmptyMethodTreeError`, "
+            "both from `mthds.method_tree.exceptions`, before any run starts"
+        ) in python
+        assert "A missing or empty\n# directory is refused before any run starts, naming the path." in python
         assert "if not contents:" in python
         assert 'raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")' in python
 
@@ -1062,14 +1093,14 @@ class TestPipelexIntegrateSkill:
         ],
     )
     def test_both_gates_catch_a_file_added_to_the_bundle(self, change: str, expected_lines: tuple[str, ...], tmp_path: Path) -> None:
-        """The call site loads every `.mthds` file under its bundle directory, so a file added there changes what
-        runs while every recorded hash still matches, and both gates once stayed green over it: they hashed the
-        files `sources.json` recorded and nothing else. They now list the sidecar's `bundle_dir` the way their
-        language's call site lists it, and both report each change with the same lines, on one project."""
+        """The call site sends the whole bundle directory, so a `.mthds` file added there changes what runs while
+        every recorded hash still matches, and both gates once stayed green over it: they hashed the files
+        `sources.json` recorded and nothing else. They now list every `.mthds` file under the sidecar's
+        `bundle_dir`, and both report each change with the same lines, on one project."""
         python_script = (self.REFERENCES_DIR / "codegen_check.py").read_text(encoding="utf-8")
         typescript_script = (self.REFERENCES_DIR / "codegen-check.mjs").read_text(encoding="utf-8")
-        assert 'root.rglob("*.mthds")' in python_script, "the Python gate no longer lists the bundle as the Python call site does"
-        assert "readdir(root, { recursive: true })" in typescript_script, "the TypeScript gate no longer lists the bundle as its call site does"
+        assert 'root.rglob("*.mthds")' in python_script, "the Python gate no longer lists every .mthds file of the bundle"
+        assert "readdir(root, { recursive: true })" in typescript_script, "the TypeScript gate no longer lists every .mthds file of the bundle"
         assert '.filter((entry) => entry.endsWith(".mthds"))' in typescript_script
 
         tree = self.write_python_project(tmp_path)
@@ -1125,33 +1156,39 @@ class TestPipelexIntegrateSkill:
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
     def test_a_bundles_template_files_are_passed_sent_and_recorded(self, target_name: str) -> None:
         """A bundle sent as content loads only with the template files its `PipeDocGen` steps name, so the skill
-        passes them to the workshop and the TypeScript call site sends them as `resources`. `@pipelex/sdk` exports
-        nothing that reads the steps, so the call site's map is written from the sidecar's `templates`, which the
-        drift gate hashes and refresh rewrites: a map written once went stale on the first renamed `template_file`
-        and failed every run behind a green gate. `pipelex-sdk` sends no template file yet, so a Python target over
-        such a bundle stops rather than ship a module whose every call fails."""
+        passes them to the workshop, and the call site sends them inside the method's tree, the whole bundle
+        directory the SDK lists: a template travels at its own place in the tree, so no map of template files is
+        written into the module, which once went stale on the first renamed `template_file` and failed every run
+        behind a green gate. The sidecar still records each template, for the drift gate to hash. Only a
+        `python-structures` project whose `pipelex` brings a `pipelex-sdk` from before the tree sends no template
+        file, so over such a bundle it stops rather than ship a module whose every call fails."""
         body = self.render(target_name)
         file_set = self.the_line(body, "- **Local files**:")
         assert "is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name." in file_set
         assert "is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**." in file_set
         assert "**the root `.mthds` file first**, as nothing above its directory is read" in file_set
-        assert "with the template files its steps name, or running the recorded selector." in self.the_line(body, "One module per method")
+        assert "sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector." in self.the_line(
+            body, "One module per method"
+        )
         assert '  "templates": {}\n}' in body
         sidecar_rule = '`templates` maps each step\'s `template_file` to its file\'s `{ "path", "sha256" }`, `{}` for none'
-        assert f"{sidecar_rule}; the call site's map is written from it." in body
-        stop = self.the_line(body, "| a Python target over a bundle naming template files |")
+        assert f"{sidecar_rule}. A `method_ref`" in body
+        assert "the call site's map" not in body, "the call site writes no map of template files"
+        stop = self.the_line(body, "| `python-structures` below step 8's `pipelex-sdk` floor, over a bundle naming template files |")
         assert "STOP, nothing generated, as [python.md](references/python.md) says" in stop
 
         typescript = self.reference("typescript.md")
-        assert "**A bundle whose `PipeDocGen` steps name template files sends them with every run.**" in typescript
-        assert "**Write the map from the sidecar's `templates`, entry for entry**" in typescript
-        assert "`@pipelex/sdk` exports nothing that reads the steps" in typescript
-        assert "resources: await readTemplates()," in typescript
-        assert "refresh rewrites the map from the steps before it rewrites the sidecar" in typescript
+        tree_paragraph = self.the_line(typescript, "**`directory` sends the method's tree, which is everything the run needs from disk.**")
+        assert "each template travels at its own place in the tree" in tree_paragraph
+        assert "no map of template files is written into the module" in tree_paragraph
+        assert "refresh rewrites it to the template above, `readBundle`, `TEMPLATE_FILES` and `readTemplates` removed" in tree_paragraph
         python = self.reference("python.md")
-        stop_paragraph = self.the_line(python, "**A bundle whose `PipeDocGen` steps name template files stops the integration**")
+        stop_paragraph = self.the_line(
+            python, "**A `python-structures` project runs on the `pipelex-sdk` its `pipelex` pins exactly, so read that version at step 1**"
+        )
         assert python.index(stop_paragraph) < python.index("## Detecting the project"), "the stop is read at step 1, before anything else"
-        assert "generate nothing and write no module" in stop_paragraph
+        assert "**a bundle whose `PipeDocGen` steps name template files stops the integration**" in stop_paragraph
+        assert "Generate nothing and write no module." in stop_paragraph
         assert "On a refresh, regenerate nothing either" in stop_paragraph
 
         refresh = self.reference("refresh.md")
@@ -1160,9 +1197,10 @@ class TestPipelexIntegrateSkill:
         assert "**the template map re-derived from those steps**" in cells["taken from disk"]
         assert "the template files' hashes against the sidecar's `templates`" in cells["re-checked"]
         trigger = self.the_line(
-            refresh, "**A TypeScript call site's `TEMPLATE_FILES` is rewritten whenever it differs from the re-derived template map**"
+            refresh, "**A call site written for an SDK below step 8's floor is rewritten to its language reference's template once the pin is raised"
         )
-        assert "gains the map, `readTemplates` and the `resources` argument" in trigger
+        assert "`directory: BUNDLE_DIR` on TypeScript and `tree=BUNDLE_DIR` on Python" in trigger
+        assert "its template files as `resources`, read through a `TEMPLATE_FILES` map" in trigger
         assert "with `templates` recording the template map it derived, `{}` for none." in refresh
 
     TEMPLATE_KEY = "templates/notice.html"
@@ -1266,7 +1304,7 @@ class TestPipelexIntegrateSkill:
         # The sidecar example and the TypeScript call site name the same directory.
         typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
         assert 'const BUNDLE_DIR = path.join(process.cwd(), "methods", "summarize-pdf");' in typescript
-        assert "loading **every `.mthds` file under `bundle_dir`** at call time" in body
+        assert "sending **the whole `bundle_dir` as the method's tree** at call time" in body
         cells = self.refresh_cells(self.reference("refresh.md"))
         assert "**file set, which is re-read from `bundle_dir` and never taken from `method.files`**" in cells["taken from disk"]
         assert "a file edited, removed or added" in cells["re-checked"]
@@ -1577,15 +1615,11 @@ class TestPipelexIntegrateSkill:
         assert "Raise and report older pins." in step_8
 
         # Every version the reference's TypeScript SDK lines carry is the floor, and it carries it more than once.
-        # The one exception is the template files' own minimum, the release that sends `resources`, which only a
-        # bundle whose `PipeDocGen` steps name a template file needs, and which the reference raises to there.
         regions: dict[str, str] = {}
         typescript = (self.REFERENCES_DIR / "typescript.md").read_text(encoding="utf-8")
-        template_minimum = "`resources` needs `@pipelex/sdk` 0.40.0 or later, so raise a project below it."
-        assert typescript.count(template_minimum) == 1, "the template files' SDK minimum is stated once"
         for index_line, line in enumerate(typescript.splitlines()):
-            if "@pipelex/sdk" in line and self.VERSION.search(line.replace(template_minimum, "")):
-                regions[f"typescript.md line {index_line + 1}"] = line.replace(template_minimum, "")
+            if "@pipelex/sdk" in line and self.VERSION.search(line):
+                regions[f"typescript.md line {index_line + 1}"] = line
         assert len(regions) >= 2, "typescript.md should name the floor in its header and its offline gate section"
         for where, text in regions.items():
             assert set(self.VERSION.findall(text)) == {self.TYPESCRIPT_SDK_FLOOR}, f"{where} names {self.VERSION.findall(text)}"
@@ -1604,8 +1638,15 @@ class TestPipelexIntegrateSkill:
         assert f'const SDK_MINIMUM = "{self.TYPESCRIPT_SDK_FLOOR}";' in gate
         assert self.VERSION.findall(gate) == [self.TYPESCRIPT_SDK_FLOOR], "the gate names a version other than SDK_MINIMUM"
 
-        changelog = self.the_line((self.REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), "**`pipelex-integrate` — wire an MTHDS method")
-        assert re.findall(r"`@pipelex/sdk` (\d+\.\d+\.\d+)", changelog) == [self.TYPESCRIPT_SDK_FLOOR]
+        # The newest changelog entry of the skill that names a TypeScript SDK names the floor; the entries
+        # below it are the releases they shipped in, and keep the floor those releases installed.
+        entries = [
+            line
+            for line in (self.REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+            if line.startswith("- **`pipelex-integrate`") and "`@pipelex/sdk` " in line
+        ]
+        assert entries, "no changelog entry of pipelex-integrate names a TypeScript SDK"
+        assert re.findall(r"`@pipelex/sdk` (\d+\.\d+\.\d+)", entries[0]) == [self.TYPESCRIPT_SDK_FLOOR]
 
         # What a user installs: the committed skill of every target carries step 8's floor.
         for target_name in ("prod", "codex", "mistral-vibe"):
