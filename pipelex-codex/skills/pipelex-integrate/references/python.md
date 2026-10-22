@@ -76,9 +76,10 @@ from <package>.generated.summarize_pdf.models import DocumentSummary
 PIPE_CODE = "summarize.summarize_pdf"
 # The method's tree, sent whole with every run. A bundle is one closure: a main file that imports a
 # sibling needs that sibling sent with it, or the run fails to load what the generated models were
-# projected from. The SDK lists this directory under the MTHDS standard's membership rule, so every
-# `.mthds` file travels, and every file a step reads, such as a `PipeDocGen` step's template, while
-# hidden files, what a `.gitignore` keeps out and a run's `inputs.json` stay home. A missing or empty
+# projected from. The SDK lists this directory under the MTHDS standard's membership rule and sends
+# every file it keeps, the `.mthds` files and the files a step reads, such as a `PipeDocGen` step's
+# template, among them. Names starting with a dot, a run's `inputs.json` and what a `.gitignore`
+# inside the tree keeps out stay home; nothing screens the rest for secrets. A missing or empty
 # directory is refused before any run starts, naming the path.
 BUNDLE_DIR = Path(__file__).resolve().parent.parent / "methods" / "summarize_pdf"
 

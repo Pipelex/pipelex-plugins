@@ -2,13 +2,15 @@
 
 The vendored `check.mjs` validates the edited file's method as the MTHDS protocol's `files` map: the edited file's
 directory listed by the `mthds` package's lister under the standard's membership rule, rooted at the nearest
-`METHODS.toml` at or above it, so every bundle of the method and every file a step reads, such as the template a
-`PipeDocGen` step names in `template_file`, travel at their tree paths, while hidden entries, what a `.gitignore` keeps
-out and a run's inputs file stay home. These tests run `templates/hooks/assets/check.mjs`, the copy every target carries
-byte for byte, as a Claude `PostToolUse` `Write`, against a stand-in API on a loopback port (`stub_api` in
-`conftest.py`, run by `run_write_hook` in `stub_api.py`), and read what the validate stage sent. The stand-in answers
-the version handshake as a runner keeping no blob store, so the tree always travels inline and every file sent is in
-the request's body. The key they give the hook is a placeholder the stand-in never checks.
+`METHODS.toml` at or above it, so every file the rule keeps travels at its tree path, every bundle of the method and
+every file a step reads, such as the template a `PipeDocGen` step names in `template_file`, among them, while names
+starting with a dot, a run's inputs file and what a `.gitignore` inside the tree or the manifest's `exclude` keeps out
+stay home. A `.gitignore` above the tree root keeps nothing out, and no file is screened for secrets. These tests run
+`templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a Claude `PostToolUse` `Write`,
+against a stand-in API on a loopback port (`stub_api` in `conftest.py`, run by `run_write_hook` in `stub_api.py`), and
+read what the validate stage sent. The stand-in answers the version handshake as a runner keeping no blob store, so
+the tree always travels inline and every file sent is in the request's body. The key they give the hook is a
+placeholder the stand-in never checks.
 """
 
 from __future__ import annotations
@@ -127,6 +129,24 @@ class TestHookMethodTree:
             "notices/notice.mthds",
             f"notices/{TEMPLATE_FILE}",
         ]
+
+    def test_a_gitignore_above_the_tree_keeps_nothing_out_and_no_file_is_screened(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
+        """What `docs/hooks.md` and the README say leaves the machine: the lister reads only the `.gitignore` files inside
+        the tree, so a repository's root `.gitignore` above a bundle with no manifest keeps nothing out, and a key or
+        credentials file beside the bundle travels with it. When the hook gains a secret screen, this test changes with
+        those two documents."""
+        repository = tmp_path / "repository"
+        (repository / ".git").mkdir(parents=True)
+        (repository / ".gitignore").write_text("*.pem\nsecrets.yaml\n", encoding="utf-8")
+        bundle = repository / "methods" / "notices"
+        method = _write_bundle(bundle)
+        (bundle / "key.pem").write_text("not a real key\n", encoding="utf-8")
+        (bundle / "secrets.yaml").write_text("token: not-a-real-token\n", encoding="utf-8")
+
+        result = run_write_hook(node=node, method=method, stub_api=stub_api)
+
+        assert result.stdout.strip() == "", f"a valid verdict passes silently, but the hook said: {result.stdout}"
+        assert sorted(_sent_tree(stub_api)) == ["key.pem", "method-graph.html", "notice.mthds", "secrets.yaml", TEMPLATE_FILE]
 
     def test_two_steps_naming_one_path_each_send_their_own_file(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
         """A path two files of the bundle name leads to a different file from each, and the tree carries both."""
