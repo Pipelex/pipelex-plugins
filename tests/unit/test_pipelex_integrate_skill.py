@@ -1337,8 +1337,16 @@ class TestPipelexIntegrateSkill:
         sidecar_rule = '`templates` maps each step\'s `template_file` to its file\'s `{ "path", "sha256" }`, `{}` for none'
         assert f"{sidecar_rule}. A `method_ref`" in body
         assert "the call site's map" not in body, "the call site writes no map of template files"
-        stop = self.the_line(body, "| `python-structures` below step 8's `pipelex-sdk` floor, over a bundle naming template files |")
-        assert "STOP, nothing generated, as [python.md](references/python.md) says" in stop
+        # The stop follows the SDK the project runs on once step 8 has run, and one that cannot be read at all.
+        stop = self.the_line(body, "| `python-structures`, its `pipelex-sdk` after step 8 unread or below the floor, templated bundle |")
+        assert "STOP, nothing generated: [python.md](references/python.md)" in stop
+        settling = self.the_line(self.reference("python.md"), "**A `python-structures` project runs on the `pipelex-sdk` its `pipelex` pins exactly")
+        assert "settle at step 1 which `pipelex-sdk` it will run on once step 8 has run**" in settling
+        assert "A read that raises `PackageNotFoundError` means the environment is not synced" in settling
+        assert "sync the environment with the project's package manager (`uv sync`, `poetry install`) and read again." in settling
+        assert "When step 8 will raise `pipelex`, the installed version says nothing of the run:" in settling
+        assert "Below it, **or when no read succeeds**, the module sends the bundle the older way" in settling
+        assert "At step 9, once step 8 has run, read the version once more" in settling
 
         typescript = self.reference("typescript.md")
         tree_paragraph = self.the_line(typescript, "**`directory` sends the method's tree, which is everything the run needs from disk.**")
@@ -1347,7 +1355,7 @@ class TestPipelexIntegrateSkill:
         assert "refresh rewrites it to the template above, `readBundle`, `TEMPLATE_FILES` and `readTemplates` removed" in tree_paragraph
         python = self.reference("python.md")
         stop_paragraph = self.the_line(
-            python, "**A `python-structures` project runs on the `pipelex-sdk` its `pipelex` pins exactly, so read that version at step 1**"
+            python, "**A `python-structures` project runs on the `pipelex-sdk` its `pipelex` pins exactly, so settle at step 1 which"
         )
         assert python.index(stop_paragraph) < python.index("## Detecting the project"), "the stop is read at step 1, before anything else"
         assert "**a bundle whose `PipeDocGen` steps name template files stops the integration**" in stop_paragraph
