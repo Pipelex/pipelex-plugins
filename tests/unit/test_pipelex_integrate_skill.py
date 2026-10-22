@@ -150,8 +150,10 @@ class TestPipelexIntegrateSkill:
     # call site's docstring points at — in 0.17.0, which also stopped it calling `/v1/build/inputs` and reading
     # a text field merely named `url` from disk, and the run-results surface the language reference names —
     # the artifact operations, `summarizeUsage`, and `working_memory` and `graph_assembly_error` on `RunResults`
-    # — in 0.18.0. Step 8 raises an older pin to it, and every place that names a TypeScript SDK version names
-    # this one.
+    # — in 0.18.0, and the method's tree, which the call site sends as `directory` and the gate lists with the
+    # lister of the `mthds` package the SDK depends on, in 0.48.0, the last of it to arrive and the floor today,
+    # as `targets/defaults.toml` records. Step 8 raises an older pin to it, and every place that names a
+    # TypeScript SDK version names this one.
     # Read from the table rather than typed here, so that a bump cannot leave this suite asserting
     # the old number — which would fail on the skill and pass on itself, pointing at the wrong file.
     TYPESCRIPT_SDK_FLOOR = load_version_floors(REPO_ROOT)["pipelex_sdk_js"]
