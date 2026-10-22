@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.48.0 (2f7ab9d) + @pipelex/tools-wasm 0.6.0 (npm)
+// Provenance: @pipelex/sdk 0.48.1 (ce6a199) + @pipelex/tools-wasm 0.6.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -3446,7 +3446,7 @@ function isParams(value) {
 function isLocation(value) {
   if (!isObject(value))
     return false;
-  return optional(value, "pipe", isString) && optional(value, "path", (path) => isStringArray(path)) && optional(value, "input", isString) && optional(value, "field", isString) && optional(value, "item", (item) => isIntegerAtLeast(item, 0)) && optional(value, "attempt", (attempt) => isIntegerAtLeast(attempt, 1)) && optional(value, "file", isString) && optional(value, "line", (line) => isIntegerAtLeast(line, 1)) && optional(value, "column", (column) => isIntegerAtLeast(column, 1));
+  return optional(value, "pipe", isString) && optional(value, "path", (path2) => isStringArray(path2)) && optional(value, "input", isString) && optional(value, "field", isString) && optional(value, "item", (item) => isIntegerAtLeast(item, 0)) && optional(value, "attempt", (attempt) => isIntegerAtLeast(attempt, 1)) && optional(value, "file", isString) && optional(value, "line", (line) => isIntegerAtLeast(line, 1)) && optional(value, "column", (column) => isIntegerAtLeast(column, 1));
 }
 function isScalar(value) {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
@@ -3993,7 +3993,7 @@ function isSuperTable(table) {
     return false;
   return members.every((value) => isTableValue(value));
 }
-function emitMembers(table, path, lines) {
+function emitMembers(table, path2, lines) {
   const tableMembers = [];
   for (const [key, value] of Object.entries(table)) {
     if (isTableValue(value)) {
@@ -4003,7 +4003,7 @@ function emitMembers(table, path, lines) {
     }
   }
   for (const [key, value] of tableMembers) {
-    const memberPath = [...path, key];
+    const memberPath = [...path2, key];
     if (Array.isArray(value)) {
       for (const element of value) {
         emitTable(element, memberPath, lines, true);
@@ -4013,17 +4013,17 @@ function emitMembers(table, path, lines) {
     }
   }
 }
-function emitTable(table, path, lines, isArrayElement) {
+function emitTable(table, path2, lines, isArrayElement) {
   if (isArrayElement || !isSuperTable(table)) {
     if (lines.length > 0)
       lines.push("");
     const [openMarker, closeMarker] = isArrayElement ? ["[[", "]]"] : ["[", "]"];
-    lines.push(`${openMarker}${renderPath(path)}${closeMarker}`);
+    lines.push(`${openMarker}${renderPath(path2)}${closeMarker}`);
   }
-  emitMembers(table, path, lines);
+  emitMembers(table, path2, lines);
 }
-function renderPath(path) {
-  return path.map((segment) => renderKey(segment)).join(".");
+function renderPath(path2) {
+  return path2.map((segment) => renderKey(segment)).join(".");
 }
 function renderKey(key) {
   if (BARE_KEY.test(key))
@@ -5914,11 +5914,11 @@ var init_client = __esm({
       // ── Routes ─────────────────────────────────────────────────────────
       /** A route under `<base>/v1/`. */
       route(method, endpoint, timeoutMs, createsRun = false) {
-        const path = `/${API_PREFIX}/${endpoint.replace(/^\/+/, "")}`;
+        const path2 = `/${API_PREFIX}/${endpoint.replace(/^\/+/, "")}`;
         return {
           method,
-          url: `${this.baseUrl}${path}`,
-          name: `${method} ${path}`,
+          url: `${this.baseUrl}${path2}`,
+          name: `${method} ${path2}`,
           createsRun,
           timeoutMs
         };
@@ -8336,10 +8336,10 @@ var init_digest = __esm({
 function namesExcludedDirectory(rule) {
   return rule === "nested_repository" || rule === "nested_package";
 }
-function limitMessage(root, limit, maximum, reached, path) {
+function limitMessage(root, limit, maximum, reached, path2) {
   switch (limit) {
     case "maxFileSize":
-      return `The method tree at ${root} holds ${path ?? "a file"}, of ${reached} bytes, past the limit of ${maximum} bytes for one file; listing stopped there, before hashing any file.`;
+      return `The method tree at ${root} holds ${path2 ?? "a file"}, of ${reached} bytes, past the limit of ${maximum} bytes for one file; listing stopped there, before hashing any file.`;
     case "maxFileCount":
       return `The method tree at ${root} holds more than ${maximum} files, the limit; listing stopped at ${reached} files, before hashing any file. Hand over the method's own directory, or keep the rest out with a .gitignore file or the manifest's exclude patterns.`;
     case "maxTotalSize":
@@ -8374,9 +8374,9 @@ var init_exceptions3 = __esm({
       maximum;
       /** The count or size reached when the listing stopped. */
       reached;
-      constructor(root, limit, maximum, reached, path) {
-        super("limit_exceeded", limitMessage(root, limit, maximum, reached, path), {
-          names: path === void 0 ? [] : [path]
+      constructor(root, limit, maximum, reached, path2) {
+        super("limit_exceeded", limitMessage(root, limit, maximum, reached, path2), {
+          names: path2 === void 0 ? [] : [path2]
         });
         this.name = "TreeLimitExceededError";
         this.root = root;
@@ -8399,48 +8399,48 @@ function errorCode(err) {
   const code = err?.code;
   return typeof code === "string" ? code : void 0;
 }
-function linkRefusal(path, where) {
-  return new MethodTreeError("symbolic_link", `'${path}' under ${where} is now a symbolic link, which a method tree never follows; replace it with the file itself and list the tree again.`, { names: [path] });
+function linkRefusal(path2, where) {
+  return new MethodTreeError("symbolic_link", `'${path2}' under ${where} is now a symbolic link, which a method tree never follows; replace it with the file itself and list the tree again.`, { names: [path2] });
 }
-function specialRefusal(path, where) {
-  return new MethodTreeError("special_file", `'${path}' under ${where} is now neither a file nor a directory, such as a named pipe or a device; remove it and list the tree again.`, { names: [path] });
+function specialRefusal(path2, where) {
+  return new MethodTreeError("special_file", `'${path2}' under ${where} is now neither a file nor a directory, such as a named pipe or a device; remove it and list the tree again.`, { names: [path2] });
 }
-function unreadable(path, where, err) {
-  return new MethodTreeError("not_listable", `Cannot read '${path}' under ${where}: ${describe(err)}`, {
-    names: [path]
+function unreadable(path2, where, err) {
+  return new MethodTreeError("not_listable", `Cannot read '${path2}' under ${where}: ${describe(err)}`, {
+    names: [path2]
   });
 }
-function refusalOfOpenError(err, path, where) {
+function refusalOfOpenError(err, path2, where) {
   switch (errorCode(err)) {
     // `O_NOFOLLOW` on a link fails with ELOOP, or EMLINK on the BSDs.
     case "ELOOP":
     case "EMLINK":
-      return linkRefusal(path, where);
+      return linkRefusal(path2, where);
     // A socket cannot be opened as a file.
     case "ENXIO":
     case "EOPNOTSUPP":
-      return specialRefusal(path, where);
+      return specialRefusal(path2, where);
     default:
-      return unreadable(path, where, err);
+      return unreadable(path2, where, err);
   }
 }
-function refusalOfStats(stats, path, where) {
+function refusalOfStats(stats, path2, where) {
   if (stats.isDirectory()) {
-    return new MethodTreeError("not_listable", `'${path}' under ${where} is now a directory, not the file the method tree listed; list the tree again.`, { names: [path] });
+    return new MethodTreeError("not_listable", `'${path2}' under ${where} is now a directory, not the file the method tree listed; list the tree again.`, { names: [path2] });
   }
-  return specialRefusal(path, where);
+  return specialRefusal(path2, where);
 }
-async function readMember(absolute, path, where, keepBytes) {
+async function readMember(absolute, path2, where, keepBytes) {
   let handle;
   try {
     handle = await open(absolute, OPEN_FLAGS);
   } catch (err) {
-    throw refusalOfOpenError(err, path, where);
+    throw refusalOfOpenError(err, path2, where);
   }
   try {
     const stats = await handle.stat();
     if (!stats.isFile())
-      throw refusalOfStats(stats, path, where);
+      throw refusalOfStats(stats, path2, where);
     const hash = createHash2("sha256");
     const chunks = [];
     let size = 0;
@@ -8465,7 +8465,7 @@ async function readMember(absolute, path, where, keepBytes) {
   } catch (err) {
     if (err instanceof MethodTreeError)
       throw err;
-    throw unreadable(path, where, err);
+    throw unreadable(path2, where, err);
   } finally {
     await handle.close().catch(() => void 0);
   }
@@ -8959,14 +8959,14 @@ function percentDecodeSegment(segment) {
   return decoded;
 }
 function referencePath(reference, context) {
-  let path;
+  let path2;
   if (context === "path") {
     if (reference === "")
       return { code: "reference_not_a_tree_path" };
     if (SCHEME.test(reference) || reference.startsWith("/") || reference.includes("\\")) {
       return { code: "reference_invalid" };
     }
-    path = reference;
+    path2 = reference;
   } else {
     const pathPart = urlPathPart(reference);
     if (pathPart.startsWith("/") || pathPart.includes("\\"))
@@ -8982,13 +8982,13 @@ function referencePath(reference, context) {
       }
       segments.push(decoded);
     }
-    path = segments.join("/");
+    path2 = segments.join("/");
   }
-  return { path: path.normalize("NFC") };
+  return { path: path2.normalize("NFC") };
 }
-function lexicalJoin(holder, path) {
+function lexicalJoin(holder, path2) {
   const resolved = [];
-  for (const segment of [...holder.split("/").slice(0, -1), ...path.split("/")]) {
+  for (const segment of [...holder.split("/").slice(0, -1), ...path2.split("/")]) {
     if (segment === ".")
       continue;
     if (segment === "..") {
@@ -9256,11 +9256,11 @@ function refusal(code, message, names, extra = {}) {
 function describeIoError(err) {
   return err instanceof Error ? err.message : String(err);
 }
-async function lstatSize(absolute, path, where) {
+async function lstatSize(absolute, path2, where) {
   try {
     return (await lstat(absolute)).size;
   } catch (err) {
-    throw new MethodTreeError("not_listable", `Cannot read '${path}' under ${where}: ${describeIoError(err)}`, { names: [path] });
+    throw new MethodTreeError("not_listable", `Cannot read '${path2}' under ${where}: ${describeIoError(err)}`, { names: [path2] });
   }
 }
 async function readEntries(absolute, displayPath) {
@@ -9319,19 +9319,19 @@ async function readGitignore(directory, root) {
   const entry = findEntry(directory.entries, GITIGNORE_NAME);
   if (entry === void 0 || entry.kind !== "file")
     return null;
-  const path = joinPath(directory.path, GITIGNORE_NAME);
+  const path2 = joinPath(directory.path, GITIGNORE_NAME);
   let bytes;
   try {
     bytes = await readFile(Buffer.concat([directory.absolute, SEPARATOR, entry.nameBytes]));
   } catch (err) {
-    throw new MethodTreeError("not_listable", `Cannot read '${path}' under ${root}: ${describeIoError(err)}`, { names: [path] });
+    throw new MethodTreeError("not_listable", `Cannot read '${path2}' under ${root}: ${describeIoError(err)}`, { names: [path2] });
   }
   const body = bytes.subarray(0, 3).equals(UTF8_BOM) ? bytes.subarray(3) : bytes;
   let text;
   try {
     text = strictUtf84.decode(body);
   } catch {
-    throw new MethodTreeError("gitignore_not_utf8", `The file '${path}' under ${root} is not UTF-8; a .gitignore file of a method tree is read as UTF-8, so re-save it in that encoding.`, { names: [path] });
+    throw new MethodTreeError("gitignore_not_utf8", `The file '${path2}' under ${root} is not UTF-8; a .gitignore file of a method tree is read as UTF-8, so re-save it in that encoding.`, { names: [path2] });
   }
   return parseGitignore(text, directory.matchPath, "gitignore");
 }
@@ -9352,7 +9352,7 @@ async function walk(listing, directory) {
     listing.spellings.set(joinPath(directory.path, name), new Set([...rawNames].map((rawName) => joinPath(directory.rawPath, rawName))));
   }
   for (const entry of directory.entries) {
-    const path = joinPath(directory.path, entry.name);
+    const path2 = joinPath(directory.path, entry.name);
     const rawPath = joinPath(directory.rawPath, entry.rawName);
     const absolute = Buffer.concat([directory.absolute, SEPARATOR, entry.nameBytes]);
     const matchPath = directory.matchPath.length === 0 ? entry.matchBytes : Buffer.concat([directory.matchPath, SLASH2, entry.matchBytes]);
@@ -9376,9 +9376,9 @@ async function walk(listing, directory) {
       rule ??= patternRule;
     }
     if (rule !== null) {
-      listing.exclusions.set(path, {
+      listing.exclusions.set(path2, {
         rule,
-        directory: isMarkerRule(rule) ? path : null,
+        directory: isMarkerRule(rule) ? path2 : null,
         isDirectory: isDirectory2,
         absolute
       });
@@ -9386,13 +9386,13 @@ async function walk(listing, directory) {
     }
     switch (entry.kind) {
       case "symlink":
-        throw refusal("symbolic_link", `The method tree at ${listing.root} holds a symbolic link, '${path}': a link is never followed. Replace it with the file itself, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+        throw refusal("symbolic_link", `The method tree at ${listing.root} holds a symbolic link, '${path2}': a link is never followed. Replace it with the file itself, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path2]);
       case "other":
-        throw refusal("special_file", `The method tree at ${listing.root} holds '${path}', which is neither a file nor a directory, such as a named pipe or a device. Remove it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+        throw refusal("special_file", `The method tree at ${listing.root} holds '${path2}', which is neither a file nor a directory, such as a named pipe or a device. Remove it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path2]);
       case "directory":
         await walk(listing, {
           absolute,
-          path,
+          path: path2,
           rawPath,
           matchPath,
           invalidName: directory.invalidName || !entry.validUtf8,
@@ -9401,12 +9401,12 @@ async function walk(listing, directory) {
         });
         continue;
       case "file": {
-        const violation = directory.invalidName || !entry.validUtf8 ? "a name on the path is not UTF-8" : treePathViolation(path);
+        const violation = directory.invalidName || !entry.validUtf8 ? "a name on the path is not UTF-8" : treePathViolation(path2);
         if (violation !== null) {
-          throw refusal("invalid_tree_path", `The method tree at ${listing.root} holds '${path}', which is not a tree path: ${violation}. Rename it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path]);
+          throw refusal("invalid_tree_path", `The method tree at ${listing.root} holds '${path2}', which is not a tree path: ${violation}. Rename it, or keep it out with a .gitignore file or the manifest's exclude patterns.`, [path2]);
         }
-        listing.count(path, await lstatSize(absolute, path, listing.root));
-        listing.members.push({ path, absolute });
+        listing.count(path2, await lstatSize(absolute, path2, listing.root));
+        listing.members.push({ path: path2, absolute });
         continue;
       }
     }
@@ -9604,10 +9604,10 @@ var init_lister = __esm({
         this.limits = limits;
       }
       /** Count a member from its `lstat` size, stopping at the first limit passed. */
-      count(path, size) {
+      count(path2, size) {
         const { maxFileSize, maxFileCount, maxTotalSize } = this.limits;
         if (maxFileSize !== void 0 && size > maxFileSize) {
-          throw new TreeLimitExceededError(this.root, "maxFileSize", maxFileSize, size, path);
+          throw new TreeLimitExceededError(this.root, "maxFileSize", maxFileSize, size, path2);
         }
         this.fileCount += 1;
         if (maxFileCount !== void 0 && this.fileCount > maxFileCount) {
@@ -9952,7 +9952,7 @@ async function readFileEntryMapValue(document, blobStore = EMPTY_BLOB_STORE) {
     const named = NAMES_ALL.has(code) ? [...names].sort(compareUtf8) : names.slice(0, 1);
     throw new MethodTreeError(code, mapRefusalMessage(code, named), { names: named });
   }
-  const files = [...contents.entries()].map(([path, bytes]) => ({ path, size: bytes.length, sha256: sha256Hex(bytes), bytes })).sort((left, right) => compareUtf8(left.path, right.path));
+  const files = [...contents.entries()].map(([path2, bytes]) => ({ path: path2, size: bytes.length, sha256: sha256Hex(bytes), bytes })).sort((left, right) => compareUtf8(left.path, right.path));
   return { files, digest: treeDigest(files) };
 }
 async function readFileEntryMap(text, blobStore = EMPTY_BLOB_STORE) {
@@ -10150,6 +10150,31 @@ var init_dist2 = __esm({
     init_types();
     init_exceptions2();
     init_method_tree();
+  }
+});
+
+// src/node-host/node.ts
+var node_exports = {};
+__export(node_exports, {
+  nodeHost: () => nodeHost
+});
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+var nodeHost;
+var init_node = __esm({
+  "src/node-host/node.ts"() {
+    nodeHost = {
+      fs,
+      path,
+      async loadTreeLister() {
+        const { listMethodTree: listMethodTree2, MethodTreeError: MethodTreeError2 } = await Promise.resolve().then(() => (init_dist2(), dist_exports));
+        return { listMethodTree: listMethodTree2, MethodTreeError: MethodTreeError2 };
+      },
+      async loadAgent() {
+        const { Agent } = await import("undici");
+        return Agent;
+      }
+    };
   }
 });
 
@@ -10735,7 +10760,7 @@ function readPatchSections(text) {
   }
   return sections;
 }
-function patchTargets(sections, keyOf = (path) => path) {
+function patchTargets(sections, keyOf = (path2) => path2) {
   const envelopes = /* @__PURE__ */ new Map();
   for (const section of sections) {
     envelopes.set(section.envelope, [...envelopes.get(section.envelope) ?? [], section]);
@@ -10756,12 +10781,12 @@ function patchTargets(sections, keyOf = (path) => path) {
         surviving.set(key, { path: section.path, section });
       }
     }
-    for (const [key, { path, section }] of surviving) {
+    for (const [key, { path: path2, section }] of surviving) {
       const file = files.get(key);
       if (file) {
         file.sections.push(section);
       } else {
-        files.set(key, { key, path, sections: [section], removedByPatch: false });
+        files.set(key, { key, path: path2, sections: [section], removedByPatch: false });
       }
     }
   }
@@ -11947,12 +11972,12 @@ function extractCodexMthdsTargets(stdinJson, processCwd) {
       addedLinesOf = (section) => linesAsRead(section.addedLines, reading.quotingAt(section.offset));
     }
   }
-  const keyOf = (path, section) => {
-    if (isAbsolutePath(path)) {
-      return resolvePath(path);
+  const keyOf = (path2, section) => {
+    if (isAbsolutePath(path2)) {
+      return resolvePath(path2);
     }
     const directory = directoryOf(section);
-    return directory === null ? UNPLACED_KEY + path : resolvePath(directory, path);
+    return directory === null ? UNPLACED_KEY + path2 : resolvePath(directory, path2);
   };
   const targets = [];
   const unplaced = [];
@@ -12007,7 +12032,7 @@ function comparedLines(addedLines) {
   return addedLines.map((line) => line.trimEnd()).filter((line) => line !== "");
 }
 function uncheckedShellPatchNote(paths) {
-  const named = paths.map((path) => `\`${path}\``);
+  const named = paths.map(pathSpan);
   const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
   const context = named.length === 1 ? `The .mthds hook did not check ${list}: it could not confirm which file this shell command patched. Name the file by its absolute path, or edit it with the apply_patch tool, and the hook will check it.` : `The .mthds hook did not check ${list}: it could not confirm which files this shell command patched. Name the files by their absolute paths, or edit them with the apply_patch tool, and the hook will check them.`;
   return { kind: "context", context: truncate(context) };
@@ -12032,18 +12057,28 @@ function extractVibeMthdsFilePath(stdinJson) {
   return { filePath, cwd: typeof parsed.cwd === "string" ? parsed.cwd : void 0 };
 }
 function mergeOutcomes(outcomes) {
+  const notes = notesOf(outcomes);
   const blocks = outcomes.filter((outcome) => outcome.kind === "block");
   if (blocks.length > 0) {
-    return { kind: "block", reason: truncate(blocks.map((block) => block.reason).join("\n\n")) };
+    const reason = joinTexts(blocks.map((block) => block.reason));
+    return notes.length > 0 ? { kind: "block", reason, notes } : { kind: "block", reason: truncate(reason) };
   }
   const contexts = outcomes.filter((outcome) => outcome.kind === "context");
   if (contexts.length > 0) {
-    return {
-      kind: "context",
-      context: truncate(contexts.map((context) => context.context).join("\n\n"))
-    };
+    const context = joinTexts(contexts.map((outcome) => outcome.context));
+    return notes.length > 0 ? { kind: "context", context, notes } : { kind: "context", context: truncate(context) };
   }
   return { kind: "pass" };
+}
+function joinTexts(texts) {
+  return texts.filter((text) => text !== "").join("\n\n");
+}
+function notesOf(outcomes) {
+  return [
+    ...new Set(
+      outcomes.flatMap((outcome) => outcome.kind === "pass" ? [] : outcome.notes ?? [])
+    )
+  ];
 }
 var MAX_OUTPUT_CHARS = 9500;
 function truncate(text) {
@@ -12054,6 +12089,31 @@ function truncate(text) {
   return `${text.slice(0, MAX_OUTPUT_CHARS)}
 
 [truncated, ${omitted} chars omitted]`;
+}
+function fitWithin(text, budget) {
+  if (text.length <= budget) {
+    return text;
+  }
+  const marker = (omitted) => `
+
+[truncated, ${omitted} chars omitted]`;
+  const kept = Math.max(0, budget - marker(text.length).length);
+  return `${text.slice(0, kept)}${marker(text.length - kept)}`;
+}
+var NOTES_SHARE = 3e3;
+function outcomeText(outcome) {
+  const text = outcome.kind === "block" ? outcome.reason : outcome.context;
+  const notes = outcome.notes ?? [];
+  if (notes.length === 0) {
+    return text;
+  }
+  const notesText = fitWithin(notes.join("\n\n"), NOTES_SHARE);
+  if (text === "") {
+    return notesText;
+  }
+  return `${fitWithin(text, MAX_OUTPUT_CHARS - notesText.length - 2)}
+
+${notesText}`;
 }
 function renderDiagnosticLine(diagnostic) {
   const locators = [
@@ -12083,31 +12143,77 @@ function renderValidationErrorLine(item) {
   ].filter(Boolean).join(", ");
   return `- [${item.category ?? "error"}] ${item.message ?? ""}${locators ? ` (${locators})` : ""}`;
 }
+var WITHHELD_LISTED = 10;
+var CONTROL_CHARACTERS = /[\p{Cc}\u2028\u2029]/gu;
+var NAMED_ESCAPES = { "\n": "\\n", "\r": "\\r", "	": "\\t" };
+function pathSpan(path2) {
+  const shown = path2.replace(
+    CONTROL_CHARACTERS,
+    (character) => NAMED_ESCAPES[character] ?? `\\u${character.codePointAt(0).toString(16).padStart(4, "0")}`
+  );
+  const longestRun = Math.max(0, ...(shown.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(longestRun + 1);
+  const padded = shown.startsWith("`") || shown.endsWith("`") || shown.startsWith(" ") && shown.endsWith(" ") && /[^ ]/.test(shown);
+  return padded ? `${fence} ${shown} ${fence}` : `${fence}${shown}${fence}`;
+}
+function withheldLines(withheld) {
+  const lines = withheld.slice(0, WITHHELD_LISTED).map((file) => `- ${pathSpan(file.path)} (${file.reason})`);
+  const more = withheld.length - WITHHELD_LISTED;
+  return more > 0 ? [...lines, `- and ${more} more ${more === 1 ? "file" : "files"}`] : lines;
+}
+var KEY_BELONGS_IN_THE_ENVIRONMENT = "A key belongs in the environment, never in a method: a method's files leave this machine for the Pipelex API, which keeps them in the organization's storage, where every member can read them.";
+var KEEP_IT_OUT = "keep the file out of the method's tree with a `.gitignore` line inside the tree, since one above the tree's root is not read, or with a name starting with a dot";
+function withheldNote(withheld) {
+  return [
+    "The .mthds hook kept these files of the method's tree on this machine, since each looks like a secret, and validated the method without them:",
+    ...withheldLines(withheld),
+    "",
+    "If a step reads one of them, as its template or its Python module, the validation reports that file missing until the secret is moved out of it. " + KEY_BELONGS_IN_THE_ENVIRONMENT + ` Move the secret out of the file, or ${KEEP_IT_OUT}. A file kept home for its name alone that holds no key can be renamed.`
+  ].join("\n");
+}
+function refusedNote(root, withheld) {
+  return [
+    `The .mthds hook did not validate the method at ${pathSpan(root)}: these files of its tree look like a secret, and every validation reads the method's bundles and its manifest, so nothing was sent:`,
+    ...withheldLines(withheld),
+    "",
+    KEY_BELONGS_IN_THE_ENVIRONMENT + ` Move the secret out of each bundle or manifest listed, and the next edit is validated; any other file listed can instead stay where it is if you ${KEEP_IT_OUT}.`
+  ].join("\n");
+}
 function decideAfterValidate(filePath, validate) {
   switch (validate.status) {
     case "unavailable":
       return { kind: "pass" };
+    case "refused":
+      return {
+        kind: "context",
+        context: "",
+        notes: [refusedNote(validate.root, validate.withheld)]
+      };
     case "valid": {
-      if (validate.pendingSignatures.length === 0) {
+      const notes = validate.withheld.length > 0 ? [withheldNote(validate.withheld)] : [];
+      const nudge = validate.pendingSignatures.length > 0 ? "Bundle is valid but not yet runnable. Signatures still unimplemented (PipeSignature placeholders): " + validate.pendingSignatures.join(", ") + ". They mock their output on dry-run; implement them before running the method for real." : "";
+      if (nudge === "" && notes.length === 0) {
         return { kind: "pass" };
       }
-      const context = "Bundle is valid but not yet runnable. Signatures still unimplemented (PipeSignature placeholders): " + validate.pendingSignatures.join(", ") + ". They mock their output on dry-run; implement them before running the method for real.";
-      return { kind: "context", context: truncate(context) };
+      return notes.length > 0 ? { kind: "context", context: nudge, notes } : { kind: "context", context: truncate(nudge) };
     }
     case "invalid": {
+      let reason;
       if (validate.renderedMarkdown) {
-        return { kind: "block", reason: truncate(validate.renderedMarkdown) };
+        reason = validate.renderedMarkdown;
+      } else {
+        const lines = [
+          `Validation failed for ${filePath}:`,
+          "",
+          validate.message || "Bundle is invalid."
+        ];
+        if (validate.validationErrors.length > 0) {
+          lines.push("");
+          lines.push(...validate.validationErrors.map(renderValidationErrorLine));
+        }
+        reason = lines.join("\n");
       }
-      const lines = [
-        `Validation failed for ${filePath}:`,
-        "",
-        validate.message || "Bundle is invalid."
-      ];
-      if (validate.validationErrors.length > 0) {
-        lines.push("");
-        lines.push(...validate.validationErrors.map(renderValidationErrorLine));
-      }
-      return { kind: "block", reason: truncate(lines.join("\n")) };
+      return validate.withheld.length > 0 ? { kind: "block", reason, notes: [withheldNote(validate.withheld)] } : { kind: "block", reason: truncate(reason) };
     }
   }
 }
@@ -12117,20 +12223,20 @@ function encodeOutcome(outcome, platform = "claude") {
       return "";
     case "block":
       if (platform === "vibe") {
-        return JSON.stringify({ decision: "deny", reason: outcome.reason }) + "\n";
+        return JSON.stringify({ decision: "deny", reason: outcomeText(outcome) }) + "\n";
       }
-      return JSON.stringify({ decision: "block", reason: outcome.reason }) + "\n";
+      return JSON.stringify({ decision: "block", reason: outcomeText(outcome) }) + "\n";
     case "context":
       if (platform === "vibe") {
         return JSON.stringify({
           decision: "allow",
-          hook_specific_output: { additional_context: outcome.context }
+          hook_specific_output: { additional_context: outcomeText(outcome) }
         }) + "\n";
       }
       return JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
-          additionalContext: outcome.context
+          additionalContext: outcomeText(outcome)
         }
       }) + "\n";
   }
@@ -12138,7 +12244,7 @@ function encodeOutcome(outcome, platform = "claude") {
 
 // src/hooks/bundle-gather.ts
 import { realpathSync } from "node:fs";
-import { dirname as dirname3, isAbsolute as isAbsolute2, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
 
 // src/method-trees.ts
 init_protocol();
@@ -12851,6 +12957,29 @@ function responseVerdict(status, errorType, code, problem) {
   return makeVerdict(sentDomain, sentDomain === "runtime" ? fallback.retryable : false);
 }
 
+// src/node-host.ts
+function isNodeRuntime() {
+  return typeof process !== "undefined" && process.versions != null && process.versions.node != null;
+}
+var NODE_CONDITION_MISSING = `this copy of @pipelex/sdk runs in Node but was resolved without the "node" export condition, which selects the part of the package that reaches Node's file system. Bundle it for Node (esbuild platform "node", webpack target "node"), add "node" to the bundler's conditions (esbuild conditions, webpack resolve.conditionNames, Vite resolve.conditions), or leave @pipelex/sdk out of the bundle.`;
+function hostImportFailed(detail) {
+  return `the Node host of @pipelex/sdk could not be loaded (${detail}). The SDK reaches Node's file system through "#node-host", an entry of the "imports" map of its package.json, and a toolchain that does not resolve package "imports", such as Jest before 29.4, cannot load it: run under one that does, such as Node's own loader, Jest 29.4 or later or a current bundler, or reinstall @pipelex/sdk if it is installed in part.`;
+}
+async function loadNodeHost() {
+  if (!isNodeRuntime()) return { host: null, reason: null };
+  let loaded;
+  try {
+    loaded = await Promise.resolve().then(() => (init_node(), node_exports));
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    return { host: null, reason: hostImportFailed(detail), cause };
+  }
+  return loaded.nodeHost === null ? { host: null, reason: NODE_CONDITION_MISSING } : { host: loaded.nodeHost };
+}
+function absenceCause(absence) {
+  return absence.cause === void 0 ? {} : { cause: absence.cause };
+}
+
 // src/timers.ts
 var MAX_TIMER_DELAY_MS = 2147483647;
 function isTimerDelay(value) {
@@ -13308,8 +13437,18 @@ async function contentsTreeSource(contents, call, sending) {
     }
   };
 }
+async function treeListerFor(directory, call) {
+  const loaded = await loadNodeHost();
+  if (loaded.host === null) {
+    throw new RequestArgumentError(
+      loaded.reason === null ? `${call}() got a directory, which only Node can list. In the browser or an edge runtime, give the method's tree as contents, tree or files instead.` : `${call}() cannot list the directory '${directory}': ${loaded.reason}`,
+      absenceCause(loaded)
+    );
+  }
+  return loaded.host.loadTreeLister();
+}
 async function listDirectoryTree(directory, limits, call) {
-  const { listMethodTree: listMethodTree2, MethodTreeError: MethodTreeError2 } = await Promise.resolve().then(() => (init_dist2(), dist_exports));
+  const { listMethodTree: listMethodTree2, MethodTreeError: MethodTreeError2 } = await treeListerFor(directory, call);
   try {
     return await listMethodTree2(directory, { limits });
   } catch (err) {
@@ -13420,27 +13559,33 @@ function methodFileTransferCodeOfStatus(status) {
 }
 async function writeMethodTreeTo(files, destination, options) {
   refuseUnwritableListing(files);
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-  const target = path.resolve(destination);
-  await refuseOccupiedDestination(fs, target);
-  const parent = path.dirname(target);
-  await fs.mkdir(parent, { recursive: true });
-  const staging = path.join(parent, `.${path.basename(target)}.${randomHex(8)}.writing`);
-  await fs.mkdir(staging);
+  const loaded = await loadNodeHost();
+  if (loaded.host === null) {
+    throw new RequestArgumentError(
+      loaded.reason === null ? "writeMethodTree() writes to a file system, which only Node has. In the browser or an edge runtime, download each file of the listing from its url instead." : `writeMethodTree() cannot write to the file system: ${loaded.reason}`,
+      { verdict: { errorDomain: "config", retryable: false }, ...absenceCause(loaded) }
+    );
+  }
+  const { fs: fs2, path: path2 } = loaded.host;
+  const target = path2.resolve(destination);
+  await refuseOccupiedDestination(fs2, target);
+  const parent = path2.dirname(target);
+  await fs2.mkdir(parent, { recursive: true });
+  const staging = path2.join(parent, `.${path2.basename(target)}.${randomHex(8)}.writing`);
+  await fs2.mkdir(staging);
   let inPlace = false;
   try {
     await forEachConcurrently2(files, MAX_CONCURRENT_TRANSFERS, async (file, signal) => {
       const bytes = await downloadMethodFile(file, { timeoutMs: options.timeoutMs, signal });
-      const filePath = path.join(staging, ...file.path.split("/"));
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, bytes, { flag: "wx" });
+      const filePath = path2.join(staging, ...file.path.split("/"));
+      await fs2.mkdir(path2.dirname(filePath), { recursive: true });
+      await fs2.writeFile(filePath, bytes, { flag: "wx" });
     });
-    if (await isDirectory(fs, target)) await fs.rmdir(target);
-    await fs.rename(staging, target);
+    if (await isDirectory(fs2, target)) await fs2.rmdir(target);
+    await fs2.rename(staging, target);
     inPlace = true;
   } finally {
-    if (!inPlace) await fs.rm(staging, { recursive: true, force: true }).catch(() => void 0);
+    if (!inPlace) await fs2.rm(staging, { recursive: true, force: true }).catch(() => void 0);
   }
 }
 async function downloadMethodFile(file, options) {
@@ -13621,12 +13766,12 @@ function pathCollisions2(treePaths) {
   }
   return [...colliding].sort(compareUtf82);
 }
-async function refuseOccupiedDestination(fs, target) {
+async function refuseOccupiedDestination(fs2, target) {
   let entries;
   try {
-    const found = await fs.lstat(target);
+    const found = await fs2.lstat(target);
     if (!found.isDirectory()) throw occupied(target);
-    entries = await fs.readdir(target);
+    entries = await fs2.readdir(target);
   } catch (err) {
     if (err.code === "ENOENT") return;
     throw err;
@@ -13638,9 +13783,9 @@ function occupied(target) {
     `Cannot write a method tree at '${target}': it already exists and is not an empty directory, and a written tree holds nothing but its files.`
   );
 }
-async function isDirectory(fs, target) {
+async function isDirectory(fs2, target) {
   try {
-    return (await fs.lstat(target)).isDirectory();
+    return (await fs2.lstat(target)).isDirectory();
   } catch {
     return false;
   }
@@ -13708,6 +13853,75 @@ function randomHex(byteCount) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+// src/hooks/secret-guard.ts
+function isZipArchive(bytes) {
+  return bytes[0] === 80 && bytes[1] === 75 && bytes[2] === 3 && bytes[3] === 4;
+}
+var SECRET_NAMES = [
+  {
+    pattern: /\.key$/i,
+    reason: "a key file (.key), and is no zip archive as a Keynote deck is",
+    unless: isZipArchive
+  },
+  { pattern: /\.(p12|pfx|jks|keystore)$/i, reason: "a certificate or key store" },
+  { pattern: /\.ppk$/i, reason: "a PuTTY private key" },
+  { pattern: /\.kdbx$/i, reason: "a KeePass password database" },
+  {
+    pattern: /^id_(?:rsa|dsa|ecdsa|ed25519)(?:_sk)?$/i,
+    reason: "an SSH key under its default name"
+  },
+  { pattern: /^credentials(\.json)?$/i, reason: "a credentials file" },
+  { pattern: /^client_secret.*\.json$/i, reason: "an OAuth client secret export" }
+];
+var KEY_FORMATS = [
+  {
+    pattern: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----(?:[ \t]*|[\s\S]{0,200}?(?:\n|\\n)[ \t]*)[A-Za-z0-9+/]{40,}/,
+    reason: "a private key block (PEM)"
+  },
+  { pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, reason: "an AWS access key id" },
+  { pattern: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/, reason: "a GitHub token" },
+  { pattern: /\bgithub_pat_[A-Za-z0-9_]{22,}/, reason: "a GitHub fine-grained token" },
+  { pattern: /\bglpat-[A-Za-z0-9_-]{20,}/, reason: "a GitLab token" },
+  { pattern: /\bxox[abprs]-[A-Za-z0-9-]{10,}/, reason: "a Slack token" },
+  { pattern: /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}/, reason: "a Stripe live key" },
+  { pattern: /\bAIza[0-9A-Za-z_-]{35}/, reason: "a Google API key" },
+  { pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}/, reason: "an Anthropic API key" },
+  {
+    pattern: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}/,
+    reason: "an OpenAI API key"
+  },
+  { pattern: /\bsk-[A-Za-z0-9]{32,}\b/, reason: "an OpenAI-style secret key" },
+  { pattern: /\bhf_[A-Za-z0-9]{30,}\b/, reason: "a Hugging Face token" },
+  { pattern: /\bnpm_[A-Za-z0-9]{36}\b/, reason: "an npm token" },
+  { pattern: /\bplx_sk_[A-Za-z0-9_-]{16,}/, reason: "a Pipelex API key" }
+];
+var ONE_CHARACTER_PER_BYTE = new TextDecoder("latin1");
+function searchableTexts(bytes) {
+  const text = ONE_CHARACTER_PER_BYTE.decode(bytes);
+  return text.includes("\0") ? [text, text.replaceAll("\0", "")] : [text];
+}
+function secretFindings(files) {
+  const findings = [];
+  for (const file of files) {
+    const name = file.path.slice(file.path.lastIndexOf("/") + 1);
+    const byName = SECRET_NAMES.find(
+      (rule) => rule.pattern.test(name) && rule.unless?.(file.bytes) !== true
+    );
+    if (byName !== void 0) {
+      findings.push({ path: file.path, reason: `it is named like ${byName.reason}` });
+      continue;
+    }
+    const texts = searchableTexts(file.bytes);
+    const held = KEY_FORMATS.filter(
+      (format) => texts.some((text) => format.pattern.test(text))
+    ).map((format) => format.reason);
+    if (held.length > 0) {
+      findings.push({ path: file.path, reason: `it holds ${[...new Set(held)].join(" and ")}` });
+    }
+  }
+  return findings;
+}
+
 // src/hooks/bundle-gather.ts
 var DEFAULT_GATHER_CAPS = {
   maxFiles: 100,
@@ -13730,14 +13944,63 @@ async function gatherMethodTree(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
   } catch (err) {
     return { ok: false, reason: isLimitExceeded(err) ? "overflow" : "unreadable" };
   }
-  const treePath = treePathOf(editedAbs, tree.root);
-  if (treePath === void 0 || !tree.files.some((file) => file.path === treePath)) {
+  const root = tree.root;
+  const treePath = root === null ? void 0 : treePathOf(editedAbs, root);
+  if (root === null || treePath === void 0 || !tree.files.some((f) => f.path === treePath)) {
     return { ok: false, reason: "outside" };
   }
-  return { ok: true, tree };
+  const bytesByPath = /* @__PURE__ */ new Map();
+  try {
+    for (const file of tree.files) {
+      bytesByPath.set(file.path, await tree.readFile(file.path));
+    }
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  const findings = secretFindings(
+    tree.files.map((file) => ({ path: file.path, bytes: bytesByPath.get(file.path) }))
+  );
+  const shownRoot = shownRootOf(editedAbs, root);
+  const withheld = findings.map((finding) => ({
+    path: join4(shownRoot, ...finding.path.split("/")),
+    reason: finding.reason
+  }));
+  if (findings.some((finding) => isReadByEveryValidation(finding.path))) {
+    const firsts = findings.map((finding) => isReadByEveryValidation(finding.path));
+    const ordered = [
+      ...withheld.filter((_, index) => firsts[index]),
+      ...withheld.filter((_, index) => !firsts[index])
+    ];
+    return { ok: false, reason: "secret", root: shownRoot, withheld: ordered };
+  }
+  for (const finding of findings) bytesByPath.delete(finding.path);
+  const files = tree.files.filter((file) => bytesByPath.has(file.path));
+  return { ok: true, tree: await treeOver(files, bytesByPath), withheld };
+}
+function shownRootOf(editedAbs, root) {
+  const editedDir = dirname3(editedAbs);
+  try {
+    const candidate = resolve3(editedDir, relative2(realpathSync(editedDir), root));
+    return realpathSync(candidate) === root ? candidate : root;
+  } catch {
+    return root;
+  }
+}
+function isReadByEveryValidation(treePath) {
+  return treePath.endsWith(".mthds") || treePath === "METHODS.toml";
+}
+async function treeOver(files, bytesByPath) {
+  return {
+    files,
+    digest: await treeDigestOf(files),
+    readFile: async (treePath) => {
+      const bytes = bytesByPath.get(treePath);
+      if (bytes === void 0) throw new Error(`The tree holds no file '${treePath}'.`);
+      return bytes;
+    }
+  };
 }
 function treePathOf(editedAbs, root) {
-  if (root === null) return void 0;
   let real;
   try {
     real = realpathSync(editedAbs);
@@ -13759,7 +14022,7 @@ function isLimitExceeded(err) {
 init_protocol();
 
 // src/version.ts
-var SDK_VERSION = "0.48.0";
+var SDK_VERSION = "0.48.1";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -13892,12 +14155,9 @@ var EXTENSION_MIME = {
   csv: "text/csv",
   json: "application/json"
 };
-function isNodeRuntime() {
-  return typeof process !== "undefined" && process.versions != null && process.versions.node != null;
-}
-function basename3(path) {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
+function basename3(path2) {
+  const parts = path2.split(/[\\/]/);
+  return parts[parts.length - 1] || path2;
 }
 function guessContentType(filename) {
   const dot = filename.lastIndexOf(".");
@@ -13905,20 +14165,22 @@ function guessContentType(filename) {
   const ext = filename.slice(dot + 1).toLowerCase();
   return EXTENSION_MIME[ext] ?? DEFAULT_CONTENT_TYPE;
 }
-async function readLocalPath(path) {
-  if (!isNodeRuntime()) {
+async function readLocalPath(path2) {
+  const loaded = await loadNodeHost();
+  if (loaded.host === null) {
     throw new InvalidLocalSourceError(
-      `Cannot read the local path "${path}" outside Node \u2014 path strings are Node-only. In the browser or an edge runtime, pass the file as bytes (Blob/File/ArrayBuffer/Uint8Array).`,
-      path
+      loaded.reason === null ? `Cannot read the local path "${path2}" outside Node \u2014 path strings are Node-only. In the browser or an edge runtime, pass the file as bytes (Blob/File/ArrayBuffer/Uint8Array).` : `Cannot read the local path "${path2}": ${loaded.reason}`,
+      path2,
+      absenceCause(loaded)
     );
   }
+  const host = loaded.host;
   try {
-    const { readFile: readFile2 } = await import("node:fs/promises");
-    return await readFile2(path);
+    return await host.fs.readFile(path2);
   } catch (cause) {
     throw new InvalidLocalSourceError(
-      `Local file cannot be read: "${path}" (${cause.code ?? "read error"}).`,
-      path,
+      `Local file cannot be read: "${path2}" (${cause.code ?? "read error"}).`,
+      path2,
       { cause }
     );
   }
@@ -14412,19 +14674,19 @@ function inputFormFault(entry) {
   }
   return fieldsFault(entry.fields, "fields");
 }
-function fault(path, problem) {
+function fault(path2, problem) {
   return {
-    path,
+    path: path2,
     problem,
-    message: `malformed${path === "" ? "" : ` at ${path}`}: ${problem}`
+    message: `malformed${path2 === "" ? "" : ` at ${path2}`}: ${problem}`
   };
 }
-function fieldsFault(fields, path) {
+function fieldsFault(fields, path2) {
   if (!Array.isArray(fields)) {
-    return fault(path, `expected a list of fields, got ${described(fields)}`);
+    return fault(path2, `expected a list of fields, got ${described(fields)}`);
   }
   for (const [index, field] of fields.entries()) {
-    const at = `${path}[${index}]`;
+    const at = `${path2}[${index}]`;
     if (!isPlainObject2(field)) {
       return fault(at, `expected a field with a string name and kind, got ${described(field)}`);
     }
@@ -14436,22 +14698,22 @@ function fieldsFault(fields, path) {
   }
   return void 0;
 }
-function nodeFault(node, path) {
+function nodeFault(node, path2) {
   if (!isPlainObject2(node)) {
-    return fault(path, `expected a node with a string kind, got ${described(node)}`);
+    return fault(path2, `expected a node with a string kind, got ${described(node)}`);
   }
   const kind = node.kind;
   if (typeof kind !== "string") {
-    return fault(`${path}.kind`, `expected a string, got ${described(kind)}`);
+    return fault(`${path2}.kind`, `expected a string, got ${described(kind)}`);
   }
   if (!KNOWN_KINDS.has(kind)) {
     return fault(
-      `${path}.kind`,
+      `${path2}.kind`,
       `${described(kind)} is not a kind this version of @pipelex/sdk knows (${[...KNOWN_KINDS].join(", ")}); a newer API may need a newer SDK`
     );
   }
-  if (kind === "object") return fieldsFault(node.fields, `${path}.fields`);
-  if (kind === "list") return nodeFault(node.item, `${path}.item`);
+  if (kind === "object") return fieldsFault(node.fields, `${path2}.fields`);
+  if (kind === "list") return nodeFault(node.item, `${path2}.item`);
   return void 0;
 }
 function described(value) {
@@ -14542,9 +14804,9 @@ function walkReferences(value, withPaths = true) {
         if (known === void 0) byUri.set(node, { uri: node, paths: [] });
         return;
       }
-      const path = [...trail];
-      if (known === void 0) byUri.set(node, { uri: node, paths: [path] });
-      else known.paths.push(path);
+      const path2 = [...trail];
+      if (known === void 0) byUri.set(node, { uri: node, paths: [path2] });
+      else known.paths.push(path2);
       return;
     }
     if (Array.isArray(node)) {
@@ -14570,13 +14832,13 @@ function renderLocation(located) {
   return { uri: located.uri, found_at: located.paths.map(renderPath2) };
 }
 function renderPath2(segments) {
-  let path = "$";
+  let path2 = "$";
   for (const segment of segments) {
-    if (typeof segment === "number") path += `[${segment}]`;
-    else if (IDENTIFIER_KEY.test(segment)) path += `.${segment}`;
-    else path += `[${JSON.stringify(segment)}]`;
+    if (typeof segment === "number") path2 += `[${segment}]`;
+    else if (IDENTIFIER_KEY.test(segment)) path2 += `.${segment}`;
+    else path2 += `[${JSON.stringify(segment)}]`;
   }
-  return path;
+  return path2;
 }
 function isStorageReference(value) {
   return value.startsWith(PIPELEX_STORAGE_SCHEME2) && value.length > PIPELEX_STORAGE_SCHEME2.length;
@@ -14678,9 +14940,10 @@ function requirePositive(name, value) {
   }
 }
 async function dispatcherFor(timeoutMs) {
-  if (!isNodeRuntime()) return null;
   try {
-    const { Agent } = await import("undici");
+    const { host } = await loadNodeHost();
+    if (host === null) return null;
+    const Agent = await host.loadAgent();
     return new Agent({ headersTimeout: timeoutMs, bodyTimeout: timeoutMs });
   } catch {
     return null;
@@ -14941,13 +15204,13 @@ async function writeFully(writer, chunk) {
     offset += bytesWritten;
   }
 }
-async function openUniqueFile(fs, path, dir, baseName) {
+async function openUniqueFile(fs2, path2, dir, baseName) {
   const ext = extensionOf(baseName);
   const stem = baseName.slice(0, baseName.length - ext.length);
   for (let attempt = 0; attempt < MAX_UNIQUE_ATTEMPTS; attempt += 1) {
-    const candidate = path.join(dir, attempt === 0 ? baseName : `${stem}-${attempt}${ext}`);
+    const candidate = path2.join(dir, attempt === 0 ? baseName : `${stem}-${attempt}${ext}`);
     try {
-      return { handle: await fs.open(candidate, "wx"), path: candidate };
+      return { handle: await fs2.open(candidate, "wx"), path: candidate };
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
     }
@@ -14997,12 +15260,14 @@ async function readCompletedResults(client, runId, scope, signal) {
   return state.result;
 }
 async function downloadArtifacts(client, request) {
-  if (!isNodeRuntime()) {
+  const loaded = await loadNodeHost();
+  if (loaded.host === null) {
     throw new ArtifactOperationError(
-      "downloadArtifacts writes to a filesystem and is Node-only. In another runtime, resolve with resolveArtifacts or stream with fetchArtifact instead.",
-      ENVIRONMENT_REFUSED
+      loaded.reason === null ? "downloadArtifacts writes to a filesystem and is Node-only. In another runtime, resolve with resolveArtifacts or stream with fetchArtifact instead." : `downloadArtifacts cannot write to the filesystem: ${loaded.reason}`,
+      { ...ENVIRONMENT_REFUSED, ...absenceCause(loaded) }
     );
   }
+  const host = loaded.host;
   const scope = request.scope ?? "main_stuff";
   requireScope(scope);
   const concurrency = request.concurrency ?? DEFAULT_DOWNLOAD_CONCURRENCY;
@@ -15035,11 +15300,11 @@ async function downloadArtifacts(client, request) {
   }
   const locations = located.map(renderLocation);
   const uris = located.map((reference) => reference.uri);
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-  const dir = path.resolve(request.dir);
+  const fs2 = host.fs;
+  const path2 = host.path;
+  const dir = path2.resolve(request.dir);
   try {
-    await fs.mkdir(dir, { recursive: true });
+    await fs2.mkdir(dir, { recursive: true });
   } catch (cause) {
     throw new ArtifactOperationError(
       `The download directory "${dir}" cannot be created or used: ${cause instanceof Error ? cause.message : String(cause)}.`,
@@ -15106,7 +15371,7 @@ async function downloadArtifacts(client, request) {
     let target;
     try {
       const filename = filenameFor(located[index].paths[0], uri, contentType, scope);
-      target = await openUniqueFile(fs, path, dir, filename);
+      target = await openUniqueFile(fs2, path2, dir, filename);
     } catch (err) {
       committedBytes -= share();
       await discard(response);
@@ -15120,7 +15385,7 @@ async function downloadArtifacts(client, request) {
     const removePartial = async () => {
       committedBytes -= share();
       await target.handle.close().catch(() => void 0);
-      await fs.unlink(target.path).catch(() => void 0);
+      await fs2.unlink(target.path).catch(() => void 0);
     };
     if (response.body === null) {
       try {
@@ -15533,8 +15798,8 @@ function methodPath(methodId, call) {
   return `methods/${segment}`;
 }
 function methodExamplePath(methodId, exampleId, call) {
-  const path = methodPath(methodId, call);
-  return `${path}/examples/${idPathSegment(exampleId, call, EXAMPLE_ID_ARGUMENT)}`;
+  const path2 = methodPath(methodId, call);
+  return `${path2}/examples/${idPathSegment(exampleId, call, EXAMPLE_ID_ARGUMENT)}`;
 }
 var isString4 = (value) => typeof value === "string";
 var METHOD_EXAMPLE_FIELDS = {
@@ -15852,15 +16117,15 @@ var PipelexApiClient = class {
    * member included.
    */
   readMethodExample(method, endpoint, res, value, where) {
-    const path = `/${API_PREFIX2}/${endpoint}`;
+    const path2 = `/${API_PREFIX2}/${endpoint}`;
     if (!isPlainObject(value)) {
-      throw this.unreadableAnswer(method, path, res, `${where} that is not an object`);
+      throw this.unreadableAnswer(method, path2, res, `${where} that is not an object`);
     }
     for (const [field, [expected, fits]] of Object.entries(METHOD_EXAMPLE_FIELDS)) {
       if (!fits(value[field])) {
         throw this.unreadableAnswer(
           method,
-          path,
+          path2,
           res,
           `${where} whose \`${field}\` is not ${expected}`
         );
@@ -15909,14 +16174,14 @@ var PipelexApiClient = class {
    * cannot read too, with `JSON.parse`'s own failure as `cause` when it has one.
    * The one place a success body is parsed.
    */
-  readAnswerAt(method, path, res, run = {}, parse2 = readJson) {
+  readAnswerAt(method, path2, res, run = {}, parse2 = readJson) {
     if (!res.utf8) {
-      throw this.unreadableAnswer(method, path, res, "a body that is not UTF-8", void 0, run);
+      throw this.unreadableAnswer(method, path2, res, "a body that is not UTF-8", void 0, run);
     }
     const reading = parseJsonBody(res.body);
     if (!reading.ok) {
       const what = res.body ? "a body that is not JSON" : "an empty body where JSON was expected";
-      throw this.unreadableAnswer(method, path, res, what, jsonParseFailure(res.body), run);
+      throw this.unreadableAnswer(method, path2, res, what, jsonParseFailure(res.body), run);
     }
     if (parse2 === readJson) return reading.value;
     try {
@@ -15926,7 +16191,7 @@ var PipelexApiClient = class {
       if (err instanceof ExactJsonUnsupportedError) {
         what = "a body holding a number past Number.MAX_SAFE_INTEGER, which this runtime cannot read exactly";
       } else what = res.body ? "a body that is not JSON" : "an empty body where JSON was expected";
-      throw this.unreadableAnswer(method, path, res, what, err, run);
+      throw this.unreadableAnswer(method, path2, res, what, err, run);
     }
   }
   /**
@@ -15934,12 +16199,12 @@ var PipelexApiClient = class {
    * reads it. A body that is JSON but not an object — `null`, a number, a string, an array — is
    * an answer the SDK cannot read either, and throws the same `ApiResponseError`, with no `cause`.
    */
-  readObjectAnswerAt(method, path, res, run = {}, parse2 = readJson) {
-    const answer = this.readAnswerAt(method, path, res, run, parse2);
+  readObjectAnswerAt(method, path2, res, run = {}, parse2 = readJson) {
+    const answer = this.readAnswerAt(method, path2, res, run, parse2);
     if (!isPlainObject(answer)) {
       throw this.unreadableAnswer(
         method,
-        path,
+        path2,
         res,
         "a body that is not an object",
         void 0,
@@ -15956,10 +16221,10 @@ var PipelexApiClient = class {
    * An answer that carries signed links (`RawResponse.carriesLinks`) is held with every link
    * hidden, and with no `cause`, which could quote one. On a request that may create a run, the run may have started: the server accepted it.
    */
-  unreadableAnswer(method, path, res, what, cause, run = {}) {
+  unreadableAnswer(method, path2, res, what, cause, run = {}) {
     const carriesLinks = res.carriesLinks === true;
     return new ApiResponseError(
-      `API ${method} ${path} answered ${res.status} with ${what}`,
+      `API ${method} ${path2} answered ${res.status} with ${what}`,
       this.baseUrl,
       res.status,
       res.statusText,
@@ -15980,13 +16245,13 @@ var PipelexApiClient = class {
    * Throw the `ApiResponseError` of a non-2xx answer, naming the route by its `path` from the
    * origin (`/v1/...`, or `/health` for the liveness probe).
    */
-  throwApiResponseErrorAt(method, path, res, run = {}) {
+  throwApiResponseErrorAt(method, path2, res, run = {}) {
     const { errorType, serverMessage, validationErrors, code, details, document } = parseErrorBody(
       res.body
     );
     const requestId = details.requestId ?? nonEmptyHeader(res.headers, REQUEST_ID_HEADER);
     throw new ApiResponseError(
-      `API ${method} ${path} failed (${res.status}): ${serverMessage ?? (res.body || res.statusText)}`,
+      `API ${method} ${path2} failed (${res.status}): ${serverMessage ?? (res.body || res.statusText)}`,
       this.baseUrl,
       res.status,
       res.statusText,
@@ -17214,9 +17479,10 @@ var PipelexApiClient = class {
    * The links expire about fifteen minutes after the read that served them: write the tree soon
    * after reading the method, and read it again for fresh links when a download is refused.
    *
-   * Throws `RequestArgumentError` before any download when the destination exists and is not an
-   * empty directory, or the listing holds a path that is not a tree path, the same path twice, or
-   * paths that collide once case-folded or where one names a directory of another;
+   * Throws `RequestArgumentError` before any download when it runs outside Node, when the
+   * destination exists and is not an empty directory, or when the listing holds a path that is not
+   * a tree path, the same path twice, or paths that collide once case-folded or where one names a
+   * directory of another;
    * `MethodFileTransferError` when a file could not be downloaded, or its bytes are not the file
    * listed, and nothing is left under the destination.
    */
@@ -17227,7 +17493,8 @@ var PipelexApiClient = class {
    * The method's tree a call was given, made ready to prepare: a `directory` listed, `contents`
    * turned into a tree, a `tree` checked, `files` kept as given; `undefined` when the input gives
    * none. Two forms are refused with `RequestArgumentError` before any request, naming `call`, and
-   * so are a `directory` that is not a string and a `tree` that is not a listed tree. A
+   * so are a `directory` that is not a string, a `directory` where the Node host cannot be had
+   * (outside Node, or in a toolchain that cannot load it), and a `tree` that is not a listed tree. A
    * `directory` is listed by the `mthds` package's lister under the limits the deployment
    * announces, so a tree past one is refused while it is listed, before any file is hashed; the
    * handshake that announces them is asked under `signal`. It is listed once per call: a request
@@ -17243,6 +17510,8 @@ var PipelexApiClient = class {
     if (given[0] === "directory") {
       const directory = input.directory;
       if (typeof directory !== "string") throw directoryRefusal(call);
+      throwIfAborted(signal);
+      await treeListerFor(directory, call);
       throwIfAborted(signal);
       const limits = listerLimitsOf2(announcedTreeLimits2(await this.cachedVersion(signal)));
       throwIfAborted(signal);
@@ -18572,17 +18841,19 @@ async function runValidateStage(filePath, options = {}) {
     return { status: "unavailable" };
   }
   const deadline = AbortSignal.timeout(options.timeoutMs ?? VALIDATE_TIMEOUT_MS);
-  const gathered = await gatherMethodTree(filePath);
-  if (!gathered.ok) {
-    return { status: "unavailable" };
-  }
   try {
+    const gathered = await gatherMethodTree(filePath);
+    if (!gathered.ok) {
+      return gathered.reason === "secret" ? { status: "refused", root: gathered.root, withheld: gathered.withheld } : { status: "unavailable" };
+    }
+    const withheld = gathered.withheld;
     const client = options.client ?? createHookClient();
     const result = await client.validate({ tree: gathered.tree }, true, { signal: deadline });
     if (result.is_valid === true) {
       return {
         status: "valid",
-        pendingSignatures: Array.isArray(result.pending_signatures) ? result.pending_signatures : []
+        pendingSignatures: Array.isArray(result.pending_signatures) ? result.pending_signatures : [],
+        withheld
       };
     }
     if (result.is_valid === false) {
@@ -18590,7 +18861,8 @@ async function runValidateStage(filePath, options = {}) {
         status: "invalid",
         message: result.message,
         validationErrors: Array.isArray(result.validation_errors) ? result.validation_errors : [],
-        renderedMarkdown: result.rendered_markdown
+        renderedMarkdown: result.rendered_markdown,
+        withheld
       };
     }
     return { status: "unavailable" };

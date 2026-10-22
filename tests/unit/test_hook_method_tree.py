@@ -15,6 +15,7 @@ placeholder the stand-in never checks.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,18 @@ def _write_bundle(bundle: Path) -> Path:
     return method
 
 
+def _fake_pem_block(label: str) -> str:
+    """A PEM block of `label`, its body one repeated Base64 character as long as a key's lines, assembled at run time
+    so that no literal in the repository looks like a key to a scanner reading it. It is no key, but the hook's secret
+    guard finds it as it finds one, as the SDK's own suites build theirs."""
+    return "\n".join(["".join(["-----BEGIN ", label, "-----"]), "M" * 64, "Q" * 40, "".join(["-----END ", label, "-----"])]) + "\n"
+
+
+def _fake_service_account_export() -> str:
+    """A cloud console's service-account export, its private key a fake PEM block written into JSON as such exports are."""
+    return json.dumps({"type": "service_account", "project_id": "acme-notices", "private_key": _fake_pem_block("PRIVATE KEY")}) + "\n"
+
+
 def _sent_tree(stub_api: StubApiServer) -> dict[str, Any]:
     """The `files` map of the one validation the hook sent, after the version handshake that precedes it."""
     assert stub_api.routes == ["GET /v1/version", "POST /v1/validate"]
@@ -130,23 +143,56 @@ class TestHookMethodTree:
             f"notices/{TEMPLATE_FILE}",
         ]
 
-    def test_a_gitignore_above_the_tree_keeps_nothing_out_and_no_file_is_screened(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
-        """What `docs/hooks.md` and the README say leaves the machine: the lister reads only the `.gitignore` files inside
-        the tree, so a repository's root `.gitignore` above a bundle with no manifest keeps nothing out, and a key or
-        credentials file beside the bundle travels with it. When the hook gains a secret screen, this test changes with
-        those two documents."""
-        repository = tmp_path / "repository"
-        (repository / ".git").mkdir(parents=True)
-        (repository / ".gitignore").write_text("*.pem\nsecrets.yaml\n", encoding="utf-8")
-        bundle = repository / "methods" / "notices"
-        method = _write_bundle(bundle)
-        (bundle / "key.pem").write_text("not a real key\n", encoding="utf-8")
-        (bundle / "secrets.yaml").write_text("token: not-a-real-token\n", encoding="utf-8")
+    def test_a_manifest_holding_a_secret_sends_nothing_and_says_so(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
+        """Every validation reads the method's bundles and its manifest, so a tree without one is not the method: when
+        either looks like a secret, the hook sends nothing at all, not even the version handshake, and a non-blocking
+        note names the tree and the file in place of a verdict."""
+        package = tmp_path / "package"
+        method = _write_bundle(package / "notices")
+        description = _fake_pem_block("PRIVATE KEY").replace("\n", "\\n")
+        (package / "METHODS.toml").write_text(
+            MANIFEST.replace('description = "The notices a shop tapes to its doors"', f'description = "{description}"'), encoding="utf-8"
+        )
 
         result = run_write_hook(node=node, method=method, stub_api=stub_api)
 
-        assert result.stdout.strip() == "", f"a valid verdict passes silently, but the hook said: {result.stdout}"
-        assert sorted(_sent_tree(stub_api)) == ["key.pem", "method-graph.html", "notice.mthds", "secrets.yaml", TEMPLATE_FILE]
+        assert stub_api.routes == [], "a tree whose manifest looks like a secret must not reach the API"
+        output: dict[str, Any] = json.loads(result.stdout)
+        assert "decision" not in output, f"a validation the hook did not send must not block: {output}"
+        note: str = output["hookSpecificOutput"]["additionalContext"]
+        assert "The .mthds hook did not validate the method at" in note, note
+        assert "METHODS.toml" in note and "M" * 40 not in note, note
+
+    def test_secret_files_stay_home_while_a_gitignore_above_the_tree_still_keeps_nothing_out(
+        self, node: str, stub_api: StubApiServer, tmp_path: Path
+    ) -> None:
+        """What `docs/hooks.md` and the README say leaves the machine. The hook screens every file of the tree before it
+        sends anything, so a file named like a secret file or holding a well-known key format stays home, and the
+        verdict comes with a note naming it, never quoting it. The lister still reads only the `.gitignore` files
+        inside the tree, so a repository's root `.gitignore` above a bundle with no manifest keeps nothing out: a file
+        it lists that holds no secret travels with the method."""
+        repository = tmp_path / "repository"
+        (repository / ".git").mkdir(parents=True)
+        (repository / ".gitignore").write_text("*.pem\ncredentials.json\nservice-account.json\nscratch.txt\n", encoding="utf-8")
+        bundle = repository / "methods" / "notices"
+        method = _write_bundle(bundle)
+        (bundle / "key.pem").write_text(_fake_pem_block("PRIVATE KEY"), encoding="utf-8")
+        (bundle / "credentials.json").write_text("{}\n", encoding="utf-8")
+        (bundle / "service-account.json").write_text(_fake_service_account_export(), encoding="utf-8")
+        (bundle / "scratch.txt").write_text("a draft the repository ignores and that holds no secret\n", encoding="utf-8")
+
+        result = run_write_hook(node=node, method=method, stub_api=stub_api)
+
+        assert sorted(_sent_tree(stub_api)) == ["method-graph.html", "notice.mthds", "scratch.txt", TEMPLATE_FILE]
+        # A valid verdict still passes: the note rides as context for the agent, never as a block.
+        output: dict[str, Any] = json.loads(result.stdout)
+        assert "decision" not in output, f"a valid verdict reached without the secret files must not block: {output}"
+        note: str = output["hookSpecificOutput"]["additionalContext"]
+        assert "The .mthds hook kept these files of the method's tree on this machine" in note, note
+        for kept_home in ("key.pem", "credentials.json", "service-account.json"):
+            assert kept_home in note, f"the note does not name {kept_home}: {note}"
+        assert "scratch.txt" not in note, "a file holding no secret is never named as one"
+        assert "M" * 40 not in note, "the note must never quote what a file holds"
 
     def test_two_steps_naming_one_path_each_send_their_own_file(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
         """A path two files of the bundle name leads to a different file from each, and the tree carries both."""
