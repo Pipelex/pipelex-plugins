@@ -9,19 +9,22 @@ own environment (the one `pipelex-sdk` is installed in), and one generated direc
 For each directory it (1) runs `pipelex-sdk`'s `run_codegen_check` over the stamped files against
 `codegen.lock` — pure hashing, no engine, no network, no API key, and no `pipelex` runtime — and (2)
 compares the SHA-256 recorded for each .mthds source in `sources.json` against the file on disk, and the
-recorded sources against every .mthds file under the sidecar's `bundle_dir`, which is what the call site
-loads, so a bundle changed without a regeneration — a file edited, removed or added — is caught as
-`stale-source`; and (3) hashes each template file the sidecar's `templates` records, the files a call site sends
-beside the bundle, so one moved, removed or edited since the call site was written is caught the same way.
+recorded sources against every .mthds file of the method tree the call site sends from the sidecar's
+`bundle_dir`, listed by the MTHDS standard's own lister under the membership rule the run follows, so a
+bundle changed without a regeneration — a file edited, removed or added, or one a `.gitignore` or the
+manifest's `exclude` now keeps out or lets in — is caught as `stale-source`; and (3) hashes each template file
+the sidecar's `templates` records and checks that the tree still carries it, so one moved, removed, edited or
+left out since the call site was written is caught the same way.
 
 Exit codes: 0 current · 1 drift or stale source · 2 no verdict (no lock, a malformed or unreadable lock
 or tree, a symlink at the generated directory or on an artifact's path, a check that raises, `pipelex-sdk`
 not importable or failing while it loads). Precedence across directories: 2 > 1 > 0.
 
 It is the twin of `codegen-check.mjs`, which does the same for a TypeScript project over `@pipelex/sdk`,
-and the two fail closed on the same malformed sidecars. It imports only the standard library and
-`pipelex-sdk` (0.10.2 or later), and writes through `sys.stdout` / `sys.stderr` so a no-print lint rule
-stays quiet. When `pipelex-sdk` ships this check as a command, replace this file with that one line.
+and the two fail closed on the same malformed sidecars. It imports only the standard library,
+`pipelex-sdk` (0.48.0 or later) and the `mthds` package that release depends on, whose lister is the one the
+SDK sends a tree with, and writes through `sys.stdout` / `sys.stderr` so a no-print lint rule stays quiet.
+When `pipelex-sdk` ships this check as a command, replace this file with that one line.
 """
 
 from __future__ import annotations
@@ -40,13 +43,17 @@ from pathlib import Path
 from typing import NamedTuple, NoReturn, cast
 
 try:
+    # `pipelex-sdk` lists a `tree=` path with this lister, so the gate lists the bundle with it too: one membership
+    # rule for what the run sends and what the gate checks. An SDK below the floor brings an `mthds` without it.
+    from mthds.method_tree.exceptions import MethodTreeError
+    from mthds.method_tree.lister import list_method_tree
     from pipelex_sdk.codegen_check import run_codegen_check
     from pipelex_sdk.errors import CodegenLockError
 except ImportError as import_error:
     # A gate that cannot run has no verdict to give. Letting the import fail would exit 1, which reads as
     # drift, and the likeliest cause is an interpreter outside the project's environment, not the tree.
     sys.stderr.write(
-        f"codegen-check: no verdict — pipelex-sdk 0.10.2 or later is not importable ({import_error}). "
+        f"codegen-check: no verdict — pipelex-sdk 0.48.0 or later is not importable ({import_error}). "
         "Run this script with the project's own environment, e.g. `uv run python scripts/codegen_check.py …`.\n"
     )
     sys.exit(2)  # EXIT_NO_VERDICT, which a linter will not let this file define above its imports
@@ -74,15 +81,19 @@ NO_SOURCES_LINE = f"  {SIDECAR_FILENAME} records no sources — a by-ref or by-i
 TEMPLATE_FILE_KEY = re.compile(r"""^\s*["']?template_file["']?\s*=""", re.MULTILINE)
 
 
+REFRESH_HINT = "  Run /pipelex-integrate to refresh the generated types."
+
+
 class Outcome(NamedTuple):
-    """One check's exit code and the lines explaining it."""
+    """One check's exit code, the lines explaining it, and the cure to print in place of the refresh hint, if any."""
 
     code: int
     lines: tuple[str, ...]
+    cure: str | None = None
 
 
 class Recorded(NamedTuple):
-    """What a sidecar recorded about a local bundle: its sources as sorted pairs, the directory the call site loads,
+    """What a sidecar recorded about a local bundle: its sources as sorted pairs, the directory the call site sends,
     and its `templates` as the sidecar holds them, `has_templates` telling an absent field from any value."""
 
     sources: list[tuple[str, object]]
@@ -92,13 +103,17 @@ class Recorded(NamedTuple):
 
 
 class Bundle(NamedTuple):
-    """The .mthds files the call site loads, each normalized path mapped to the path shown for it.
+    """The method tree the call site sends: its .mthds files, each normalized path mapped to the path shown for it,
+    and every file it carries, each normalized path mapped to its SHA-256.
 
-    `paths` is None when the directory cannot be listed, and `lines` then says why.
+    `paths` and `members` are None when the tree cannot be listed, and `lines` then says why. `cure` is set when a
+    refresh cannot clear what `lines` reports.
     """
 
     paths: dict[Path, str] | None
+    members: dict[Path, str] | None
     lines: tuple[str, ...]
+    cure: str | None = None
 
 
 def _out(line: str) -> None:
@@ -186,8 +201,8 @@ def _recorded_sources(*, sidecar: object) -> Recorded | Outcome:
     recorded_sources = sorted(cast("dict[str, object]", sources).items())
     if not recorded_sources and "bundle_dir" not in fields:
         return Outcome(code=EXIT_CURRENT, lines=(NO_SOURCES_LINE,))
-    # The hashes alone prove only that the recorded files are unchanged. The call site loads every .mthds file
-    # under its bundle directory, so a file added beside them changes what runs while every recorded hash still
+    # The hashes alone prove only that the recorded files are unchanged. The call site sends its bundle directory
+    # as the method's tree, so a file added beside them changes what runs while every recorded hash still
     # matches: without the directory, that addition cannot be ruled out.
     if "bundle_dir" not in fields:
         return Outcome(
@@ -229,23 +244,23 @@ def _compare_sources(*, recorded: Recorded) -> Outcome:
         if on_disk != recorded_hash:
             stale_lines.append(f"  stale-source: {source} — edited since the types were generated")
         elif bundle.paths is not None and resolved not in bundle.paths:
-            stale_lines.append(
-                f"  stale-source: {source} — recorded as a source but not under {recorded.bundle_dir}, so the call site does not load it"
-            )
+            stale_lines.append(f"  stale-source: {source} — recorded as a source but left out of the tree the call site sends")
     if bundle.paths is not None:
         for resolved, shown in bundle.paths.items():
             if resolved not in recorded_paths:
                 stale_lines.append(f"  stale-source: {shown} — added to the bundle since the types were generated")
     stale_lines.extend(_check_templates(recorded=recorded, bundle=bundle, project_root=project_root))
-    return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines))
+    return Outcome(code=EXIT_DRIFT if stale_lines else EXIT_CURRENT, lines=tuple(stale_lines), cure=bundle.cure)
 
 
 def _check_templates(*, recorded: Recorded, bundle: Bundle, project_root: Path) -> list[str]:
-    """Hash each template file the sidecar's `templates` records against the file at its path.
+    """Hash each template file the sidecar's `templates` records against the file at its path, and find it in the tree.
 
     The map is `{"<template_file>": {"path": ..., "sha256": ...}}`. A renamed or added `template_file` needs no check
-    here, since it edits a .mthds file the sources hash. A sidecar written before the skill recorded `templates` has
-    none, and then a bundle file naming a `template_file` is stale: its call site may send no template at all.
+    here, since it edits a .mthds file the sources hash. A template the membership rule keeps out of the tree, by a
+    `.gitignore` or the manifest's `exclude`, is never sent, so the run refuses its step. A sidecar written before
+    the skill recorded `templates` has none, and then a bundle file naming a `template_file` is stale: its call site
+    may send no template at all.
     """
     stale_lines: list[str] = []
     if not recorded.has_templates:
@@ -286,30 +301,63 @@ def _check_templates(*, recorded: Recorded, bundle: Bundle, project_root: Path) 
             continue
         if on_disk != entry_hash:
             stale_lines.append(f"  stale-source: {entry_path} — template file edited since the call site was written")
+        elif bundle.members is not None and _normalized(project_root / entry_path) not in bundle.members:
+            stale_lines.append(f"  stale-source: {entry_path} — recorded as a template file but left out of the tree the call site sends")
     return stale_lines
 
 
 def _list_bundle(*, project_root: Path, bundle_dir: str) -> Bundle:
-    """List the .mthds files the call site loads, the way it lists them: `rglob("*.mthds")` under the bundle directory."""
+    """List the method tree the call site sends from the bundle directory, with the standard's lister, as `pipelex-sdk` does.
+
+    The lister applies the MTHDS membership rule, so a file whose name starts with a dot, one under `node_modules` or
+    `__pycache__`, a run's inputs file, and whatever a `.gitignore` inside the tree or the manifest's `exclude` keeps
+    out are not in it, exactly as they are not in the run. It roots the tree at the nearest `METHODS.toml` at or
+    above the directory, as the SDK does, so a manifest above the bundle makes the run send more than the bundle.
+    """
     root = project_root / bundle_dir
-    # Asked first because `rglob` answers a missing directory and a file alike with an empty list, while the
-    # TypeScript twin's `readdir` raises for both; asking here makes the two gates say the same thing.
+    # Asked first so a missing or non-directory bundle reads the same as in the TypeScript twin.
     try:
         root_stat = root.stat()
     except FileNotFoundError:
-        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but no longer on disk",))
+        return Bundle(paths=None, members=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but no longer on disk",))
     except (OSError, ValueError) as exc:
-        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but unreadable ({exc})",))
+        return Bundle(paths=None, members=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but unreadable ({exc})",))
     if not stat.S_ISDIR(root_stat.st_mode):
-        return Bundle(paths=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but not a directory",))
-    shown_by_path = {
-        _normalized(match): posixpath.normpath(posixpath.join(bundle_dir, match.relative_to(root).as_posix())) for match in root.rglob("*.mthds")
-    }
+        return Bundle(paths=None, members=None, lines=(f"  stale-source: {bundle_dir} — recorded as the bundle directory but not a directory",))
+    try:
+        tree = list_method_tree(root)
+    except MethodTreeError as exc:
+        return Bundle(paths=None, members=None, lines=(f"  stale-source: {bundle_dir} — the call site cannot send it as a method tree ({exc})",))
+    lines: list[str] = []
+    cure: str | None = None
+    # The lister reports the physical root; the shown and compared paths stay on the bundle directory as recorded.
+    tree_root = tree.directory if tree.directory is not None else root.resolve()
+    root_from_bundle = Path(os.path.relpath(tree_root, root.resolve())).as_posix()
+    if root_from_bundle != ".":
+        shown_root = posixpath.normpath(posixpath.join(bundle_dir, root_from_bundle))
+        lines.append(
+            f"  stale-source: {bundle_dir} — a METHODS.toml at {shown_root} roots the tree the call site sends above the bundle "
+            "directory, so the run sends files the types were not generated from"
+        )
+        # The workshop lists a folder from the folder itself, never from a manifest above it, so a refresh records
+        # the bundle alone again and this line, with every file it brings in from beside the bundle, stays.
+        cure = (
+            f"  A refresh cannot clear this: move {bundle_dir} out from under {shown_root}/METHODS.toml, or integrate "
+            f"{shown_root} itself as the bundle, then run /pipelex-integrate. A file outside {bundle_dir} reported as "
+            "added above has the same cause."
+        )
+    members: dict[Path, str] = {}
+    shown_by_path: dict[Path, str] = {}
+    for member in tree.files:
+        resolved = _normalized(root / root_from_bundle / member.path)
+        members[resolved] = member.sha256
+        if member.path.endswith(".mthds"):
+            shown_by_path[resolved] = posixpath.normpath(posixpath.join(bundle_dir, root_from_bundle, member.path))
     # Ordered by the path shown, which is how the TypeScript twin orders them; `Path` ordering compares parts.
     paths = dict(sorted(shown_by_path.items(), key=lambda item: item[1]))
     if not paths:
-        return Bundle(paths=paths, lines=(f"  stale-source: {bundle_dir} — holds no .mthds file, so the call site has no bundle to load",))
-    return Bundle(paths=paths, lines=())
+        lines.append(f"  stale-source: {bundle_dir} — holds no .mthds file, so the call site has no bundle to send")
+    return Bundle(paths=paths, members=members, lines=tuple(lines), cure=cure)
 
 
 def settle(*, name: str, check: Callable[[], Outcome]) -> Outcome:
@@ -363,7 +411,7 @@ def main(argv: list[str]) -> int:
         for line in (*tree.lines, *sources.lines):
             write(line)
         if code == EXIT_DRIFT:
-            _err("  Run /pipelex-integrate to refresh the generated types.")
+            _err(sources.cure or REFRESH_HINT)
         exit_code = worse(exit_code, code)
 
     verdicts = {EXIT_CURRENT: "current", EXIT_DRIFT: "drift", EXIT_NO_VERDICT: "no verdict"}

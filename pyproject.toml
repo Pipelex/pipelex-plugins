@@ -16,9 +16,11 @@ pipelex-plugins-render = "scripts.outside_render:main"
 dev = [
   "mypy>=1.11.2",
   # Not imported by the tooling: `tests/unit` runs `pipelex-integrate`'s shipped Python drift gate
-  # (`skills/pipelex-integrate/references/codegen_check.py`) against the real offline check, and
-  # pyright type-checks that script against the real SDK (see `[tool.pyright] include`).
-  "pipelex-sdk>=0.10.0",
+  # (`skills/pipelex-integrate/references/codegen_check.py`) against the real offline check and the
+  # real method-tree lister of the `mthds` package it depends on, and pyright type-checks that script
+  # against the real SDK (see `[tool.pyright] include`). 0.48.0 is the gate's own floor: the first
+  # release whose `mthds` carries the lister.
+  "pipelex-sdk>=0.48.0",
   "pyright>=1.1.410",
   "pytest>=8.0.0,<9.0.0",
   "pytest-mock>=3.14.0",

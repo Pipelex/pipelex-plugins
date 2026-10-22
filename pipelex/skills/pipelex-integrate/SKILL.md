@@ -24,7 +24,7 @@ Leave a project calling a method through one typed module, over generated types 
 
 - **If a tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code.
 - **If a call returns `status: "error"` with an error of class `config`**, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. A **403** on `mthds_codegen` is a feature gate, not a key problem.
-- **`mthds_list_methods`** is optional, resolving a method named without its id; never stop for it.
+- **`mthds_list_methods`** is optional, for a method named without its id; never stop for it.
 
 ## Guards
 
@@ -44,7 +44,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: every `.mthds` file beneath the bundle directory is the set you record and hash, and you pass it with the template files its `PipeDocGen` steps name. Prefer the path form `{path: <absolute path>}`, **the root `.mthds` file first**, as nothing above its directory is read. The workshop refuses a path outside **its own** working directory, where the harness launched it; relaunching the harness from a directory holding the bundle cures that. Inline `{content, uri: <path relative to the bundle dir>}` is the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A bundle outside the project is copied in first, where the language reference places it, and the user told.
+- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. **Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir` or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop. A bundle outside the project is copied in first, where the language reference places it, and the user told. **A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -95,9 +95,9 @@ Write this unstamped `sources.json` beside the lock:
 
 ```json
 {
-  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit. `bundle_dir` is what the call site loads, and `sources` and `templates` hash its .mthds and template files, so a bundle changed without a regeneration is detectable.",
+  "comment": "Written by /pipelex-integrate, which refreshes it; never hand-edit.",
   "generator": "pipelex-integrate",
-  "method": { "files": ["methods/summarize-pdf/main.mthds"] },
+  "method": { "method_dir": "methods/summarize-pdf" },
   "target": "ts-zod",
   "pipe": { "pipe_ref": "summarize.summarize_pdf", "inputs": { "document": "native.Document", "context": "native.Text?" }, "output": "summarize.DocumentSummary" },
   "bundle_dir": "methods/summarize-pdf",
@@ -106,15 +106,15 @@ Write this unstamped `sources.json` beside the lock:
 }
 ```
 
-`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes every `.mthds` file beneath it with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none; the call site's map is written from it. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
+`method` holds the selector as passed; paths are from the project root; `pipe` writes `Concept[]` for a list, `Concept?` for an optional. **`bundle_dir` is the call site's `BUNDLE_DIR`**, and `sources` hashes the `.mthds` files of `files_sent` with SHA-256; `templates` maps each step's `template_file` to its file's `{ "path", "sha256" }`, `{}` for none. A `method_ref` or `method_id` has no `bundle_dir` or `templates` and an empty `sources`.
 
 ### 8. Dependencies
 
-With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.18.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.10.2 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
+With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.48.0 (`ts-zod`); `pydantic`, `pipelex-sdk` 0.48.0 (`python-pydantic`); `pipelex` 0.79.0 (`python-structures`). Raise and report older pins.
 
 ### 9. The call site
 
-One module per method from the language reference's template, in the project's service layer, loading **every `.mthds` file under `bundle_dir`** at call time, with the template files its steps name, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
+One module per method from the language reference's template, in the project's service layer, sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
 
 ### 10. The offline gate
 
@@ -143,9 +143,10 @@ What was generated and where, the target and why, the call site's signature, the
 | `input_domain` at `output_dir`, outside the server's directory | step 1's containment: STOP, relaunch, say what is already written |
 | `is_current: false`, not step 6's orphans case | report `drifts[]` verbatim and stop; commit nothing |
 | no signature, by address or id | STOP as the fallback reference says; never guess the output concept |
-| a Python target over a bundle naming template files | STOP, nothing generated, as [python.md](references/python.md) says |
+| `python-structures`, its `pipelex-sdk` after step 8 unread or below the floor, templated bundle | STOP, nothing generated: [python.md](references/python.md) |
 | `TS2835` | the TypeScript reference: yours in your module, the emitter's in `binder.ts` |
 | a gate exits `2` | no verdict, not drift: read [references/gate-failures.md](references/gate-failures.md) |
+| a `METHODS.toml` above `bundle_dir` (step 1, or a gate's `roots the tree` line) | STOP: move the bundle out from under it, or make `bundle_dir` the package root; a refresh clears neither it nor its `added` lines |
 | `stale-source`: a file added, or no `bundle_dir` | [refresh mode](references/refresh.md); never add its hash to `sources` by hand |
 
 ## References

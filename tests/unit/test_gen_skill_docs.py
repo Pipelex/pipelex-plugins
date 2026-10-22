@@ -1180,18 +1180,20 @@ class TestSharedSkillIncludes:
         longer claims to be the one form the hosted console accepts: the console's
         tools are `pipelex_*` and take no files at all.
 
-        Every skill but the catalog's save and integrate passes the bundle directory as `method_dir`, and the workshop
+        Every skill but the catalog's save passes the bundle directory as `method_dir`, and the workshop
         finds the `.mthds` files and the template files their `PipeDocGen` steps name, lists
         what it sent in `files_sent`, and keeps out what a `.gitignore` inside the folder
         excludes, which is how a saved run stays out of the method (`pipelex-mcp`, SPEC.md,
         "The method folder"). Its sentence ends on the pointer to the language reference's
         fallback for a workshop older than the folder form, which lists the files instead.
-        The catalog's save and integrate keep the listing form: `mthds_save_method` takes no
-        folder, and integrate submits the set its call site loads. A template file travels
-        only from disk, so in both forms the inline fallback is one for a bundle with no
-        template file, and a templated bundle out of the workshop's reach is a stop and the
-        relaunch. The catalog's save sends no template file, since `mthds_save_method` takes
-        `.mthds` and `.py` files alone, and integrate states its own set.
+        The catalog's save keeps the listing form, since `mthds_save_method` takes no folder.
+        Integrate passed the listing too, the set its call site loaded, until its call site sent
+        the bundle directory as the method's tree, which the same standard's lister lists: the
+        folder's `files_sent` is that tree's set, so it takes the folder form like the rest. A
+        template file travels only from disk, so in both forms the inline fallback is one for a
+        bundle with no template file, and a templated bundle out of the workshop's reach is a stop
+        and the relaunch. The catalog's save sends no template file, since `mthds_save_method`
+        takes `.mthds` and `.py` files alone.
 
         In the listing form the workshop reads every `{ path }` item from at or under the
         directory of the first one, so the root `.mthds` file goes first; the catalog states
@@ -1206,7 +1208,7 @@ class TestSharedSkillIncludes:
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
             if "{% set validate_call_folder = false %}" in _skill_source(path.parent)
         )
-        assert listing == ["pipelex-catalog", "pipelex-integrate"], "only the catalog's save and integrate list the files"
+        assert listing == ["pipelex-catalog"], "only the catalog's save lists the files"
         assert set(listing) < set(includers)
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
@@ -1228,6 +1230,10 @@ class TestSharedSkillIncludes:
         )
         template_files = "and every template file a `PipeDocGen` step names"
         root_first = "**the root `.mthds` file first**, as nothing above its directory is read"
+        tree_only = (
+            "**Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir`"
+            " or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop."
+        )
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert cure in body, f"{target_name}/{skill}: the cure is unnamed"
@@ -1239,8 +1245,15 @@ class TestSharedSkillIncludes:
             else:
                 assert body.count(folder) == 1, f"{target_name}/{skill}: the bundle directory is not passed as method_dir"
                 assert "It refuses one outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
-                assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
-                assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                if skill == "pipelex-integrate":
+                    # Its call site sends the folder's tree, which no fallback sends: the inline form sends the listing's set,
+                    # named in `files_sent` by tree paths a gate cannot find, and an older workshop's fallback is the listing.
+                    assert folder_fallback not in body and older not in body, f"{target_name}/{skill}: a fallback is not the call site's tree"
+                    assert tree_only in body, f"{target_name}/{skill}: a bundle the folder cannot reach is not a stop"
+                else:
+                    assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                    assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                    assert tree_only not in body, f"{target_name}/{skill}: only integrate replaces the fallbacks with a stop"
                 assert "Prefer the path form" not in body and template_files not in body, f"{target_name}/{skill}: the folder form lists no file"
             if skill == "pipelex-catalog":
                 assert templated_stop not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
@@ -1248,16 +1261,15 @@ class TestSharedSkillIncludes:
                 assert root_first not in body, "the catalog states the order at its save step, with its own reason"
                 assert "with the **root file first**" in body and "the workshop reads nothing above its directory" in body
             elif skill == "pipelex-integrate":
-                assert templated_stop in body, f"{target_name}/{skill}: the inline fallback is gone"
-                assert root_first in body, f"{target_name}/{skill}: the root file no longer goes first"
-                assert template_files not in body, "integrate states the set its call site loads"
+                assert "record and hash what step 2's `files_sent` lists." in body, f"{target_name}/{skill}: the folder's set is not what it records"
 
     def test_no_skill_that_passes_the_folder_lists_the_bundle_s_files_elsewhere(self) -> None:
         """A skill that passes the bundle directory as `method_dir` to one call and lists its files to
         the next sends different sets, the folder's rule and a hand-made list, and loses the
         template files the folder finds. So a skill in the folder form names `method_dir` wherever it
-        calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save
-        and integrate, which set the include's listing form."""
+        calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save,
+        which sets the include's listing form. Integrate's references are left out of the sweep: the Python
+        reference's branch for an SDK from before the method tree reads the bundle's files by hand."""
         listings = ("whole-bundle `files`", "with `files` for every file", "the same files", "the file set step 5 submits", "bundle `files`")
         for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")):
             body = _skill_source(path.parent)
@@ -1277,9 +1289,9 @@ class TestSharedSkillIncludes:
     def test_a_folder_form_skill_names_files_only_where_the_folder_cannot_go(self, target_name: str) -> None:
         """The structural half of the sweep above, which a rewording cannot slip past: in every skill
         that passes the folder, `files` is named only where the folder cannot go. That is the
-        include's inline fallback in every one of them, explain's single file, whose folder may hold
-        other methods, and in inputs the stop row of a workshop that answers a prepare at `files`.
-        Every other mention would be a listing the folder replaced."""
+        include's inline fallback in every one of them but integrate, which has none, explain's single
+        file, whose folder may hold other methods, and in inputs the stop row of a workshop that answers
+        a prepare at `files`. Every other mention would be a listing the folder replaced."""
         folder_form = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1297,7 +1309,9 @@ class TestSharedSkillIncludes:
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=folder_form, target_name=config.name)
         for skill in folder_form:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert body.count(everywhere) == 1, f"{target_name}/{skill}: the inline fallback is not named once"
+            assert body.count(everywhere) == (0 if skill == "pipelex-integrate" else 1), (
+                f"{target_name}/{skill}: the inline fallback is not named once"
+            )
             allowed = body.count(everywhere)
             if skill in exceptions:
                 assert body.count(exceptions[skill]) == 1, f"{target_name}/{skill}: its own use of `files` is gone"
