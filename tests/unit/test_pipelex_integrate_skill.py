@@ -742,12 +742,17 @@ class TestPipelexIntegrateSkill:
     )
 
     def run_typescript_gate(
-        self, root: Path, *arguments: str, sdk_index: str | None, mthds_index: str | None = STUB_MTHDS
+        self,
+        root: Path,
+        *arguments: str,
+        sdk_index: str | None,
+        mthds_index: str | None = STUB_MTHDS,
+        node_arguments: tuple[str, ...] = (),
     ) -> subprocess.CompletedProcess[str]:
         """Copy the shipped script into `root` and run it from there, beside a stub `@pipelex/sdk` whose module
         body is `sdk_index` — or with no `@pipelex/sdk` resolvable at all when it is `None` — and, with an SDK,
-        a stub `mthds` whose module body is `mthds_index`, none when it is `None`. Skipped when no `node` is on
-        the PATH."""
+        a stub `mthds` whose module body is `mthds_index`, none when it is `None`. `node_arguments` go to `node`
+        before the script, a `--require` preload among them. Skipped when no `node` is on the PATH."""
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on the PATH")
@@ -763,7 +768,7 @@ class TestPipelexIntegrateSkill:
             (stub / "index.js").write_text(sdk_index, encoding="utf-8")
             if mthds_index is not None:
                 self.install_stub_mthds(root, mthds_index)
-        return subprocess.run([node, str(gate), *arguments], cwd=root, capture_output=True, text=True, check=False)
+        return subprocess.run([node, *node_arguments, str(gate), *arguments], cwd=root, capture_output=True, text=True, check=False)
 
     @staticmethod
     def install_stub_mthds(root: Path, index: str) -> None:
@@ -852,6 +857,47 @@ class TestPipelexIntegrateSkill:
         assert expected_message in result.stderr, self.explain(result)
         assert "node:internal" not in result.stderr, "the failure reached the user as a stack trace, not a verdict"
         assert result.stdout == ""
+
+    def test_the_typescript_gate_finds_the_lister_under_yarn_plug_n_play(self, tmp_path: Path) -> None:
+        """Yarn Plug'n'Play writes no `node_modules`, so walking up from the SDK finds no `mthds` although Node
+        imports `@pipelex/sdk` fine, and the gate gave no verdict on every run. Under Plug'n'Play, which sets
+        `process.versions.pnp`, the gate asks its `pnpapi` where `mthds` resolves from the SDK's file. Here a stub
+        `pnpapi` points at a stub `mthds` kept outside every `node_modules`, and a preload sets the version key the
+        runtime would, so the gate reaches a verdict only through that route: a bundle file added since the types
+        were generated, which only the lister can see."""
+        self.write_python_project(tmp_path)
+        (tmp_path / "methods" / "summarize" / "extra.mthds").write_text('domain = "extra"\n', encoding="utf-8")
+        store = tmp_path / "yarn-cache" / "mthds"
+        store.mkdir(parents=True)
+        (store / "package.json").write_text(
+            '{"name":"mthds","version":"0.0.0-stub","type":"module","exports":{".":{"import":"./index.js"}}}', encoding="utf-8"
+        )
+        (store / "index.js").write_text(self.STUB_MTHDS, encoding="utf-8")
+        pnpapi = tmp_path / "node_modules" / "pnpapi"
+        pnpapi.mkdir(parents=True)
+        (pnpapi / "index.js").write_text(
+            "module.exports = {\n"
+            "  resolveToUnqualified: (request, issuer) =>\n"
+            f"    request === 'mthds' && issuer.includes('@pipelex') ? {json.dumps(str(store))} : null,\n"
+            "};\n",
+            encoding="utf-8",
+        )
+        preload = tmp_path / "pnp-preload.cjs"
+        preload.write_text('process.versions.pnp = "3";\n', encoding="utf-8")
+
+        result = self.run_typescript_gate(
+            tmp_path,
+            "generated/summarize",
+            sdk_index=self.STUB_SDK_THAT_CAN_CRASH,
+            mthds_index=None,
+            node_arguments=("--require", str(preload)),
+        )
+        assert not (tmp_path / "node_modules" / "mthds").exists(), "the lister must be reachable only through pnpapi"
+        assert result.returncode == 1, self.explain(result)
+        assert "stale-source: methods/summarize/extra.mthds — added to the bundle since the types were generated" in result.stderr, self.explain(
+            result
+        )
+        assert "not installed beside it" not in result.stderr
 
     def test_the_typescript_gate_has_no_verdict_when_a_check_throws(self, tmp_path: Path) -> None:
         """An error a check did not expect is no verdict for that directory — never an uncaught rejection that

@@ -25,12 +25,14 @@
 // It is the twin of codegen_check.py, which does the same for a Python project over
 // pipelex-sdk. It imports only Node builtins, @pipelex/sdk and the `mthds` package the SDK
 // depends on, whose lister is the one the SDK sends a `directory` with, found from the SDK's
-// own location, and writes through process.stdout / process.stderr so a no-console lint rule
-// stays quiet. When @pipelex/sdk
-// ships this check as a command, replace this file with that one line.
+// own location (in a `node_modules` above it, or through Yarn Plug'n'Play's `pnpapi` where
+// there is none), and writes through process.stdout / process.stderr so a no-console lint rule
+// stays quiet. When @pipelex/sdk ships this check as a command, replace this file with that
+// one line.
 
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -103,15 +105,18 @@ async function loadSdk() {
 }
 
 /**
- * The `mthds` package @pipelex/sdk depends on, found the way Node finds it for the SDK: in a `node_modules`
- * at or above the SDK's own physical directory. A bare import of `mthds` from this script would resolve from
- * the project root instead, where a package manager that does not hoist, pnpm's default among them, puts no
- * `mthds`. Returns { MethodTreeError, listMethodTree }, or null once the reason is on stderr.
+ * The `mthds` package @pipelex/sdk depends on, found the way the package manager finds it for the SDK: in a
+ * `node_modules` at or above the SDK's own physical directory, or, under Yarn Plug'n'Play, which writes no
+ * `node_modules`, through its `pnpapi` resolving `mthds` from the SDK's file. A bare import of `mthds` from this
+ * script would resolve from the project root instead, where a package manager that does not hoist, pnpm's
+ * default among them, puts no `mthds`, and a `require.resolve` of it throws, since its exports carry no
+ * `require` condition. Returns { MethodTreeError, listMethodTree }, or null once the reason is on stderr.
  */
 async function loadLister() {
   let mthds;
   try {
-    let directory = path.dirname(await realpath(fileURLToPath(import.meta.resolve("@pipelex/sdk"))));
+    const sdkFile = fileURLToPath(import.meta.resolve("@pipelex/sdk"));
+    let directory = path.dirname(await realpath(sdkFile));
     let manifest = null;
     for (;;) {
       const candidate = path.join(directory, "node_modules", "mthds", "package.json");
@@ -124,6 +129,14 @@ async function loadLister() {
       const parent = path.dirname(directory);
       if (parent === directory) break;
       directory = parent;
+    }
+    if (manifest === null && process.versions.pnp) {
+      // Plug'n'Play resolves a package to its location without reading its exports, which is all the gate needs.
+      const location = createRequire(import.meta.url)("pnpapi").resolveToUnqualified("mthds", sdkFile);
+      if (location) {
+        const candidate = path.join(location, "package.json");
+        manifest = { file: candidate, json: JSON.parse(await readFile(candidate, "utf8")) };
+      }
     }
     if (manifest === null) {
       err("codegen-check: no verdict — the `mthds` package @pipelex/sdk depends on is not installed beside it. Reinstall the project's dependencies.");
