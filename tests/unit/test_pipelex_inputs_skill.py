@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -197,6 +200,79 @@ class TestPipelexInputsSkill:
         user_data = self.reference("user-data.md")
         assert "in two calls when the user's files need an upload too, since only the factory's go up as test files" in user_data
         assert "one prepare call then covers both sources' files" not in user_data
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_inputs_are_marked_out_of_the_method_s_tree_before_they_are_written(self, target_name: str) -> None:
+        """`L-261022-b695eb`: for a local bundle `<output_dir>` is the bundle's directory, every surface sends the
+        method's whole tree, and the membership rule keeps out only `inputs.json`, reading no `.gitignore` above the
+        tree root. So the copies and the prepared file are marked where the lister reads: `*` in `inputs/`, as
+        `runs/` is marked, and an anchored line in `<output_dir>/.gitignore`. The mark comes before the ignore
+        check, which then finds every copy ignored unless git tracks it, so the guard no longer writes an
+        `inputs/` entry of its own, and the entries it still writes are anchored (`L-260924-9fd751`). Two
+        exceptions keep the mark from hiding what should stay in git: an `inputs/` already there that is not the
+        skill's own layout, beside a `.mthds` file or an `inputs.json`, is marked only on the user's yes, and a
+        caller may ask for none, as the lab does for a synthetic case it commits."""
+        body = self.render(target_name)
+        guards = body.split("## Guards", 1)[1].split("\n## ", 1)[0]
+        mark = self.the_line(guards, "**The inputs stay out of the method's tree**")
+        assert mark == (
+            "- **The inputs stay out of the method's tree**: unless the caller asked not to, give `<output_dir>/inputs/` a "
+            "`.gitignore` holding `*` before a file goes in, asking first for one already there beside no `.mthds` file or "
+            "`inputs.json`, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so."
+        )
+        ignore = self.the_line(guards, "**The user's own files stay out of version control**")
+        assert guards.index(mark) < guards.index(ignore), "the marks come before the ignore check that reads them"
+        assert "add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`" in ignore
+        assert "`<output_dir>/inputs/`," not in ignore, "the mark keeps the copies out of git, so the guard writes no entry for them"
+        user_data = self.reference("user-data.md")
+        copy = user_data.split("\n## Copy\n", 1)[1].split("\n## ", 1)[0]
+        assert "**Mark `inputs/` before the first copy goes in**, with a `.gitignore` inside it holding `*`" in copy
+        assert "when it sits beside a `.mthds` file or an `inputs.json`: that is the skill's own layout" in copy
+        assert (
+            "Any other `inputs/` already there may be a folder of the user's own, which the mark would hide from git, so ask before marking it"
+            in copy
+        )
+        assert "an entry in the repository's own `.gitignore` above it keeps nothing out" in copy
+        synthetic = self.reference("synthetic.md")
+        assert "Every `target` lies under `<output_dir>/inputs/`, which the skill's guards mark before the first request" in synthetic
+        assert "asking first for an `inputs/` already there beside no `.mthds` file or `inputs.json`" in synthetic
+        assert (
+            "as `pipelex-lab` does for a case made only of synthetic files, which it commits, say so in every request, "
+            "and the factory leaves it unmarked too."
+        ) in synthetic
+
+    @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
+    def test_the_marks_and_the_anchored_entries_read_as_git_reads_them(self, tmp_path: Path) -> None:
+        """The marks keep git out too: `*` in `inputs/` ignores every copy, a list input's directory included, and
+        the anchored line ignores the prepared file beside the bundle and no other. A copy git already tracks still
+        reads not ignored, which is what holds it for the user. And the bare `inputs.json` the guard used to write
+        into a `.gitignore` of `<output_dir>`'s own matched a committed `inputs.json` at any depth below, a fixture
+        included, which `/inputs.json` leaves alone."""
+
+        def ignored(path: str) -> bool:
+            # This machine's excludes file is left out, so that a developer's own rules cannot change the reading.
+            command = ["git", "-c", f"core.excludesFile={os.devnull}", "-C", str(tmp_path), "check-ignore", "-q", path]
+            return subprocess.run(command, check=False).returncode == 0
+
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        bundle = tmp_path / "methods" / "lease"
+        (bundle / "inputs" / "photos").mkdir(parents=True)
+        (bundle / "inputs" / ".gitignore").write_text("*\n", encoding="utf-8")
+        tracked = bundle / "inputs" / "lease.pdf"
+        tracked.write_bytes(b"%PDF-1.7\n")
+        subprocess.run(["git", "-C", str(tmp_path), "add", "--force", str(tracked)], check=True)
+        assert ignored("methods/lease/inputs/invoice.pdf")
+        assert ignored("methods/lease/inputs/photos/1.jpg")
+        assert not ignored("methods/lease/inputs/lease.pdf"), "git never ignores a tracked path, so the guard waits for the user"
+        bundle_gitignore = bundle / ".gitignore"
+        bundle_gitignore.write_text("/inputs.prepared.json\n", encoding="utf-8")
+        assert ignored("methods/lease/inputs.prepared.json")
+        assert not ignored("methods/lease/examples/inputs.prepared.json")
+        bundle_gitignore.write_text("inputs.json\n", encoding="utf-8")
+        assert ignored("methods/lease/fixtures/inputs.json"), "the unanchored entry reaches a fixture below the bundle"
+        bundle_gitignore.write_text("/inputs.json\n", encoding="utf-8")
+        assert ignored("methods/lease/inputs.json")
+        assert not ignored("methods/lease/fixtures/inputs.json")
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_platform_renders_the_skill(self, target_name: str) -> None:

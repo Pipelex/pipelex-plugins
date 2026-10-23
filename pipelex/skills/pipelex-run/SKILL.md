@@ -20,7 +20,7 @@ allowed-tools:
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle: Start a run from a target and its inputs, or Follow a run from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle: Start a run from a target and its inputs, or Follow a run from a run id alone; a dry run is step 2, shown.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
+For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`; add `*` to the `.gitignore` of each `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` to the one beside that file, wherever the line is missing**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
@@ -62,7 +62,7 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 One line before the call: the target, the pipe, where the inputs came from and which keys the request replaced, and that the run spends inference credit. **On a dry-run request this step comes only after the user's go**: a paid run never starts on a dry-run request whose flow the user has not been shown.
 
-> Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
+> Running the main pipe `summarize.summarize_pdf` from `summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
 **When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
 
@@ -78,7 +78,7 @@ It returns a durable `run_id` at once. **Report that id the moment it returns, b
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, on the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error long after `created_at` may be slow or a workflow task that failed out of sight, which the status cannot tell: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
+`mthds_run_status`, on the summary's `retry_after_seconds` hint. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error long after `created_at` may be slow or a workflow task that failed out of sight, which the status cannot tell: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the saved run
 
@@ -98,7 +98,7 @@ A run id alone: nothing is validated or prepared.
 
 - **"how is run X going"** → `mthds_run_status`. Report the state and, while it runs, the retry hint, never a guessed duration. Step 6's readings of `degraded` and of a long `RUNNING` hold here as well.
 - **"get the results of run X"** → `mthds_run_results`. A run that is not terminal has no results: report the state instead.
-- **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says. Saving a run twice adds copies.
+- **"save run X"**, or its files → `mthds_download_artifacts`, as step 7 says.
 
 An unknown run id is reported in the tool's own words.
 

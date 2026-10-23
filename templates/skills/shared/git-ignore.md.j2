@@ -17,6 +17,13 @@
 
    Neither has a default: strict mode fails the build naming the one left unset.
 
+   A folder the skill itself marks with a `.gitignore` holding `*` before
+   writing into it, as `pipelex-inputs` marks `inputs/`, needs no entry: the
+   mark is its entry, and an entry names a file or a folder no mark covers,
+   anchored with a leading slash so that it reaches no namesake further down.
+   The check still runs on a marked folder's paths, since it is what finds a
+   path git already tracks and holds it for the user.
+
    Included mid-sentence, after the skill's subject, so it strips its own
    trailing newline (the closing comment below). -#}
 in a git repository, `git check-ignore -q` {{ git_ignore_paths }}. For a path not ignored, add {{ git_ignore_entry }} to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**

@@ -34,6 +34,8 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 | `target` | `<output_dir>/inputs/<input_variable>.<ext>`; a list input's items go in a directory named after it, one index each (`<output_dir>/inputs/<input_variable>/1.<ext>`), so an item never takes another input's name |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |
 
+Every `target` lies under `<output_dir>/inputs/`, which the skill's guards mark before the first request with a `.gitignore` holding `*`, asking first for an `inputs/` already there beside no `.mthds` file or `inputs.json`, and the factory marks it too when it finds it unmarked. So its files, like the user's own, stay out of the method's tree and out of git: they reach Pipelex only as step 5's uploads, never as files of the method. When `inputs/` is to stay unmarked, because the user declined the mark or the calling skill asked for it, as `pipelex-lab` does for a case made only of synthetic files, which it commits, say so in every request, and the factory leaves it unmarked too.
+
 It writes the file, verifies it, and returns the path, with a caveat when the file is simulated handwriting or an AI-generated photograph. Repeat that caveat in the report, beside the file it concerns: the user decides from it what the run proves. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.
 
 A photograph is the one file it makes through the workshop, with `mthds_run`: that generation is not a run of the method, which the skill still only offers, and it waits for the user's own go on the descriptions the factory shows.
