@@ -158,7 +158,7 @@ class TestPipelexLabSkill:
             "as its `<output_dir>`, and **ask it for the case's copies**: its files under `inputs/`, named by `inputs.json` there, "
             "and the run-ready values in `inputs.prepared.json`, so that the case runs from any clone and no case writes over another."
         ) in inputs_line
-        assert "The factory, called directly, writes into that `inputs/` too." in inputs_line
+        assert "The factory, called directly" not in inputs_line, "the factory writes into a temporary directory; the copies are /pipelex-inputs'"
         assert "A case made only of synthetic files is committed with the lab, since its files cannot be rendered again byte for byte." in inputs_line
         assert "unmarked" not in move, "nothing marks a case's `inputs/` any more, so the lab asks for no exemption"
         inputs = render(target_name, "pipelex-inputs")

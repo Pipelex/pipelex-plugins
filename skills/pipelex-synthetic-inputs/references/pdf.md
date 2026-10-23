@@ -20,7 +20,7 @@ Page size: the recipes use `letter`; set `PAGE_SIZE = A4` in the content block w
 
 ## Conventions shared by every recipe
 
-- Output path: `<output_dir>/inputs/<name>.pdf` — replace with the request's `target`.
+- Output path: `<target_dir>/<name>.pdf` — replace with the request's `target`.
 - Built-in fonts (`Helvetica`, `Helvetica-Bold`, `Times-Roman`, `Courier`) cover Latin-1 text and need no files. For other scripts, register a TrueType font — matplotlib ships DejaVu Sans, which covers most of them: `from reportlab.pdfbase import pdfmetrics; from reportlab.pdfbase.ttfonts import TTFont; from matplotlib import font_manager; pdfmetrics.registerFont(TTFont("DejaVu", font_manager.findfont("DejaVu Sans")))` — adding `--with matplotlib` to the runner line.
 - Language: every word a recipe prints, labels included, and the way it writes figures sit in its content block, so a brief in another language is an edit of that block alone.
 - Fictional content only: made-up companies, people, ids, addresses.
@@ -40,7 +40,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen.canvas import Canvas
 
-OUT = "<output_dir>/inputs/test_document.pdf"
+OUT = "<target_dir>/test_document.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -135,7 +135,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
-OUT = "<output_dir>/inputs/test_report.pdf"
+OUT = "<target_dir>/test_report.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +245,7 @@ from reportlab.lib.pagesizes import A4, landscape, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<output_dir>/inputs/test_table.pdf"
+OUT = "<target_dir>/test_table.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -342,7 +342,7 @@ from reportlab.lib.pagesizes import A4, landscape, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<output_dir>/inputs/test_results.pdf"
+OUT = "<target_dir>/test_results.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -476,7 +476,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<output_dir>/inputs/test_invoice.pdf"
+OUT = "<target_dir>/test_invoice.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -599,8 +599,8 @@ Every printed word and the way figures are written sit in the content block, as 
 ## Verify
 
 ```bash
-head -c 5 "<output_dir>/inputs/<name>.pdf"; echo; wc -c "<output_dir>/inputs/<name>.pdf"
-uv run --quiet --no-project python -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<output_dir>/inputs/<name>.pdf"
+head -c 5 "<target_dir>/<name>.pdf"; echo; wc -c "<target_dir>/<name>.pdf"
+uv run --quiet --no-project python -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<target_dir>/<name>.pdf"
 ```
 
 The page count needs no packages, so it runs under whichever interpreter Step 2 resolved — the `uv run` above on rung 1, the absolute venv interpreter path on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.

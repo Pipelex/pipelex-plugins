@@ -126,7 +126,7 @@ class TestPipelexRunSkill:
         assert "**carry its `pipe_ref` through every call**, the code qualified by its own file's domain." in self.the_step(body, 1)
         assert "for another pipe, pass step 1's `pipe_ref` as `pipe_code`." in self.the_step(body, 5)
         assert "a pipe's code" not in body
-        assert "Running the main pipe `summarize.summarize_pdf` from" in self.the_step(body, 4)
+        assert "Running `summarize.summarize_pdf` from `summarize_pdf/`" in self.the_step(body, 4)
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_method_folder_runs_from_inputs_json_and_a_local_path_goes_back_to_be_uploaded(self, target_name: str) -> None:
@@ -144,6 +144,10 @@ class TestPipelexRunSkill:
         assert "3. **An `inputs.json` whose every file-ish value is an `http(s)` URL or a `pipelex-storage://` reference.**" in step_3
         refused = self.the_line(step_3, "Anything else — a placeholder, a local path,")
         assert f"is not run-ready, and nothing is spent: name the input at fault and how, and hand to `{prefix}pipelex-inputs`" in refused
+        # A lab case goes back with its directory, so that `/pipelex-inputs` keeps the case's copies rather than writing
+        # addresses over its `inputs.json`, and a stale prepared file falls through to this one hand-off.
+        assert f"hand to `{prefix}pipelex-inputs`, naming a lab case's directory as its `<output_dir>`" in refused
+        assert self.the_line(step_3, "Not current is not run-ready").endswith("Not current is not run-ready.")
         assert "Do not prepare inputs here." in refused
         assert step_3.index("3. **An `inputs.json` whose every file-ish value") < step_3.index("Anything else — a placeholder, a local path,")
         assert "with the inputs in `inputs.json`. This spends inference credit." in self.the_step(body, 4)

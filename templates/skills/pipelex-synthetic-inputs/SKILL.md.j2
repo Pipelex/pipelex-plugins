@@ -61,7 +61,7 @@ Before opening a recipe, write down what the file will say — in the reply, bri
 
 Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep step 2's runner line and the recipe's `SEED` and `invariant=1`, and run it.
 
-**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `inputs/.invoice.part.pdf` for `inputs/invoice.pdf`), and `target` when this run created it:
+**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `.invoice.part.pdf` for `invoice.pdf`), and `target` when this run created it:
 
 ```bash
 rm -f "<target_dir>/.<target_stem>.part<target_ext>"

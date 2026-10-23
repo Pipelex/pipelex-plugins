@@ -193,7 +193,7 @@ class TestPipelexSyntheticInputsSkillShape:
             recipes = text.count("os.replace(PART, OUT)")
             assert recipes > 0, f"references/{name} has no recipe renaming PART onto OUT"
             assert text.count(part_line) == recipes, f"references/{name}: a recipe computes its partial file another way"
-        example = Path("inputs/invoice.pdf")
+        example = Path("invoice.pdf")
         partial = example.with_name(f".{example.stem}.part{example.suffix}")
         cleanup = self.render(target_name).split("### Step 4", 1)[1].split("### Step 5", 1)[0]
         assert f"`{partial.as_posix()}` for `{example.as_posix()}`" in cleanup

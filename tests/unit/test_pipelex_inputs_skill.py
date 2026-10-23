@@ -215,7 +215,7 @@ class TestPipelexInputsSkill:
         assert self.the_line(guards, "**A file is uploaded where it lies, never copied beside the method**") == (
             "- **A file is uploaded where it lies, never copied beside the method**: unless the calling skill asks for a case's copies, "
             f"as `{load_target_config(self.REPO_ROOT / 'targets', target_name).template_vars['skill_prefix']}pipelex-lab` does, "
-            "copy nothing into `<output_dir>` and write no `inputs.prepared.json`."
+            "or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`, copy nothing into `<output_dir>` and write no `inputs.prepared.json`."
         )
         path_rule = self.the_line(guards, "**A path in `inputs.json` resolves relative to `inputs.json` itself")
         assert "write a local file's absolute path, a case's copy as `inputs/the_doc.pdf`, or a URL." in path_rule
@@ -227,6 +227,11 @@ class TestPipelexInputsSkill:
         assert written.startswith('On `status: "ok"`, **write the returned `inputs` over `<output_dir>/inputs.json`**, or for a case\'s copies')
         assert 'where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form' in written
         assert "prepare never rewrites it" not in step_5
+        # Once the address is written over `inputs.json`, no local path is left for step 5's skip rule to upload, so a
+        # file replaced in place goes up again only when its path is put back; the bold rule is a case's alone.
+        replaced = self.the_line(step_5, "An address names the bytes uploaded")
+        assert "outside a case, a replaced file goes up again only once named again, its path back in `inputs.json`;" in replaced
+        assert replaced.index("in a case,") < replaced.index("**prepare again whenever a file was replaced in place.**")
         ignore = self.the_line(guards, "**The user's own files stay out of version control**")
         assert "`git check-ignore -q` `inputs.json` when a value holds a file's text, a case's copies before writing them" in ignore
         assert "add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`" in ignore
@@ -258,14 +263,28 @@ class TestPipelexInputsSkill:
         assert (
             "or for a case's copies **into `<output_dir>/inputs.prepared.json`, leaving `inputs.json` and the copies exactly as they are**"
         ) in step_5
-        assert "currency check of a case misses a file moved over its copy" in step_5
+        assert "in a case, the run's currency check misses a file moved over its copy" in step_5
         copies = self.reference("user-data.md").split("\n## A case's copies\n", 1)[1].split("\n## ", 1)[0]
         assert "When the calling skill asks for a case's copies, as `pipelex-lab` does" in copies
+        assert "or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`, as when the user prepares one directly" in copies
         assert "Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself" in copies
         assert "leave that folder unmarked" in copies
         synthetic = self.reference("synthetic.md")
         assert "For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>`" in synthetic
         assert "A case's copies are the one exception, in a case directory outside every method" in synthetic
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_lab_case_keeps_its_copies_by_its_location_too(self, target_name: str) -> None:
+        """Round 1 of the review: `/pipelex-run` hands a lab case whose prepared file is not current back to this skill,
+        and a user may call it on a case directly, neither of them asking for a case's copies. Keyed on the request
+        alone, step 5 would then write addresses over the case's `inputs.json`, which must keep naming its copies for
+        the case to run from any clone. So the guard turns the case's copies on by the location as well: an
+        `<output_dir>` that is a lab case, `lab/<method>/cases/<case>/`, is one whoever asked."""
+        guards = self.render(target_name).split("## Guards", 1)[1].split("\n## ", 1)[0]
+        guard = self.the_line(guards, "**A file is uploaded where it lies, never copied beside the method**")
+        asked = guard.index("unless the calling skill asks for a case's copies")
+        located = guard.index("or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`")
+        assert asked < located < guard.index("copy nothing into `<output_dir>` and write no `inputs.prepared.json`")
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
     def test_the_marks_and_the_anchored_entries_read_as_git_reads_them(self, tmp_path: Path) -> None:
