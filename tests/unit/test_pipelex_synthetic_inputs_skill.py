@@ -151,6 +151,15 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "Then report as step 6 says" in self.the_line(body, "**stop gracefully**")
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_hand_back_says_the_file_goes_up_as_a_test_file(self, target_name: str) -> None:
+        """This skill uploads nothing: `/pipelex-inputs` uploads the files it makes, with `kind: "test"`, so the
+        team's files list them as the method's test files rather than among the members' own uploads. The
+        hand-back says so, and the upload stays the inputs skill's."""
+        hand_back = self.the_line(self.render(target_name), "uploads the file with `mthds_prepare_inputs`")
+        assert "uploads the file with `mthds_prepare_inputs` as the method's test file, and offers the run" in hand_back
+        assert "never uploads anything" in self.render(target_name)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_failure_removes_the_recipes_partial_file(self, target_name: str) -> None:
         """Every recipe renders to a hidden `PART` beside `OUT` and renames it on success, so a recipe that crashes
         mid-save leaves that file behind. Step 4's cleanup names it, spelled as the recipes compute it, or "a

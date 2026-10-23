@@ -6,7 +6,7 @@ In interactive mode, ask which of the user's files goes to which input wherever 
 
 ## Inventory
 
-Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. Determine each one's type:
+Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. A file the user names that is not on disk, such as one already uploaded to Pipelex, is looked up among the team's files as the skill's step 3 says, and fills its input by its address, with nothing to copy. Determine each one's type:
 
 | Extension | Detected type | Maps to |
 |---|---|---|
@@ -49,13 +49,14 @@ Set each matched input's light value:
 - a web page Document: the URL string, `"page": "https://example.com/article"`;
 - an Image: the path string, `"photo": "inputs/photo.jpg"`;
 - a Text from a `.txt` or `.md` file: the file's actual content as the string value;
-- a list, from a folder for instance: a list of those values, `"images": ["inputs/images/1.jpg", "inputs/images/2.jpg", "inputs/images/3.png"]`.
+- a list, from a folder for instance: a list of those values, `"images": ["inputs/images/1.jpg", "inputs/images/2.jpg", "inputs/images/3.png"]`;
+- a file from the team's files: its address as listed, `"invoice": "pipelex-storage://…"`, which step 5 passes through.
 
-Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and one prepare call then covers both sources' files.
+Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and step 5 then uploads both sources' files, in two calls when the user's files need an upload too, since only the factory's go up as test files.
 
 ## Report
 
-After the skill's step 5, and before its step 6 offers the run, show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; the final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which were synthesized, and which were uploaded.
+After the skill's step 5, and before its step 6 offers the run, show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; the final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which from the team's files, which were synthesized, and which were uploaded.
 
 ## Worked examples
 

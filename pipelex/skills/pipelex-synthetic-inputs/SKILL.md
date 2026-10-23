@@ -83,7 +83,7 @@ Reopen the file with its reference's verify command, through step 2's interprete
 
 Per file: path, format, dimensions or page count, a sentence on its content, and the facts planted in it, from step 3's draft. Name any fallback as one. Then:
 
-- **Called from `/pipelex-inputs`**: hand the path back, **with the caveat of a simulated or generated file** (handwriting reads more easily than a real hand; a photograph is AI-generated), which that skill's report repeats, and stop — that skill writes `inputs.json`, uploads the file with `mthds_prepare_inputs`, and offers the run. After a refusal or a graceful stop, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues.
+- **Called from `/pipelex-inputs`**: hand the path back, **with the caveat of a simulated or generated file** (handwriting reads more easily than a real hand; a photograph is AI-generated), which that skill's report repeats, and stop — that skill writes `inputs.json`, uploads the file with `mthds_prepare_inputs` as the method's test file, and offers the run. After a refusal or a graceful stop, return **no path** with the reason, so that input is left unfilled and the rest of its flow continues.
 - **Direct invocation**: mention that `/pipelex-inputs` is where the file becomes a runnable input.
 
 ## Stops

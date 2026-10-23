@@ -157,8 +157,8 @@ STATIC_ASSET_DIRS = ("references", "scripts")
 # reference (`writing-mthds.md`, the one every skill that reads or writes a bundle
 # points at) and the native content types that ground the skills, and the files a
 # skill reads when one of its stops fires or one of its branches is taken, such as
-# `credentials.md`, `catalog-id.md` and `fit.md`. Paths are relative to the templates/
-# directory.
+# `credentials.md`, `catalog-id.md`, `fit.md` and `team-files.md`. Paths are relative
+# to the templates/ directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
 # shared blocks — are deliberately NOT listed here: they are {% include %}-d by
@@ -170,6 +170,7 @@ SHARED_TEMPLATES = [
     "skills/shared/credentials.md.j2",
     "skills/shared/catalog-id.md.j2",
     "skills/shared/fit.md.j2",
+    "skills/shared/team-files.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
