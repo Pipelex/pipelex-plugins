@@ -15,18 +15,19 @@ allowed-tools:
   - mcp__plugin_pipelex_pipelex__mthds_validate
   - mcp__plugin_pipelex_pipelex__mthds_inputs_template
   - mcp__plugin_pipelex_pipelex__mthds_list_methods
+  - mcp__plugin_pipelex_pipelex__mthds_list_files
 ---
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle: [Start a run](#start-a-run) from a target and its inputs, or [Follow a run](#follow-a-run) from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
+This skill owns the run lifecycle: Start a run from a target and its inputs, or Follow a run from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`/pipelex-inputs`) or repair a method (`/pipelex-edit`, `/pipelex-design`).
 
 ## Requirements
 
 - **`mthds_run`**, **`mthds_run_status`** and **`mthds_run_results`** are required, and to start a run **`mthds_validate`** and **`mthds_inputs_template`** too: they keep credit from being spent on a method or inputs that cannot work.
 - **If the run tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. Never improvise a run id, a status or an output.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
-- **`mthds_download_artifacts`** and **`mthds_list_methods`** are optional: never stop for either.
+- **`mthds_download_artifacts`**, **`mthds_list_methods`**, **`mthds_list_files`**: optional, never stop for one.
 
 ## Start a run
 
@@ -38,7 +39,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`, and for an address with `method_ref`.
+For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex-design`, or to `/pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
 
@@ -46,9 +47,9 @@ The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signature
 
 ### 3. The inputs
 
-They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
+They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else where [by-id.md](references/by-id.md) says: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
 
-1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set.
+1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set. For a file named but not on disk, read [team-files.md](../shared/team-files.md) before asking for it.
 2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
 3. **An `inputs.json` holding no local file value**, every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference.
 4. **An empty object**, when the pipe declares no input at all.
@@ -73,11 +74,11 @@ Call `mthds_run` with the same target and, as `inputs`, the values step 3 settle
 
 When `pipelex-method.json` sits beside the root `.mthds` file, send its `method_id` beside step 2's source: the bundle runs, and the run is filed under that method in the webapp's history. **Say which method it was filed under, and do not let the filing read as the saved method having run.**
 
-The tool returns a durable `run_id` at once and never blocks. **Report that id the moment it returns, before anything else.** **For an id, say which version ran** (`method_version`); **for an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
+It returns a durable `run_id` at once. **Report that id the moment it returns, before anything else.** **For an id, say which version ran** (`method_version`); **for an address, give `method_provenance` beside it**: the address, the tag and the resolved commit SHA.
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, honouring the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error, long after `created_at`, may be slow or may be a workflow task that failed out of sight, and the status cannot tell which: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
+`mthds_run_status`, on the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error long after `created_at` may be slow or a workflow task that failed out of sight, which the status cannot tell: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the saved run
 
@@ -111,7 +112,6 @@ An unknown run id is reported in the tool's own words.
 
 ## References
 
-- [by-id.md](references/by-id.md): an `mt_…` target, before the first call.
-- [published-address.md](references/published-address.md): a `method_ref` target, before the first call.
+- [by-id.md](references/by-id.md), [published-address.md](references/published-address.md): an `mt_…` or a `method_ref` target, before the first call.
 - [failed-run.md](references/failed-run.md): a failed run, before routing it.
 - [linked-run.md](references/linked-run.md): a linked run refused at `method_id`.

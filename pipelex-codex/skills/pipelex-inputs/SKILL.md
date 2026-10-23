@@ -13,11 +13,11 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex.
 - **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
 - **`mthds_prepare_inputs`** is required at step 5, under the same two stops; never hand-fake a storage reference.
-- **`mthds_list_methods`** is optional, resolving a saved method named without its `mt_…` id; without it, ask for the id.
+- **`mthds_list_methods`** and **`mthds_list_files`** are optional: without the first, ask for a saved method's `mt_…` id.
 
 ## Mode
 
-**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry the chosen strategy through to its own end without stopping, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry it through to its own end, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
 
 ## Guards
 
@@ -38,7 +38,7 @@ The target takes three forms, one selector per call.
 
 ### 2. The template
 
-Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, bare values, not the `{concept, content}` envelope. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. Branch on the structured verdict, never on transport: `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`. Anything else is a stop.
+Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, bare values, not the `{concept, content}` envelope. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`; anything else is a stop.
 
 ### 3. The strategy
 
@@ -55,20 +55,21 @@ Evaluated in order:
 - **Synthetic**: read [references/synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input. Codex has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.
 - **User data**: read [references/user-data.md](references/user-data.md) before matching any file to an input.
 - **Mixed**: the user's files first, then synthetic values for what they leave unfilled; read both references.
+- **The team's files**: read [team-files.md](../shared/team-files.md) before asking for a file, or for one named but not on disk.
 
 ### 4. Save
 
-Fill the step 2 template in place, a composite native's fields included ([what they mean](../shared/native-content-types.md)), and save it as `<output_dir>/inputs.json`. An input the signature cannot shape, such as a Dynamic one, keeps its `{concept, content}` envelope exactly as the template gives it.
+Fill the step 2 template in place, a composite native's fields included ([natives](../shared/native-content-types.md), [concepts](../shared/writing-mthds.md)), and save it as `<output_dir>/inputs.json`. An input the signature cannot shape, such as a Dynamic one, keeps its `{concept, content}` envelope exactly as the template gives it.
 
 ### 5. Prepare the inputs for a run
 
-`mthds_prepare_inputs` uploads every file-ish value (Image, Document) that is a local path, a `data:` URL or inline bytes to Pipelex storage, as a `pipelex-storage://` reference. Skip the call for the Template strategy. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input (Image, Document) to Pipelex storage. Skip the call for the Template strategy. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
 **Send the exact file that was selected, generated, copied or referenced for an input — never a derived one**, whatever its type. A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset. Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it. Do not replace it with synthetic data, a public sample, another local file, or any derived file. The same prohibition applies after an upload failure. Never retry preparation with altered or substitute content to evade a storage limit. **An Office file's PDF export, made at matching, is the one exception**: it is the selected file from then on.
 
-Call it with step 2's target, step 2's `pipe_ref` if it passed one (the signature decides which values are assets), and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path** in the request alone, and no `explicit` flag.
+Call it with step 2's target, step 2's `pipe_ref` if it passed one, and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path** in the request alone, and no `explicit` flag. The factory's files take `kind`: read [synthetic.md](references/synthetic.md#test-files) before the call.
 
 On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. Report the files uploaded and `inputs.prepared.json` written, in one line.
 
@@ -103,4 +104,3 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 - [synthetic.md](references/synthetic.md), [user-data.md](references/user-data.md): step 3, by strategy; both for Mixed.
 - [published-address.md](references/published-address.md): a `method_ref` target.
 - [prepare-errors.md](references/prepare-errors.md): prepare's `input_domain` errors.
-- [Native content types](../shared/native-content-types.md), [MTHDS reference](../shared/writing-mthds.md): natives' fields, concepts.

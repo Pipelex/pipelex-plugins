@@ -69,6 +69,7 @@ class TestPipelexRunSkill:
             "an address's verdict is reported as [": ("references/published-address.md",),
             "Give `failure_message` **verbatim** first": ("references/failed-run.md",),
             "| `mthds_run`: `input_domain` at `method_id`": ("references/linked-run.md",),
+            "1. **Values the user gave in the request**": ("../shared/team-files.md",),
         }
         for decision, targets in at_the_decision.items():
             line = self.the_line(body, decision)
@@ -81,6 +82,23 @@ class TestPipelexRunSkill:
         index = body.split("## References", 1)[1]
         for name in self.REFERENCES:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_file_the_team_holds_is_looked_up_before_it_is_asked_for(self, target_name: str) -> None:
+        """A request such as "run it on the invoice uploaded this morning" names a file the organization already
+        holds, which `mthds_list_files` finds with its `pipelex-storage://` address, a value a run takes as it is.
+        The lookup is the shared reference's, pointed at where the request's values are settled, and the tool is
+        optional like the other read-only lookups: a workshop older than it answers every other tool, so its
+        absence never stops a run."""
+        body = self.render(target_name)
+        values = self.the_line(body, "1. **Values the user gave in the request**")
+        assert "For a file named but not on disk, read [team-files.md](../shared/team-files.md) before asking for it." in values
+        assert "**`mthds_list_files`**: optional, never stop for one." in self.the_line(body, "**`mthds_download_artifacts`**, ")
+        frontmatter = body.split("\n---\n", 1)[0]
+        if target_name == "prod":
+            assert "  - mcp__plugin_pipelex_pipelex__mthds_list_files" in frontmatter
+        else:
+            assert "mcp__" not in frontmatter
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_stuck_run_is_named_while_it_is_followed(self, target_name: str) -> None:

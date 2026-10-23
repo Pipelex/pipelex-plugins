@@ -1,6 +1,6 @@
 # The Synthetic strategy
 
-Read this at step 3 when the strategy is Synthetic, or Mixed with inputs the user's files leave unfilled, before generating any value. It says what to generate for each input and what to hand the file factory; step 3 of the skill says how to invoke the factory on this harness, and the skill's guards hold throughout.
+Read this at step 3 when the strategy is Synthetic, or Mixed with inputs the user's files leave unfilled, before generating any value. It says what to generate for each input, what to hand the file factory and how step 5 uploads the factory's files; step 3 of the skill says how to invoke the factory on this harness, and the skill's guards hold throughout.
 
 In interactive mode, ask first for the domain or industry context that makes the data realistic, whether to generate edge cases or happy-path data, and any specific values or constraints the user wants on a field.
 
@@ -44,6 +44,17 @@ It returns no path when it cannot make the file — no `uv`, no usable Python, a
 
 Fill the step 2 template in place and save it as `<output_dir>/inputs.json` (step 4), with any generated file in `<output_dir>/inputs/`. Then go on to step 5: a generated file is a local path, which a run cannot reach until it is uploaded.
 
+## Test files
+
+Step 5 uploads the factory's files as test files of the method, so the team's files list them with that method rather than among its members' own uploads: pass `kind: "test"` to `mthds_prepare_inputs`. A test file belongs to a saved method, which the workshop names from the target: a bare `mt_…` id, or a bundle directory that a save linked to its method through `.pipelex/method.json`.
+
+- **A published address, or an id with a suffix (`mt_…@draft`, `mt_…@<n>`)**: leave `kind` out. An address names no saved method, and the workshop refuses a suffixed id beside `kind`, at `method_id`. The factory's files then go up as the organization's own files.
+- **Mixed, with the user's own files to upload as well**: `kind` applies to every upload of a call, and the user's files are theirs, not test files. Prepare in two calls: first the inputs holding the factory's files, alone, with `kind: "test"`; then every input, without `kind`, with those inputs' prepared values in place of their paths, which the second call passes through unchanged. Write the second call's `inputs` to `inputs.prepared.json`, and nothing when either call fails.
+- **Refused over `kind`**, as `input_domain` at `kind`, or as a `config` error tagged `kind: "role"`: no file was recorded. The first means no saved method could be named, because the folder is linked to none, its link cannot be read, was made against another API or is still the older `pipelex-method.json`, or the platform no longer holds the method; the second means the user's role may not record test files, which is no problem with the key. Prepare again without `kind`, and say in one line that the factory's files went up as the organization's own and why, in the refusal's words, relaying its hint, such as saving the method so that its folder is linked, as the user's to act on, never yours.
+- **No `kind` in the answer**: a workshop older than test files drops the argument, uploads the files as the organization's own and echoes no `kind`. The inputs are run-ready all the same, so do not prepare again: say in one line that `npx -y @pipelex/mcp@latest` refreshes the workshop once the host restarts the server and reloads its tools, and that the next preparation then records test files.
+
+When the answer carries `test_method_id`, step 5's report says the files went up as test files of that method.
+
 ## A worked example
 
 A sales-chart reader expects `chart: Image` and `analysis_prompt: Text`.
@@ -60,6 +71,6 @@ A sales-chart reader expects `chart: Image` and `analysis_prompt: Text`.
    }
    ```
 
-5. `chart` is a local path, so step 5 uploads it and writes the run-ready form to `inputs.prepared.json`, leaving `inputs.json` as saved, before the run is offered.
+5. `chart` is a local path, so step 5 uploads it as a test file of the method, with `kind: "test"`, and writes the run-ready form to `inputs.prepared.json`, leaving `inputs.json` as saved, before the run is offered.
 
 Had the method wanted a photograph of a street scene, the factory would have generated one through the workshop, with the details the method must find written into its description, and reported its run id and cost beside the path. Had the workshop been unreachable, it would have come back with no path: `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.

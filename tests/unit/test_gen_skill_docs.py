@@ -134,6 +134,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -163,6 +164,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -1475,14 +1477,19 @@ class TestPipelexRunSkill:
         alone, so a saved method's sample lives only in a directory on disk, the one
         `/pipelex-inputs` writes for an id or the one its link file names (`L-260927-d7c594`).
         The two are peers, since ranking them picks one sample over another in silence, and
-        a run on the wrong sample is paid, so two candidates holding one is a question."""
+        a run on the wrong sample is paid, so two candidates holding one is a question. The two places are
+        the id's branch, so they are named in the id reference, which an id target reads at step 1, and step 3
+        keeps the directory the user named, the choice and its guard."""
         body = self.run_skill
         assert (
-            "For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory "
-            "whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which."
+            "For an id, in the one the user named, else where [by-id.md](references/by-id.md) says: "
+            "take the one holding an `inputs.json`, and say which."
         ) in body
         assert "**When several do, ask which; never choose.**" in body
         assert "by default `./<method_id>/`" not in body
+        by_id = (self.REPO_ROOT / "skills" / "pipelex-run" / "references" / "by-id.md").read_text(encoding="utf-8")
+        assert ("in `./mt_abc123/`, and in any directory below the working directory whose `.pipelex/method.json` names `mt_abc123`") in by_id
+        assert "The two are peers: when both hold an `inputs.json`, step 3 asks which." in by_id
 
     def test_a_missing_optional_input_is_not_drift_on_the_main_pipe(self) -> None:
         """The light template lists every declared input and marks none optional, so a sample
@@ -2950,7 +2957,7 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
         assert "**Default**: automatic — name the strategy and the assumptions it rests on in one line" in body
-        assert "carry the chosen strategy through to its own end without stopping" in body
+        assert "then carry it through to its own end, pausing only where a wrong guess would waste work" in body
         assert "**Go interactive** when the user asks for it" in body
         assert "when the table below lands on its no-signal row" in body
         assert "**Either mode can turn into the other mid-run**" in body

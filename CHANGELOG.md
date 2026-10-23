@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`pipelex-inputs` and `pipelex-run` look among your team's files first**: before asking you for a file a method input takes, and when you name one that is not on disk, such as "the invoice uploaded this morning", the skills look among your organization's files with the Pipelex tools' `mthds_list_files` and pass the file you settle on by its `pipelex-storage://` address, so nothing is uploaded again. With a version of the tools older than that listing, they ask for the file as before and name the `npx -y @pipelex/mcp@latest` refresh.
+- **Synthetic files upload as the method's test files**: when `pipelex-inputs` uploads the files `pipelex-synthetic-inputs` made, it passes `kind: "test"` to `mthds_prepare_inputs`, so your organization's files list them as test files of the saved method, named by its bare catalog id or by the bundle directory's link, and a preparation that also uploads your own files does so in a second call, which keeps yours ordinary uploads. A published address, a version or draft id, a directory linked to no saved method, a role that may not record test files and a version of the tools older than test files all upload them as ordinary files, and the skill says which.
+
 ### Changed
 
 - **`pipelex-integrate` sends the method's tree (Breaking)**: the call site the skill writes runs the method with its whole bundle directory as the method's tree, `directory: BUNDLE_DIR` on `@pipelex/sdk` 0.48.0 and `tree=BUNDLE_DIR` on `pipelex-sdk` 0.48.0, the floors step 8 now installs, so the template files a bundle's `PipeDocGen` steps name travel with every run in either language, and its docstring names `prepareInputs` with the same tree. A refresh raises an older pin and rewrites a module that still sends `mthds_contents` or `resources`; a `python-structures` project whose `pipelex`, once step 8 has run, still pins a `pipelex-sdk` from before the tree keeps the older module, and over a bundle naming template files the skill stops there as before. The skill judges that by the `pipelex-sdk` the project will run on after step 8, syncing the environment first when the version cannot be read, and takes the older module and the stop when it still cannot.

@@ -84,7 +84,7 @@ Your agent picks the skill your request calls for, and you can also name one you
 
 #### Prepare inputs
 
-- **`/pipelex-inputs`** prepares a method's inputs from your files, from synthetic data or from a template, ready to run.
+- **`/pipelex-inputs`** prepares a method's inputs from your files or your team's, from synthetic data or from a template, ready to run.
 - **`/pipelex-synthetic-inputs`** makes the test files a method needs when you have none: PDFs, images, Word and Excel files rendered from code, and photographs from an image model.
 
 #### Run and save
