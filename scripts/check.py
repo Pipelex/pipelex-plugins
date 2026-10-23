@@ -137,6 +137,15 @@ DEFAULTS_FILE = "defaults.toml"
 CLAUDE_MARKETPLACE_PATH = Path(".claude-plugin/marketplace.json")
 CODEX_MARKETPLACE_PATH = Path("packaging/codex-marketplace.json")
 
+# The interpreter the repository develops on, which uv reads in every command and CI reads
+# through `actions/setup-python`'s `python-version-file`. `check_python_pin` holds it to the
+# floors in `pyproject.toml` and holds every workflow to the file.
+PYTHON_PIN_FILE = ".python-version"
+PYTHON_PIN_PATTERN = re.compile(r"\d+\.\d+")
+PYPROJECT_FILE = "pyproject.toml"
+WORKFLOWS_DIR = Path(".github/workflows")
+SETUP_PYTHON_ACTION = "actions/setup-python"
+
 
 def _read_json_string(path: Path, *keys: str) -> str:
     """Read a nested key from a JSON file, raising ValueError on any problem."""
@@ -734,6 +743,117 @@ def _hardcoded_floors_in_templates(base_dir: Path, floors: dict[str, str]) -> li
     return errors
 
 
+def check_python_pin(base_dir: Path) -> list[str]:
+    """Hold `.python-version` to the floors in `pyproject.toml`, and every workflow to the file.
+
+    The repository develops on the floor of `requires-python`, which is also the version the type
+    checkers and ruff check against and the one CI runs. Before the pin, three places named an
+    interpreter, or failed to name one, and nothing compared them, so a new worktree was built on
+    whatever Python was newest on the machine. So each disagreement is named with the file to change:
+    the pin itself when it is missing or not a single `X.Y`, `pyproject.toml` when one of its four
+    versions differs from the pin, and a workflow when its `actions/setup-python` step passes a
+    literal `python-version` or does not read `.python-version`. Raising the floor is then a one-line
+    edit of the pin followed by whatever this names.
+    """
+    errors: list[str] = []
+    pin_path = base_dir / PYTHON_PIN_FILE
+    if not pin_path.is_file():
+        errors.append(f"{PYTHON_PIN_FILE} is missing: it names the Python the repository develops on, the floor of requires-python")
+    else:
+        pin = pin_path.read_text(encoding="utf-8").strip()
+        if PYTHON_PIN_PATTERN.fullmatch(pin):
+            errors.extend(_pyproject_pin_errors(base_dir, pin))
+        else:
+            errors.append(f"{PYTHON_PIN_FILE} holds {pin!r}, not a single X.Y version such as 3.13")
+    errors.extend(_workflow_pin_errors(base_dir))
+    return errors
+
+
+def _requires_python_floor(spec: str) -> str | None:
+    """The version of the `>=` (or `~=`) clause of a `requires-python` specifier, if it has one."""
+    for raw_clause in spec.split(","):
+        clause = raw_clause.strip()
+        for operator in (">=", "~="):
+            if clause.startswith(operator):
+                return clause.removeprefix(operator).strip()
+    return None
+
+
+def _pyproject_pin_errors(base_dir: Path, pin: str) -> list[str]:
+    """Each version `pyproject.toml` states that is not the pin."""
+    pyproject_path = base_dir / PYPROJECT_FILE
+    if not pyproject_path.is_file():
+        return [f"{PYPROJECT_FILE} is missing, so nothing states the floor {PYTHON_PIN_FILE} pins"]
+    raw = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    project: dict[str, Any] = raw.get("project", {})
+    tool: dict[str, Any] = raw.get("tool", {})
+    mypy: dict[str, Any] = tool.get("mypy", {})
+    pyright: dict[str, Any] = tool.get("pyright", {})
+    ruff: dict[str, Any] = tool.get("ruff", {})
+
+    errors: list[str] = []
+    requires_python = project.get("requires-python")
+    floor = _requires_python_floor(requires_python) if isinstance(requires_python, str) else None
+    if floor is None:
+        errors.append(f"{PYPROJECT_FILE}: [project] requires-python states no >= floor, so nothing holds {PYTHON_PIN_FILE}'s {pin} to it")
+    elif ".".join(floor.split(".")[:2]) != pin:
+        errors.append(f"{PYPROJECT_FILE}: the floor of [project] requires-python is {floor}, but {PYTHON_PIN_FILE} pins {pin}")
+
+    stated = (
+        ("[tool.mypy] python_version", mypy.get("python_version"), pin),
+        ("[tool.pyright] pythonVersion", pyright.get("pythonVersion"), pin),
+        ("[tool.ruff] target-version", ruff.get("target-version"), "py" + pin.replace(".", "")),
+    )
+    for label, value, expected in stated:
+        if value is None:
+            errors.append(f"{PYPROJECT_FILE}: {label} is not set; it should be {expected!r}, the version {PYTHON_PIN_FILE} pins")
+        elif value != expected:
+            errors.append(f"{PYPROJECT_FILE}: {label} is {value!r}, but {PYTHON_PIN_FILE} pins {pin}, so it should be {expected!r}")
+    return errors
+
+
+def _workflow_pin_errors(base_dir: Path) -> list[str]:
+    """Each `actions/setup-python` step that does not read the pin file, in every workflow."""
+    workflows_dir = base_dir / WORKFLOWS_DIR
+    if not workflows_dir.is_dir():
+        return []
+    errors: list[str] = []
+    for workflow in sorted([*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]):
+        rel = workflow.relative_to(base_dir).as_posix()
+        try:
+            parsed: Any = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            errors.append(f"{rel}: is not valid YAML, so its Python cannot be checked against {PYTHON_PIN_FILE} ({exc})")
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        jobs: Any = cast(dict[str, Any], parsed).get("jobs")
+        if not isinstance(jobs, dict):
+            continue
+        for job_id, job in cast(dict[str, Any], jobs).items():
+            steps: Any = cast(dict[str, Any], job).get("steps") if isinstance(job, dict) else None
+            if not isinstance(steps, list):
+                continue
+            for index, step in enumerate(cast(list[Any], steps), start=1):
+                if not isinstance(step, dict):
+                    continue
+                step_map = cast(dict[str, Any], step)
+                uses = step_map.get("uses")
+                if not isinstance(uses, str) or not uses.startswith(SETUP_PYTHON_ACTION + "@"):
+                    continue
+                with_block: Any = step_map.get("with")
+                inputs = cast(dict[str, Any], with_block) if isinstance(with_block, dict) else {}
+                where = f"{rel}: job `{job_id}`, step {index} ({uses})"
+                if "python-version" in inputs:
+                    errors.append(
+                        f"{where} passes the literal python-version {inputs['python-version']!r}; "
+                        f"pass python-version-file: {PYTHON_PIN_FILE} instead, so CI runs the version the repository pins"
+                    )
+                elif inputs.get("python-version-file") != PYTHON_PIN_FILE:
+                    errors.append(f"{where} does not pass python-version-file: {PYTHON_PIN_FILE}, so CI does not run the version the repository pins")
+    return errors
+
+
 def check_hook_provenance(base_dir: Path) -> list[str]:
     """Refuse a vendored hook bundle whose provenance no published source can reproduce.
 
@@ -1254,6 +1374,13 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_version_floors(base_dir),
         "FAIL: A version floor drifted from [vars.floors], or did not reach the built skills.",
         "  Version floors match [vars.floors] and reach every target.",
+    )
+
+    failed |= _run_check(
+        f"Checking {PYTHON_PIN_FILE} against {PYPROJECT_FILE}'s floors and the workflows...",
+        check_python_pin(base_dir),
+        f"FAIL: The Python {PYTHON_PIN_FILE} pins disagrees with a floor in {PYPROJECT_FILE}, or a workflow does not read it.",
+        f"  {PYTHON_PIN_FILE} matches every floor in {PYPROJECT_FILE}, and every workflow reads it.",
     )
 
     failed |= _run_check(
