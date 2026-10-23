@@ -1435,10 +1435,11 @@ class TestPipelexRunSkill:
         files leave in — so a method that emits or echoes one would submit its own output
         as source. The workshop writes a `.gitignore` of `*` into a `runs/` it creates; a
         `runs/` saved into before it did carries none, so step 2 writes one before the
-        first call that reads the folder. The same sweep marks what `/pipelex-inputs` left
-        beside the bundle before it marked it itself (`L-261022-b695eb`): an `inputs/`
-        beside an `inputs.json` holds the user's documents, and `inputs.prepared.json`
-        the run's values, neither of which the membership rule keeps out on its own. Each mark
+        first call that reads the folder. The same sweep marks what an earlier release of
+        `/pipelex-inputs` left beside the bundle (`L-261022-b695eb`), a folder nothing migrates
+        since the skill stopped writing there (`L-260924-208499`): an `inputs/` beside an
+        `inputs.json` holds the user's documents, and `inputs.prepared.json` the run's values,
+        neither of which the membership rule keeps out on its own. Each mark
         is written only where it is missing, so a second run announces nothing and appends no
         second line, and an `inputs/` whose own `.gitignore` lacks `*` still gets the line."""
         body = self.run_skill
@@ -1471,9 +1472,11 @@ class TestPipelexRunSkill:
         every other key and fails the template check as drift. A sample with an `https`
         document needs no preparation, so no prepared file exists and the base is
         `inputs.json` (`L-260927-235a99`): "prove it on the sample with the question asked
-        in French" keeps the sample's document. The paid run's line names the replaced keys."""
+        in French" keeps the sample's document. The paid run's line names the replaced keys.
+        A prepared file is written in a lab case alone since `L-260924-208499`, so only a
+        lab case's is a base."""
         body = self.run_skill
-        assert "laid over a current `inputs.prepared.json`, else over `inputs.json`" in body
+        assert "laid over a current `inputs.prepared.json` in a lab case, `lab/<method>/cases/<case>/`, else over `inputs.json`" in body
         assert "replace only the keys the user named and keep every other" in body
         assert "With neither file, the request's values are the whole set." in body
         assert "With no prepared file, the request's values are the whole set." not in body
@@ -1524,23 +1527,25 @@ class TestPipelexRunSkill:
         ) in body
         assert "is the prepare rewrite; neither is drift." in body
 
-    def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
-        """The example is the most-copied part of a skill: one that still overwrites
-        `inputs.json` destroys the source form this change exists to preserve. The size
-        diet moved the worked examples into the strategy references, so every file the
-        skill ships is held to it, and to the sentences `L-260922-e01c73` caught still
-        saying preparation rewrites `inputs.json`."""
+    def test_the_worked_examples_write_where_step_5_does(self) -> None:
+        """The example is the most-copied part of a skill, so it says what step 5 does.
+        Since `L-260924-208499` a method's folder gets no prepared file: the returned
+        values are written over `inputs.json`, which is then run-ready as it stands, and
+        only a lab case keeps `inputs.json` naming its copies with the prepared values
+        beside it. An example still writing a prepared file beside a method, or still
+        saying that preparation never rewrites `inputs.json`, teaches the retired layout."""
         references = self.REPO_ROOT / "skills" / "pipelex-inputs" / "references"
         texts = {"SKILL.md.j2": self.inputs_skill} | {path.name: path.read_text(encoding="utf-8") for path in sorted(references.glob("*.md"))}
         for name, text in texts.items():
             for retired in (
-                "written back over `inputs.json`",
-                "rewrites `inputs.json`",
-                "is what `inputs.json` holds from then on",
-                "rewrites it to",
+                "prepare never rewrites it",
+                "beside an unchanged `inputs.json`",
+                "leaving `inputs.json` as saved",
             ):
-                assert retired not in text, f"{name} still says preparation rewrites inputs.json: {retired!r}"
-        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in texts["user-data.md"]
+                assert retired not in text, f"{name} still teaches the prepared file beside a method: {retired!r}"
+        assert "which is written over `inputs.json`" in texts["user-data.md"]
+        assert "the run-ready list would go to `inputs.prepared.json` beside it" in texts["user-data.md"]
+        assert "writes the run-ready form over `inputs.json`" in texts["synthetic.md"]
 
     def test_preparation_is_skipped_only_for_values_already_remote(self) -> None:
         """`data:` URLs and inline bytes are not local files but still need uploading,
@@ -1559,9 +1564,11 @@ class TestPipelexRunSkill:
         here, which skips again, and takes a current-looking one as run-ready. So the
         deletion comes before the pass-through skip and before the user can decline the
         upload, and after the Template strategy's skip: a template pass prepares nothing,
-        and the prepared file may be the only run-ready copy of values it just replaced."""
+        and the prepared file may be the only run-ready copy of values it just replaced.
+        Since `L-260924-208499` only a lab case's copies get a prepared file, so the
+        deletion is theirs."""
         body = self.inputs_skill
-        delete = body.index("Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
+        delete = body.index("Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
         assert body.index("Skip the call for the Template strategy") < delete
         assert delete < body.index("Skip the call too **when every file-ish value is already")
         assert delete < body.index("If the user declines, stop before the call")
@@ -1580,24 +1587,20 @@ class TestPipelexRunSkill:
         user_data = (references / "user-data.md").read_text(encoding="utf-8")
         synthetic = (references / "synthetic.md").read_text(encoding="utf-8")
         assert "A list input's files go in a directory named after the input, each named by its position" in user_data
-        assert "`<output_dir>/inputs/<input_variable>/1.<ext>`" in synthetic
+        assert "`<tmp>/<input_variable>/1.<ext>`" in synthetic
         for text in (user_data, synthetic):
             assert "`<input_variable>_1.<ext>`" not in text
             assert not re.search(r"\[\s*\"inputs/[^/\"]+\"", text), "a list example puts its files flat under inputs/"
 
-    def test_a_user_s_file_is_copied_into_the_bundle_never_linked(self) -> None:
-        """For a local bundle `<output_dir>` is the bundle directory, which the skills pass as
-        `method_dir`, and the workshop refuses a folder holding a symbolic link its rule does not
-        exclude (`pipelex-mcp`, SPEC.md, "The method folder"). The reference used to offer a
-        symlink beside the copy, which made every later submission of the bundle refuse it, and the
-        prepare reads the copy by the bundle's folder too. A link that offer already left behind would
-        keep refusing the folder, so the next preparation replaces it with a copy of its target."""
+    def test_a_case_s_copy_is_never_linked(self) -> None:
+        """The reference used to offer a symlink beside a copy in the bundle's folder, which the
+        workshop refuses as a method's folder (`pipelex-mcp`, SPEC.md, "The method folder"). Since
+        `L-260924-208499` only a lab case gets copies, and a link there names a path on this machine,
+        so the case would not run from another clone. A link an earlier preparation left behind is
+        replaced by a copy of its target."""
         user_data = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
         assert "or symlink" not in user_data
-        assert (
-            "**Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link."
-            in user_data
-        )
+        assert "**Never link it there**: a link names a path on this machine, which no other clone holds." in user_data
         assert "A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name" in user_data
         assert "calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`" in user_data
 
@@ -1605,7 +1608,7 @@ class TestPipelexRunSkill:
         """No prepared file is written when nothing needed uploading, so an offer that
         hard-codes `inputs.prepared.json` names a file that is not there."""
         body = self.inputs_skill
-        assert "`inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped" in body
+        assert "`inputs.prepared.json` where prepare wrote one, else `inputs.json`" in body
 
     def test_it_routes_a_failure_and_never_bisects(self) -> None:
         body = self.run_skill
@@ -1663,20 +1666,22 @@ class TestPipelexRunSkill:
             for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
                 assert f"mcp__plugin_pipelex_pipelex__{tool}" in run, f"{target_name}: pipelex-run must declare {tool}"
 
-    def test_prepare_writes_a_separate_file_and_never_rewrites_the_source(self) -> None:
-        """The in-place rewrite destroyed the source form: the storage references
-        are scoped to one org on one plane, so the committed file was unusable by
-        a teammate and after a move between planes."""
+    def test_prepare_writes_over_inputs_json_and_a_case_keeps_its_source(self) -> None:
+        """The prepared file kept `inputs.json` readable with local paths, and was gitignored
+        for its references, scoped to one organization on one plane. Since `L-260924-208499`
+        a method's folder gets no prepared file: the references go into `inputs.json`, which
+        then works only inside the organization that uploaded its files, a trade-off the
+        design accepts. A lab case keeps the old split, since its `inputs.json` names the
+        copies so that the case runs from any clone."""
         body = self.inputs_skill
-        assert "leave `inputs.json` exactly as it is" in body
-        assert "prepare never rewrites it" in body
+        assert "**write the returned `inputs` over `<output_dir>/inputs.json`**" in body
+        assert "leaving `inputs.json` and the copies exactly as they are" in body
         assert "no envelope, no hash and no sidecar" in body
-        # The prepared file's references are scoped to one organization on one plane, and it carries every
-        # other value of `inputs.json` word for word, so it takes the shared ignore procedure, second check
-        # and tracked-path guard included, rather than a rule of step 5's own.
+        # A case's prepared file carries every value of its `inputs.json` word for word, so it takes the shared
+        # ignore procedure, second check and tracked-path guard included, rather than a rule of step 5's own.
         assert (
-            "{% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, "
-            "and `inputs.prepared.json` before step 5's call{% endset -%}"
+            "{% set git_ignore_paths %}`inputs.json` when a value holds a file's text, a case's copies before writing them "
+            "and its `inputs.prepared.json` before step 5's call{% endset -%}"
         ) in body
         assert "`inputs.json` or `inputs.prepared.json`, anchored with a leading `/`,{% endset -%}" in body
         assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
@@ -2209,7 +2214,7 @@ class TestPipelexInputsSizeLimitDiscipline:
         assert "preparation failed, the inputs are not run-ready, and no run will be offered" in size_branch
         assert "preserve the user's original file" in size_branch
         assert "write no `inputs.prepared.json`" in size_branch
-        assert "`inputs.json` keeps its local-path form because prepare never rewrites it" in size_branch
+        assert "`inputs.json` keeps its local-path form because step 5 writes the prepared values only on success" in size_branch
         assert "Continue only after the user supplies a different acceptable input or reference, or the service limit changes" in size_branch
         assert "resolve its path to absolute" not in size_branch
         # The reference names the guard rather than restating it: a guard lives in SKILL.md once.

@@ -190,7 +190,7 @@ class TestPipelexInputsSkill:
         assert "A published address, or an id with a suffix (`mt_…@draft`, `mt_…@<n>`)**: leave `kind` out." in section
         assert "`.pipelex/method.json`" in section
         assert "Prepare in two calls" in section
-        assert "Write the second call's `inputs` to `inputs.prepared.json`, and nothing when either call fails." in section
+        assert "Write the second call's `inputs` as step 5 says, and nothing when either call fails." in section
         assert 'as `input_domain` at `kind`, or as a `config` error tagged `kind: "role"`' in section
         assert "Prepare again without `kind`" in section
         assert "never yours" in section
@@ -202,49 +202,95 @@ class TestPipelexInputsSkill:
         assert "one prepare call then covers both sources' files" not in user_data
 
     @pytest.mark.parametrize("target_name", TARGETS)
-    def test_the_inputs_are_marked_out_of_the_method_s_tree_before_they_are_written(self, target_name: str) -> None:
-        """`L-261022-b695eb`: for a local bundle `<output_dir>` is the bundle's directory, every surface sends the
-        method's whole tree, and the membership rule keeps out only `inputs.json`, reading no `.gitignore` above the
-        tree root. So the copies and the prepared file are marked where the lister reads: `*` in `inputs/`, as
-        `runs/` is marked, and an anchored line in `<output_dir>/.gitignore`. The mark comes before the ignore
-        check, which then finds every copy ignored unless git tracks it, so the guard no longer writes an
-        `inputs/` entry of its own, and the entries it still writes are anchored (`L-260924-9fd751`). Two
-        exceptions keep the mark from hiding what should stay in git: an `inputs/` already there that is not the
-        skill's own layout, beside a `.mthds` file or an `inputs.json`, is marked only on the user's yes, and a
-        caller may ask for none, as the lab does for a synthetic case it commits."""
+    def test_a_user_s_file_is_uploaded_where_it_lies_and_its_address_goes_into_inputs_json(self, target_name: str) -> None:
+        """`L-260924-208499`: for a local bundle `<output_dir>` is the method's folder, which every surface sends whole
+        and which a `uv_build` wheel ships when the method sits in a Python package, whatever a `.gitignore` says. So
+        the skill no longer copies the user's file there: `inputs.json` names the original by its absolute path, step
+        5 uploads it from where it lies, and the address it returns is written over `inputs.json`, which is then the
+        one inputs file, run-ready as it stands. No `inputs.prepared.json` is written beside a method, and nothing is
+        marked, since nothing is written into the tree but `inputs.json`, which the membership rule keeps out. The
+        rewrite keeps the run-ready `{"url": …}` form the tool returns."""
         body = self.render(target_name)
         guards = body.split("## Guards", 1)[1].split("\n## ", 1)[0]
-        mark = self.the_line(guards, "**The inputs stay out of the method's tree**")
-        assert mark == (
-            "- **The inputs stay out of the method's tree**: unless the caller asked not to, give `<output_dir>/inputs/` a "
-            "`.gitignore` holding `*` before a file goes in, asking first for one already there beside no `.mthds` file or "
-            "`inputs.json`, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so."
+        assert self.the_line(guards, "**A file is uploaded where it lies, never copied beside the method**") == (
+            "- **A file is uploaded where it lies, never copied beside the method**: unless the calling skill asks for a case's copies, "
+            f"as `{load_target_config(self.REPO_ROOT / 'targets', target_name).template_vars['skill_prefix']}pipelex-lab` does, "
+            "or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`, copy nothing into `<output_dir>` and write no `inputs.prepared.json`."
         )
+        path_rule = self.the_line(guards, "**A path in `inputs.json` resolves relative to `inputs.json` itself")
+        assert "write a local file's absolute path, a case's copy as `inputs/the_doc.pdf`, or a URL." in path_rule
+        assert "copy a local file into `<output_dir>/inputs/`" not in body
+        assert "**The inputs stay out of the method's tree**" not in body, "the skill writes nothing into the tree that needs a mark"
+        assert ".gitignore` holding `*`" not in body
+        step_5 = body.split("### 5. Prepare the inputs for a run", 1)[1].split("\n### ", 1)[0]
+        written = self.the_line(step_5, 'On `status: "ok"`')
+        assert written.startswith('On `status: "ok"`, **write the returned `inputs` over `<output_dir>/inputs.json`**, or for a case\'s copies')
+        assert 'where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form' in written
+        assert "prepare never rewrites it" not in step_5
+        # Once the address is written over `inputs.json`, no local path is left for step 5's skip rule to upload, so a
+        # file replaced in place goes up again only when its path is put back; the bold rule is a case's alone.
+        replaced = self.the_line(step_5, "An address names the bytes uploaded")
+        assert "outside a case, a replaced file goes up again only once named again, its path back in `inputs.json`;" in replaced
+        assert replaced.index("in a case,") < replaced.index("**prepare again whenever a file was replaced in place.**")
         ignore = self.the_line(guards, "**The user's own files stay out of version control**")
-        assert guards.index(mark) < guards.index(ignore), "the marks come before the ignore check that reads them"
+        assert "`git check-ignore -q` `inputs.json` when a value holds a file's text, a case's copies before writing them" in ignore
         assert "add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`" in ignore
-        assert "`<output_dir>/inputs/`," not in ignore, "the mark keeps the copies out of git, so the guard writes no entry for them"
         user_data = self.reference("user-data.md")
-        copy = user_data.split("\n## Copy\n", 1)[1].split("\n## ", 1)[0]
-        assert "**Mark `inputs/` before the first copy goes in**, with a `.gitignore` inside it holding `*`" in copy
-        assert "when it sits beside a `.mthds` file or an `inputs.json`: that is the skill's own layout" in copy
+        lie = user_data.split("\n## Where the files lie\n", 1)[1].split("\n## ", 1)[0]
+        assert "Each matched file stays where the user keeps it, and is never copied, moved or changed" in lie
+        assert "`inputs.json` names it by its absolute path, and step 5 uploads it from there and writes its address in its place" in lie
+        assert "a Python package that holds the method ships in its wheel" in lie
+        examples = user_data.split("\n## Worked examples\n", 1)[1]
+        assert "cp " not in examples, "a worked example is what a model copies, and none copies a file"
+        assert '"invoice": "/Users/jane/documents/invoice_march.pdf"' in examples
+        assert "It uploads the PDF from where it lies and returns the run-ready set, which is written over `inputs.json`:" in examples
+        assert "nothing was copied beside the method" in examples
+        office = self.the_line(user_data, "**An Office file goes in as the PDF exported from it.**")
+        assert '--outdir "$(mktemp -d)"' in office
+        assert "never beside the method or the original" in office
+        assert "in place of the original" in office
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_case_s_copies_are_made_only_when_the_calling_skill_asks(self, target_name: str) -> None:
+        """The lab is the one exception (ruled on 2026-10-23, amending the design): a case directory sits outside every
+        method, and a synthetic case is committed because its files cannot be rendered again byte for byte. So when the
+        lab asks for a case's copies, the files are copied under `<output_dir>/inputs/`, left unmarked, `inputs.json`
+        names the copies relative to itself, and step 5 writes the run-ready values into `inputs.prepared.json` beside
+        it, deleting an earlier one first, which is what `/pipelex-run`'s currency check reads."""
+        body = self.render(target_name)
+        step_5 = body.split("### 5. Prepare the inputs for a run", 1)[1].split("\n### ", 1)[0]
+        assert "Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**" in step_5
         assert (
-            "Any other `inputs/` already there may be a folder of the user's own, which the mark would hide from git, so ask before marking it"
-            in copy
-        )
-        assert "an entry in the repository's own `.gitignore` above it keeps nothing out" in copy
+            "or for a case's copies **into `<output_dir>/inputs.prepared.json`, leaving `inputs.json` and the copies exactly as they are**"
+        ) in step_5
+        assert "in a case, the run's currency check misses a file moved over its copy" in step_5
+        copies = self.reference("user-data.md").split("\n## A case's copies\n", 1)[1].split("\n## ", 1)[0]
+        assert "When the calling skill asks for a case's copies, as `pipelex-lab` does" in copies
+        assert "or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`, as when the user prepares one directly" in copies
+        assert "Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself" in copies
+        assert "leave that folder unmarked" in copies
         synthetic = self.reference("synthetic.md")
-        assert "Every `target` lies under `<output_dir>/inputs/`, which the skill's guards mark before the first request" in synthetic
-        assert "asking first for an `inputs/` already there beside no `.mthds` file or `inputs.json`" in synthetic
-        assert (
-            "as `pipelex-lab` does for a case made only of synthetic files, which it commits, say so in every request, "
-            "and the factory leaves it unmarked too."
-        ) in synthetic
+        assert "For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>`" in synthetic
+        assert "A case's copies are the one exception, in a case directory outside every method" in synthetic
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_lab_case_keeps_its_copies_by_its_location_too(self, target_name: str) -> None:
+        """Round 1 of the review: `/pipelex-run` hands a lab case whose prepared file is not current back to this skill,
+        and a user may call it on a case directly, neither of them asking for a case's copies. Keyed on the request
+        alone, step 5 would then write addresses over the case's `inputs.json`, which must keep naming its copies for
+        the case to run from any clone. So the guard turns the case's copies on by the location as well: an
+        `<output_dir>` that is a lab case, `lab/<method>/cases/<case>/`, is one whoever asked."""
+        guards = self.render(target_name).split("## Guards", 1)[1].split("\n## ", 1)[0]
+        guard = self.the_line(guards, "**A file is uploaded where it lies, never copied beside the method**")
+        asked = guard.index("unless the calling skill asks for a case's copies")
+        located = guard.index("or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`")
+        assert asked < located < guard.index("copy nothing into `<output_dir>` and write no `inputs.prepared.json`")
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
     def test_the_marks_and_the_anchored_entries_read_as_git_reads_them(self, tmp_path: Path) -> None:
-        """The marks keep git out too: `*` in `inputs/` ignores every copy, a list input's directory included, and
-        the anchored line ignores the prepared file beside the bundle and no other. A copy git already tracks still
+        """The marks `/pipelex-run` writes into a bundle an earlier release prepared keep git out too: `*` in
+        `inputs/` ignores every copy, a list input's directory included, and the anchored line ignores the prepared
+        file beside the bundle and no other. A copy git already tracks still
         reads not ignored, which is what holds it for the user. And the bare `inputs.json` the guard used to write
         into a `.gitignore` of `<output_dir>`'s own matched a committed `inputs.json` at any depth below, a fixture
         included, which `/inputs.json` leaves alone."""

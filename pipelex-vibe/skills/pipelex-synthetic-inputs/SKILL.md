@@ -27,7 +27,7 @@ A request carries four fields: explicit when `/pipelex:pipelex-inputs` calls, ot
 
 - `format`: `pdf`, `png` with its category, `photograph`, `docx` or `xlsx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, or `photograph` when the method reads the image as a photo of a real-world scene (damage to inspect, a room, a product) rather than of a document, a chart or a screen; and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`). A `Document` a method extracts is a `pdf` even when the user's originals are Word or Excel files: extraction reads no Office format, so the test file is the PDF they would export.
 - `brief`: one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it. Derive it from the method's purpose and the input's description, or ask for it — one question, then proceed.
-- `target`: the path to write; by default `<output_dir>/inputs/<input_variable>.<ext>`, standalone `./inputs/<name>.<ext>`. **An `inputs/` the file goes into gets a `.gitignore` holding `*` first**, saying so, unless the caller asks otherwise: at once beside a `.mthds` file or an `inputs.json`, elsewhere on the user's yes.
+- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in a fresh temporary directory made once with `mktemp -d`, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. A target the caller or the user names is honoured.
 - `constraints`: page count, pixel size, language, anything the input's description pins; otherwise the recipe's defaults.
 
 A `photograph` follows [photograph.md](references/photograph.md) from here: read it before drafting, since it replaces steps 2, 4 and 5 for that file. Mode follows the caller: a request from `/pipelex:pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
@@ -60,7 +60,7 @@ Before opening a recipe, write down what the file will say — in the reply, bri
 
 Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep step 2's runner line and the recipe's `SEED` and `invariant=1`, and run it.
 
-**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `inputs/.invoice.part.pdf` for `inputs/invoice.pdf`), and `target` when this run created it:
+**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `.invoice.part.pdf` for `invoice.pdf`), and `target` when this run created it:
 
 ```bash
 rm -f "<target_dir>/.<target_stem>.part<target_ext>"

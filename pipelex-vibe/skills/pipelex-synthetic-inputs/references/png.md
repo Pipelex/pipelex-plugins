@@ -18,7 +18,7 @@ Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a compl
 
 ## Conventions shared by every recipe
 
-- Output path: `<output_dir>/inputs/<name>.png` — replace with the request's `target`.
+- Output path: `<target_dir>/<name>.png` — replace with the request's `target`.
 - Sizes: charts, diagrams and screenshots at **1200×800**; a `document_scan` at **1240×1754**, which is A4 at 150 dpi. Raise them only when the method's input description asks. Pixel size is not file size here: the first three come out in the tens of kilobytes, while a `document_scan` lands in the low megabytes because `scannerize()`'s grain is noise and noise does not compress. Drop to 100 dpi (827×1169) or lower `grain` if the upload limit is the problem.
 - Every Pillow recipe opens with the same **preamble** — the `font()` helper and, where labels are laid out, `wrap()`. No recipe ever names a system font path: `font()` takes DejaVu Sans from matplotlib's own bundled copy and falls back to the face Pillow ships. Both are always present, because both packages are in the `png` set.
 - Randomness is seeded (`SEED` in the content block), so regenerating a file produces the same file.
@@ -56,7 +56,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-OUT = "<output_dir>/inputs/test_chart.png"
+OUT = "<target_dir>/test_chart.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -132,7 +132,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import font_manager
 
-OUT = "<output_dir>/inputs/test_diagram.png"
+OUT = "<target_dir>/test_diagram.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -313,7 +313,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from matplotlib import font_manager
 
-OUT = "<output_dir>/inputs/test_scan.png"
+OUT = "<target_dir>/test_scan.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -516,7 +516,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 from matplotlib import font_manager
 
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)  # several hand fonts ship a bold face only
-OUT = "<output_dir>/inputs/test_handwritten.png"
+OUT = "<target_dir>/test_handwritten.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -696,7 +696,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import font_manager
 
-OUT = "<output_dir>/inputs/test_screenshot.png"
+OUT = "<target_dir>/test_screenshot.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -841,7 +841,7 @@ Column widths are fixed shares, not measured, so a long cell will overlap its ne
 ## Verify
 
 ```bash
-uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<output_dir>/inputs/<name>.png"
+uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<target_dir>/<name>.png"
 ```
 
 Expect `PNG`, the size the recipe declares, and `RGB` — or `RGBA` from the chart recipe, which is matplotlib's doing and not a fault. Then look at the file: on Claude Code, open it with the `Read` tool and check it reads as its category — a chart with the series drafted, a diagram whose arrows go where the process goes, a page that looks scanned and whose totals add up, a screen that looks like an app. Fix the content block and rerun if it does not; the recipes are seeded, so nothing else moves.

@@ -11,7 +11,7 @@ Recipes for the `docx` and `xlsx` formats of `/pipelex-synthetic-inputs`, carrie
 ```
 Use the /docx skill to create a Word document with the following content:
 [Describe the document content, structure, and formatting]
-Save to: <output_dir>/inputs/<filename>.docx
+Save to: <target>
 ```
 
 **If not**, create it with `python-docx` (MIT). Runner line per the skill's Step 2; the package set is `python-docx`:
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from docx import Document
 
-OUT = "<output_dir>/inputs/test_document.docx"
+OUT = "<target_dir>/test_document.docx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -48,7 +48,7 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 ```
 Use the /xlsx skill to create a spreadsheet with the following data:
 [Describe columns, rows, and sample data]
-Save to: <output_dir>/inputs/<filename>.xlsx
+Save to: <target>
 ```
 
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
@@ -60,7 +60,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-OUT = "<output_dir>/inputs/test_spreadsheet.xlsx"
+OUT = "<target_dir>/test_spreadsheet.xlsx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.

@@ -144,21 +144,31 @@ class TestPipelexLabSkill:
         assert "the case's paths" not in move
 
     @pytest.mark.parametrize("target_name", TARGETS)
-    def test_a_synthetic_case_keeps_its_inputs_in_git(self, target_name: str) -> None:
-        """`/pipelex-inputs` and the file factory mark the `inputs/` they write into with a `.gitignore` of `*`, which
-        keeps a bundle's test files out of the method's tree and out of git. A lab case sits outside the bundle, and a
-        case made only of synthetic files is committed with the lab, since no render gives back its files byte for
-        byte, so the lab asks for no mark there. A case of the user's own files is not that case: its directory is
-        ignored whole, and its `inputs/` takes the mark as any other."""
+    def test_a_case_keeps_its_copies_and_its_prepared_file(self, target_name: str) -> None:
+        """`L-260924-208499` stopped the input skills copying a user's file beside a method: it is uploaded where it
+        lies, a test file is made in a temporary directory, and `inputs.json` names each by its address. A lab case is
+        the one exception, ruled on 2026-10-23: it sits outside every method, so neither leak applies, and a case made
+        only of synthetic files is committed with the lab, since no render gives back its files byte for byte. So the
+        lab asks `/pipelex-inputs` for the case's copies, which it makes only on that request: the files under the
+        case's `inputs/`, unmarked, `inputs.json` naming them so that the case runs from any clone, and the run-ready
+        values in `inputs.prepared.json` beside it, which `/pipelex-run` reads for a lab case alone."""
         move = the_move(render(target_name), 2)
+        inputs_line = next(line for line in move.splitlines() if line.startswith("2. **Inputs.**"))
         assert (
-            "For a case made only of synthetic files, **ask it too to leave `inputs/` unmarked**, and the factory too when "
-            "called directly: that case is committed "
-            "with the lab, and its files cannot be rendered again byte for byte."
-        ) in move
-        assert move.index("**Ask it to stop at run-ready, with no run offer**") < move.index("**ask it too to leave `inputs/` unmarked**")
-        assert "unless the caller asked not to, give `<output_dir>/inputs/` a `.gitignore` holding `*`" in render(target_name, "pipelex-inputs")
-        assert "unless the caller asks otherwise" in render(target_name, "pipelex-synthetic-inputs")
+            "as its `<output_dir>`, and **ask it for the case's copies**: its files under `inputs/`, named by `inputs.json` there, "
+            "and the run-ready values in `inputs.prepared.json`, so that the case runs from any clone and no case writes over another."
+        ) in inputs_line
+        assert "The factory, called directly" not in inputs_line, "the factory writes into a temporary directory; the copies are /pipelex-inputs'"
+        assert "A case made only of synthetic files is committed with the lab, since its files cannot be rendered again byte for byte." in inputs_line
+        assert "unmarked" not in move, "nothing marks a case's `inputs/` any more, so the lab asks for no exemption"
+        inputs = render(target_name, "pipelex-inputs")
+        assert "unless the calling skill asks for a case's copies, as `" in inputs
+        assert (
+            "or for a case's copies **into `<output_dir>/inputs.prepared.json`, leaving `inputs.json` and the copies exactly as they are**" in inputs
+        )
+        run = render(target_name, "pipelex-run")
+        assert "2. **A lab case's current `inputs.prepared.json`**. **Current** means" in run
+        assert ".gitignore` holding `*` first" not in render(target_name, "pipelex-synthetic-inputs")
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
     def test_git_reads_the_case_directory_as_the_lab_needs(self, tmp_path: Path) -> None:
@@ -268,7 +278,7 @@ class TestIntegrationPoints:
         the lab would have to improvise one with the output already in view."""
         results = render(target_name, "pipelex-run").split("### 7. ", 1)[1].split("\n### ", 1)[0]
         offer = f"offer `{skill_prefix(target_name)}pipelex-lab`"
-        assert f"When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, {offer}" in results
+        assert f"When the inputs came from a lab case and the lab did not start this run, {offer}" in results
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_lab_logs_a_run_it_is_handed_outside_its_rounds(self, target_name: str) -> None:

@@ -1,12 +1,12 @@
 # The User data strategy
 
-Read this at step 3 when the strategy is User data, or Mixed, before matching any file to an input. It covers finding the user's files, matching them to the template's inputs, copying them in and filling their values; the skill's guards hold throughout, the path rule of `inputs.json` included.
+Read this at step 3 when the strategy is User data, or Mixed, before matching any file to an input. It covers finding the user's files, matching them to the template's inputs and filling their values with the files where they lie, and the copies a case of `pipelex-lab` asks for; the skill's guards hold throughout, the path rule of `inputs.json` included.
 
 In interactive mode, ask which of the user's files goes to which input wherever that is ambiguous, and any specific values or constraints the user wants on a field.
 
 ## Inventory
 
-Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. A file the user names that is not on disk, such as one already uploaded to Pipelex, is looked up among the team's files as the skill's step 3 says, and fills its input by its address, with nothing to copy. Determine each one's type:
+Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. A file the user names that is not on disk, such as one already uploaded to Pipelex, is looked up among the team's files as the skill's step 3 says, and fills its input by its address, with nothing to upload. Determine each one's type:
 
 | Extension | Detected type | Maps to |
 |---|---|---|
@@ -22,7 +22,7 @@ Collect every file the user has provided: explicit paths, folders, and files men
 | `.html`, `.htm` | HTML | `native.Html` |
 | `http://…`, `https://…` | web page URL | `native.Document` |
 
-**An Office file goes in as the PDF exported from it.** Extraction reads a PDF, an image or a web page, and nothing else, so a Word, Excel or PowerPoint file under a `Document` input fails the run at its first step. Where `soffice` is on PATH, convert each file on its own into a fresh temporary directory (`soffice --headless --convert-to pdf --outdir "$(mktemp -d)" <file>`), never into `inputs/`: LibreOffice names the PDF after the source file and replaces a file of that name without asking, so two sources sharing a stem, or a copy already in `inputs/`, would be overwritten. Say so, and from then on treat that PDF as the file selected for the input: Copy names it after its input like any other, and step 5 of the skill sends it as it is. Without `soffice`, ask the user to export it to PDF, and leave that input unfilled until they do. Never rename an Office file to `.pdf`.
+**An Office file goes in as the PDF exported from it.** Extraction reads a PDF, an image or a web page, and nothing else, so a Word, Excel or PowerPoint file under a `Document` input fails the run at its first step. Where `soffice` is on PATH, convert each file on its own into a fresh temporary directory (`soffice --headless --convert-to pdf --outdir "$(mktemp -d)" <file>`), never beside the method or the original: LibreOffice names the PDF after the source file and replaces a file of that name without asking, so two sources sharing a stem would overwrite each other, and an export beside the method would travel as one of its files. Say so, and from then on treat that PDF as the file selected for the input: `inputs.json` names it where it lies, in its temporary directory, a case's copy names it after its input like any other, and step 5 of the skill sends it as it is, in place of the original. Without `soffice`, ask the user to export it to PDF, and leave that input unfilled until they do. Never rename an Office file to `.pdf`.
 
 **A folder**: list its files — non-recursively by default, recursively if the user asks — keep the supported types, group them by detected type, and match them to list inputs (`Image[]`, `Document[]`, …). A folder `./invoices/` holding five PDFs, for a method expecting `documents: Document[]`, maps all five to that one input.
 
@@ -37,30 +37,32 @@ For each input variable of the template, apply these rules in order:
 5. **An unmatched file**: report it, and ask whether it should be ignored or mapped to a specific input.
 6. **An input still unfilled** after matching stays a placeholder or is filled with synthetic data, which is the Mixed strategy.
 
-## Copy
+## Where the files lie
 
-Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself and the directory stays self-contained.
+Each matched file stays where the user keeps it, and is never copied, moved or changed: `inputs.json` names it by its absolute path, and step 5 uploads it from there and writes its address in its place. For a local bundle `<output_dir>` is the method's folder, which every surface that hands over the method sends whole, the workshop's validation and run, a catalog save, the edit hook and an integrated call site, and which a Python package that holds the method ships in its wheel. A copy there would travel as a file of the method, so none is made. Uploading the same bytes again under the same name finds the same file among the team's files, so preparing again costs nothing.
 
-**Mark `inputs/` before the first copy goes in**, with a `.gitignore` inside it holding `*`, as the skill's guards say. For a local bundle `<output_dir>` is the bundle's directory, and every surface that hands over the method's folder, the workshop's validation and run, a catalog save, the edit hook and an integrated call site, sends each file in it that the MTHDS membership rule keeps. That rule keeps out a file named `inputs.json`, and none of the copies, and it reads only the `.gitignore` files inside the method's folder, so an entry in the repository's own `.gitignore` above it keeps nothing out. Without the mark, the user's documents would be uploaded and stored as files of the method; with it, they leave the machine only at step 5, as the run's inputs, and git ignores them too. Create `inputs/` with the mark already in it. An `inputs/` that is already there gets the mark the same way, the `.gitignore` written when there is none or the `*` line added to one that lacks it, saying so, when it sits beside a `.mthds` file or an `inputs.json`: that is the skill's own layout, one an earlier preparation left unmarked included. Any other `inputs/` already there may be a folder of the user's own, which the mark would hide from git, so ask before marking it; without the mark, the skill's ignore check still holds each copy git would not ignore until the user says so. The mark covers a list input's directory below it, which needs none of its own.
+## A case's copies
 
-**Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link. A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name, saying so. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input, each named by its position in the list with its original extension (`inputs/images/1.jpg`, `inputs/images/2.png`): no two positions share a name, and a single input's copy never lands in a list's directory, so no copy overwrites another's. Create `inputs/` only when there is a file to copy.
+When the calling skill asks for a case's copies, as `pipelex-lab` does for each case of its own, or `<output_dir>` is a lab case, `lab/<method>/cases/<case>/`, as when the user prepares one directly or `pipelex-run` hands one back, `<output_dir>` is the case's directory, outside every method, and the files are copied in so that the case runs from any clone. Copy each file into `<output_dir>/inputs/`, so `inputs.json` names it with a path relative to itself, and leave that folder unmarked: the lab commits a case made only of synthetic files, and keeps a case of the user's own files out of git itself. Create `inputs/` only when there is a file to copy.
+
+**Never link it there**: a link names a path on this machine, which no other clone holds. A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name, saying so. Name a single file's copy after its input, keeping the original extension: the input `invoice` becomes `<output_dir>/inputs/invoice.pdf`. A list input's files go in a directory named after the input, each named by its position in the list with its original extension (`inputs/images/1.jpg`, `inputs/images/2.png`): no two positions share a name, and a single input's copy never lands in a list's directory, so no copy overwrites another's.
 
 ## Fill
 
 Set each matched input's light value:
 
-- a Document: the path string, `"invoice": "inputs/invoice.pdf"`;
+- a Document: the file's absolute path, `"invoice": "/Users/jane/documents/invoice_march.pdf"`, or a case's copy, `"invoice": "inputs/invoice.pdf"`;
 - a web page Document: the URL string, `"page": "https://example.com/article"`;
-- an Image: the path string, `"photo": "inputs/photo.jpg"`;
+- an Image: the file's absolute path, `"photo": "/Users/jane/photos/storefront.jpg"`, or a case's copy, `"photo": "inputs/photo.jpg"`;
 - a Text from a `.txt` or `.md` file: the file's actual content as the string value;
-- a list, from a folder for instance: a list of those values, `"images": ["inputs/images/1.jpg", "inputs/images/2.jpg", "inputs/images/3.png"]`;
+- a list, from a folder for instance: a list of those values, `"images": ["/Users/jane/product-photos/shoe.jpg", "/Users/jane/product-photos/hat.png"]`, or a case's copies, `["inputs/images/1.jpg", "inputs/images/2.png"]`;
 - a file from the team's files: its address as listed, `"invoice": "pipelex-storage://…"`, which step 5 passes through.
 
-Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since the copies in `<output_dir>/inputs/` are local paths, which a run cannot reach until they are uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and step 5 then uploads both sources' files, in two calls when the user's files need an upload too, since only the factory's go up as test files.
+Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since a local path is one a run cannot reach until it is uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and step 5 then uploads both sources' files, in two calls when the user's files need an upload too, since only the factory's go up as test files.
 
 ## Report
 
-After the skill's step 5, and before its step 6 offers the run, show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; the final `inputs.json` content, which files were uploaded, and whether `inputs.prepared.json` was written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which from the team's files, which were synthesized, and which were uploaded.
+After the skill's step 5, and before its step 6 offers the run, show the user which files were matched to which inputs; any input left unfilled, offering synthetic data or a placeholder; which files were uploaded, from where; the final `inputs.json` content, which names each uploaded file by its address, or for a case's copies the `inputs.prepared.json` written beside it; and the path of the saved file. In the Mixed strategy, say which inputs came from the user's files, which from the team's files, which were synthesized, and which were uploaded.
 
 ## Worked examples
 
@@ -69,18 +71,18 @@ After the skill's step 5, and before its step 6 offers the run, show the user wh
 1. The template needs `invoice` (Document) and `instructions` (Text).
 2. The user provided `invoice_march.pdf`, a PDF, so a Document.
 3. `invoice_march.pdf` maps to `invoice` by name similarity and type.
-4. Copy it: `cp ~/documents/invoice_march.pdf <output_dir>/inputs/invoice.pdf`.
+4. It stays where it is, and its path is resolved to an absolute one: `/Users/jane/documents/invoice_march.pdf`.
 5. No file fills `instructions`, so its text is synthesized.
 6. Save `inputs.json`:
 
    ```json
    {
-     "invoice": "inputs/invoice.pdf",
+     "invoice": "/Users/jane/documents/invoice_march.pdf",
      "instructions": "Extract all line items, totals, and vendor information from this invoice."
    }
    ```
 
-7. `invoice` is a local path, so step 5 calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`, the path sent absolute. It uploads the PDF and returns the run-ready set, which is written to `inputs.prepared.json` beside an unchanged `inputs.json`:
+7. `invoice` is a local path, so step 5 says that the PDF is about to go to Pipelex storage, then calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`. It uploads the PDF from where it lies and returns the run-ready set, which is written over `inputs.json`:
 
    ```json
    {
@@ -89,14 +91,14 @@ After the skill's step 5, and before its step 6 offers the run, show the user wh
    }
    ```
 
-   `inputs.json` still reads `"invoice": "inputs/invoice.pdf"`, `uploads` lists that one new uri, and `inputs/invoice.pdf` stays on disk untouched. The method is now runnable, so the run is offered.
+   `uploads` lists that one new uri, the PDF stays in `~/documents/` untouched, and nothing was copied beside the method. The method is now runnable, so the run is offered.
 
-**A folder of images.** A batch image captioner expects `images: Image[]`, and the user says "use the photos in `./product-photos/`", which holds `shoe.jpg`, `hat.png` and `bag.jpg`. All three are copied into `<output_dir>/inputs/images/`, named by their position, and `inputs.json` is:
+**A folder of images.** A batch image captioner expects `images: Image[]`, and the user says "use the photos in `./product-photos/`", which holds `shoe.jpg`, `hat.png` and `bag.jpg`. All three stay where they are, and `inputs.json` names them by their absolute paths:
 
 ```json
 {
-  "images": ["inputs/images/1.jpg", "inputs/images/2.png", "inputs/images/3.jpg"]
+  "images": ["/Users/jane/shop/product-photos/shoe.jpg", "/Users/jane/shop/product-photos/hat.png", "/Users/jane/shop/product-photos/bag.jpg"]
 }
 ```
 
-All three are local paths, so one prepare call uploads the whole list: `inputs.prepared.json` holds it as `[{"url": "pipelex-storage://…"}, …]`, while `inputs.json` keeps the three paths.
+All three are local paths, so one prepare call uploads the whole list, and `inputs.json` then holds it as `[{"url": "pipelex-storage://…"}, …]`. Had `pipelex-lab` asked for a case's copies, the three would have been copied into `<output_dir>/inputs/images/` as `1.jpg`, `2.png` and `3.jpg`, `inputs.json` would name those copies, and the run-ready list would go to `inputs.prepared.json` beside it.
