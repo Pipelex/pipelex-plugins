@@ -15,8 +15,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from tests.unit.stub_api import StubApiServer, run_write_hook
 
 METHOD_FILE = "greeting.mthds"
@@ -114,14 +112,6 @@ class TestHookValidateVerdict:
         assert decision["reason"].startswith(f"Validation failed for {method}:")
         assert INVALID_VERDICT["message"] in decision["reason"]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "The vendored check.mjs builds a reason without Markdown from `validation_errors[]` and does not read `errors[]` yet: "
-            "its source in pipelex-sdk's js/src/hooks must read the problem items, and the bundle be re-vendored. "
-            "The re-vendor that brings the reading turns this test into an unexpected pass, which fails until this marker goes."
-        ),
-    )
     def test_an_invalid_verdict_without_markdown_names_each_problem_item(self, node: str, stub_api: StubApiServer, tmp_path: Path) -> None:
         """The reason the hook builds itself names every item by its code, its sentence and its pipe."""
         stub_api.verdict = INVALID_VERDICT
