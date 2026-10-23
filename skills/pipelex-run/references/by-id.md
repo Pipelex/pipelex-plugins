@@ -12,7 +12,7 @@ A saved method has a draft, which every save writes, and published versions numb
 
 Pass the form the user meant, which is not always the one they typed: "run what I just saved" or "run the draft" is `mt_…@draft`, and "run version 3" is `mt_…@3`, even when the request names the bare id.
 
-When the user named no directory, its inputs are looked for under the bare id whatever the suffix: in `./mt_abc123/`, and in any directory below the working directory whose `pipelex-method.json` names `mt_abc123`, since a link records the bare id. The two are peers: when both hold an `inputs.json`, step 3 asks which.
+When the user named no directory, its inputs are looked for under the bare id whatever the suffix: in `./mt_abc123/`, and in any directory below the working directory whose `.pipelex/method.json` names `mt_abc123`, since a link records the bare id. The two are peers: when both hold an `inputs.json`, step 3 asks which.
 
 ## A method never published
 

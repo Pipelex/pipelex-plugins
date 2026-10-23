@@ -7,7 +7,7 @@ Read this when a file input of the method, an `Image` or a `Document`, alone or 
 Call `mthds_list_files`: it reads no file's content and spends no credit. Narrow it with what you know:
 
 - `query`: a word or two of the file's name, from the user's words or the input's (`invoice`), at most 200 characters; leave it out when there is nothing to search by.
-- `format`: the input's, `image` for an `Image` and `pdf` for a `Document`, or the extension the user named.
+- `format`: `image` for an `Image` input and `pdf` for a `Document` one, or the extension the user named.
 - `kind`: only when the user said what made the file, `uploaded` for a member's upload, `generated` for a run's output, `test` for a test file made for a method.
 - `method_id`: a saved method's bare id, never `mt_…@draft` or `mt_…@<n>`, for that method's files, its test files and its runs' outputs.
 
@@ -17,6 +17,7 @@ The newest come first. While nothing fits and `next_cursor` is not null, ask for
 
 - **One file is plainly the one the user named**: take it, and say which in one line, with its name, format and date.
 - **Several could be, or the user named none**: show them, each with its name, format, date and where it came from, and ask which; never pick one on a guess, since a run on the wrong file spends credit for nothing.
+- **The match is a Word, Excel or PowerPoint file, or another format the input cannot read**: extraction reads a `Document` input only as a PDF, an image or a web page, and an `Image` input takes a picture, so the file cannot fill the input as it is. Never pass its address: say so, and ask the user for a PDF of it.
 - **None fits**: say that the team's files hold no match, and ask for the file as the skill would have.
 
 ## Pass its address

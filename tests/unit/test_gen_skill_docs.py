@@ -1488,7 +1488,7 @@ class TestPipelexRunSkill:
         assert "**When several do, ask which; never choose.**" in body
         assert "by default `./<method_id>/`" not in body
         by_id = (self.REPO_ROOT / "skills" / "pipelex-run" / "references" / "by-id.md").read_text(encoding="utf-8")
-        assert ("in `./mt_abc123/`, and in any directory below the working directory whose `pipelex-method.json` names `mt_abc123`") in by_id
+        assert ("in `./mt_abc123/`, and in any directory below the working directory whose `.pipelex/method.json` names `mt_abc123`") in by_id
         assert "The two are peers: when both hold an `inputs.json`, step 3 asks which." in by_id
 
     def test_a_missing_optional_input_is_not_drift_on_the_main_pipe(self) -> None:
