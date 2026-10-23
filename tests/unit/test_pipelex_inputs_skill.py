@@ -208,13 +208,17 @@ class TestPipelexInputsSkill:
         tree root. So the copies and the prepared file are marked where the lister reads: `*` in `inputs/`, as
         `runs/` is marked, and an anchored line in `<output_dir>/.gitignore`. The mark comes before the ignore
         check, which then finds every copy ignored unless git tracks it, so the guard no longer writes an
-        `inputs/` entry of its own, and the entries it still writes are anchored (`L-260924-9fd751`)."""
+        `inputs/` entry of its own, and the entries it still writes are anchored (`L-260924-9fd751`). Two
+        exceptions keep the mark from hiding what should stay in git: an `inputs/` already there that is not the
+        skill's own layout, beside a `.mthds` file or an `inputs.json`, is marked only on the user's yes, and a
+        caller may ask for none, as the lab does for a synthetic case it commits."""
         body = self.render(target_name)
         guards = body.split("## Guards", 1)[1].split("\n## ", 1)[0]
         mark = self.the_line(guards, "**The inputs stay out of the method's tree**")
         assert mark == (
-            "- **The inputs stay out of the method's tree**: give `<output_dir>/inputs/` a `.gitignore` holding `*` before a file "
-            "goes in, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so."
+            "- **The inputs stay out of the method's tree**: unless the caller asked not to, give `<output_dir>/inputs/` a "
+            "`.gitignore` holding `*` before a file goes in, asking first for one already there beside no `.mthds` file or "
+            "`inputs.json`, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so."
         )
         ignore = self.the_line(guards, "**The user's own files stay out of version control**")
         assert guards.index(mark) < guards.index(ignore), "the marks come before the ignore check that reads them"
@@ -223,10 +227,19 @@ class TestPipelexInputsSkill:
         user_data = self.reference("user-data.md")
         copy = user_data.split("\n## Copy\n", 1)[1].split("\n## ", 1)[0]
         assert "**Mark `inputs/` before the first copy goes in**, with a `.gitignore` inside it holding `*`" in copy
-        assert "one an earlier preparation left unmarked included, gets the mark the same way" in copy
+        assert "when it sits beside a `.mthds` file or an `inputs.json`: that is the skill's own layout" in copy
+        assert (
+            "Any other `inputs/` already there may be a folder of the user's own, which the mark would hide from git, so ask before marking it"
+            in copy
+        )
         assert "an entry in the repository's own `.gitignore` above it keeps nothing out" in copy
         synthetic = self.reference("synthetic.md")
         assert "Every `target` lies under `<output_dir>/inputs/`, which the skill's guards mark before the first request" in synthetic
+        assert "asking first for an `inputs/` already there beside no `.mthds` file or `inputs.json`" in synthetic
+        assert (
+            "as `pipelex-lab` does for a case made only of synthetic files, which it commits, say so in every request, "
+            "and the factory leaves it unmarked too."
+        ) in synthetic
 
     @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
     def test_the_marks_and_the_anchored_entries_read_as_git_reads_them(self, tmp_path: Path) -> None:

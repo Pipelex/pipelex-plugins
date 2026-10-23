@@ -24,7 +24,7 @@ The one entry point for a method's inputs, through to run-ready inputs.
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
 - **A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**: a run fetches it without the user's sign-in, so download or export the file first.
-- **The inputs stay out of the method's tree**: give `<output_dir>/inputs/` a `.gitignore` holding `*` before a file goes in, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so.
+- **The inputs stay out of the method's tree**: unless the caller asked not to, give `<output_dir>/inputs/` a `.gitignore` holding `*` before a file goes in, asking first for one already there beside no `.mthds` file or `inputs.json`, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so.
 - **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` each copy's path before writing it, `inputs.json` when a value holds a file's text, and `inputs.prepared.json` before step 5's call. For a path not ignored, add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 ## Process
@@ -78,14 +78,14 @@ On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned
 
 ### 6. Offer the run
 
-Say what is ready, or which placeholders are left. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `/pipelex:pipelex-integrate` wires it in.
+Say what is ready, or which placeholders are left. When a codebase here does not call the method yet, add that `/pipelex:pipelex-integrate` wires it in.
 
 **Offer the run, never start it**: it spends inference credit, so the user's yes buys it, and everything past that yes is `/pipelex:pipelex-run`'s, whose `SKILL.md` sits beside this one on Mistral Vibe, which has no cross-skill invocation; never call a run tool here. Offer only when:
 
 - no calling skill asked to stop at run-ready (a user who said not to run still gets the offer: an offer is not a run);
 - no placeholder remains;
 - **every input the template asked for is filled** — one the factory could not make is absent, passes every other check and guarantees a failed run: say which input waits on the user, and why;
-- the inputs are run-ready: prepare wrote `inputs.prepared.json`, or step 5 skipped it because nothing needed uploading. If prepare failed, report that and what fixing it takes.
+- the inputs are run-ready: prepare wrote `inputs.prepared.json`, or step 5 skipped it because nothing needed uploading.
 
 The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped — and the target: the bundle, the id or the address.
 

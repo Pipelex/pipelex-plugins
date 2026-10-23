@@ -143,6 +143,23 @@ class TestPipelexLabSkill:
         ) in move
         assert "the case's paths" not in move
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_synthetic_case_keeps_its_inputs_in_git(self, target_name: str) -> None:
+        """`/pipelex-inputs` and the file factory mark the `inputs/` they write into with a `.gitignore` of `*`, which
+        keeps a bundle's test files out of the method's tree and out of git. A lab case sits outside the bundle, and a
+        case made only of synthetic files is committed with the lab, since no render gives back its files byte for
+        byte, so the lab asks for no mark there. A case of the user's own files is not that case: its directory is
+        ignored whole, and its `inputs/` takes the mark as any other."""
+        move = the_move(render(target_name), 2)
+        assert (
+            "For a case made only of synthetic files, **ask it too to leave `inputs/` unmarked**, and the factory too when "
+            "called directly: that case is committed "
+            "with the lab, and its files cannot be rendered again byte for byte."
+        ) in move
+        assert move.index("**Ask it to stop at run-ready, with no run offer**") < move.index("**ask it too to leave `inputs/` unmarked**")
+        assert "unless the caller asked not to, give `<output_dir>/inputs/` a `.gitignore` holding `*`" in render(target_name, "pipelex-inputs")
+        assert "unless the caller asks otherwise" in render(target_name, "pipelex-synthetic-inputs")
+
     @pytest.mark.skipif(shutil.which("git") is None, reason="the reading is git's")
     def test_git_reads_the_case_directory_as_the_lab_needs(self, tmp_path: Path) -> None:
         """The two readings the lab relies on: a rule that ignores the copies does not ignore the case directory, and

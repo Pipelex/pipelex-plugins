@@ -1438,13 +1438,16 @@ class TestPipelexRunSkill:
         first call that reads the folder. The same sweep marks what `/pipelex-inputs` left
         beside the bundle before it marked it itself (`L-261022-b695eb`): an `inputs/`
         beside an `inputs.json` holds the user's documents, and `inputs.prepared.json`
-        the run's values, neither of which the membership rule keeps out on its own."""
+        the run's values, neither of which the membership rule keeps out on its own. Each mark
+        is written only where it is missing, so a second run announces nothing and appends no
+        second line, and an `inputs/` whose own `.gitignore` lacks `*` still gets the line."""
         body = self.run_skill
         assert 'include "skills/shared/validate-call.md.j2"' in body
         assert "validate_call_folder" not in body, "run passes the folder"
         mark = (
-            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`, "
-            "and each such `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` into the `.gitignore` beside that file**,"
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`; "
+            "add `*` to the `.gitignore` of each `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` to the one beside that file, "
+            "wherever the line is missing**,"
             " saying so, then one `mthds_validate` call on it."
         )
         step_2 = body[body.index("### 2. Prove the target before spending credit") : body.index("### 3. The inputs")]

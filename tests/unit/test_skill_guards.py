@@ -171,6 +171,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**",
         "**The inputs stay out of the method's tree**",
         "`<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call",
+        "asking first for one already there beside no `.mthds` file or `inputs.json`",
         "**The user's own files stay out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "**Say what is about to leave the machine, before it does**",
@@ -259,8 +260,9 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**",
         (
-            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`, "
-            "and each such `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` into the `.gitignore` beside that file**"
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`; "
+            "add `*` to the `.gitignore` of each `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` to the one beside that file, "
+            "wherever the line is missing**"
         ),
         "**report the paths the tool returns**",
         "**with the inputs' source and the keys the request replaced**",
@@ -299,7 +301,8 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-synthetic-inputs": (
         "**with the caveat of a simulated or generated file**",
-        "**The default `inputs/`, or one beside a `.mthds` file, gets a `.gitignore` holding `*` before a file goes in**",
+        "**An `inputs/` the file goes into gets a `.gitignore` holding `*` first**",
+        "at once beside a `.mthds` file or an `inputs.json`, elsewhere on the user's yes",
         "It never edits `inputs.json`, never uploads anything, and never runs the method it makes files for",
         "never from a procedural scene or a public image",
         "**No AI for what code can render.**",
@@ -331,6 +334,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
             "and never promise a schedule, a connector or a write-back that no carrier provides.**"
         ),
         "**Ask it to stop at run-ready, with no run offer**",
+        "**ask it too to leave `inputs/` unmarked**",
         "**A case of the user's own files stays out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "**Show every key, the budget and a round's estimated cost, then end the turn there**",
