@@ -129,6 +129,27 @@ class TestPipelexRunSkill:
         assert "Running the main pipe `summarize.summarize_pdf` from" in self.the_step(body, 4)
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_method_folder_runs_from_inputs_json_and_a_local_path_goes_back_to_be_uploaded(self, target_name: str) -> None:
+        """`L-260924-208499`: `/pipelex-inputs` writes a method folder's run-ready values over `inputs.json` and no
+        `inputs.prepared.json` beside it, so a run reads `inputs.json` there, and a value still naming a file on this
+        machine has not been uploaded: it goes back to `/pipelex-inputs`, which uploads it from where it lies, and
+        nothing is spent. A prepared file is read only in a lab case, the one place that keeps copies and writes one;
+        one an earlier release left beside a method is not read, since nothing migrates those folders and its
+        references may name another organization's uploads."""
+        body = self.render(target_name)
+        prefix = load_target_config(self.REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+        step_3 = self.the_step(body, 3)
+        assert "2. **A lab case's current `inputs.prepared.json`**. **Current** means" in step_3
+        assert "laid over a current `inputs.prepared.json` in a lab case, `lab/<method>/cases/<case>/`, else over `inputs.json`" in step_3
+        assert "3. **An `inputs.json` whose every file-ish value is an `http(s)` URL or a `pipelex-storage://` reference.**" in step_3
+        refused = self.the_line(step_3, "Anything else — a placeholder, a local path,")
+        assert f"is not run-ready, and nothing is spent: name the input at fault and how, and hand to `{prefix}pipelex-inputs`" in refused
+        assert "Do not prepare inputs here." in refused
+        assert step_3.index("3. **An `inputs.json` whose every file-ish value") < step_3.index("Anything else — a placeholder, a local path,")
+        assert "with the inputs in `inputs.json`. This spends inference credit." in self.the_step(body, 4)
+        assert "A current `inputs.prepared.json`" not in body, "a method folder's prepared file is no longer a source"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_stop_table_holds_only_what_a_tool_reports(self, target_name: str) -> None:
         """Each other condition is stated once, at its step: a row restating a step is a second copy that drifts."""
         table = self.render(target_name).split("## Stops", 1)[1].split("\n## ", 1)[0]

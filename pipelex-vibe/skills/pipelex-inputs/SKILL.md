@@ -22,10 +22,10 @@ The one entry point for a method's inputs, through to run-ready inputs.
 ## Guards
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
-- **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
+- **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: write a local file's absolute path, a case's copy as `inputs/the_doc.pdf`, or a URL.
 - **A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**: a run fetches it without the user's sign-in, so download or export the file first.
-- **The inputs stay out of the method's tree**: unless the caller asked not to, give `<output_dir>/inputs/` a `.gitignore` holding `*` before a file goes in, asking first for one already there beside no `.mthds` file or `inputs.json`, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so.
-- **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` each copy's path before writing it, `inputs.json` when a value holds a file's text, and `inputs.prepared.json` before step 5's call. For a path not ignored, add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
+- **A file is uploaded where it lies, never copied beside the method**: unless the calling skill asks for a case's copies, as `/pipelex:pipelex-lab` does, copy nothing into `<output_dir>` and write no `inputs.prepared.json`.
+- **The user's own files stay out of version control**: in a git repository, `git check-ignore -q` `inputs.json` when a value holds a file's text, a case's copies before writing them and its `inputs.prepared.json` before step 5's call. For a path not ignored, add `inputs.json` or `inputs.prepared.json`, anchored with a leading `/`, to the nearest `.gitignore`, relative to that file's directory, say so, and check again: **git never ignores a tracked path, so one still not ignored is not written until the user says so.**
 
 ## Process
 
@@ -64,7 +64,7 @@ Fill the step 2 template in place, a composite native's fields included ([native
 
 ### 5. Prepare the inputs for a run
 
-`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input to Pipelex storage. Skip the call for the Template strategy. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input to Pipelex storage. Skip the call for the Template strategy. Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
@@ -72,9 +72,9 @@ Fill the step 2 template in place, a composite native's fields included ([native
 
 Call it with step 2's target, step 2's `pipe_ref` if it passed one, and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path** in the request alone, and no `explicit` flag. The factory's files take `kind`: read [synthetic.md](references/synthetic.md#test-files) before the call.
 
-On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. Report the files uploaded and the file written, in one line.
+On `status: "ok"`, **write the returned `inputs` over `<output_dir>/inputs.json`**, or for a case's copies **into `<output_dir>/inputs.prepared.json`, leaving `inputs.json` and the copies exactly as they are**. Either is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Report the files uploaded and the file written, in one line.
 
-`/pipelex:pipelex-run`'s currency check misses a file moved over the original: **prepare again whenever a file was replaced in place.**
+An address names the bytes uploaded, and `/pipelex:pipelex-run`'s currency check of a case misses a file moved over its copy: **prepare again whenever a file was replaced in place.**
 
 ### 6. Offer the run
 
@@ -85,9 +85,9 @@ Say what is ready, or which placeholders are left. When a codebase here does not
 - no calling skill asked to stop at run-ready (a user who said not to run still gets the offer: an offer is not a run);
 - no placeholder remains;
 - **every input the template asked for is filled** — one the factory could not make is absent, passes every other check and guarantees a failed run: say which input waits on the user, and why;
-- the inputs are run-ready: prepare wrote `inputs.prepared.json`, or step 5 skipped it because nothing needed uploading.
+- the inputs are run-ready: prepare succeeded, or step 5 skipped it because nothing needed uploading.
 
-The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped — and the target: the bundle, the id or the address.
+The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, else `inputs.json` — and the target: the bundle, the id or the address.
 
 ## Stops
 

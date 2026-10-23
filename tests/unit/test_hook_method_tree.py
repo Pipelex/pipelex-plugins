@@ -59,15 +59,16 @@ BACK_DOOR_METHOD = (
 )
 BACK_DOOR_HTML = TEMPLATE_HTML.replace("Weekdays", "Back door, weekdays")
 MANIFEST = '[package]\naddress = "github.com/acme/shop-notices"\nversion = "0.1.0"\ndescription = "The notices a shop tapes to its doors"\n'
-# What `/pipelex-inputs` leaves beside a local bundle: the user's document copied under `inputs/`, the `inputs.json`
-# naming it, and the run-ready `inputs.prepared.json` that step 5 writes. The document is a stand-in for a scanned
-# lease, its bytes not UTF-8 text, as a real PDF's are not.
+# What an earlier release of `/pipelex-inputs` left beside a local bundle, a folder nothing migrates: the user's
+# document copied under `inputs/`, the `inputs.json` naming it, and the run-ready `inputs.prepared.json` its step 5
+# wrote. The document is a stand-in for a scanned lease, its bytes not UTF-8 text, as a real PDF's are not.
 COPIED_DOCUMENT = "inputs/lease.pdf"
 COPIED_DOCUMENT_BYTES = b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n"
 INPUTS_JSON = '{"notice": {"shop_name": "The shop on the lease", "weekdays": "9-18", "weekend": "closed"}, "lease": "inputs/lease.pdf"}\n'
 PREPARED_INPUTS = '{"notice": {"shop_name": "The shop on the lease", "weekdays": "9-18", "weekend": "closed"}, "lease": {"url": "pipelex-storage://user/assets/1.pdf"}}\n'
-# The marks both skills write: `*` in the `inputs/` folder's own `.gitignore`, and an anchored line in the bundle
-# directory's `.gitignore`, which is always inside the tree root, unlike the repository's own above it.
+# The marks `/pipelex-run`'s sweep writes into such a folder: `*` in the `inputs/` folder's own `.gitignore`, and an
+# anchored line in the bundle directory's `.gitignore`, which is always inside the tree root, unlike the repository's
+# own above it.
 INPUTS_MARK = "*\n"
 PREPARED_MARK = "/inputs.prepared.json\n"
 # An invalid verdict, its fault a problem item, as a runner speaking the problem document answers it.
@@ -218,13 +219,14 @@ class TestHookMethodTree:
     def test_the_inputs_beside_a_bundle_stay_home_once_marked(
         self, node: str, stub_api: StubApiServer, tmp_path: Path, marked: bool, expected_tree: list[str]
     ) -> None:
-        """`L-261022-b695eb`: `/pipelex-inputs` copies the user's documents into `inputs/` beside a local bundle and
-        writes `inputs.prepared.json` there, and the membership rule keeps out only `inputs.json`, so unmarked both
-        travel with every validation, run and save of the method. The repository's own `.gitignore`, which the
-        ignore guard used to write their entries into, sits above the tree root and keeps nothing out. The two marks
-        the skills now write, `*` in `inputs/.gitignore` and `/inputs.prepared.json` in the bundle directory's
-        `.gitignore`, are read by the lister itself, so the tree carries neither, while the method's own files still
-        travel, a dot file being out of the tree by its name."""
+        """`L-261022-b695eb`: `/pipelex-inputs` used to copy the user's documents into `inputs/` beside a local bundle
+        and write `inputs.prepared.json` there, and the membership rule keeps out only `inputs.json`, so unmarked both
+        travel with every validation, run and save of the method. It no longer writes either (`L-260924-208499`), but
+        nothing migrates a folder it already wrote into. The repository's own `.gitignore`, which the ignore guard
+        used to write their entries into, sits above the tree root and keeps nothing out. The two marks
+        `/pipelex-run`'s sweep writes, `*` in `inputs/.gitignore` and `/inputs.prepared.json` in the bundle
+        directory's `.gitignore`, are read by the lister itself, so the tree carries neither, while the method's own
+        files still travel, a dot file being out of the tree by its name."""
         repository = tmp_path / "repository"
         (repository / ".git").mkdir(parents=True)
         (repository / ".gitignore").write_text("methods/notices/inputs/\nmethods/notices/inputs.prepared.json\n", encoding="utf-8")

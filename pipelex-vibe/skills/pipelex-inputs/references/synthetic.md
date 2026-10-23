@@ -31,12 +31,12 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 |---|---|
 | `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan`; `docx` / `xlsx` when the method asks for those |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
-| `target` | `<output_dir>/inputs/<input_variable>.<ext>`; a list input's items go in a directory named after it, one index each (`<output_dir>/inputs/<input_variable>/1.<ext>`), so an item never takes another input's name |
+| `target` | `<tmp>/<input_variable>.<ext>`, `<tmp>` being a temporary directory made once for the preparation with `mktemp -d`; a list input's items go in a directory named after it, one index each (`<tmp>/<input_variable>/1.<ext>`), so an item never takes another input's name. For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>` |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |
 
-Every `target` lies under `<output_dir>/inputs/`, which the skill's guards mark before the first request with a `.gitignore` holding `*`, asking first for an `inputs/` already there beside no `.mthds` file or `inputs.json`, and the factory marks it too when it finds it unmarked. So its files, like the user's own, stay out of the method's tree and out of git: they reach Pipelex only as step 5's uploads, never as files of the method. When `inputs/` is to stay unmarked, because the user declined the mark or the calling skill asked for it, as `pipelex-lab` does for a case made only of synthetic files, which it commits, say so in every request, and the factory leaves it unmarked too.
+No `target` lies beside the method: its folder is sent whole on every validation, run and catalog save, and shipped in the wheel of a Python package that holds it, so a test file reaches Pipelex only as step 5's upload, never as a file of the method. A case's copies are the one exception, in a case directory outside every method: `pipelex-lab` commits a case made only of synthetic files, since no render gives back the same bytes, so the factory writes them under the case's `inputs/`, which nothing marks.
 
-It writes the file, verifies it, and returns the path, with a caveat when the file is simulated handwriting or an AI-generated photograph. Repeat that caveat in the report, beside the file it concerns: the user decides from it what the run proves. Put that path into the template as a bare string, relative to `inputs.json` — `inputs/invoice.pdf` — and step 5 uploads it later, unchanged.
+It writes the file, verifies it, and returns the path, with a caveat when the file is simulated handwriting or an AI-generated photograph. Repeat that caveat in the report, beside the file it concerns: the user decides from it what the run proves. Put that path into the template as a bare string, absolute, or for a case's copy relative to `inputs.json` (`inputs/invoice.pdf`), and step 5 uploads it later, unchanged.
 
 A photograph is the one file it makes through the workshop, with `mthds_run`: that generation is not a run of the method, which the skill still only offers, and it waits for the user's own go on the descriptions the factory shows.
 
@@ -44,35 +44,35 @@ It returns no path when it cannot make the file — no `uv`, no usable Python, a
 
 ## Then
 
-Fill the step 2 template in place and save it as `<output_dir>/inputs.json` (step 4), with any generated file in `<output_dir>/inputs/`. Then go on to step 5: a generated file is a local path, which a run cannot reach until it is uploaded.
+Fill the step 2 template in place and save it as `<output_dir>/inputs.json` (step 4), each generated file staying in its temporary directory. Then go on to step 5: a generated file is a local path, which a run cannot reach until it is uploaded.
 
 ## Test files
 
 Step 5 uploads the factory's files as test files of the method, so the team's files list them with that method rather than among its members' own uploads: pass `kind: "test"` to `mthds_prepare_inputs`. A test file belongs to a saved method, which the workshop names from the target: a bare `mt_…` id, or a bundle directory that a save linked to its method through `.pipelex/method.json`.
 
 - **A published address, or an id with a suffix (`mt_…@draft`, `mt_…@<n>`)**: leave `kind` out. An address names no saved method, and the workshop refuses a suffixed id beside `kind`, at `method_id`. The factory's files then go up as the organization's own files.
-- **Mixed, with the user's own files to upload as well**: `kind` applies to every upload of a call, and the user's files are theirs, not test files. Prepare in two calls: first the inputs holding the factory's files, alone, with `kind: "test"`; then every input, without `kind`, with those inputs' prepared values in place of their paths, which the second call passes through unchanged. Write the second call's `inputs` to `inputs.prepared.json`, and nothing when either call fails.
+- **Mixed, with the user's own files to upload as well**: `kind` applies to every upload of a call, and the user's files are theirs, not test files. Prepare in two calls: first the inputs holding the factory's files, alone, with `kind: "test"`; then every input, without `kind`, with those inputs' prepared values in place of their paths, which the second call passes through unchanged. Write the second call's `inputs` as step 5 says, and nothing when either call fails.
 - **Refused over `kind`**, as `input_domain` at `kind`, or as a `config` error tagged `kind: "role"`: no file was recorded. The first means no saved method could be named, because the folder is linked to none, its link cannot be read, was made against another API or is still the older `pipelex-method.json`, or the platform no longer holds the method; the second means the user's role may not record test files, which is no problem with the key. Prepare again without `kind`, and say in one line that the factory's files went up as the organization's own and why, in the refusal's words, relaying its hint, such as saving the method so that its folder is linked, as the user's to act on, never yours.
 - **No `kind` in the answer**: a workshop older than test files drops the argument, uploads the files as the organization's own and echoes no `kind`. The inputs are run-ready all the same, so do not prepare again: say in one line that `npx -y @pipelex/mcp@latest` refreshes the workshop once the host restarts the server and reloads its tools, and that the next preparation then records test files.
 
-When the answer carries `test_method_id`, step 5's report says the files went up as test files of that method.
+When the answer carries `test_method_id`, step 5's report says the files went up as test files of that method. The report gives each generated file's temporary path, for a user who wants to open it before the run, and its name among the team's files, its file name, under which it is listed with the method.
 
 ## A worked example
 
 A sales-chart reader expects `chart: Image` and `analysis_prompt: Text`.
 
 1. Get the template; the method needs an image it can read as a chart, and instruction text.
-2. `chart` is `native.Image`, so it goes to the factory: `format: png` with category `chart`, `brief: "a grouped bar chart of quarterly units shipped for three regions, with a legend and axis labels"`, `target: <output_dir>/inputs/chart.png`. It returns that path.
+2. `chart` is `native.Image`, so it goes to the factory: `format: png` with category `chart`, `brief: "a grouped bar chart of quarterly units shipped for three regions, with a legend and axis labels"`, `target: /tmp/tmp.Xq3v9K/chart.png`, in the directory `mktemp -d` made. It returns that path.
 3. Write an analysis prompt matching the method's context.
 4. Save `inputs.json`:
 
    ```json
    {
-     "chart": "inputs/chart.png",
+     "chart": "/tmp/tmp.Xq3v9K/chart.png",
      "analysis_prompt": "Read this chart. Report the trend per region and name the strongest quarter."
    }
    ```
 
-5. `chart` is a local path, so step 5 uploads it as a test file of the method, with `kind: "test"`, and writes the run-ready form to `inputs.prepared.json`, leaving `inputs.json` as saved, before the run is offered.
+5. `chart` is a local path, so step 5 uploads it as a test file of the method, with `kind: "test"`, and writes the run-ready form over `inputs.json`, before the run is offered. The report names `/tmp/tmp.Xq3v9K/chart.png` and `chart.png`, its name among the team's files.
 
 Had the method wanted a photograph of a street scene, the factory would have generated one through the workshop, with the details the method must find written into its description, and reported its run id and cost beside the path. Had the workshop been unreachable, it would have come back with no path: `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.

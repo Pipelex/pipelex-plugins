@@ -34,9 +34,9 @@ The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signature
 
 They sit beside the bundle unless the caller named another directory. For an id, in the one the user named, else where [by-id.md](references/by-id.md) says: take the one holding an `inputs.json`, and say which. **When several do, ask which; never choose.** In this order, take the first that applies:
 
-1. **Values the user gave in the request**, laid over a current `inputs.prepared.json`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set. For a file named but not on disk, read [team-files.md](../shared/team-files.md) before asking for it.
-2. **A current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
-3. **An `inputs.json` holding no local file value**, every file-ish value already an `http(s)` URL or a `pipelex-storage://` reference.
+1. **Values the user gave in the request**, laid over a current `inputs.prepared.json` in a lab case, `lab/<method>/cases/<case>/`, else over `inputs.json`: replace only the keys the user named and keep every other. With neither file, the request's values are the whole set. For a file named but not on disk, read [team-files.md](../shared/team-files.md) before asking for it.
+2. **A lab case's current `inputs.prepared.json`**. **Current** means, key by key, every value that is not a file is equal in it and in `inputs.json`, and neither `inputs.json` nor any local file it names is newer than it. Not current is not run-ready: hand to `/pipelex-inputs`.
+3. **An `inputs.json` whose every file-ish value is an `http(s)` URL or a `pipelex-storage://` reference.**
 4. **An empty object**, when the pipe declares no input at all.
 
 Then call **`mthds_inputs_template`** once, with the same target and `explicit: false`, and check the inputs against it on **both keys and value shapes**: the key set, where a key the inputs lack is fine when the run is on the main pipe and step 2's verdict marks it `required: false`, and per key the JSON kind and a structured value's field names. A `{concept, content}` envelope the template does not show is checked by its `content`, a one-field `{"text": …}` standing for a bare value, and a file input held as `{"url": "pipelex-storage://…"}` where the template shows a string is the prepare rewrite; neither is drift.
@@ -47,7 +47,7 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 One line before the call: the target, the pipe, where the inputs came from and which keys the request replaced, and that the run spends inference credit. **On a dry-run request this step comes only after the user's go**: a paid run never starts on a dry-run request whose flow the user has not been shown.
 
-> Running the main pipe `summarize.summarize_pdf` from `summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
+> Running the main pipe `summarize.summarize_pdf` from `summarize_pdf/`, with the inputs in `inputs.json`. This spends inference credit.
 
 **When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `/pipelex-catalog` and run as `mt_…@draft` carries it.
 
@@ -71,7 +71,7 @@ It returns a durable `run_id` at once. **Report that id the moment it returns, b
 
 `mthds_run_results`, then report the main output, **with the inputs' source and the keys the request replaced**, and save the run, file or no file: `mthds_download_artifacts` with the run id alone writes the output as `main_stuff.json`, beside each stored file it references, into `runs/<run_id>/` under the workshop's working directory. Pass `dir` only for a folder the user named, relative to that directory. Either way, **report the paths the tool returns**, never paths relative to the user's project.
 
-When the inputs came from a lab case, `lab/<method>/cases/<case>/`, and the lab did not start this run, offer `/pipelex-lab` to score and log it.
+When the inputs came from a lab case and the lab did not start this run, offer `/pipelex-lab` to score and log it.
 
 ### 8. A failed run is reported, then routed, never bisected
 
