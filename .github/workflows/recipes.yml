@@ -35,6 +35,7 @@ on:
       - "Makefile"
       - "pyproject.toml"
       - "uv.lock"
+      - ".python-version"
 
 permissions:
   contents: read

@@ -17,8 +17,10 @@ from pytest_mock import MockerFixture
 from scripts import local_mcp
 from scripts.gen_skill_docs import build_target, load_target_config, write_files
 from scripts.local_mcp import (
+    INTERPRETER_VARIABLES,
     LOCAL_DIR_NAME,
     MAKE_STATE,
+    MAKEFILE_EXPORTS,
     TARGET_VARIABLES,
     WORKSHOP_BUNDLE,
     WORKSHOP_MANIFEST,
@@ -67,13 +69,16 @@ def checkout(tmp_path: Path) -> Path:
 
 
 def _handed_by_make(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The environment a make target's command gets when every target variable was given on make's command line."""
-    assignments = {name: f"from the make target {name}" for name in TARGET_VARIABLES}
+    """The environment a make target's command gets when every target variable and `PYTHON_VERSION` were given on make's
+    command line, with the interpreter the Makefile exports beside them."""
+    assignments = {name: f"from the make target {name}" for name in TARGET_VARIABLES | INTERPRETER_VARIABLES}
     for name, value in assignments.items():
         monkeypatch.setenv(name, value)
     makeflags = " ".join(f"{name}={value.replace(' ', chr(92) + ' ')}" for name, value in assignments.items())
     for name in MAKE_STATE:
         monkeypatch.setenv(name, makeflags if name == "MAKEFLAGS" else "1")
+    for name in MAKEFILE_EXPORTS:
+        monkeypatch.setenv(name, "3.13")
 
 
 def _built(checkout: Path) -> Launcher:
@@ -156,7 +161,7 @@ class TestLauncher:
         build_checkout(checkout)
         assert run.call_args.args[0] == ["/usr/bin/make", "--no-print-directory", "-C", str(checkout), "build-local"]
         environment = run.call_args.kwargs["env"]
-        assert not (MAKE_STATE | TARGET_VARIABLES) & environment.keys()
+        assert not (MAKE_STATE | MAKEFILE_EXPORTS | TARGET_VARIABLES | INTERPRETER_VARIABLES) & environment.keys()
         assert environment["PATH"] == os.environ["PATH"]
 
     def test_a_target_variable_from_the_users_shell_is_kept(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -167,6 +172,27 @@ class TestLauncher:
         environment = local_mcp.without_make_handoff()
         assert {"MCP", "MCP_VERSION"} <= environment.keys()
         assert not {"WORKDIR", "ARGS", "MAKEFLAGS"} & environment.keys()
+
+    @pytest.mark.parametrize(
+        ("makeflags", "python_version_kept"),
+        [
+            pytest.param("", True, id="PYTHON_VERSION from the shell"),
+            pytest.param("PYTHON_VERSION=3.14", False, id="PYTHON_VERSION on make's command line"),
+        ],
+    )
+    def test_the_makefiles_interpreter_never_reaches_the_session(
+        self, monkeypatch: pytest.MonkeyPatch, makeflags: str, python_version_kept: bool
+    ) -> None:
+        """The `UV_PYTHON` the Makefile exports is this repository's pin, and in the session it would override the
+        `.python-version` of the project the agent works in. A shell's `PYTHON_VERSION` stays, as a shell's `ARGS` does."""
+        monkeypatch.setenv("MAKEFLAGS", makeflags)
+        monkeypatch.setenv("PYTHON_VERSION", "3.14")
+        monkeypatch.setenv("UV_PYTHON", "3.14")
+        environment = local_mcp.without_make_handoff()
+        assert "UV_PYTHON" not in environment
+        assert ("PYTHON_VERSION" in environment) is python_version_kept
+        if python_version_kept:
+            assert environment["PYTHON_VERSION"] == "3.14"
 
     @pytest.mark.parametrize(
         ("makeflags", "names"),
@@ -412,7 +438,7 @@ class TestStart:
         monkeypatch.setenv("PIPELEX_API_KEY", "plx_sk_test")
         with pytest.raises(Launched) as launched:
             start(harness, _published("latest"), tmp_path, [], repo)
-        assert not (MAKE_STATE | TARGET_VARIABLES) & launched.value.environment.keys()
+        assert not (MAKE_STATE | MAKEFILE_EXPORTS | TARGET_VARIABLES | INTERPRETER_VARIABLES) & launched.value.environment.keys()
         assert launched.value.environment["PIPELEX_API_KEY"] == "plx_sk_test"
         assert launched.value.environment["PATH"] == os.environ["PATH"]
 
@@ -455,7 +481,7 @@ class TestMakeTargets:
     @pytest.mark.skipif(not (REPO_ROOT / ".venv" / "bin" / "python").is_file(), reason="no venv: run `make install`")
     @pytest.mark.parametrize("spelling", ["absolute", "home-relative", "shell-special"])
     def test_the_checkout_is_built_with_none_of_the_targets_variables(self, tmp_path: Path, spelling: str) -> None:
-        """make hands a target's commands its command-line variables, which would override or fill the checkout's own.
+        """make hands a target's commands its command-line variables, which would override or fill the checkout's own, and its pin.
 
         This one runs for real: the checkout's build only reports what it sees, and the script then
         refuses the checkout for having built no workshop, naming it, so nothing starts. zsh passes
@@ -466,12 +492,15 @@ class TestMakeTargets:
         checkout = parent / "pipelex-mcp"
         checkout.mkdir(parents=True)
         (checkout / "Makefile").write_text(
-            'ARGS = its-own\nbuild-local:\n\t@echo "built with ARGS=[$(ARGS)] MCP=[$(MCP)] MCP_VERSION=[$(MCP_VERSION)] WORKDIR=[$(WORKDIR)]"\n',
+            (
+                'ARGS = its-own\nbuild-local:\n\t@echo "built with ARGS=[$(ARGS)] MCP=[$(MCP)] MCP_VERSION=[$(MCP_VERSION)] WORKDIR=[$(WORKDIR)] '
+                'PYTHON_VERSION=[$(PYTHON_VERSION)] UV_PYTHON=[$(UV_PYTHON)]"\n'
+            ),
             encoding="utf-8",
         )
         mcp = "~/pipelex-mcp" if spelling == "home-relative" else str(checkout)
-        completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={parent}", home=tmp_path)
-        assert "built with ARGS=[its-own] MCP=[] MCP_VERSION=[] WORKDIR=[]" in completed.stdout
+        completed = self._make("claude-local-mcp", f"MCP={mcp}", "ARGS=--model sonnet", f"WORKDIR={parent}", "PYTHON_VERSION=3.14", home=tmp_path)
+        assert "built with ARGS=[its-own] MCP=[] MCP_VERSION=[] WORKDIR=[] PYTHON_VERSION=[] UV_PYTHON=[]" in completed.stdout
         assert f"does not exist after `make build-local` in {checkout.resolve()}." in completed.stderr
         assert completed.returncode != 0
 
