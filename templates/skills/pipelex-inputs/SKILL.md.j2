@@ -12,7 +12,7 @@ description: Prepare inputs for MTHDS methods. Use when user says "prepare input
 
 # Prepare Inputs for MTHDS methods
 
-The one entry point for a method's inputs — placeholders, synthetic data, the user's files, or a mix — through to run-ready inputs.
+The one entry point for a method's inputs, through to run-ready inputs.
 
 ## Requirements
 
@@ -24,15 +24,16 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 
 ## Mode
 
-**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry it through to its own end, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it" or "don't ask": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
+**Default**: automatic — name the strategy and the assumptions it rests on in one line, then carry it through to its own end, pausing only where a wrong guess would waste work. **Go interactive** when the user asks for it ("walk me through", "let me decide"), or when the table below lands on its no-signal row and there is somebody to ask who has not said "just do it": ask what the strategy's reference lists before filling anything (at the no-signal row, first whether they have files or want synthetic data), and show the assembled set before preparing it. **Either mode can turn into the other mid-run**: a question or a correction makes the step interactive, a "go ahead" the rest automatic.
 
 ## Guards
 
 - **The template is authoritative**: fill its values; never invent shapes it doesn't have.
 - **A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**: copy a local file into `<output_dir>/inputs/` and write `inputs/the_doc.pdf` (preferred), or write a URL or an absolute path.
 - **A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**: a run fetches it without the user's sign-in, so download or export the file first.
+- **The inputs stay out of the method's tree**: give `<output_dir>/inputs/` a `.gitignore` holding `*` before a file goes in, and `<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call, saying so.
 {% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, and `inputs.prepared.json` before step 5's call{% endset -%}
-{% set git_ignore_entry %}`<output_dir>/inputs/`, `inputs.json` or `inputs.prepared.json`{% endset -%}
+{% set git_ignore_entry %}`inputs.json` or `inputs.prepared.json`, anchored with a leading `/`,{% endset -%}
 - **The user's own files stay out of version control**: {% include "skills/shared/git-ignore.md.j2" %}
 
 ## Process
@@ -42,12 +43,12 @@ The one entry point for a method's inputs — placeholders, synthetic data, the 
 The target takes three forms, one selector per call.
 
 - **A local bundle**, the usual case: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. {% include "skills/shared/validate-call.md.j2" %}
-- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`, which needs the API key: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `method_not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
+- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `method_not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 
 ### 2. The template
 
-Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, bare values, not the `{concept, content}` envelope. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`; anything else is a stop.
+Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, for bare values. It resolves the declared `main_pipe`; for another pipe, pass `pipe_ref` as a qualified `domain.pipe_code`. `status: "ok"` with `is_valid: true` returns the template in `inputs`, with its resolved `pipe_ref`; anything else is a stop.
 
 ### 3. The strategy
 
@@ -72,7 +73,7 @@ Fill the step 2 template in place, a composite native's fields included ([native
 
 ### 5. Prepare the inputs for a run
 
-`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input (Image, Document) to Pipelex storage. Skip the call for the Template strategy. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input to Pipelex storage. Skip the call for the Template strategy. Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**: a skipped, declined or failed prepare writes none, and a run would read the old one. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
@@ -80,13 +81,13 @@ Fill the step 2 template in place, a composite native's fields included ([native
 
 Call it with step 2's target, step 2's `pipe_ref` if it passed one, and as `inputs` the saved `inputs.json` with **every local file path resolved to an absolute path** in the request alone, and no `explicit` flag. The factory's files take `kind`: read [synthetic.md](references/synthetic.md#test-files) before the call.
 
-On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. Report the files uploaded and `inputs.prepared.json` written, in one line.
+On `status: "ok"`, **write `<output_dir>/inputs.prepared.json` with the returned `inputs`, and leave `inputs.json` exactly as it is**: prepare never rewrites it. The prepared file is a plain inputs object, the same keys with no envelope, no hash and no sidecar, where each file value is now `{"url": "pipelex-storage://…"}`, the run-ready form — never "simplify" it back to a string — and every other value is untouched. Leave the copies in `<output_dir>/inputs/` alone. Report the files uploaded and the file written, in one line.
 
 `{{ skill_prefix }}pipelex-run`'s currency check misses a file moved over the original: **prepare again whenever a file was replaced in place.**
 
 ### 6. Offer the run
 
-Say what is ready: `inputs.json`, `inputs.prepared.json` where prepare wrote one, or the placeholders still to fill. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `{{ skill_prefix }}pipelex-integrate` wires it in.
+Say what is ready, or which placeholders are left. When a codebase here (a `package.json` or a `pyproject.toml`) does not call the method yet, add that `{{ skill_prefix }}pipelex-integrate` wires it in.
 
 **Offer the run, never start it**: it spends inference credit, so the user's yes buys it, and everything past that yes is `{{ skill_prefix }}pipelex-run`'s{% if platform != "claude" %}, whose `SKILL.md` sits beside this one on {{ harness_name }}, which has no cross-skill invocation{% endif %}; never call a run tool here. Offer only when:
 
@@ -95,7 +96,7 @@ Say what is ready: `inputs.json`, `inputs.prepared.json` where prepare wrote one
 - **every input the template asked for is filled** — one the factory could not make is absent, passes every other check and guarantees a failed run: say which input waits on the user, and why;
 - the inputs are run-ready: prepare wrote `inputs.prepared.json`, or step 5 skipped it because nothing needed uploading. If prepare failed, report that and what fixing it takes.
 
-The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped — and the target: the bundle, or the id or the address itself.
+The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped — and the target: the bundle, the id or the address.
 
 ## Stops
 

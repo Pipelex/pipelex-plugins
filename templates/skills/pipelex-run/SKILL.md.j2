@@ -16,7 +16,7 @@ description: Run an MTHDS method on the hosted Pipelex API, and follow a run tha
 
 # Run an MTHDS method
 
-This skill owns the run lifecycle: Start a run from a target and its inputs, or Follow a run from a run id alone; a dry run is step 2, shown. It does not prepare inputs (`{{ skill_prefix }}pipelex-inputs`) or repair a method (`{{ skill_prefix }}pipelex-edit`, `{{ skill_prefix }}pipelex-design`).
+This skill owns the run lifecycle: Start a run from a target and its inputs, or Follow a run from a run id alone; a dry run is step 2, shown.
 
 ## Requirements
 
@@ -36,7 +36,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 ### 2. Prove the target before spending credit
 
-For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**, saying so, then one `mthds_validate` call on it. {% include "skills/shared/validate-call.md.j2" %} For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
+For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`, and each such `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` into the `.gitignore` beside that file**, saying so, then one `mthds_validate` call on it. {% include "skills/shared/validate-call.md.j2" %} For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
 
 The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `{{ skill_prefix }}pipelex-design`, or to `{{ skill_prefix }}pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. {% include "skills/shared/validate-warnings.md.j2" %}
 
@@ -59,7 +59,7 @@ Anything else — a placeholder, a local path, a `data:` URL, inline bytes, a re
 
 One line before the call: the target, the pipe, where the inputs came from and which keys the request replaced, and that the run spends inference credit. **On a dry-run request this step comes only after the user's go**: a paid run never starts on a dry-run request whose flow the user has not been shown.
 
-> Running the main pipe `summarize.summarize_pdf` from `methods/summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
+> Running the main pipe `summarize.summarize_pdf` from `summarize_pdf/`, with the inputs in `inputs.prepared.json`. This spends inference credit.
 
 **When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**, and that a method saved through `{{ skill_prefix }}pipelex-catalog` and run as `mt_…@draft` carries it.
 
@@ -75,7 +75,7 @@ It returns a durable `run_id` at once. **Report that id the moment it returns, b
 
 ### 6. Follow it to terminal
 
-`mthds_run_status`, on the summary's `retry_after_seconds` hint, never in a tight loop. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error long after `created_at` may be slow or a workflow task that failed out of sight, which the status cannot tell: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
+`mthds_run_status`, on the summary's `retry_after_seconds` hint. Terminal is any of `COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, `TIMED_OUT`. A run still `RUNNING` on fresh reads with no error long after `created_at` may be slow or a workflow task that failed out of sight, which the status cannot tell: stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed. **A status marked `degraded` is the last-known one, not a fresh reading: keep polling on its hint, and never call the run stuck or failed from it.**
 
 ### 7. Results, and the saved run
 

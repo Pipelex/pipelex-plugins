@@ -1435,12 +1435,16 @@ class TestPipelexRunSkill:
         files leave in — so a method that emits or echoes one would submit its own output
         as source. The workshop writes a `.gitignore` of `*` into a `runs/` it creates; a
         `runs/` saved into before it did carries none, so step 2 writes one before the
-        first call that reads the folder."""
+        first call that reads the folder. The same sweep marks what `/pipelex-inputs` left
+        beside the bundle before it marked it itself (`L-261022-b695eb`): an `inputs/`
+        beside an `inputs.json` holds the user's documents, and `inputs.prepared.json`
+        the run's values, neither of which the membership rule keeps out on its own."""
         body = self.run_skill
         assert 'include "skills/shared/validate-call.md.j2"' in body
         assert "validate_call_folder" not in body, "run passes the folder"
         mark = (
-            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**,"
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`, "
+            "and each such `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` into the `.gitignore` beside that file**,"
             " saying so, then one `mthds_validate` call on it."
         )
         step_2 = body[body.index("### 2. Prove the target before spending credit") : body.index("### 3. The inputs")]
@@ -1671,7 +1675,7 @@ class TestPipelexRunSkill:
             "{% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, "
             "and `inputs.prepared.json` before step 5's call{% endset -%}"
         ) in body
-        assert "`inputs.json` or `inputs.prepared.json`{% endset -%}" in body
+        assert "`inputs.json` or `inputs.prepared.json`, anchored with a leading `/`,{% endset -%}" in body
         assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
 
     def test_design_points_at_the_run_without_running(self) -> None:

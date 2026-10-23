@@ -169,6 +169,8 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**The template is authoritative**: fill its values; never invent shapes it doesn't have.",
         "**A share link to a private drive or workspace (Google Drive, OneDrive, SharePoint, Notion) is not a document**",
         "**A path in `inputs.json` resolves relative to `inputs.json` itself, never to the working directory**",
+        "**The inputs stay out of the method's tree**",
+        "`<output_dir>/.gitignore` a `/inputs.prepared.json` line before step 5's call",
         "**The user's own files stay out of version control**",
         "**git never ignores a tracked path, so one still not ignored is not written until the user says so.**",
         "**Say what is about to leave the machine, before it does**",
@@ -256,7 +258,10 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**for an address, give `method_provenance` beside it**",
         "stop waiting, report the status, the elapsed time and the run id to follow it by, and do not call it failed.",
         "**When a bundle directory holds a `PipeFunc`, the line says its Python does not travel**",
-        "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**",
+        (
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`, "
+            "and each such `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` into the `.gitignore` beside that file**"
+        ),
         "**report the paths the tool returns**",
         "**with the inputs' source and the keys the request replaced**",
         "**A saved run stays out of version control**",
@@ -294,6 +299,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
     ),
     "pipelex-synthetic-inputs": (
         "**with the caveat of a simulated or generated file**",
+        "**The default `inputs/`, or one beside a `.mthds` file, gets a `.gitignore` holding `*` before a file goes in**",
         "It never edits `inputs.json`, never uploads anything, and never runs the method it makes files for",
         "never from a procedural scene or a public image",
         "**No AI for what code can render.**",
