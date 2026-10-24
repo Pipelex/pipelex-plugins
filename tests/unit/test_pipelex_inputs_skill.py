@@ -74,6 +74,7 @@ class TestPipelexInputsSkill:
             "- **Synthetic**: read [": ("references/synthetic.md",),
             "- **User data**: read [": ("references/user-data.md",),
             "| template: `is_valid: false` |": ("references/published-address.md",),
+            "| prepare with `kind`:": ("references/synthetic.md#test-files",),
             "| prepare: an `input` or `method` problem": ("references/prepare-errors.md",),
             "| prepare, by address:": ("references/published-address.md",),
             "- **The team's files**: read [": ("../shared/team-files.md",),
@@ -191,7 +192,11 @@ class TestPipelexInputsSkill:
         assert "`.pipelex/method.json`" in section
         assert "Prepare in two calls" in section
         assert "Write the second call's `inputs` as step 5 says, and nothing when either call fails." in section
-        assert "as `client.argument_invalid` at `kind` or at `method_id`, or as `auth.forbidden`" in section
+        assert (
+            "as `client.argument_invalid` at `kind` or at `method_id` with `params.reason` `method_not_found`, "
+            "`method_being_deleted` or `version_suffix`, or as `auth.forbidden`"
+        ) in section
+        assert "such as `not_a_catalog_id`, is a fault of the target that dropping `kind` does not cure" in section
         assert "Prepare again without `kind`" in section
         assert "never yours" in section
         assert "echoes no `kind`" in section

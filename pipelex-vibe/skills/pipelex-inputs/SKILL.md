@@ -12,7 +12,7 @@ The one entry point for a method's inputs, through to run-ready inputs.
 - **`mthds_inputs_template`** is required: never hand-derive the template from the `.mthds` source.
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe.
 - **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
-- **`mthds_prepare_inputs`** is required at step 5, under the same two stops; never hand-fake a storage reference.
+- **`mthds_prepare_inputs`** is required at step 5, under the same two stops, except `auth.forbidden` on a call with `kind` (see Stops); never hand-fake a storage reference.
 - **`mthds_list_methods`** and **`mthds_list_files`** are optional: without the first, ask for a saved method's `mt_…` id.
 
 ## Mode
@@ -35,7 +35,7 @@ The target takes three forms, one selector per call.
 
 - **A local bundle**, the usual case: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first.
 - **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `pipelex.catalog.not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
-- **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
+- **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 
 ### 2. The template
 
@@ -53,8 +53,8 @@ Evaluated in order:
 | No clear signal (e.g. right after `/pipelex:pipelex-design`, with no further context) | **Template**, then offer to populate |
 
 - **Template**: replace each file-ish mock URL (an `https://` URL on a `.invalid` host) with `"<VARNAME-url-or-path-relative-to-this-inputs-file>"`, never `"<path-to-VARNAME>"`; save, show it with its path, and offer synthetic data or the user's files.
-- **Synthetic**: read [references/synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input. Mistral Vibe has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.
-- **User data**: read [references/user-data.md](references/user-data.md) before matching any file to an input.
+- **Synthetic**: read [synthetic.md](references/synthetic.md) before generating anything. **`pipelex-synthetic-inputs` is the file factory**, and makes every file input. Mistral Vibe has no cross-skill invocation, so open `../pipelex-synthetic-inputs/SKILL.md` and follow it.
+- **User data**: read [user-data.md](references/user-data.md) before matching any file to an input.
 - **Mixed**: the user's files first, then synthetic values for what they leave unfilled; read both references.
 - **The team's files**: read [team-files.md](../shared/team-files.md) before asking for a file, or for one named but not on disk.
 
@@ -64,7 +64,7 @@ Fill the step 2 template in place, a composite native's fields included ([native
 
 ### 5. Prepare the inputs for a run
 
-`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input to Pipelex storage. Skip the call for the Template strategy. Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**, which a run would read after a prepare that writes none. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
+`mthds_prepare_inputs` uploads each local path, `data:` URL or inline bytes at a file input to Pipelex storage. Skip the call for the Template strategy. Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**. Skip the call too **when every file-ish value is already an `http(s)` URL or a `pipelex-storage://` reference**: a run then reads `inputs.json`.
 
 **Say what is about to leave the machine, before it does**: each file and where it goes (Pipelex storage, the user's organization, through their API key), or for a folder batch too long to list, the count and the folder; in interactive mode wait for a yes, in automatic mode state it and proceed. If the user declines, stop before the call and report that the inputs stay local and are not runnable.
 
@@ -84,10 +84,10 @@ Say what is ready, or which placeholders are left. When a codebase here does not
 
 - no calling skill asked to stop at run-ready (a user who said not to run still gets the offer: an offer is not a run);
 - no placeholder remains;
-- **every input the template asked for is filled** — one the factory could not make is absent, passes every other check and guarantees a failed run: say which input waits on the user, and why;
+- **every input the template asked for is filled** — one the factory could not make is absent: say which input waits on the user, and why;
 - the inputs are run-ready: prepare succeeded, or step 5 skipped it because nothing needed uploading.
 
-The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, else `inputs.json` — and the target: the bundle, the id or the address.
+The offer names the file the run reads — `inputs.prepared.json` where prepare wrote one, else `inputs.json` — and the target.
 
 ## Stops
 
@@ -97,11 +97,12 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 | template: `request.pipe_not_found` or `request.pipe_ambiguous` | pass an explicit `pipe_ref`. Another `domain: "input"` problem: report it in the tool's words; another organization's id reads as a miss |
 | `retry: "yes"`, either call | report, and retry once |
 | the factory returns no path | leave that one input unfilled, carry on with the others; report the reason and ask for the user's own file. Never fabricate a value or abandon `inputs.json` |
-| prepare: an `input` or `method` problem, not at `kind` | read [references/prepare-errors.md](references/prepare-errors.md) before replying or retrying; a storage size limit at `inputs` is terminal for this attempt |
-| prepare, by address: refused at `files`, or an `account` problem | read [references/published-address.md](references/published-address.md) before naming a cause |
+| prepare with `kind`: `auth.forbidden`, or a refusal naming `kind`, or `method_id` for `method_not_found`, `method_being_deleted` or `version_suffix` | read [synthetic.md](references/synthetic.md#test-files) before preparing again without `kind` |
+| prepare: an `input` or `method` problem, not a refusal of `kind` | read [prepare-errors.md](references/prepare-errors.md) before replying or retrying; a storage size limit at `inputs` is terminal for this attempt |
+| prepare, by address: refused at `files`, or an `account` problem | read [published-address.md](references/published-address.md) before naming a cause |
 
 ## References
 
-- [synthetic.md](references/synthetic.md), [user-data.md](references/user-data.md): step 3, by strategy; both for Mixed.
+- [synthetic.md](references/synthetic.md), [user-data.md](references/user-data.md): step 3, by strategy.
 - [published-address.md](references/published-address.md): a `method_ref` target.
 - [prepare-errors.md](references/prepare-errors.md): prepare's input and method problems.
