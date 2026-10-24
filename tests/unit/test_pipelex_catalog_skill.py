@@ -57,8 +57,8 @@ class TestPipelexCatalogSkillShape:
         body = self.render(target_name)
         at_the_decision = {
             "3. **Decide `python`.**": "references/python.md",
-            "| `input_domain` at `expected_updated_at`": "references/conflict.md",
-            "| `input_domain` at `method_id`": "references/unknown-id.md",
+            "| a problem at `expected_updated_at`": "references/conflict.md",
+            "| `pipelex.catalog.not_found`, or a problem at `method_id`": "references/unknown-id.md",
             "on `written: false`, read [link-file.md]": "references/link-file.md",
             "When the workshop refuses a path, read [link-file.md]": "references/link-file.md",
         }
@@ -76,7 +76,10 @@ class TestPipelexCatalogSkillShape:
         reference = self.reference("unknown-id.md")
         assert "`mthds_save_method`, `mthds_publish_method` or a pull's `mthds_get_method`" in reference.splitlines()[2]
         assert "**A pull or a publish has no link to judge.**" in reference
-        assert "An empty stored source answers at the same location and is not a miss" in reference
+        assert (
+            "`method.package_invalid` with `params.reason` `empty_tree` is a pull of a method whose stored source holds no file yet. It is not a miss"
+            in reference
+        )
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_each_branch_keeps_its_guard_at_the_pointer(self, target_name: str) -> None:
@@ -85,8 +88,8 @@ class TestPipelexCatalogSkillShape:
         ways are the user's to choose between, and a dead link is removed only on a yes."""
         body = self.render(target_name)
         assert "do not sweep the directory" in self.the_line(body, "3. **Decide `python`.**")
-        assert "**Never choose between them.**" in self.the_line(body, "| `input_domain` at `expected_updated_at`")
-        assert "removed only on the user's yes" in self.the_line(body, "| `input_domain` at `method_id`")
+        assert "**Never choose between them.**" in self.the_line(body, "| a problem at `expected_updated_at`")
+        assert "removed only on the user's yes" in self.the_line(body, "| `pipelex.catalog.not_found`, or a problem at `method_id`")
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_pull_refusals_are_stated_once_in_the_stop_table(self, target_name: str) -> None:

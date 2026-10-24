@@ -373,11 +373,14 @@ class TestPipelexIntegrateSkill:
     def test_failure_posture_pins_the_403_and_the_orphans(self) -> None:
         body = self.integrate
         assert "A **403** on `mthds_codegen` is a feature gate, not a key problem" in body
-        # The plan limit is a `config` error like any other, so the shared stop surfaces its hint verbatim.
-        assert "surface the error's `hint` verbatim" in self.render("prod")
+        # The plan limit is a problem in the `account` domain like any other, so the shared stop relays its next step verbatim.
+        assert (
+            "If a call returns a problem in the `account` domain, or `client.unreachable`**, STOP the same way and relay its `next_step` verbatim"
+            in self.render("prod")
+        )
         assert "**Never delete an orphan, and never offer to clean orphans up**" in body
         assert "the orphan paths, by name, and that none of them were deleted" in self.reference("orphans.md")
-        assert "never delete, move or clear it, and never offer to" in self.the_line(body, "which this tool does not own")
+        assert "never delete, move or clear it, and never offer to" in self.the_line(body, "a file this tool does not own")
         # A lock is not this method's without a sidecar naming it: same file names mean a silent overwrite, not an orphan.
         assert "is this method's only when a `sources.json` beside it names this method" in body
         assert "so another method's files would be silently overwritten, not orphaned" in body

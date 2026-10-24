@@ -16,15 +16,15 @@ When the user named no directory, its inputs are looked for under the bare id wh
 
 ## A method never published
 
-A bare id of a method with no published version is refused at step 2 as `method_not_published`, and nothing is spent. Its only content is its draft: say so, carry `mt_…@draft` through every call from step 2 on, and name it in step 4's line, so the user sees that the draft is what runs. Publishing is `/pipelex-catalog`'s, on the user's request, and never a way to make a bare id run.
+A bare id of a method with no published version is refused at step 2 as `pipelex.catalog.not_published`, and nothing is spent. Its only content is its draft: say so, carry `mt_…@draft` through every call from step 2 on, and name it in step 4's line, so the user sees that the draft is what runs. Publishing is `/pipelex-catalog`'s, on the user's request, and never a way to make a bare id run.
 
 ## A version the method never had
 
-`mt_…@<n>` for a version that does not exist is refused at `method_id` as `method_version_not_found`, and the message names the versions the method has. Nothing is spent: report it and ask which one to run.
+`mt_…@<n>` for a version that does not exist is refused as `pipelex.catalog.not_found` whose `params.resource` is `version`. Nothing is spent: report it in the tool's words and ask which one to run.
 
 ## A platform that does not resolve versions yet
 
-Such a platform refuses `@draft` and `@<n>`, and the hint says that a bare id reads the draft there. Report it in the tool's words; on that platform the bare id runs the draft.
+Such a platform refuses `@draft` and `@<n>`, and the problem's `message` says that a bare id reads the draft there. Report it in the tool's words; on that platform the bare id runs the draft.
 
 ## Which version ran
 

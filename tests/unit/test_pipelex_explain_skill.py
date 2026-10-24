@@ -74,7 +74,7 @@ class TestPipelexExplainSkillShape:
         assert "Never refuse to explain a local bundle because the workshop is not connected." in requirements
         assert "a narrower explanation, not a stop" in requirements
         assert "That stop is only for a target that lives on the platform" in requirements
-        assert "Same scope: on a local bundle a `config` error costs the verdict line and nothing else" in requirements
+        assert "Same scope: on a local bundle such a problem costs the verdict line and nothing else" in requirements
 
     def test_the_reference_is_static_and_says_when_it_is_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one

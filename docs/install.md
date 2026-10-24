@@ -172,6 +172,6 @@ A chatbot takes the Pipelex MCP rather than the plugin. Add it in the chatbot's 
 https://mcp.pipelex.com/mcp
 ```
 
-The sign-in is OAuth, and the chatbot drives it, including the choice of the organization you work in. The Pipelex MCP holds no key of its own and has no keyless mode: every call runs on your signed-in session, so the methods you see and the runs you spend are your own. When a session expires or is revoked, calls come back as a `config` no-verdict telling you to reconnect and sign in again.
+The sign-in is OAuth, and the chatbot drives it, including the choice of the organization you work in. The Pipelex MCP holds no key of its own and has no keyless mode: every call runs on your signed-in session, so the methods you see and the runs you spend are your own. When a session expires or is revoked, calls come back with an error telling you to reconnect and sign in again.
 
 > **Upgrading from an `?api_key=` address.** The Pipelex MCP stopped taking an API key in its 0.12.0 release. An entry still registered with `?api_key=plx_sk_...` in its address, or with an `Authorization: Bearer plx_sk_...` header, no longer connects at all: remove it, add it again by the plain address above, and revoke in your console at [app.pipelex.com](https://app.pipelex.com) the key it carried, since a key that sat in an address may have reached browser history, copied links and proxy logs. ChatGPT keeps the configuration it read when the entry was added, so adding it again is the only way through there.

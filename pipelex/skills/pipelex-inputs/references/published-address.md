@@ -1,6 +1,6 @@
 # A published address
 
-Read this at step 1 when the target is a published method's address, passed as `method_ref`, before the first call; and again when `mthds_prepare_inputs` refuses the address in one of the two ways only an address meets. An address is passed exactly as a catalog id is, so every step runs as the skill says; what follows is where an address is genuinely not like an id.
+Read this at step 1 when the target is a published method's address, passed as `method_ref`, before the first call; and again when `mthds_prepare_inputs` refuses the address, before naming a cause. An address is passed exactly as a catalog id is, so every step runs as the skill says; what follows is where an address is genuinely not like an id.
 
 ## Where the inputs go
 
@@ -8,14 +8,14 @@ The server fetches the repository at the tag and locates the package there, so t
 
 ## A template that does not validate
 
-When `mthds_inputs_template` answers `is_valid: false` on an address, the package at that address does not validate: report `validation_errors[]` with the address and its tag, and say the fix is upstream or another tag — never a local repair of source the user does not have.
+When `mthds_inputs_template` answers `is_valid: false` on an address, the package at that address does not validate: report its `errors[]` with the address and its tag, and say the fix is upstream or another tag — never a local repair of source the user does not have.
 
-## Prepare, `input_domain` at `files`: a workshop older than the selector
+## Prepare refused at `files`: a workshop older than the selector
 
-`mthds_prepare_inputs` took `files` and `method_id` alone until the release that gave it the address, so a workshop cached from before then does not know `method_ref` — and a host that validates a call against that older tool schema drops the argument before it is ever sent. The tell is the error itself: `input_domain` located at **`files`**, saying *"Provide MTHDS files or a method_id"*, on a call that did supply a selector — the message lists what the tool accepts and leaves `method_ref` out of it. Read it as a workshop that predates the selector, not as a missing target. The same address goes on templating normally throughout, because `mthds_inputs_template` has taken it for longer — which is what makes the pair of answers the diagnosis.
+`mthds_prepare_inputs` took `files` and `method_id` alone until the release that gave it the address, so a workshop cached from before then does not know `method_ref` — and a host that validates a call against that older tool schema drops the argument before it is ever sent. The tell is the error itself: located at **`files`**, saying *"Provide MTHDS files or a method_id"*, on a call that did supply a selector — the message lists what the tool accepts and leaves `method_ref` out of it. Read it as a workshop that predates the selector, not as a missing target. The same address goes on templating normally throughout, because `mthds_inputs_template` has taken it for longer — which is what makes the pair of answers the diagnosis.
 
 Give the cure with both of its conditions: the launcher fetches the newest workshop only on its next spawn, so `npx -y @pipelex/mcp@latest` changes nothing until the host restarts the server and reloads its tool schema — and a refresh only reaches the selector once a published workshop carries `method_ref` on prepare at all. Where none does yet, say that this one leg is unavailable rather than leaving them refreshing in a loop, and never fall back to submitting files you do not have.
 
-## Prepare, class `config`: the credential first, then the deployment
+## Prepare, a problem in the `account` domain: the credential, and only the credential
 
-The skill's `config` stop applies as written: surface the `hint` verbatim and deal with the credential first, since it is the one thing the user can act on. But a by-address target has one further cause here, and nothing in the answer yet tells you which of them you met. Preparation resolves an address's signature through the run route, which refuses a published package shipping in-process Python where the deployment hosts no sandbox — and that refusal arrives in this same `config` arm wearing the deployment's authentication wording. A template call that just succeeded on the same address rules nothing out, because preparation also uploads with the key and templating never exercises that. So once the key proves good, name the other cause rather than leaving the user with a mystery: a published package can be refused by the deployment itself, and one carrying no in-process Python is not affected.
+The skill's account stop applies as written: relay the `next_step` verbatim and deal with the credential first, since it is the one thing the user can act on. A template call that just succeeded on the same address rules nothing out, because preparation also uploads with the key and templating never exercises that. What the problem names is the whole cause: preparation reads an address's signature from the package's `.mthds` files alone, so the deployment's refusal of a package shipping in-process Python never reaches it. That refusal, `pipelex.deployment.custom_code_requires_sandbox`, meets the run instead, which says so in its own words.

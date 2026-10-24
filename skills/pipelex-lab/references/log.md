@@ -30,7 +30,7 @@ Failed: M3 (the memo puts the relocation clause below the medium items). Partial
 - **The duration** runs from the status's `created_at` to its `finished_at`.
 - **The score** is the Must and Must not lines passed, out of the case's Must and Must not lines. A reading an Also acceptable line allows passes the line it names, and planted facts are not scored. Partial and unscored lines count as not passed, toward the round's score and toward the pass bar, except a line the pass bar allows to be partial, which meets the bar when it is partial.
 - **A cut output** adds a line: "Output cut at the size cap: M4 and M6 unscored."
-- **A failed run** is logged with the status and the first line of its `failure_message`, as `FAILED · …`, and scores nothing.
+- **A failed run** is logged with the status and its problem's `code` and `title`, from `run_error` or the status's `error`, as `FAILED · …`, and scores nothing.
 - **An unfinished run** is logged as `UNFINISHED · still RUNNING after …`, with its run id, so that `/pipelex-run` can follow it later.
 
 ## A run the loop did not start

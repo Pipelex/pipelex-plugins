@@ -4,7 +4,7 @@ Read this at step 1 when the target is a published method's address, passed as `
 
 ## It pairs with nothing
 
-An address is a complete run source, so **an address pairs with nothing**: a `method_dir`, `files` or a `method_id` beside it is refused with an `input_domain` error before anything runs. Every call carries the `method_ref` alone.
+An address is a complete run source, so **an address pairs with nothing**: a `method_dir`, `files` or a `method_id` beside it is refused as `client.argument_invalid` before anything runs. Every call carries the `method_ref` alone.
 
 ## It floats without a tag
 

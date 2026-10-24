@@ -11,7 +11,7 @@ This skill owns the run lifecycle: Start a run from a target and its inputs, or 
 
 - **`mthds_run`**, **`mthds_run_status`** and **`mthds_run_results`** are required, and to start a run **`mthds_validate`** and **`mthds_inputs_template`** too: they keep credit from being spent on a method or inputs that cannot work.
 - **If the run tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe. Never improvise a run id, a status or an output.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 - **`mthds_download_artifacts`**, **`mthds_list_methods`**, **`mthds_list_files`**: optional, never stop for one.
 
 ## Start a run
@@ -26,7 +26,7 @@ The pipe is the declared main pipe unless the user named another: **carry its `p
 
 For a **bundle directory**, **first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`; add `*` to the `.gitignore` of each `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` to the one beside that file, wherever the line is missing**, saying so, then one `mthds_validate` call on it. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first. For an **`mt_…` id**, the same call with `method_id` in place of `method_dir`; for an address, `method_ref`.
 
-The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex:pipelex-design`, or to `/pipelex:pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`.
+The bar is `is_valid: true`, `is_runnable: true` and an empty `pending_signatures`. Short of it, report the verdict and route to `/pipelex:pipelex-design`, or to `/pipelex:pipelex-edit` when the fix is contract-preserving; an address's verdict is reported as [its reference](references/published-address.md) says. Never run a method that did not pass. **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `pipelex.docgen.template_warning`.
 
 **A dry run is this step, shown.** A run on test files is a real run. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands. Show the flow as numbered text: each step, what it reads and makes, where it batches or branches, and which steps call a model. For an id or an address, give the contract from the verdict's `main_pipe` instead. Say that no model ran and nothing was spent. **Then end the turn there, even when the same request asked for the real run too**: the flow is the reply, and the paid run waits for the user's go.
 
@@ -75,7 +75,7 @@ When the inputs came from a lab case and the lab did not start this run, offer `
 
 ### 8. A failed run is reported, then routed, never bisected
 
-Give `failure_message` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
+Give the run's `run_error` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 
 ## Follow a run
 
@@ -91,7 +91,7 @@ An unknown run id is reported in the tool's own words.
 
 | Condition | Do this |
 |---|---|
-| `mthds_run`: `input_domain` at `method_id`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
+| `mthds_run`: `pipelex.catalog.not_found`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
 | `mthds_download_artifacts` absent | say nothing was saved to disk and report the stored references as they came back; the run still completed |
 | `mthds_download_artifacts` refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
 
@@ -101,4 +101,4 @@ These references name a skill by its bare `/pipelex-<name>`; to the user, write 
 
 - [by-id.md](references/by-id.md), [published-address.md](references/published-address.md): an `mt_…` or a `method_ref` target, before the first call.
 - [failed-run.md](references/failed-run.md): a failed run, before routing it.
-- [linked-run.md](references/linked-run.md): a linked run refused at `method_id`.
+- [linked-run.md](references/linked-run.md): a linked run whose id is unknown.

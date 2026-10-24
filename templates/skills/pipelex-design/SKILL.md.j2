@@ -61,7 +61,7 @@ Design the whole graph in memory, then write `main.mthds` in the bundle home, to
 
 Call `mthds_validate`. {% include "skills/shared/validate-call.md.j2" %}
 
-Branch on the **structured verdict**, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `validation_errors[]` and the summary's locators, then re-validate. {% include "skills/shared/validate-warnings.md.j2" %}
+Branch on the **structured verdict**, never on transport: `is_valid: true` is complete with `is_runnable: true` and nothing pending, and otherwise a scaffold whose backlog is the summary's `## Pending signatures`; on `is_valid: false`, fix from `errors[]`, then re-validate. {% include "skills/shared/validate-warnings.md.j2" %}
 
 ### 6. The runnable gate and delivery
 
@@ -86,8 +86,8 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 
 | Condition | Do this |
 |---|---|
-| `status: "error"`, class `input_domain` | fix the call |
-| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| `status: "error"`, `domain: "input"` | fix the call |
+| any other `status: "error"` | report it, after one retry when its `retry` is `"yes"` |
 | validation fails twice on the same construct, or the client contract itself looks wrong | pause and show the user |
 
 ## References

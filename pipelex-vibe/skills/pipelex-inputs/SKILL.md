@@ -11,7 +11,7 @@ The one entry point for a method's inputs, through to run-ready inputs.
 
 - **`mthds_inputs_template`** is required: never hand-derive the template from the `.mthds` source.
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. Never silently improvise a template.
 - **`mthds_prepare_inputs`** is required at step 5, under the same two stops; never hand-fake a storage reference.
 - **`mthds_list_methods`** and **`mthds_list_files`** are optional: without the first, ask for a saved method's `mt_…` id.
 
@@ -34,7 +34,7 @@ The one entry point for a method's inputs, through to run-ready inputs.
 The target takes three forms, one selector per call.
 
 - **A local bundle**, the usual case: `<output_dir>` is its directory, usually the one holding `main.mthds`, unless the caller names another. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first.
-- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `method_not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
+- **A registered method**, an `mt_…` id with no local bundle in play, as `method_id`: bare, the latest published version; `@draft`, the draft; `@<n>`, version n. **Say which one the template came from** (`method_version`) and offer the run on that same form; a bare id never published is refused as `pipelex.catalog.not_published`, and `mt_…@draft` is then the target. `<output_dir>` is a directory the user names, by default a new `./<method_id>/` without the suffix.
 - **A published method**, as `method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`: read [references/published-address.md](references/published-address.md) before the first call. **An address with no tag is accepted, and it floats**: say so in one line, recommend the tag, and carry on.
 
 ### 2. The template
@@ -93,15 +93,15 @@ The offer names the file the run reads — `inputs.prepared.json` where prepare 
 
 | Condition | Do this |
 |---|---|
-| template: `is_valid: false` | report `validation_errors[]` and the summary. A local bundle is repaired first (`/pipelex:pipelex-design` resumes it), then retried; a registered method through `/pipelex:pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
-| template: `input_domain` | an unknown `pipe_ref` or unresolvable `main_pipe`: pass an explicit `pipe_ref`. At `method_dir`, `method_id` or `method_ref`, report it in the tool's words; another organization's id reads as a miss |
-| `runtime`, either call | report, and retry once |
+| template: `is_valid: false` | report `errors[]` and the summary. A local bundle is repaired first (`/pipelex:pipelex-design` resumes it), then retried; a registered method through `/pipelex:pipelex-edit`, not here; a published one is reported as [its reference](references/published-address.md) says |
+| template: `request.pipe_not_found` or `request.pipe_ambiguous` | pass an explicit `pipe_ref`. Another `domain: "input"` problem: report it in the tool's words; another organization's id reads as a miss |
+| `retry: "yes"`, either call | report, and retry once |
 | the factory returns no path | leave that one input unfilled, carry on with the others; report the reason and ask for the user's own file. Never fabricate a value or abandon `inputs.json` |
-| prepare: `input_domain` at `inputs`, `pipe_ref`, `method_id` or `method_ref` | read [references/prepare-errors.md](references/prepare-errors.md) before replying or retrying; a storage size limit at `inputs` is terminal for this attempt |
-| prepare, by address: `input_domain` at `files`, or `config` (the credential first, as the requirements say) | read [references/published-address.md](references/published-address.md) before naming a cause |
+| prepare: an `input` or `method` problem, not at `kind` | read [references/prepare-errors.md](references/prepare-errors.md) before replying or retrying; a storage size limit at `inputs` is terminal for this attempt |
+| prepare, by address: refused at `files`, or an `account` problem | read [references/published-address.md](references/published-address.md) before naming a cause |
 
 ## References
 
 - [synthetic.md](references/synthetic.md), [user-data.md](references/user-data.md): step 3, by strategy; both for Mixed.
 - [published-address.md](references/published-address.md): a `method_ref` target.
-- [prepare-errors.md](references/prepare-errors.md): prepare's `input_domain` errors.
+- [prepare-errors.md](references/prepare-errors.md): prepare's input and method problems.
