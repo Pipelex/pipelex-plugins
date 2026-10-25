@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.48.1 (ce6a199) + @pipelex/tools-wasm 0.6.0 (npm)
+// Provenance: @pipelex/sdk 0.53.0 (5dfe747) + @pipelex/tools-wasm 0.6.0 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10704,6 +10704,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve as resolvePath2 } from "node:path";
 
 // src/hooks/check-core.ts
+init_protocol();
 import { isAbsolute as isAbsolutePath, resolve as resolvePath } from "node:path";
 
 // src/hooks/patch-envelope.ts
@@ -12134,14 +12135,13 @@ function decideAfterLint(filePath, lint) {
   ];
   return { kind: "block", reason: truncate(lines.join("\n")) };
 }
-function renderValidationErrorLine(item) {
-  const locators = [
-    item.pipe_code && `pipe ${item.pipe_code}`,
-    item.concept_code && `concept ${item.concept_code}`,
-    item.field_name && `field ${item.field_name}`,
-    item.source && `source ${item.source}`
-  ].filter(Boolean).join(", ");
-  return `- [${item.category ?? "error"}] ${item.message ?? ""}${locators ? ` (${locators})` : ""}`;
+function renderProblemItemLines(item) {
+  const where = formatLocation(item.location);
+  const lines = [`- \`${item.code}\`: ${item.detail}${where ? ` (${where})` : ""}`];
+  if (item.suggested_fix !== void 0) {
+    lines.push(`  - ${formatSuggestedFix(item.suggested_fix)}`);
+  }
+  return lines;
 }
 var WITHHELD_LISTED = 10;
 var CONTROL_CHARACTERS = /[\p{Cc}\u2028\u2029]/gu;
@@ -12207,9 +12207,9 @@ function decideAfterValidate(filePath, validate) {
           "",
           validate.message || "Bundle is invalid."
         ];
-        if (validate.validationErrors.length > 0) {
+        if (validate.errors.length > 0) {
           lines.push("");
-          lines.push(...validate.validationErrors.map(renderValidationErrorLine));
+          lines.push(...validate.errors.flatMap(renderProblemItemLines));
         }
         reason = lines.join("\n");
       }
@@ -12242,88 +12242,10 @@ function encodeOutcome(outcome, platform = "claude") {
   }
 }
 
-// src/hooks/bundle-gather.ts
-import { realpathSync } from "node:fs";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
-
-// src/method-trees.ts
+// src/problem-items.ts
 init_protocol();
 
-// src/error-verdicts.ts
-init_protocol();
-var INPUT = Object.freeze({ errorDomain: "input", retryable: false });
-var CONFIG = Object.freeze({ errorDomain: "config", retryable: false });
-var TRANSIENT = Object.freeze({ errorDomain: "runtime", retryable: true });
-var FAULT = Object.freeze({ errorDomain: "runtime", retryable: false });
-var API_KEY_LIMIT_CODE = "pipelex_api_key_limit_reached";
-var IDEMPOTENCY_KEY_IN_USE_CODE = "idempotency_key_in_use";
-function fallbackVerdict(status, code, named) {
-  switch (status) {
-    case 401:
-    case 402:
-    case 403:
-      return CONFIG;
-    case 404:
-      return named ? INPUT : CONFIG;
-    case 405:
-      return CONFIG;
-    case 408:
-    case 429:
-      return TRANSIENT;
-    case 409:
-      if (code === API_KEY_LIMIT_CODE) return CONFIG;
-      if (code === IDEMPOTENCY_KEY_IN_USE_CODE) return TRANSIENT;
-      return INPUT;
-    case 501:
-      return CONFIG;
-  }
-  if (status >= 400 && status < 500) return INPUT;
-  if (status >= 500 && status < 600) return TRANSIENT;
-  return FAULT;
-}
-var ERROR_DOMAIN_OF = Object.freeze({
-  input: "input",
-  method: "input",
-  account: "config",
-  operator: "config",
-  runtime: "runtime"
-});
-var RETRYABLE_OF = Object.freeze({
-  yes: true,
-  no: false,
-  outcome_unknown: false
-});
-function problemVerdict(problem) {
-  return {
-    errorDomain: ERROR_DOMAIN_OF[problemDomain(problem)],
-    retryable: RETRYABLE_OF[problemRetry(problem)]
-  };
-}
-
-// src/errors.ts
-init_protocol();
-
-// src/error-models.ts
-var REPORT_STRING_FIELDS = [
-  "error_type",
-  "message",
-  "title",
-  "type_uri",
-  "error_domain",
-  "error_category",
-  "model",
-  "provider"
-];
-var REPORT_BOOLEAN_FIELDS = ["retryable", "caller_facing_message"];
-var PROVIDER_STRING_FIELDS = [
-  "provider",
-  "sdk_exception_type",
-  "message",
-  "request_id",
-  "provider_error_code"
-];
-var PROVIDER_NUMERIC_FIELDS = ["status_code", "retry_after_seconds"];
-var FIELD_ERROR_STRING_FIELDS = ["field", "code", "detail"];
+// src/records.ts
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -12334,72 +12256,102 @@ function dropUnfit(record, fields, fits) {
     if (value !== null && !fits(value)) delete record[field];
   }
 }
-var isString2 = (value) => typeof value === "string";
-var isBoolean = (value) => typeof value === "boolean";
-var isNumberOrString = (value) => typeof value === "number" || typeof value === "string";
-function readUserAction(value) {
-  return typeof value.kind === "string" && typeof value.detail === "string" ? { ...value } : void 0;
+
+// src/problem-items.ts
+var CHECKED_MEMBERS = ["params", "location", "suggestions", "suggested_fix"];
+var PROBE_CODE = "client.argument_invalid";
+function memberFits(name, value) {
+  return isProblemItem({ code: PROBE_CODE, detail: "", [name]: value });
 }
-function readProviderMetadata(value) {
-  const metadata = { ...value };
-  dropUnfit(metadata, PROVIDER_STRING_FIELDS, isString2);
-  dropUnfit(metadata, PROVIDER_NUMERIC_FIELDS, isNumberOrString);
-  return metadata;
-}
-function readMigration(value) {
-  const migration = { ...value };
-  dropUnfit(migration, ["remedy"], isString2);
-  dropUnfit(migration, ["would_write", "needs_attention"], isBoolean);
-  if (Object.hasOwn(migration, "plans") && migration.plans !== null) {
-    if (Array.isArray(migration.plans)) migration.plans = migration.plans.filter(isPlainObject);
-    else delete migration.plans;
+function readProblemItem(entry) {
+  if (!isPlainObject(entry) || typeof entry.code !== "string" || typeof entry.detail !== "string") {
+    return void 0;
   }
-  return migration;
-}
-function isValidationItem(value) {
-  return isPlainObject(value) && isString2(value.category) && isString2(value.message);
-}
-function readFieldError(value) {
-  const item = { ...value };
-  dropUnfit(item, FIELD_ERROR_STRING_FIELDS, isString2);
+  const item = { ...entry };
+  for (const name of CHECKED_MEMBERS) {
+    if (Object.hasOwn(item, name) && !memberFits(name, item[name])) delete item[name];
+  }
   return item;
 }
-function readRunErrorReport(value) {
-  if (!isPlainObject(value)) return null;
-  const report = { ...value };
-  dropUnfit(report, REPORT_STRING_FIELDS, isString2);
-  dropUnfit(report, REPORT_BOOLEAN_FIELDS, isBoolean);
-  readNested(report, "user_action", readUserAction);
-  readNested(report, "provider_metadata", readProviderMetadata);
-  readNested(report, "migration", readMigration);
-  if (Object.hasOwn(report, "validation_errors") && report.validation_errors !== null) {
-    if (Array.isArray(report.validation_errors)) {
-      report.validation_errors = report.validation_errors.filter(isValidationItem);
-    } else {
-      delete report.validation_errors;
-    }
+function readProblemItems(entries) {
+  if (!Array.isArray(entries)) return [];
+  const items = [];
+  for (const entry of entries) {
+    const item = readProblemItem(entry);
+    if (item !== void 0) items.push(item);
   }
-  return report;
-}
-function readNested(record, field, read) {
-  if (!Object.hasOwn(record, field)) return;
-  const value = record[field];
-  if (value === null) return;
-  const kept = isPlainObject(value) ? read(value) : void 0;
-  if (kept === void 0) delete record[field];
-  else record[field] = kept;
+  return items;
 }
 
-// src/run-may-have-started.ts
-var START_UNAVAILABLE_CODE = "pipeline_start_unavailable";
-function answerMayHaveStartedRun(status, code) {
-  if (status >= 200 && status < 300) return true;
-  if (status === 408) return true;
-  if (status === 501) return false;
-  if (status === 503 && code === START_UNAVAILABLE_CODE) return false;
-  return status >= 500 && status < 600;
+// src/hooks/bundle-gather.ts
+import { realpathSync } from "node:fs";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
+
+// src/method-trees.ts
+init_protocol();
+
+// src/errors.ts
+init_protocol();
+
+// src/answer-reading.ts
+init_protocol();
+function readHostedAnswer(answer, options = {}) {
+  if (readProblemBody(answer.body) !== void 0) {
+    return readAnswer(answer, { createsRun: false });
+  }
+  return { problem: bareAnswerProblem(answer, options.createsRun === true), fromBody: false };
 }
-function transportMayHaveStartedRun(cause) {
+function isSuccess(status) {
+  return status >= 200 && status < 300;
+}
+function bareAnswerProblem(answer, createsRun) {
+  const { status } = answer;
+  if (createsRun && (isSuccess(status) || status === 408 || status >= 500 && status !== 501)) {
+    return outcomeUnknownProblem(runIdNamedBy(answer.body));
+  }
+  if (isSuccess(status)) return unreadableAnswer(status);
+  switch (status) {
+    case 401:
+      return buildProblem("auth.missing_credential", {}, { status });
+    case 403:
+      return buildProblem("auth.invalid_credential", {}, { status });
+    case 404:
+      return buildProblem("request.not_found", {}, { status });
+    case 500:
+      return buildProblem("runtime.unexpected", {}, { status });
+    case 408:
+    case 429:
+    case 502:
+    case 503:
+    case 504:
+      return buildProblem(
+        "runtime.unavailable",
+        {},
+        { status, retryAfter: retryAfterSeconds(answer.headers) }
+      );
+    default:
+      return readAnswer(answer, { createsRun: false }).problem;
+  }
+}
+function runIdNamedBy(body) {
+  const reading = parseJsonBody(body);
+  if (!reading.ok) return void 0;
+  const { value } = reading;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return void 0;
+  const runId = value.pipeline_run_id;
+  return typeof runId === "string" && runId !== "" ? runId : void 0;
+}
+function outcomeUnknownProblem(runId) {
+  if (runId === void 0) return buildProblem("client.outcome_unknown", {});
+  return buildProblem(
+    "client.outcome_unknown",
+    { pipeline_run_id: runId },
+    { pipeline_run_id: runId }
+  );
+}
+
+// src/transport-reading.ts
+function requestMayHaveLeft(cause) {
   return !provesNothingSent(cause);
 }
 function provesNothingSent(fetchFailure) {
@@ -12461,58 +12413,82 @@ var CONNECTION_SETUP_CODES = /* @__PURE__ */ new Set([
 ]);
 
 // src/errors.ts
-var ERROR_DOMAINS = /* @__PURE__ */ new Set(["input", "config", "runtime"]);
-function isErrorDomain(value) {
-  return typeof value === "string" && ERROR_DOMAINS.has(value);
+function causeOption(cause) {
+  return cause === void 0 ? void 0 : { cause };
 }
-function makeVerdict(errorDomain, retryable) {
-  return Object.freeze({ errorDomain, retryable });
+function argumentInvalidProblem(argument, reason) {
+  return buildProblem("client.argument_invalid", { argument, reason });
 }
-var PipelexRequestError = class extends PipelineRequestError {
-  /** Whether asking again can plausibly succeed. Always decided. */
-  retryable;
-  /** Who can fix the failure: `input`, `config` or `runtime`. Always decided. */
-  errorDomain;
-  /**
-   * Whether the failed request may still have started a run whose id never reached the caller:
-   * a `start` or an `execute` (and so `startAndWaitForResult`'s start, or the blocking execute it
-   * falls back to) that failed in a way that does not prove the server started nothing. When it
-   * is true, `retryable` is false: look the run up in the run history before starting it again.
-   * False for every other request, a wait on a run already named included. Always decided.
-   */
-  runMayHaveStarted;
-  constructor(message, verdict, options) {
-    super(message, options);
+function responseUnreadableProblem(status, runId) {
+  return buildProblem(
+    "client.response_unreadable",
+    { status },
+    runId === void 0 ? {} : { pipeline_run_id: runId }
+  );
+}
+function statusProblem(status) {
+  return readAnswer({ status, headers: {}, body: "" }, { createsRun: false }).problem;
+}
+function isTransientStorageStatus(status) {
+  return status === 408 || status === 429 || status >= 500 && status <= 599 && status !== 501;
+}
+function storageStatusProblem(status) {
+  if (isTransientStorageStatus(status)) return buildProblem("runtime.unavailable", {});
+  if (status === 501)
+    return buildProblem("runtime.unsupported", { capability: "this storage request" });
+  return responseUnreadableProblem(status);
+}
+function credentialRefusedProblem(credentialSent) {
+  return credentialSent ? buildProblem("auth.invalid_credential", {}) : buildProblem("auth.missing_credential", {});
+}
+function wrappedProblem(cause) {
+  return cause instanceof ProblemError ? cause.problem : void 0;
+}
+function credentialProblem(cause, credentialSent) {
+  if (cause instanceof ApiResponseError && readProblemBody(cause.responseBody) !== void 0) {
+    return cause.problem;
+  }
+  if (credentialSent !== void 0) return credentialRefusedProblem(credentialSent);
+  return wrappedProblem(cause) ?? credentialRefusedProblem(true);
+}
+var PipelexRequestError = class extends ProblemError {
+  constructor(message, problem, options) {
+    super(problem, options);
     this.name = "PipelexRequestError";
-    this.runMayHaveStarted = options?.runMayHaveStarted === true;
-    this.retryable = this.runMayHaveStarted ? false : verdict.retryable;
-    this.errorDomain = verdict.errorDomain;
+    this.message = message;
   }
 };
-function errorVerdictOf(err) {
-  if (!(err instanceof Error)) return void 0;
-  const { retryable, errorDomain, problem } = err;
-  if (typeof retryable === "boolean" && isErrorDomain(errorDomain)) {
-    return { retryable, errorDomain };
-  }
-  return isProblem(problem) ? problemVerdict(problem) : void 0;
-}
 var RequestArgumentError = class extends PipelexRequestError {
   constructor(message, options) {
-    super(message, options?.verdict ?? makeVerdict("input", false), options);
+    super(
+      message,
+      options?.problem ?? argumentInvalidProblem("arguments", "unspecified"),
+      causeOption(options?.cause)
+    );
     this.name = "RequestArgumentError";
   }
 };
 var InputPreparationError = class extends PipelexRequestError {
   constructor(message, options) {
-    super(message, options?.verdict ?? makeVerdict("input", false), options);
+    super(
+      message,
+      options?.problem ?? argumentInvalidProblem("inputs", "unspecified"),
+      causeOption(options?.cause)
+    );
     this.name = "InputPreparationError";
   }
 };
 var InvalidLocalSourceError = class extends InputPreparationError {
   source;
   constructor(message, source, options) {
-    super(message, options);
+    super(message, {
+      ...options,
+      problem: buildProblem("input.file_unreadable", {
+        input: source,
+        file_type: "file",
+        reason: "unreadable"
+      })
+    });
     this.name = "InvalidLocalSourceError";
     this.source = source;
   }
@@ -12521,7 +12497,13 @@ var InvalidInputValueError = class extends InputPreparationError {
   inputName;
   inputPath;
   constructor(message, details, options) {
-    super(message, options);
+    super(message, {
+      ...options,
+      problem: buildProblem("input.invalid", {
+        input: details.inputName,
+        field: details.inputPath
+      })
+    });
     this.name = "InvalidInputValueError";
     this.inputName = details.inputName;
     this.inputPath = details.inputPath;
@@ -12539,7 +12521,7 @@ var UploadNotAllowedError = class extends InputPreparationError {
   constructor(details, options) {
     super(
       `Input "${details.inputPath}" is ${UPLOAD_NOT_ALLOWED_KIND_WORDS[details.valueKind]}, which would need an upload, and this preparation uploads nothing: pass an http(s) URL or a pipelex-storage:// reference instead.`,
-      options
+      { ...options, problem: argumentInvalidProblem(details.inputPath, details.valueKind) }
     );
     this.name = "UploadNotAllowedError";
     this.inputName = details.inputName;
@@ -12548,31 +12530,38 @@ var UploadNotAllowedError = class extends InputPreparationError {
   }
 };
 var MethodLoadError = class extends InputPreparationError {
-  validationErrors;
   serverMessage;
   constructor(message, details, options) {
-    super(message, options);
+    super(message, {
+      ...options,
+      problem: buildProblem("method.invalid", {}, { errors: details.errors })
+    });
     this.name = "MethodLoadError";
-    this.validationErrors = details.validationErrors;
     this.serverMessage = details.serverMessage;
   }
 };
 var RejectedAssetError = class extends InputPreparationError {
   filename;
   status;
-  code;
+  reason;
   constructor(message, filename, status, options) {
-    super(message, options);
+    super(message, {
+      cause: options?.cause,
+      problem: options?.problem ?? statusProblem(status)
+    });
     this.name = "RejectedAssetError";
     this.filename = filename;
     this.status = status;
-    this.code = options?.code;
+    this.reason = options?.reason;
   }
 };
 var UnsupportedUploadCapabilityError = class extends InputPreparationError {
   filename;
   constructor(message, options) {
-    super(message, { ...options, verdict: makeVerdict("config", false) });
+    super(message, {
+      cause: options?.cause,
+      problem: buildProblem("runtime.unsupported", { capability: "file upload" })
+    });
     this.name = "UnsupportedUploadCapabilityError";
     this.filename = options?.filename;
   }
@@ -12581,54 +12570,83 @@ var UploadAuthenticationError = class extends InputPreparationError {
   status;
   filename;
   constructor(message, status, options) {
-    super(message, { ...options, verdict: makeVerdict("config", false) });
+    super(message, {
+      cause: options?.cause,
+      problem: credentialProblem(options?.cause, options?.credentialSent)
+    });
     this.name = "UploadAuthenticationError";
     this.status = status;
     this.filename = options?.filename;
   }
 };
+var TestFileRefusedError = class extends InputPreparationError {
+  status;
+  reason;
+  filename;
+  methodId;
+  constructor(message, options) {
+    super(message, {
+      cause: options?.cause,
+      problem: wrappedProblem(options?.cause) ?? testFileRefusalProblem(options?.reason)
+    });
+    this.name = "TestFileRefusedError";
+    this.status = options?.status;
+    this.reason = options?.reason;
+    this.filename = options?.filename;
+    this.methodId = options?.methodId;
+  }
+};
+function testFileRefusalProblem(reason) {
+  switch (reason) {
+    case "role_not_permitted":
+      return buildProblem("auth.forbidden", { requirement: "a role that may change methods" });
+    case "method_not_found":
+    case "method_being_deleted":
+      return argumentInvalidProblem("method_id", reason);
+    case void 0:
+      return void 0;
+  }
+}
 var UploadTransportError = class extends InputPreparationError {
   status;
-  code;
+  reason;
   filename;
   constructor(message, options) {
     super(message, {
-      ...options,
-      verdict: errorVerdictOf(options?.cause) ?? uploadTransportVerdict(options?.code, options?.status)
+      cause: options?.cause,
+      problem: options?.problem ?? wrappedProblem(options?.cause) ?? uploadTransportProblem(options?.reason, options?.status)
     });
     this.name = "UploadTransportError";
     this.status = options?.status;
-    this.code = options?.code;
+    this.reason = options?.reason;
     this.filename = options?.filename;
   }
 };
-function uploadTransportVerdict(code, status) {
-  switch (code) {
+function uploadTransportProblem(reason, status) {
+  switch (reason) {
     case "timeout":
+    case "unreachable":
     case "storage_timeout":
     case "conflict":
-      return makeVerdict("runtime", true);
+      return buildProblem("runtime.unavailable", {});
     case "server_error":
-      return makeVerdict(
-        "runtime",
-        status === void 0 || fallbackVerdict(status, void 0, true).retryable
-      );
+      return status === void 0 ? buildProblem("runtime.unavailable", {}) : storageStatusProblem(status);
     case "unexpected":
-      return makeVerdict(
-        "runtime",
-        status !== void 0 && fallbackVerdict(status, void 0, true).retryable
-      );
-    case "unreachable":
-      return makeVerdict("config", true);
+    case void 0:
+      return status === void 0 ? buildProblem("runtime.unexpected", {}) : storageStatusProblem(status);
     case "redirected":
-      return makeVerdict("config", false);
-    default:
-      return makeVerdict("runtime", false);
+      return buildProblem("runtime.misconfigured", {});
+    case "invalid_grant_url":
+      return responseUnreadableProblem(200);
   }
 }
 var ArtifactOperationError = class extends PipelexRequestError {
   constructor(message, options) {
-    super(message, options?.verdict ?? makeVerdict("runtime", false), options);
+    super(
+      message,
+      options?.problem ?? buildProblem("runtime.unexpected", {}),
+      causeOption(options?.cause)
+    );
     this.name = "ArtifactOperationError";
   }
 };
@@ -12638,7 +12656,7 @@ var ScopeUnavailableError = class extends ArtifactOperationError {
   constructor(scope, runId, options) {
     super(
       `Run "${runId}" carries no "${scope}" artifact to walk for produced files \u2014 it is null or absent from the results body.`,
-      options
+      { cause: options?.cause, problem: responseUnreadableProblem(200, runId) }
     );
     this.name = "ScopeUnavailableError";
     this.scope = scope;
@@ -12647,43 +12665,49 @@ var ScopeUnavailableError = class extends ArtifactOperationError {
 };
 var ArtifactFetchError = class extends ArtifactOperationError {
   uri;
-  code;
+  reason;
   status;
-  constructor(message, uri, code, status, options) {
-    super(message, { ...options, verdict: artifactFetchVerdict(code, status) });
+  constructor(message, uri, reason, status, options) {
+    super(message, {
+      cause: options?.cause,
+      problem: options?.problem ?? artifactFetchProblem(reason, uri, status)
+    });
     this.name = "ArtifactFetchError";
     this.uri = uri;
-    this.code = code;
+    this.reason = reason;
     this.status = status;
   }
 };
-function artifactFetchVerdict(code, status) {
-  switch (code) {
+function artifactFetchProblem(reason, uri, status) {
+  switch (reason) {
     case "invalid_storage_uri":
     case "forbidden":
-    case "unsupported_url":
     case "not_found":
-    case "too_large":
-      return makeVerdict("input", false);
+      return buildProblem("input.reference_not_found", { input: uri });
+    case "unsupported_url":
+      return buildProblem("client.link_refused", { reason: "unsupported_scheme" });
     case "plain_http_refused":
-      return makeVerdict("config", false);
+      return buildProblem("client.link_refused", { reason: "plain_http" });
+    case "redirect_refused":
+      return buildProblem("client.link_refused", { reason: "redirect" });
+    case "store_error":
+    case "store_refused":
+      return status === void 0 ? buildProblem("runtime.unavailable", {}) : storageStatusProblem(status);
     case "timeout":
     case "network":
-      return makeVerdict("runtime", true);
-    case "store_error":
-      return makeVerdict(
-        "runtime",
-        status !== void 0 && fallbackVerdict(status, void 0, true).retryable
-      );
+      return buildProblem("runtime.unavailable", {});
     default:
-      return makeVerdict("runtime", false);
+      return buildProblem("runtime.unexpected", {});
   }
 }
 var ArtifactAuthenticationError = class extends ArtifactOperationError {
   status;
   verdict;
   constructor(message, status, verdict, options) {
-    super(message, { ...options, verdict: makeVerdict("config", false) });
+    super(message, {
+      cause: options?.cause,
+      problem: credentialProblem(options?.cause, options?.credentialSent)
+    });
     this.name = "ArtifactAuthenticationError";
     this.status = status;
     this.verdict = verdict;
@@ -12691,89 +12715,110 @@ var ArtifactAuthenticationError = class extends ArtifactOperationError {
 };
 var MethodFileTransferError = class extends PipelexRequestError {
   operation;
-  code;
+  reason;
   sha256;
   path;
   status;
   constructor(message, details) {
-    super(message, methodFileTransferVerdict(details.code));
+    super(message, methodFileTransferProblem(details.reason, details.status));
     this.name = "MethodFileTransferError";
     this.operation = details.operation;
-    this.code = details.code;
+    this.reason = details.reason;
     this.sha256 = details.sha256;
     this.path = details.path;
     this.status = details.status;
   }
 };
-function methodFileTransferVerdict(code) {
-  switch (code) {
+function methodFileTransferProblem(reason, status) {
+  switch (reason) {
     case "unreachable":
     case "storage_error":
+      return buildProblem("runtime.unavailable", {});
+    case "refused":
+      return status === void 0 ? buildProblem("runtime.unexpected", {}) : storageStatusProblem(status);
     case "mismatch":
-      return makeVerdict("runtime", true);
-    default:
-      return makeVerdict("runtime", false);
+      return responseUnreadableProblem(200);
   }
 }
 var ApiUnreachableError = class extends PipelexRequestError {
   apiUrl;
-  code;
-  constructor(message, apiUrl, code, options) {
-    super(message, makeVerdict(code === "ABORT_TIMEOUT" ? "runtime" : "config", true), {
-      ...options,
-      runMayHaveStarted: options?.mayStartRun === true && transportMayHaveStartedRun(options.cause)
-    });
+  networkCode;
+  constructor(message, apiUrl, networkCode, options) {
+    super(message, transportProblem(apiUrl, networkCode, options), causeOption(options?.cause));
     this.name = "ApiUnreachableError";
     this.apiUrl = apiUrl;
-    this.code = code;
+    this.networkCode = networkCode;
   }
 };
+var ABORT_TIMEOUT = "ABORT_TIMEOUT";
+function transportProblem(apiUrl, networkCode, options) {
+  if (options?.mayStartRun === true && requestMayHaveLeft(options.cause)) {
+    return outcomeUnknownProblem();
+  }
+  if (networkCode === ABORT_TIMEOUT && options?.timeoutMs !== void 0) {
+    return buildProblem("client.timeout", { seconds: options.timeoutMs / 1e3 });
+  }
+  return buildProblem("client.unreachable", { base_url: apiUrl });
+}
 var PipelineExecuteTimeoutError = class extends PipelexRequestError {
   elapsedMs;
   constructor(elapsedMs, options) {
     const seconds = Math.round(elapsedMs / 1e3);
     super(
       `The Pipelex Hosted API times out synchronous requests after ~30s \u2014 this run took ${seconds}s. The blocking execute path can't run methods longer than 30s behind the gateway. Start the run and poll for its result instead: \`start()\` then \`waitForResult(runId)\`.`,
-      makeVerdict("input", false),
-      { ...options, runMayHaveStarted: true }
+      outcomeUnknownProblem(),
+      causeOption(options?.cause)
     );
     this.name = "PipelineExecuteTimeoutError";
     this.elapsedMs = elapsedMs;
   }
 };
+function runFailedProblem(runId, status, runError) {
+  return buildProblem(
+    "run.failed",
+    { pipeline_run_id: runId, run_status: status },
+    { pipeline_run_id: runId, extra: { run_error: runError ?? void 0 } }
+  );
+}
 var RunFailedError = class extends PipelexRequestError {
   runId;
   status;
-  error;
   constructor(message, runId, status, options) {
     super(
       message,
-      runFailureVerdict(options?.error ?? null),
-      options?.cause === void 0 ? void 0 : { cause: options.cause }
+      options?.problem ?? runFailedProblem(runId, status),
+      causeOption(options?.cause)
     );
     this.name = "RunFailedError";
     this.runId = runId;
     this.status = status;
-    this.error = options?.error ?? null;
+  }
+  /** The run's own problem, nested as `run_error`, when the run ended with one. */
+  get runError() {
+    const nested = this.problem.run_error;
+    return isProblem(nested) ? nested : void 0;
   }
 };
-function runFailureVerdict(report) {
-  const domain = report?.error_domain;
-  return makeVerdict(isErrorDomain(domain) ? domain : "runtime", report?.retryable === true);
-}
 var MissingMainStuffError = class extends PipelexRequestError {
   runId;
   constructor(message, runId) {
-    super(message, makeVerdict("runtime", false));
+    super(message, responseUnreadableProblem(200, runId));
     this.name = "MissingMainStuffError";
     this.runId = runId;
   }
 };
+function followFailedProblem(runId) {
+  return buildProblem(
+    "client.follow_failed",
+    { pipeline_run_id: runId },
+    { pipeline_run_id: runId }
+  );
+}
 var RunTimeoutError = class extends PipelexRequestError {
   runId;
   timeoutMs;
   constructor(message, runId, timeoutMs) {
-    super(message, makeVerdict("runtime", true));
+    super(message, followFailedProblem(runId));
     this.name = "RunTimeoutError";
     this.runId = runId;
     this.timeoutMs = timeoutMs;
@@ -12784,7 +12829,7 @@ var RunStillRunningError = class extends PipelexRequestError {
   retryAfterSeconds;
   location;
   constructor(message, runId, retryAfterSeconds2 = null, location = null, options) {
-    super(message, makeVerdict("runtime", true), options);
+    super(message, followFailedProblem(runId), causeOption(options?.cause));
     this.name = "RunStillRunningError";
     this.runId = runId;
     this.retryAfterSeconds = retryAfterSeconds2;
@@ -12794,7 +12839,11 @@ var RunStillRunningError = class extends PipelexRequestError {
 var RunLifecycleUnavailableError = class extends PipelexRequestError {
   apiUrl;
   constructor(message, apiUrl, options) {
-    super(message, makeVerdict("config", false), options);
+    super(
+      message,
+      buildProblem("runtime.unsupported", { capability: "the durable run lifecycle" }),
+      causeOption(options?.cause)
+    );
     this.name = "RunLifecycleUnavailableError";
     this.apiUrl = apiUrl;
   }
@@ -12802,160 +12851,50 @@ var RunLifecycleUnavailableError = class extends PipelexRequestError {
 var PagingNotTerminatingError = class extends PipelexRequestError {
   pageLimit;
   constructor(message, pageLimit) {
-    super(message, makeVerdict("runtime", false));
+    super(message, responseUnreadableProblem(200));
     this.name = "PagingNotTerminatingError";
     this.pageLimit = pageLimit;
   }
 };
+var REQUEST_ID_HEADER = "x-request-id";
+function headerValue(headers, name) {
+  if (headers === void 0) return void 0;
+  if (typeof headers.get === "function") {
+    const value2 = headers.get(name);
+    return value2 === null || value2 === "" ? void 0 : value2;
+  }
+  const map = headers;
+  const found = Object.keys(map).find((key) => key.toLowerCase() === name);
+  const value = found === void 0 ? void 0 : map[found];
+  return value === void 0 || value === "" ? void 0 : value;
+}
 var ApiResponseError = class extends PipelexRequestError {
   apiUrl;
   status;
   statusText;
   responseBody;
-  errorType;
-  serverMessage;
-  /**
-   * The platform's native code — a closed set (`conflict`, `not_found`, `run_not_found`,
-   * `pipelex_api_key_limit_reached`, …), one-to-one with `type`; `MethodErrorCode` names the
-   * ones about a stored method and its versions, and `IdempotencyErrorCode` the one about a
-   * request's idempotency key. Finer than `errorDomain` and specific to the
-   * platform: a runner's problem carries `errorType` instead. `undefined` for a body that
-   * carries no `code`.
-   */
-  code;
-  /**
-   * RFC 9457 `type`: the stable URI naming the error class. With `errorDomain`, the field a
-   * machine consumer branches on — the same class carries the same URI on every occurrence.
-   */
-  type;
-  /** RFC 9457 `title`: the short human label of the error class. */
-  title;
-  /** RFC 9457 `instance`: the occurrence — the request path, or a request URN. */
-  instance;
-  /**
-   * The request's correlation id — the body's `request_id`, or the `X-Request-ID` response
-   * header when the body carries none. The id to hand to support: it finds the server's log
-   * lines for this request.
-   */
-  requestId;
-  /**
-   * The body's `error_category`: the finer classification of an inference failure — known
-   * values `transient`, `configuration`, `content`, `capacity`, `ambiguous`, `unknown`.
-   */
-  errorCategory;
-  /** The body's `user_action`: what the caller should do next, when the server can say. */
-  userAction;
-  /** The body's `model`: the model an inference failure used. */
-  model;
-  /** The body's `provider`: the provider an inference failure reached. */
-  provider;
-  /**
-   * The body's `provider_metadata`: what the provider's SDK said. On the hosted API it comes
-   * from the runner's problem document, which the hosted runner renders under its STRICT
-   * disclosure, so it keeps only `status_code` and `retry_after_seconds`; a runner that
-   * discloses errors VERBOSE, as a self-hosted one does when `ERROR_DISCLOSURE` is unset, sends
-   * it whole, the provider's raw text included.
-   */
-  providerMetadata;
-  /** The body's `migration`: a pending configuration migration that explains the failure. */
-  migration;
-  /** The platform's field-level `errors[]` — one item per offending request field. */
-  errors;
-  /**
-   * The decoded problem document whole — every member, named or not, such as a failed run's
-   * `run_status` and `error` or a member a newer server adds. `undefined` when the body was not
-   * a JSON object.
-   */
-  problemDocument;
-  /**
-   * Structured per-error diagnostics on a problem body that carries a top-level
-   * `validation_errors[]` — the 422 a **run route** (`execute`, `start`) answers when the
-   * runner refuses the method for its validation errors.
-   *
-   * Everywhere else an invalid bundle is a produced verdict, not an `ApiResponseError`:
-   * `POST /v1/validate` answers it with a **200** `PipelexInvalidReport`, and the crate
-   * routes with a **200** `CrateInvalidReport`, whose `validation_errors[]` the caller
-   * reads off the returned value. This field is `undefined` for any error that carries no
-   * per-error list (auth, transport, a request-shape 422, the 422 `pipe-io` answers for a
-   * pipe selection it refuses). A consumer must NOT assume a given `error_type` implies a
-   * populated list — fall back to `serverMessage` when this is empty.
-   */
-  validationErrors;
-  /**
-   * The answer read as the MTHDS standard reads it, the problem `mthds`'s own client carries,
-   * agreeing with `runMayHaveStarted`: `client.outcome_unknown` where a run may have started,
-   * whatever the body, and where none started the body when it is a core problem document,
-   * otherwise the reading of an answer to a request that creates no run.
-   * Built from the constructor's arguments, so an error a consumer builds by hand carries the
-   * reading the client would give it.
-   */
-  problem;
-  constructor(message, apiUrl, status, statusText, responseBody, errorType, serverMessage, validationErrors, code, options) {
-    super(message, responseVerdict(status, errorType, code, options?.details), {
-      ...options?.cause === void 0 ? {} : { cause: options.cause },
-      runMayHaveStarted: options?.mayStartRun === true && answerMayHaveStartedRun(status, code)
-    });
+  requestIdHeader;
+  constructor(message, apiUrl, status, statusText, responseBody, options) {
+    super(
+      message,
+      options?.problem ?? readHostedAnswer(
+        { status, headers: options?.headers ?? {}, body: responseBody },
+        { createsRun: options?.mayStartRun === true }
+      ).problem,
+      causeOption(options?.cause)
+    );
     this.name = "ApiResponseError";
     this.apiUrl = apiUrl;
     this.status = status;
     this.statusText = statusText;
     this.responseBody = responseBody;
-    this.errorType = errorType;
-    this.serverMessage = serverMessage;
-    this.validationErrors = validationErrors;
-    this.code = code;
-    const details = options?.details;
-    this.type = details?.type;
-    this.title = details?.title;
-    this.instance = details?.instance;
-    this.requestId = details?.requestId;
-    this.errorCategory = details?.errorCategory;
-    this.userAction = details?.userAction;
-    this.model = details?.model;
-    this.provider = details?.provider;
-    this.providerMetadata = details?.providerMetadata;
-    this.migration = details?.migration;
-    this.errors = details?.errors;
-    this.problemDocument = options?.problemDocument;
-    this.problem = standardReading(
-      status,
-      responseBody,
-      options?.headers ?? {},
-      options?.mayStartRun === true,
-      code
-    );
+    this.requestIdHeader = headerValue(options?.headers, REQUEST_ID_HEADER);
+  }
+  /** The request's id: the problem's `request_id`, else the answer's `X-Request-ID` header. */
+  get requestId() {
+    return super.requestId ?? this.requestIdHeader;
   }
 };
-function standardReading(status, body, headers, mayStartRun, code) {
-  const runMayHaveStarted = mayStartRun && answerMayHaveStartedRun(status, code);
-  if (!runMayHaveStarted) {
-    if (status >= 200 && status < 300) return unreadableAnswer(status);
-    return readAnswer({ status, headers, body }, { createsRun: false }).problem;
-  }
-  const reading = parseJsonBody(body);
-  const runId = reading.ok && isPlainObject(reading.value) ? reading.value.pipeline_run_id : void 0;
-  if (typeof runId !== "string" || runId === "") {
-    return buildProblem("client.outcome_unknown", {});
-  }
-  return buildProblem(
-    "client.outcome_unknown",
-    { pipeline_run_id: runId },
-    { pipeline_run_id: runId }
-  );
-}
-function responseVerdict(status, errorType, code, problem) {
-  const fallback = fallbackVerdict(status, code, code !== void 0 || errorType !== void 0);
-  const sentDomain = problem?.errorDomain;
-  const sentRetryable = problem?.retryable;
-  if (!isErrorDomain(sentDomain)) {
-    return makeVerdict(
-      fallback.errorDomain,
-      typeof sentRetryable === "boolean" ? sentRetryable : fallback.retryable
-    );
-  }
-  if (typeof sentRetryable === "boolean") return makeVerdict(sentDomain, sentRetryable);
-  return makeVerdict(sentDomain, sentDomain === "runtime" ? fallback.retryable : false);
-}
 
 // src/node-host.ts
 function isNodeRuntime() {
@@ -12979,6 +12918,9 @@ async function loadNodeHost() {
 function absenceCause(absence) {
   return absence.cause === void 0 ? {} : { cause: absence.cause };
 }
+
+// src/runs.ts
+init_protocol();
 
 // src/timers.ts
 var MAX_TIMER_DELAY_MS = 2147483647;
@@ -13006,14 +12948,16 @@ function runStatusFilter(status) {
   }
   if (status.length === 0) {
     throw new RequestArgumentError(
-      `"status" must name one or more of ${RUN_STATUSES.join(", ")}; omit it to list every status.`
+      `"status" must name one or more of ${RUN_STATUSES.join(", ")}; omit it to list every status.`,
+      { problem: argumentInvalidProblem("status", "empty") }
     );
   }
   const known = RUN_STATUSES;
   const unknown = status.filter((name) => !known.includes(name));
   if (unknown.length > 0) {
     throw new RequestArgumentError(
-      `Unknown run status(es) ${unknown.join(", ")}; valid statuses are: ${RUN_STATUSES.join(", ")}.`
+      `Unknown run status(es) ${unknown.join(", ")}; valid statuses are: ${RUN_STATUSES.join(", ")}.`,
+      { problem: argumentInvalidProblem("status", "unknown_value") }
     );
   }
   return RUN_STATUSES.filter((name) => status.includes(name));
@@ -13051,27 +12995,27 @@ function instantMicros(timestamp) {
   const milliseconds = Date.parse(`${seconds.toUpperCase()}${zone.toUpperCase()}`);
   return milliseconds * 1e3 + Number(fraction.padEnd(6, "0").slice(0, 6));
 }
-var isString3 = (value) => typeof value === "string";
+var isString2 = (value) => typeof value === "string";
 var isStringOrNull = (value) => value === null || typeof value === "string";
 var RUN_PROGRESS_FIELDS = [
-  ["pipeline_run_id", "a string", isString3],
-  ["mode", "a string", isString3],
-  ["status", "a string", isString3],
+  ["pipeline_run_id", "a string", isString2],
+  ["mode", "a string", isString2],
+  ["status", "a string", isString2],
   [
     "version",
     "a non-negative integer",
     (value) => Number.isSafeInteger(value) && value >= 0
   ],
-  ["assembled_at", "a string", isString3],
-  ["summary", "a string", isString3],
+  ["assembled_at", "a string", isString2],
+  ["summary", "a string", isString2],
   ["invocations", "a list", Array.isArray]
 ];
 var PROGRESS_INVOCATION_FIELDS = [
-  ["path", "a string", isString3],
-  ["pipe_code", "a string", isString3],
-  ["pipe_ref", "a string", isString3],
-  ["pipe_type", "a string", isString3],
-  ["status", "a string", isString3],
+  ["path", "a string", isString2],
+  ["pipe_code", "a string", isString2],
+  ["pipe_ref", "a string", isString2],
+  ["pipe_type", "a string", isString2],
+  ["status", "a string", isString2],
   ["started_at", "a string or null", isStringOrNull],
   ["ended_at", "a string or null", isStringOrNull]
 ];
@@ -13090,10 +13034,18 @@ function runProgressFault(snapshot) {
   }
   return void 0;
 }
-function withCheckedProgressDegradations(snapshot) {
+function readProgressFailure(value) {
+  if (!isPlainObject(value) || !isProblem(value.problem)) return void 0;
+  const failure = { ...value };
+  if (Object.hasOwn(failure, "at") && typeof failure.at !== "string") delete failure.at;
+  return failure;
+}
+function withCheckedProgressHealth(snapshot) {
   return {
     ...withCheckedDegradationMember(snapshot),
-    invocations: snapshot.invocations.map(withCheckedDegradationMember)
+    invocations: snapshot.invocations.map(
+      (invocation) => withCheckedFailureMember(withCheckedDegradationMember(invocation))
+    )
   };
 }
 function withCheckedDegradationMember(record) {
@@ -13101,6 +13053,12 @@ function withCheckedDegradationMember(record) {
   const { degradation, ...rest } = record;
   const checked = readRunDegradation(degradation);
   return checked === null ? rest : { ...rest, degradation: checked };
+}
+function withCheckedFailureMember(invocation) {
+  if (!Object.hasOwn(invocation, "last_failure")) return invocation;
+  const { last_failure: failure, ...rest } = invocation;
+  const checked = readProgressFailure(failure);
+  return checked === void 0 ? rest : { ...rest, last_failure: checked };
 }
 var RUN_RESULT_ARTIFACTS = [
   "graph_spec",
@@ -13120,14 +13078,16 @@ function assertArtifactSelection(artifacts) {
   }
   if (artifacts.length === 0) {
     throw new RequestArgumentError(
-      `"artifacts" must name one or more of ${RUN_RESULT_ARTIFACTS.join(", ")}; omit it to read every artifact.`
+      `"artifacts" must name one or more of ${RUN_RESULT_ARTIFACTS.join(", ")}; omit it to read every artifact.`,
+      { problem: argumentInvalidProblem("artifacts", "empty") }
     );
   }
   const known = RUN_RESULT_ARTIFACTS;
   const unknown = artifacts.filter((name) => !known.includes(name));
   if (unknown.length > 0) {
     throw new RequestArgumentError(
-      `Unknown result artifact(s) ${unknown.join(", ")}; valid artifacts are: ${RUN_RESULT_ARTIFACTS.join(", ")}.`
+      `Unknown result artifact(s) ${unknown.join(", ")}; valid artifacts are: ${RUN_RESULT_ARTIFACTS.join(", ")}.`,
+      { problem: argumentInvalidProblem("artifacts", "unknown_value") }
     );
   }
 }
@@ -13172,7 +13132,7 @@ async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress) {
       return state.result;
     }
     if (state.state === "failed") {
-      throw new RunFailedError(state.message, runId, state.status, { error: state.error });
+      throw new RunFailedError(state.message, runId, state.status, { problem: state.problem });
     }
     if (readsProgress && onProgress !== void 0 && fetchProgress !== void 0) {
       let progress;
@@ -13254,7 +13214,8 @@ function presentMap(value) {
 function emptyTreeRefusal(call, what, sending) {
   const remedy = sending.emptyRemedy === void 0 ? "." : `; ${sending.emptyRemedy}.`;
   return new RequestArgumentError(
-    `${call}() got ${what} holding no file, and a method tree holds at least one${remedy}`
+    `${call}() got ${what} holding no file, and a method tree holds at least one${remedy}`,
+    { problem: argumentInvalidProblem(what === "contents" ? "contents" : "tree", "empty") }
   );
 }
 function declaresBlobStore2(version) {
@@ -13360,14 +13321,8 @@ async function forEachConcurrently2(items, limit, task) {
 }
 function isMethodTreeTooLarge2(status, body) {
   if (status !== 422) return false;
-  const reading = parseJsonBody(body);
-  if (!reading.ok || !isJsonObject(reading.value)) return false;
-  const answer = reading.value;
-  if (answer["code"] === "method.package_invalid") {
-    const params = answer["params"];
-    return isJsonObject(params) && typeof params["limit"] === "number";
-  }
-  return answer["code"] === "method_tree_too_large" || answer["error_type"] === "MethodTreeTooLarge";
+  const problem = readProblemBody(body);
+  return problem?.code === "method.package_invalid" && typeof problem.params?.["limit"] === "number";
 }
 function missingBlobsOf2(status, body) {
   if (status !== 422) return void 0;
@@ -13399,16 +13354,14 @@ function eitherSignal(first, second) {
   second.addEventListener("abort", onSecond, { once: true });
   return { signal: controller.signal, dispose };
 }
-function isJsonObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
 async function contentsTreeSource(contents, call, sending) {
   const bytesByPath = /* @__PURE__ */ new Map();
   for (const [treePath, content] of Object.entries(contents)) {
     if (typeof content === "string") {
       if (LONE_SURROGATE2.test(content)) {
         throw new RequestArgumentError(
-          `${call}() got contents['${treePath}'] holding a lone surrogate, which is no text a file can hold: give its bytes instead.`
+          `${call}() got contents['${treePath}'] holding a lone surrogate, which is no text a file can hold: give its bytes instead.`,
+          { problem: argumentInvalidProblem("contents", "lone_surrogate") }
         );
       }
       bytesByPath.set(treePath, UTF8_ENCODER.encode(content));
@@ -13416,7 +13369,8 @@ async function contentsTreeSource(contents, call, sending) {
       bytesByPath.set(treePath, content);
     } else {
       throw new RequestArgumentError(
-        `${call}() got contents['${treePath}'] that is neither a string nor a Uint8Array.`
+        `${call}() got contents['${treePath}'] that is neither a string nor a Uint8Array.`,
+        { problem: argumentInvalidProblem("contents", "entry_mistyped") }
       );
     }
   }
@@ -13442,7 +13396,10 @@ async function treeListerFor(directory, call) {
   if (loaded.host === null) {
     throw new RequestArgumentError(
       loaded.reason === null ? `${call}() got a directory, which only Node can list. In the browser or an edge runtime, give the method's tree as contents, tree or files instead.` : `${call}() cannot list the directory '${directory}': ${loaded.reason}`,
-      absenceCause(loaded)
+      {
+        ...absenceCause(loaded),
+        problem: buildProblem("runtime.unsupported", { capability: "listing a directory" })
+      }
     );
   }
   return loaded.host.loadTreeLister();
@@ -13455,7 +13412,7 @@ async function listDirectoryTree(directory, limits, call) {
     if (err instanceof MethodTreeError2) {
       throw new RequestArgumentError(
         `${call}() could not list the method's tree at '${directory}': ${err.message}`,
-        { cause: err }
+        { problem: argumentInvalidProblem("directory", err.code), cause: err }
       );
     }
     throw err;
@@ -13537,7 +13494,7 @@ async function uploadBlob(blob, bytes, options) {
     options,
     (code) => new MethodFileTransferError(
       `Uploading the file with SHA-256 ${sha256} to ${host} failed: no answer came back (${code}), so ${options.unsent}.`,
-      { operation: "upload", code: "unreachable", sha256 }
+      { operation: "upload", reason: "unreachable", sha256 }
     ),
     async (response) => {
       await response.arrayBuffer().catch(() => void 0);
@@ -13546,7 +13503,7 @@ async function uploadBlob(blob, bytes, options) {
         `Uploading the file with SHA-256 ${sha256} to ${host} failed (${statusLine(response)}), so ${options.unsent}.`,
         {
           operation: "upload",
-          code: methodFileTransferCodeOfStatus(response.status),
+          reason: methodFileTransferReasonOfStatus(response.status),
           sha256,
           status: response.status
         }
@@ -13554,8 +13511,8 @@ async function uploadBlob(blob, bytes, options) {
     }
   );
 }
-function methodFileTransferCodeOfStatus(status) {
-  return fallbackVerdict(status, void 0, true).retryable ? "storage_error" : "refused";
+function methodFileTransferReasonOfStatus(status) {
+  return isTransientStorageStatus(status) ? "storage_error" : "refused";
 }
 async function writeMethodTreeTo(files, destination, options) {
   refuseUnwritableListing(files);
@@ -13563,7 +13520,10 @@ async function writeMethodTreeTo(files, destination, options) {
   if (loaded.host === null) {
     throw new RequestArgumentError(
       loaded.reason === null ? "writeMethodTree() writes to a file system, which only Node has. In the browser or an edge runtime, download each file of the listing from its url instead." : `writeMethodTree() cannot write to the file system: ${loaded.reason}`,
-      { verdict: { errorDomain: "config", retryable: false }, ...absenceCause(loaded) }
+      {
+        ...absenceCause(loaded),
+        problem: buildProblem("runtime.unsupported", { capability: "writing to the file system" })
+      }
     );
   }
   const { fs: fs2, path: path2 } = loaded.host;
@@ -13592,7 +13552,7 @@ async function downloadMethodFile(file, options) {
   const host = hostOf(file.url);
   const unreachable = (code) => new MethodFileTransferError(
     `Downloading '${file.path}' from ${host} failed: no answer came back (${code}).`,
-    { operation: "download", code: "unreachable", sha256: file.sha256, path: file.path }
+    { operation: "download", reason: "unreachable", sha256: file.sha256, path: file.path }
   );
   const received = await storageExchange(
     file.url,
@@ -13606,7 +13566,7 @@ async function downloadMethodFile(file, options) {
           `Downloading '${file.path}' from ${host} failed (${statusLine(response)}). A refused link may have expired: read the method again for fresh links.`,
           {
             operation: "download",
-            code: methodFileTransferCodeOfStatus(response.status),
+            reason: methodFileTransferReasonOfStatus(response.status),
             sha256: file.sha256,
             path: file.path,
             status: response.status
@@ -13625,7 +13585,7 @@ async function downloadMethodFile(file, options) {
     const cameBack = received.length > file.size ? "more than that came back." : `${received.length} bytes came back, hashing to ${receivedSha256}.`;
     throw new MethodFileTransferError(
       `The bytes downloaded for '${file.path}' are not the file listed: the listing names ${file.size} bytes hashing to ${file.sha256}, and ${cameBack}`,
-      { operation: "download", code: "mismatch", sha256: file.sha256, path: file.path }
+      { operation: "download", reason: "mismatch", sha256: file.sha256, path: file.path }
     );
   }
   return received;
@@ -13695,12 +13655,14 @@ function refuseUnwritableListing(files) {
     const violation = treePathViolation2(file.path);
     if (violation !== null) {
       throw new RequestArgumentError(
-        `The listing holds '${file.path}', which is not a tree path (${violation}), so the tree cannot be written.`
+        `The listing holds '${file.path}', which is not a tree path (${violation}), so the tree cannot be written.`,
+        { problem: argumentInvalidProblem("files", "not_a_tree_path") }
       );
     }
     if (seen.has(file.path)) {
       throw new RequestArgumentError(
-        `The listing holds '${file.path}' twice, so the tree cannot be written.`
+        `The listing holds '${file.path}' twice, so the tree cannot be written.`,
+        { problem: argumentInvalidProblem("files", "duplicate_path") }
       );
     }
     seen.add(file.path);
@@ -13708,7 +13670,8 @@ function refuseUnwritableListing(files) {
   const colliding = pathCollisions2([...seen]);
   if (colliding.length > 0) {
     throw new RequestArgumentError(
-      `The listing holds paths that collide once case-folded, or where one names a directory of another: ${colliding.join(", ")}.`
+      `The listing holds paths that collide once case-folded, or where one names a directory of another: ${colliding.join(", ")}.`,
+      { problem: argumentInvalidProblem("files", "colliding_paths") }
     );
   }
 }
@@ -13780,7 +13743,8 @@ async function refuseOccupiedDestination(fs2, target) {
 }
 function occupied(target) {
   return new RequestArgumentError(
-    `Cannot write a method tree at '${target}': it already exists and is not an empty directory, and a written tree holds nothing but its files.`
+    `Cannot write a method tree at '${target}': it already exists and is not an empty directory, and a written tree holds nothing but its files.`,
+    { problem: argumentInvalidProblem("destination", "not_empty") }
   );
 }
 async function isDirectory(fs2, target) {
@@ -14022,7 +13986,7 @@ function isLimitExceeded(err) {
 init_protocol();
 
 // src/version.ts
-var SDK_VERSION = "0.48.1";
+var SDK_VERSION = "0.53.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -14137,6 +14101,102 @@ function buildUserAgent2(appInfo, runtime = detectRuntime2()) {
 }
 
 // src/upload.ts
+init_protocol();
+
+// src/method-selector.ts
+var METHOD_ID_PATTERN = /^mt_[A-Za-z0-9_-]+$/;
+var VERSION_PATTERN = /^[1-9][0-9]*$/;
+var DRAFT_SUFFIX = "draft";
+function parseMethodSelector(selector) {
+  if (typeof selector !== "string") {
+    throw new RequestArgumentError("parseMethodSelector() takes a method selector string (mt_\u2026).", {
+      problem: argumentInvalidProblem("selector", "not_a_string")
+    });
+  }
+  const at = selector.indexOf("@");
+  const methodId = at < 0 ? selector : selector.slice(0, at);
+  if (!METHOD_ID_PATTERN.test(methodId)) {
+    throw new RequestArgumentError(
+      `"${selector}" is not a method selector: a catalog id is mt_ followed by letters, digits, _ or -.`,
+      { problem: argumentInvalidProblem("selector", "not_a_catalog_id") }
+    );
+  }
+  if (at < 0) return { method_id: methodId, version: null };
+  const suffix = selector.slice(at + 1);
+  if (suffix === DRAFT_SUFFIX) return { method_id: methodId, version: "draft" };
+  if (!VERSION_PATTERN.test(suffix)) {
+    throw new RequestArgumentError(
+      `"${selector}" names no version: the suffix of a catalog id is @<version>, a positive number without a leading zero, or @draft.`,
+      { problem: argumentInvalidProblem("selector", "not_a_version") }
+    );
+  }
+  const version = Number(suffix);
+  if (!Number.isSafeInteger(version)) {
+    throw new RequestArgumentError(
+      `"${selector}" names a version number too large to address exactly.`,
+      { problem: argumentInvalidProblem("selector", "version_too_long") }
+    );
+  }
+  return { method_id: methodId, version };
+}
+
+// src/upload.ts
+var UPLOAD_KINDS = ["uploaded", "test"];
+function describedArgument(value) {
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  return typeof value;
+}
+function uploadKindFields(given, refusal2, field = "") {
+  const raw = given;
+  const kind = raw.kind ?? void 0;
+  const methodId = raw.method_id ?? void 0;
+  if (kind !== void 0 && !UPLOAD_KINDS.includes(kind)) {
+    throw new InputPreparationError(
+      `${refusal2}: \`${field}kind\` is "uploaded" or "test", got ${describedArgument(kind)}.`,
+      { problem: argumentInvalidProblem(`${field}kind`, "unknown_value") }
+    );
+  }
+  if (methodId !== void 0) {
+    if (typeof methodId !== "string") {
+      throw new InputPreparationError(
+        `${refusal2}: \`${field}method_id\` names a method by its bare catalog id, got ${describedArgument(methodId)}.`,
+        { problem: argumentInvalidProblem(`${field}method_id`, "not_a_string") }
+      );
+    }
+    let bare;
+    try {
+      bare = parseMethodSelector(methodId).version === null;
+    } catch (cause) {
+      throw new InputPreparationError(
+        `${refusal2}: \`${field}method_id\` ${JSON.stringify(methodId)} is not a catalog id, which is mt_ followed by letters, digits, _ or -.`,
+        { problem: argumentInvalidProblem(`${field}method_id`, "not_a_catalog_id"), cause }
+      );
+    }
+    if (!bare) {
+      throw new InputPreparationError(
+        `${refusal2}: \`${field}method_id\` names the method a test file is for by its bare catalog id, with no version suffix, got ${JSON.stringify(methodId)}.`,
+        { problem: argumentInvalidProblem(`${field}method_id`, "version_suffix") }
+      );
+    }
+  }
+  if (kind === "test" && methodId === void 0) {
+    throw new InputPreparationError(
+      `${refusal2}: a test file names the method it is for; give \`${field}method_id\` with \`${field}kind: "test"\`.`,
+      { problem: argumentInvalidProblem(`${field}method_id`, "missing") }
+    );
+  }
+  if (kind !== "test" && methodId !== void 0) {
+    throw new InputPreparationError(
+      `${refusal2}: only a test file names a method; give \`${field}method_id\` with \`${field}kind: "test"\` alone.`,
+      { problem: argumentInvalidProblem(`${field}method_id`, "without_test_kind") }
+    );
+  }
+  return {
+    ...kind === void 0 ? {} : { kind },
+    ...methodId === void 0 ? {} : { method_id: methodId }
+  };
+}
 var DEFAULT_CONTENT_TYPE = "application/octet-stream";
 var DEFAULT_FILENAME = "upload.bin";
 var EXTENSION_MIME = {
@@ -14219,14 +14279,15 @@ function assetBytesFromBuffer(bytes, options) {
   return { bytes, filename, contentType: options.contentType ?? guessContentType(filename) };
 }
 async function uploadFile(client, asset, options = {}) {
+  const claimed = uploadKindFields(options, "Cannot upload");
   const { bytes, filename, contentType } = await toAssetBytes(asset, options);
   throwIfAborted(options.signal);
   const data = bytesToBase64(bytes);
   let uploaded;
   try {
-    uploaded = await client.upload({ filename, data, content_type: contentType });
+    uploaded = await client.upload({ filename, data, content_type: contentType, ...claimed });
   } catch (error) {
-    throw mapUploadError(error, filename);
+    throw mapUploadError(error, filename, claimed.method_id);
   }
   const stored = uploaded.filename;
   return {
@@ -14236,21 +14297,56 @@ async function uploadFile(client, asset, options = {}) {
     size: bytes.length
   };
 }
-function mapUploadError(error, filename) {
+function testFileRefusalOf(error, methodId) {
+  if (methodId === void 0) return void 0;
+  switch (error.code) {
+    case "auth.forbidden":
+      return "role_not_permitted";
+    case "pipelex.catalog.being_deleted":
+      return "method_being_deleted";
+    case "pipelex.catalog.not_found":
+      return "method_not_found";
+    default:
+      return void 0;
+  }
+}
+function testFileRefusalMessage(reason, error, filename, methodId) {
+  const refused = `Upload of "${filename}" as a test file was refused (${error.status})`;
+  const method = methodId === void 0 ? "the method it names" : `the method "${methodId}"`;
+  switch (reason) {
+    case "role_not_permitted":
+      return `${refused}: ${withoutFinalPeriod(error.problem.detail)}. Upload it as "uploaded", or with the credential of a member who may change methods.`;
+    case "method_not_found":
+      return `${refused}: ${method} is not one of the organization's methods.`;
+    case "method_being_deleted":
+      return `${refused}: ${method} is being deleted.`;
+  }
+}
+function mapUploadError(error, filename, methodId) {
   if (error instanceof ApiResponseError) {
     if (error.status >= 200 && error.status < 300) {
       return new UploadTransportError(
         `Upload of "${filename}" was answered (${error.status}) with a body the SDK could not read, so whether and where the file was stored is unknown.`,
-        { cause: error, status: error.status, code: "unexpected", filename }
+        { cause: error, status: error.status, reason: "unexpected", filename }
       );
+    }
+    const refusal2 = testFileRefusalOf(error, methodId);
+    if (refusal2 !== void 0) {
+      return new TestFileRefusedError(testFileRefusalMessage(refusal2, error, filename, methodId), {
+        cause: error,
+        status: error.status,
+        reason: refusal2,
+        filename,
+        ...methodId === void 0 ? {} : { methodId }
+      });
     }
     switch (error.status) {
       case 413:
         return new RejectedAssetError(
-          `The server rejected "${filename}": ${error.serverMessage ?? "asset exceeds the service size limit"}.`,
+          `The server rejected "${filename}": ${answeredDetail(error) ?? "asset exceeds the service size limit"}.`,
           filename,
           error.status,
-          { cause: error, code: "too_large" }
+          { cause: error, reason: "too_large", problem: error.problem }
         );
       case 401:
       case 403:
@@ -14266,11 +14362,11 @@ function mapUploadError(error, filename) {
         );
       default:
         return new UploadTransportError(
-          `Upload of "${filename}" failed (${error.status}): ${error.serverMessage ?? error.statusText}.`,
+          `Upload of "${filename}" failed (${error.status}): ${answeredDetail(error) ?? error.statusText}.`,
           {
             cause: error,
             status: error.status,
-            code: error.status >= 500 ? "server_error" : "unexpected",
+            reason: error.status >= 500 ? "server_error" : "unexpected",
             filename
           }
         );
@@ -14278,17 +14374,27 @@ function mapUploadError(error, filename) {
   }
   if (error instanceof ApiUnreachableError) {
     return new UploadTransportError(
-      `Upload of "${filename}" could not reach the Pipelex API (${error.code ?? "unreachable"}).`,
+      `Upload of "${filename}" could not reach the Pipelex API (${error.networkCode ?? "unreachable"}).`,
       // The client's own request timeout surfaces as an unreachable host with this code.
-      { cause: error, code: error.code === "ABORT_TIMEOUT" ? "timeout" : "unreachable", filename }
+      {
+        cause: error,
+        reason: error.networkCode === ABORT_TIMEOUT ? "timeout" : "unreachable",
+        filename
+      }
     );
   }
   const detail = error instanceof Error ? error.message : String(error);
   return new UploadTransportError(`Upload of "${filename}" failed unexpectedly: ${detail}.`, {
     cause: error,
-    code: "unexpected",
+    reason: "unexpected",
     filename
   });
+}
+function answeredDetail(error) {
+  return error.problem.detail !== "" && readProblemBody(error.responseBody) !== void 0 ? withoutFinalPeriod(error.problem.detail) : void 0;
+}
+function withoutFinalPeriod(text) {
+  return text.endsWith(".") ? text.slice(0, -1) : text;
 }
 
 // src/prepare-inputs.ts
@@ -14308,9 +14414,10 @@ var WALKED_KINDS = {
   unknown: true
 };
 var KNOWN_KINDS = new Set(Object.keys(WALKED_KINDS));
-var PIPE_SELECTION_ERROR_TYPES = /* @__PURE__ */ new Set([
-  "EntryPipeNotFoundError",
-  "EntryPipeAmbiguousError"
+var PIPE_SELECTION_CODES2 = /* @__PURE__ */ new Set([
+  "request.pipe_not_found",
+  "request.pipe_ambiguous",
+  "request.pipe_unspecified"
 ]);
 function isPlainObject2(value) {
   return Object.prototype.toString.call(value) === "[object Object]";
@@ -14388,14 +14495,21 @@ async function doResolveSource(ctx, source, at) {
     case "data_url": {
       const { bytes, contentType } = decodeDataUrl(source.value, at);
       throwIfAborted(ctx.signal);
-      const record = await uploadFile(ctx.client, bytes, { contentType, signal: ctx.signal });
+      const record = await uploadFile(ctx.client, bytes, {
+        contentType,
+        signal: ctx.signal,
+        ...ctx.uploadAs
+      });
       ctx.uploads.push(record);
       return record.uri;
     }
     case "local_path":
     case "bytes": {
       throwIfAborted(ctx.signal);
-      const record = await uploadFile(ctx.client, source.value, { signal: ctx.signal });
+      const record = await uploadFile(ctx.client, source.value, {
+        signal: ctx.signal,
+        ...ctx.uploadAs
+      });
       ctx.uploads.push(record);
       return record.uri;
     }
@@ -14469,7 +14583,7 @@ async function resolveNode(ctx, node, callerValue, at) {
       const unwalked = node;
       throw new InputPreparationError(
         `Cannot prepare inputs: the walk has no arm for the kind ${described(unwalked.kind)}.`,
-        { verdict: { errorDomain: "runtime", retryable: false } }
+        { problem: responseUnreadableProblem(200) }
       );
     }
   }
@@ -14486,13 +14600,15 @@ function refuseNonMap(name, value, holds, isValue) {
   if (value === void 0 || value === null) return;
   if (!isPlainObject2(value)) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`${name}\` must be ${holds}, got ${describeNonMap(value)}.`
+      `Cannot prepare inputs: \`${name}\` must be ${holds}, got ${describeNonMap(value)}.`,
+      { problem: argumentInvalidProblem(name, "not_a_map") }
     );
   }
   for (const [key, entry] of Object.entries(value)) {
     if (!isValue(entry)) {
       throw new InputPreparationError(
-        `Cannot prepare inputs: \`${name}\` must be ${holds}, and "${key}" holds ${entry === null ? "null" : describeNonMap(entry)}.`
+        `Cannot prepare inputs: \`${name}\` must be ${holds}, and "${key}" holds ${entry === null ? "null" : describeNonMap(entry)}.`,
+        { problem: argumentInvalidProblem(name, "entry_mistyped") }
       );
     }
   }
@@ -14502,13 +14618,15 @@ function checkedTree(value) {
   const fault2 = treeShapeFault(value);
   if (fault2 !== void 0) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`tree\` must be a listed method tree \u2014 its \`files\`, its \`digest\` and a \`readFile\` \u2014 such as the \`MethodTree\` the client's \`listMethodTree\` returns, got ${fault2}.`
+      `Cannot prepare inputs: \`tree\` must be a listed method tree \u2014 its \`files\`, its \`digest\` and a \`readFile\` \u2014 such as the \`MethodTree\` the client's \`listMethodTree\` returns, got ${fault2}.`,
+      { problem: argumentInvalidProblem("tree", "not_a_tree") }
     );
   }
   const tree = value;
   if (tree.files.length === 0) {
     throw new InputPreparationError(
-      "Cannot prepare inputs: `tree` holds no file, and a method tree holds at least one."
+      "Cannot prepare inputs: `tree` holds no file, and a method tree holds at least one.",
+      { problem: argumentInvalidProblem("tree", "empty") }
     );
   }
   return tree;
@@ -14518,7 +14636,8 @@ function resolveSelector(request) {
   const rawFiles = raw["files"];
   if (rawFiles !== void 0 && rawFiles !== null && !isPlainObject2(rawFiles)) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`files\` must be the method's tree as a map from tree path to file entry, got ${Array.isArray(rawFiles) ? "a list" : typeof rawFiles}.`
+      `Cannot prepare inputs: \`files\` must be the method's tree as a map from tree path to file entry, got ${Array.isArray(rawFiles) ? "a list" : typeof rawFiles}.`,
+      { problem: argumentInvalidProblem("files", "not_a_map") }
     );
   }
   refuseNonMap(
@@ -14536,7 +14655,8 @@ function resolveSelector(request) {
   const rawDirectory = raw["directory"];
   if (rawDirectory !== void 0 && rawDirectory !== null && typeof rawDirectory !== "string") {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`directory\` must be the method's directory as a path, got ${describeNonMap(rawDirectory)}.`
+      `Cannot prepare inputs: \`directory\` must be the method's directory as a path, got ${describeNonMap(rawDirectory)}.`,
+      { problem: argumentInvalidProblem("directory", "not_a_string") }
     );
   }
   const directory = typeof rawDirectory === "string" && rawDirectory !== "" ? rawDirectory : void 0;
@@ -14553,7 +14673,8 @@ function resolveSelector(request) {
   if (files !== void 0) treeForms.push("`files`");
   if (treeForms.length > 1) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: the method's tree was given as ${treeForms.join(" and ")}. Give it in one form \u2014 \`directory\`, \`contents\`, \`tree\` or \`files\`.`
+      `Cannot prepare inputs: the method's tree was given as ${treeForms.join(" and ")}. Give it in one form \u2014 \`directory\`, \`contents\`, \`tree\` or \`files\`.`,
+      { problem: argumentInvalidProblem("files", "mutually_exclusive") }
     );
   }
   const given = [...treeForms];
@@ -14561,12 +14682,14 @@ function resolveSelector(request) {
   if (methodId !== void 0) given.push("`method_id`");
   if (given.length === 0) {
     throw new InputPreparationError(
-      "Cannot prepare inputs: no method selector. Supply exactly one of the method's tree (`directory`, `contents`, `tree` or `files`), `method_ref` (a published method's address) or `method_id` (a stored method's catalog id)."
+      "Cannot prepare inputs: no method selector. Supply exactly one of the method's tree (`directory`, `contents`, `tree` or `files`), `method_ref` (a published method's address) or `method_id` (a stored method's catalog id).",
+      { problem: argumentInvalidProblem("files", "nothing_to_prepare") }
     );
   }
   if (given.length > 1) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 the method's tree, \`method_ref\` or \`method_id\`.`
+      `Cannot prepare inputs: ${given.join(" and ")} were ${given.length === 2 ? "both" : "all"} given. Supply exactly one method selector \u2014 the method's tree, \`method_ref\` or \`method_id\`.`,
+      { problem: argumentInvalidProblem("files", "mutually_exclusive") }
     );
   }
   if (treeForms.length === 1) {
@@ -14581,7 +14704,8 @@ function resolveSelector(request) {
   const owner = methodRef !== void 0 ? "published" : "stored";
   if (dependencies !== void 0) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`dependencies\` accompany the method's own tree; a ${owner} method's packages are its own.`
+      `Cannot prepare inputs: \`dependencies\` accompany the method's own tree; a ${owner} method's packages are its own.`,
+      { problem: argumentInvalidProblem("dependencies", "without_a_tree") }
     );
   }
   if (methodRef !== void 0) return { method_ref: methodRef };
@@ -14592,12 +14716,14 @@ function normalizePipeRef(raw) {
   if (pipeRef === void 0) return void 0;
   if (pipeRef.includes("->")) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`pipe_ref\` "${pipeRef}" names a dependency package's pipe. Preparation covers the method's own pipes: name one as \`domain.pipe_code\`.`
+      `Cannot prepare inputs: \`pipe_ref\` "${pipeRef}" names a dependency package's pipe. Preparation covers the method's own pipes: name one as \`domain.pipe_code\`.`,
+      { problem: argumentInvalidProblem("pipe_ref", "dependency_pipe") }
     );
   }
   if (!pipeRef.includes(".")) {
     throw new InputPreparationError(
-      `Cannot prepare inputs: \`pipe_ref\` must be qualified (\`domain.pipe_code\`), got the bare "${pipeRef}".`
+      `Cannot prepare inputs: \`pipe_ref\` must be qualified (\`domain.pipe_code\`), got the bare "${pipeRef}".`,
+      { problem: argumentInvalidProblem("pipe_ref", "not_qualified") }
     );
   }
   return pipeRef;
@@ -14606,8 +14732,19 @@ function resolveAllowUploads(raw) {
   if (raw === void 0) return true;
   if (typeof raw === "boolean") return raw;
   throw new InputPreparationError(
-    `Cannot prepare inputs: \`allowUploads\` must be a boolean, got ${raw === null ? "null" : typeof raw}.`
+    `Cannot prepare inputs: \`allowUploads\` must be a boolean, got ${raw === null ? "null" : typeof raw}.`,
+    { problem: argumentInvalidProblem("allowUploads", "not_a_bool") }
   );
+}
+function resolveUploadAs(raw) {
+  if (raw === void 0 || raw === null) return {};
+  if (!isPlainObject2(raw)) {
+    throw new InputPreparationError(
+      `Cannot prepare inputs: \`upload\` must be an object of \`kind\` and \`method_id\`, got ${describeNonMap(raw)}.`,
+      { problem: argumentInvalidProblem("upload", "not_upload_kind_options") }
+    );
+  }
+  return uploadKindFields(raw, "Cannot prepare inputs", "upload.");
 }
 async function fetchSignature(client, selector, pipeRef, signal) {
   const request = pipeRef === void 0 ? { ...selector } : { ...selector, pipe_ref: pipeRef };
@@ -14615,9 +14752,11 @@ async function fetchSignature(client, selector, pipeRef, signal) {
   try {
     result = await client.pipeIo(request, signal === void 0 ? {} : { signal });
   } catch (error) {
-    if (error instanceof ApiResponseError && error.status === 422 && error.errorType !== void 0 && PIPE_SELECTION_ERROR_TYPES.has(error.errorType)) {
-      const detail = error.serverMessage ?? error.message;
-      throw new InputPreparationError(`Cannot prepare inputs: ${detail}`, { cause: error });
+    if (error instanceof ApiResponseError && PIPE_SELECTION_CODES2.has(error.code)) {
+      throw new InputPreparationError(`Cannot prepare inputs: ${error.problem.detail}`, {
+        cause: error,
+        problem: error.problem
+      });
     }
     throw error;
   }
@@ -14625,25 +14764,24 @@ async function fetchSignature(client, selector, pipeRef, signal) {
   if (!isPlainObject2(answer) || typeof answer.is_valid !== "boolean") {
     throw new InputPreparationError(
       "Cannot prepare inputs: the pipe I/O answer carries no boolean `is_valid`, so it says neither that the method loaded nor why it did not.",
-      { verdict: { errorDomain: "runtime", retryable: false } }
+      { problem: responseUnreadableProblem(200) }
     );
   }
   if (!answer.is_valid) {
-    const items = answer.validation_errors;
+    const errors = readProblemItems(answer.errors);
     throw new MethodLoadError(
-      `Cannot prepare inputs: the method signature did not resolve \u2014 ${invalidReason(answer)}`,
+      `Cannot prepare inputs: the method signature did not resolve \u2014 ${invalidReason(answer, errors)}`,
       {
-        validationErrors: Array.isArray(items) ? items.filter(isValidationItem) : [],
+        errors,
         serverMessage: typeof answer.message === "string" ? answer.message : void 0
       }
     );
   }
   return result;
 }
-function invalidReason(answer) {
-  const items = answer.validation_errors;
-  const first = Array.isArray(items) ? items[0] : void 0;
-  if (isPlainObject2(first) && typeof first.message === "string") return first.message;
+function invalidReason(answer, errors) {
+  const first = errors[0];
+  if (first !== void 0) return first.detail;
   return typeof answer.message === "string" ? answer.message : "the answer gives no reason";
 }
 function selectedDescriptor(report) {
@@ -14653,7 +14791,7 @@ function selectedDescriptor(report) {
     const describedPipes = isPlainObject2(inputForm) ? Object.keys(inputForm).join(", ") || "none" : "none";
     throw new InputPreparationError(
       `Cannot prepare inputs: the pipe I/O answer selected ${pipeRef === void 0 ? "no pipe" : `"${pipeRef}"`}, but its \`input_form\` does not describe it (it describes: ${describedPipes}).`,
-      { verdict: { errorDomain: "runtime", retryable: false } }
+      { problem: responseUnreadableProblem(200) }
     );
   }
   return checkedDescriptor(pipeRef, inputForm[pipeRef]);
@@ -14663,7 +14801,7 @@ function checkedDescriptor(pipeRef, entry) {
   if (found !== void 0) {
     throw new InputPreparationError(
       `Cannot prepare inputs: the pipe I/O answer's \`input_form\` for "${pipeRef}" is ${found.message}.`,
-      { verdict: { errorDomain: "runtime", retryable: false } }
+      { problem: responseUnreadableProblem(200) }
     );
   }
   return entry;
@@ -14731,6 +14869,7 @@ async function prepareInputs(client, request) {
   const selector = resolveSelector(request);
   const pipeRef = normalizePipeRef(request.pipe_ref);
   const allowUploads = resolveAllowUploads(request.allowUploads);
+  const uploadAs = resolveUploadAs(request.upload);
   throwIfAborted(request.signal);
   const report = await fetchSignature(client, selector, pipeRef, request.signal);
   throwIfAborted(request.signal);
@@ -14742,6 +14881,7 @@ async function prepareInputs(client, request) {
     client,
     signal: request.signal,
     allowUploads,
+    uploadAs,
     uploads: [],
     dedup: /* @__PURE__ */ new Map()
   };
@@ -14762,12 +14902,7 @@ async function prepareInputs(client, request) {
 }
 
 // src/artifacts.ts
-var ARGUMENT_REFUSED = {
-  verdict: { errorDomain: "input", retryable: false }
-};
-var ENVIRONMENT_REFUSED = {
-  verdict: { errorDomain: "config", retryable: false }
-};
+init_protocol();
 var PIPELEX_STORAGE_SCHEME2 = "pipelex-storage://";
 var BULK_RESOLVE_MAX_URIS = 100;
 var DEFAULT_ARTIFACT_MAX_BYTES = 1024 * 1024 * 1024;
@@ -14889,7 +15024,7 @@ function requireScope(scope) {
   if (scope !== "main_stuff" && scope !== "working_memory") {
     throw new ArtifactOperationError(
       `"scope" must be "main_stuff" or "working_memory", got ${String(scope)}.`,
-      ARGUMENT_REFUSED
+      { problem: argumentInvalidProblem("scope", "unknown_value") }
     );
   }
 }
@@ -14901,7 +15036,8 @@ async function resolveArtifacts(client, uris, options = {}) {
     const resolved = answer?.items;
     if (!Array.isArray(resolved) || resolved.length !== chunk.length) {
       throw new ArtifactOperationError(
-        `The bulk resolve route answered ${Array.isArray(resolved) ? resolved.length : "no"} item(s) for ${chunk.length} reference(s) \u2014 a malformed answer, so no reference can be matched to its verdict.`
+        `The bulk resolve route answered ${Array.isArray(resolved) ? resolved.length : "no"} item(s) for ${chunk.length} reference(s) \u2014 a malformed answer, so no reference can be matched to its verdict.`,
+        { problem: responseUnreadableProblem(200) }
       );
     }
     items.push(...resolved);
@@ -14926,17 +15062,16 @@ function fetchBounds(options) {
   if (!isTimerDelay(timeoutMs)) {
     throw new ArtifactOperationError(
       `"timeoutMs" must be a positive number no larger than ${MAX_TIMER_DELAY_MS}, got ${String(timeoutMs)}.`,
-      ARGUMENT_REFUSED
+      { problem: argumentInvalidProblem("timeoutMs", "not_positive") }
     );
   }
   return { maxBytes, timeoutMs, allowHttp: options.allowHttp ?? false, signal: options.signal };
 }
 function requirePositive(name, value) {
   if (!Number.isFinite(value) || value <= 0) {
-    throw new ArtifactOperationError(
-      `"${name}" must be a positive number, got ${String(value)}.`,
-      ARGUMENT_REFUSED
-    );
+    throw new ArtifactOperationError(`"${name}" must be a positive number, got ${String(value)}.`, {
+      problem: argumentInvalidProblem(name, "not_positive")
+    });
   }
 }
 async function dispatcherFor(timeoutMs) {
@@ -15022,7 +15157,10 @@ async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
         uri,
         "timeout",
         void 0,
-        { cause: err }
+        {
+          cause: err,
+          problem: buildProblem("client.timeout", { seconds: bounds.timeoutMs / 1e3 })
+        }
       );
     }
     if (userSignal?.aborted) return userSignal.reason;
@@ -15032,7 +15170,7 @@ async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
       uri,
       "network",
       void 0,
-      { cause: err }
+      { cause: err, problem: buildProblem("client.unreachable", { base_url: url.origin }) }
     );
   };
   if (controller.signal.aborted) {
@@ -15066,7 +15204,8 @@ async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
       `The artifact is ${formatMiB(declared)}, over the ${formatMiB(bounds.maxBytes)} cap.`,
       uri,
       "too_large",
-      response.status
+      response.status,
+      { problem: downloadLimitProblem(bounds.maxBytes) }
     );
   }
   if (response.body === null) {
@@ -15110,7 +15249,8 @@ async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
             `The artifact crossed the ${formatMiB(bounds.maxBytes)} cap mid-stream.`,
             uri,
             "too_large",
-            response.status
+            response.status,
+            { problem: downloadLimitProblem(bounds.maxBytes) }
           )
         );
         return;
@@ -15138,6 +15278,9 @@ function decodedHeaders(headers) {
   decoded.delete("content-encoding");
   decoded.delete("content-length");
   return decoded;
+}
+function downloadLimitProblem(maxBytes) {
+  return buildProblem("client.download_limit_exceeded", { limit: maxBytes });
 }
 function statusRefusal(uri, response) {
   const status = response.status;
@@ -15255,7 +15398,7 @@ async function readCompletedResults(client, runId, scope, signal) {
     );
   }
   if (state.state === "failed") {
-    throw new RunFailedError(state.message, runId, state.status, { error: state.error });
+    throw new RunFailedError(state.message, runId, state.status, { problem: state.problem });
   }
   return state.result;
 }
@@ -15264,7 +15407,10 @@ async function downloadArtifacts(client, request) {
   if (loaded.host === null) {
     throw new ArtifactOperationError(
       loaded.reason === null ? "downloadArtifacts writes to a filesystem and is Node-only. In another runtime, resolve with resolveArtifacts or stream with fetchArtifact instead." : `downloadArtifacts cannot write to the filesystem: ${loaded.reason}`,
-      { ...ENVIRONMENT_REFUSED, ...absenceCause(loaded) }
+      {
+        ...absenceCause(loaded),
+        problem: buildProblem("runtime.unsupported", { capability: "writing to the filesystem" })
+      }
     );
   }
   const host = loaded.host;
@@ -15275,7 +15421,7 @@ async function downloadArtifacts(client, request) {
   if (!Number.isInteger(concurrency) || concurrency < 1) {
     throw new ArtifactOperationError(
       `"concurrency" must be a positive integer, got ${String(concurrency)}.`,
-      ARGUMENT_REFUSED
+      { problem: argumentInvalidProblem("concurrency", "not_positive") }
     );
   }
   requirePositive("maxTotalBytes", maxTotalBytes);
@@ -15285,7 +15431,7 @@ async function downloadArtifacts(client, request) {
   if (hasRunId === hasResults) {
     throw new ArtifactOperationError(
       "downloadArtifacts takes exactly one of `run_id` (the results are re-read) or `results` (a RunResults in hand).",
-      ARGUMENT_REFUSED
+      { problem: argumentInvalidProblem("run_id", "not_exactly_one_selector") }
     );
   }
   const results = hasResults ? request.results : await readCompletedResults(client, request.run_id, scope, request.signal);
@@ -15308,7 +15454,10 @@ async function downloadArtifacts(client, request) {
   } catch (cause) {
     throw new ArtifactOperationError(
       `The download directory "${dir}" cannot be created or used: ${cause instanceof Error ? cause.message : String(cause)}.`,
-      { cause, ...ENVIRONMENT_REFUSED }
+      {
+        cause,
+        problem: buildProblem("client.write_failed", { path: dir, reason: osErrorReason(cause) })
+      }
     );
   }
   const outcomes = Array.from(
@@ -15564,13 +15713,17 @@ function assembleVerdict(scope, artifacts, aborted) {
   return verdict;
 }
 function classifyFailure(err, signal) {
-  if (err instanceof ArtifactFetchError) return [err.code, err.message];
+  if (err instanceof ArtifactFetchError) return [err.reason, err.message];
   if (signal?.aborted === true)
     return ["aborted", "The download was aborted while this artifact was being fetched."];
   return [
-    "network",
+    "unknown",
     `The artifact could not be read: ${err instanceof Error ? err.message : String(err)}.`
   ];
+}
+function osErrorReason(cause) {
+  const code = cause?.code;
+  return typeof code === "string" && /^[A-Z][A-Z0-9_]*$/.test(code) ? code : "unwritable";
 }
 
 // src/execute-result.ts
@@ -15632,21 +15785,26 @@ function resultsFromExecute(response) {
 }
 
 // src/exact-json.ts
+init_protocol();
 var INTEGER_TOKEN = /^-?\d+$/;
 var LONG_DIGIT_RUN = /\d{16}/;
 var JSON_WITH_RAW = JSON;
-var ExactJsonUnsupportedError = class extends Error {
-  /** Whether asking again can succeed: never, on this runtime. */
-  retryable = false;
-  /** Who can fix it: the environment, by moving to a runtime the package supports. */
-  errorDomain = "config";
-  /** Reading JSON starts no run. */
-  runMayHaveStarted = false;
+var ExactJsonUnsupportedError = class extends ProblemError {
   constructor(message) {
-    super(message);
+    super(
+      buildProblem("client.tool_outdated", {
+        tool: "JavaScript runtime",
+        version: runtimeVersion()
+      })
+    );
     this.name = "ExactJsonUnsupportedError";
+    this.message = message;
   }
 };
+function runtimeVersion() {
+  const node = globalThis.process?.versions?.node;
+  return typeof node === "string" ? `Node.js ${node}` : "unknown";
+}
 function parseExactJson(text) {
   return LONG_DIGIT_RUN.test(text) ? JSON.parse(text, readIntegerExactly) : JSON.parse(text);
 }
@@ -15732,7 +15890,7 @@ function requestBodyText(method, url, body) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new RequestArgumentError(
       `The body of ${method} ${new URL(url).pathname} cannot be written as JSON, so nothing was sent: ${reason}`,
-      { cause: err }
+      { problem: argumentInvalidProblem("body", "not_json"), cause: err }
     );
   }
 }
@@ -15746,27 +15904,133 @@ function productQuery(params) {
   const text = search.toString();
   return text ? `?${text}` : "";
 }
+function repeatedFilter(call, name, values) {
+  if (values === void 0) return void 0;
+  if (!Array.isArray(values) || values.some((value) => typeof value !== "string")) {
+    throw new TypeError(`${call}() takes "${name}" as a list of strings.`);
+  }
+  if (values.length === 0) {
+    throw new RequestArgumentError(
+      `${call}() takes "${name}" as one or more values; omit it to list every ${name}.`,
+      { problem: argumentInvalidProblem(name, "empty") }
+    );
+  }
+  return values;
+}
 function inWords(items, conjunction) {
   if (items.length < 2) return items.join("");
   return `${items.slice(0, -1).join(", ")} ${conjunction} ${items[items.length - 1]}`;
 }
-var METHOD_ID_ARGUMENT = "a method id, the method's non-empty bare catalog id";
-var EXAMPLE_ID_ARGUMENT = "an example id, the example's non-empty `example_id`";
-var RUN_ID_ARGUMENT = "a run id, the run's non-empty `pipeline_run_id`";
-var ORG_ID_ARGUMENT = "an organization id, the organization's non-empty `org_id`";
-var API_KEY_ID_ARGUMENT = "an API key id, the key's non-empty `id`";
-var CREATE_RUN_ID_ARGUMENT = "a run_id naming a run of this method that used these inputs, a non-empty string, or none";
-var RECORD_RUN_ID_ARGUMENT = "a run_id naming a run of this method that used the example's inputs, a non-empty string";
-function argumentRefusal(call, what, got, cause) {
-  const message = `${call}() takes ${what}; got ${got}.`;
-  return new RequestArgumentError(message, cause === void 0 ? void 0 : { cause });
+var METHOD_ID_ARGUMENT = {
+  name: "method_id",
+  what: "a method id, the method's non-empty bare catalog id"
+};
+var EXAMPLE_ID_ARGUMENT = {
+  name: "example_id",
+  what: "an example id, the example's non-empty `example_id`"
+};
+var RUN_ID_ARGUMENT = {
+  name: "run_id",
+  what: "a run id, the run's non-empty `pipeline_run_id`"
+};
+var ORG_ID_ARGUMENT = {
+  name: "org_id",
+  what: "an organization id, the organization's non-empty `org_id`"
+};
+var API_KEY_ID_ARGUMENT = {
+  name: "key_id",
+  what: "an API key id, the key's non-empty `id`"
+};
+var FILE_ID_ARGUMENT = {
+  name: "file_id",
+  what: "a file id, the file's non-empty `file_id`"
+};
+var ARCHIVE_ID_ARGUMENT = {
+  name: "archive_id",
+  what: "an archive id, the archive's non-empty `archive_id`"
+};
+var CREATE_RUN_ID_ARGUMENT = {
+  name: "run_id",
+  what: "a run_id naming a run of this method that used these inputs, a non-empty string, or none"
+};
+var RECORD_RUN_ID_ARGUMENT = {
+  name: "run_id",
+  what: "a run_id naming a run of this method that used the example's inputs, a non-empty string"
+};
+var ASSISTANT_EXAMPLE_ID_ARGUMENT = {
+  name: "example_id",
+  what: "an example_id naming the assistant's example the caller read, a non-empty string, or none"
+};
+var ASSISTANT_REVISION_ARGUMENT = {
+  name: "input_revision",
+  what: "an input_revision, the revision the caller read the assistant's example at, a positive integer"
+};
+var STORAGE_URI_ARGUMENT = {
+  name: "uri",
+  what: "a `pipelex-storage://` address, a non-empty string"
+};
+var RENAME_NAME_ARGUMENT = {
+  name: "name",
+  what: "the file's new name, a string"
+};
+var LINK_TARGET_ARGUMENT = {
+  name: "files",
+  what: "a file to link, an object naming exactly one of `file_id` and `uri`, each a non-empty string"
+};
+var ARCHIVE_FILE_ID_ARGUMENT = {
+  name: "file_ids",
+  what: "a file id to zip, a non-empty string"
+};
+var ARCHIVE_RUN_ID_ARGUMENT = {
+  name: "run_id",
+  what: "a run_id naming the run whose files to zip, a non-empty string"
+};
+var ARCHIVE_NAME_ARGUMENT = {
+  name: "name",
+  what: "a name for the zip, a string, or none"
+};
+var DRAFT_PATH_ARGUMENT = {
+  name: "path",
+  what: "the tree path the file takes in the draft, a non-empty string"
+};
+var DRAFT_TOKEN_ARGUMENT = {
+  name: "expected_updated_at",
+  what: "the draft token the caller last read, the method's `updated_at`, a string, or none"
+};
+var COPY_DESTINATION_ARGUMENT = {
+  name: "destination_org_id",
+  what: "a destination_org_id, the canonical id of the organization to copy into, a non-empty string"
+};
+var COPY_NAME_ARGUMENT = {
+  name: "name",
+  what: "a name for the copy, a string, or none"
+};
+var COPY_DRAFT_TOKEN_ARGUMENT = {
+  name: "expected_draft_updated_at",
+  what: "an expected_draft_updated_at, the draft token the caller last read, the method's `updated_at`, a string, or none"
+};
+function argumentRefusal(call, argument, got, reason, cause) {
+  const message = `${call}() takes ${argument.what}; got ${got}.`;
+  return new RequestArgumentError(message, {
+    cause,
+    problem: argumentInvalidProblem(argument.name, reason)
+  });
 }
 function requireNonEmptyId(value, call, what) {
   if (typeof value === "string" && value !== "") return value;
   let got;
   if (typeof value === "string") got = "an empty string";
   else got = value === null ? "null" : typeof value;
-  throw argumentRefusal(call, what, got);
+  throw argumentRefusal(call, what, got, typeof value === "string" ? "empty" : "not_a_string");
+}
+function requireNameAndInputs(name, inputs, call, needs) {
+  if (name != null && inputs != null) return;
+  let got;
+  if (name == null && inputs == null) got = "neither";
+  else got = name == null ? "no name" : "no inputs";
+  throw new RequestArgumentError(`${call}() needs ${needs}; got ${got}.`, {
+    problem: argumentInvalidProblem(name == null ? "name" : "inputs", "missing")
+  });
 }
 function describeNumberArgument(value) {
   if (typeof value === "number") return String(value);
@@ -15778,21 +16042,23 @@ function idPathSegment(value, call, what) {
     throw argumentRefusal(
       call,
       what,
-      `"${id}", a dot segment, which the URL would resolve into another route's path`
+      `"${id}", a dot segment, which the URL would resolve into another route's path`,
+      "dot_segment"
     );
   }
   try {
     return encodeURIComponent(id);
   } catch (err) {
     const got = "a string holding a lone surrogate, which a URL cannot carry";
-    throw argumentRefusal(call, what, got, err);
+    throw argumentRefusal(call, what, got, "lone_surrogate", err);
   }
 }
 function methodPath(methodId, call) {
   const segment = idPathSegment(methodId, call, METHOD_ID_ARGUMENT);
   if (methodId.includes("@")) {
     throw new RequestArgumentError(
-      `"${methodId}" carries a version suffix, and the method routes take a bare catalog id: they address the method itself, never one of its versions. Strip the suffix with parseMethodSelector, and read a published version with getMethodVersion.`
+      `"${methodId}" carries a version suffix, and the method routes take a bare catalog id: they address the method itself, never one of its versions. Strip the suffix with parseMethodSelector, and read a published version with getMethodVersion.`,
+      { problem: argumentInvalidProblem("method_id", "version_suffix") }
     );
   }
   return `methods/${segment}`;
@@ -15801,17 +16067,43 @@ function methodExamplePath(methodId, exampleId, call) {
   const path2 = methodPath(methodId, call);
   return `${path2}/examples/${idPathSegment(exampleId, call, EXAMPLE_ID_ARGUMENT)}`;
 }
-var isString4 = (value) => typeof value === "string";
+var isString3 = (value) => typeof value === "string";
+var FILE_ARCHIVE_STATES = ["queued", "building", "ready", "failed"];
+var DRAFT_FILE_BLOBS = ["copied", "already_held"];
+var METHOD_COPY_OUTCOMES = ["copied", "refused"];
+var RUN_FILES_STATES = ["listing", "listed"];
+var RUN_FILES_LISTS = ["inputs", "outputs", "intermediates", "links"];
+function fileLinkTarget(value) {
+  if (!isPlainObject(value)) {
+    throw argumentRefusal(
+      "linkFiles",
+      LINK_TARGET_ARGUMENT,
+      describeNumberArgument(value),
+      "entry_mistyped"
+    );
+  }
+  const fileId = value.file_id ?? void 0;
+  const uri = value.uri ?? void 0;
+  if (fileId === void 0 === (uri === void 0)) {
+    const got = fileId === void 0 ? "an object naming neither" : "an object naming both";
+    throw argumentRefusal("linkFiles", LINK_TARGET_ARGUMENT, got, "not_exactly_one_selector");
+  }
+  if (fileId !== void 0) {
+    return { file_id: requireNonEmptyId(fileId, "linkFiles", LINK_TARGET_ARGUMENT) };
+  }
+  return { uri: requireNonEmptyId(uri, "linkFiles", LINK_TARGET_ARGUMENT) };
+}
 var METHOD_EXAMPLE_FIELDS = {
-  example_id: ["a string", isString4],
-  method_id: ["a string", isString4],
-  name: ["a string", isString4],
+  example_id: ["a string", isString3],
+  method_id: ["a string", isString3],
+  name: ["a string", isString3],
   inputs: ["an object", isPlainObject],
   input_revision: ["an integer", (value) => Number.isSafeInteger(value)],
-  latest_run_id: ["a string or null", (value) => value === null || isString4(value)],
-  created_by_user_id: ["a string", isString4],
-  created_at: ["a string", isString4],
-  updated_at: ["a string", isString4]
+  latest_run_id: ["a string or null", (value) => value === null || isString3(value)],
+  created_by_user_id: ["a string", isString3],
+  created_at: ["a string", isString3],
+  updated_at: ["a string", isString3],
+  kept_by_assistant: ["a boolean", (value) => typeof value === "boolean"]
 };
 var PipelexApiClient = class {
   apiKey;
@@ -15842,7 +16134,7 @@ var PipelexApiClient = class {
     if (!isValidBaseUrl2(normalizedBaseUrl)) {
       throw new RequestArgumentError(
         `Invalid API base URL ${describeRefusedBaseUrl(normalizedBaseUrl)}: it must be host-only (http/https, no path, query, fragment, or credentials). Endpoints compose as {base}/v1/{endpoint}.`,
-        { verdict: { errorDomain: "config", retryable: false } }
+        { problem: buildProblem("client.not_configured", { setting: "base_url" }) }
       );
     }
     this.baseUrl = normalizedBaseUrl;
@@ -15886,11 +16178,13 @@ var PipelexApiClient = class {
    * Issue one HTTP request and return the raw status/headers/body. Wraps
    * DNS/connect/TLS/timeout failures as `ApiUnreachableError`; a caller-driven
    * abort (Ctrl-C / agent walk-away) propagates as-is so the poll loop can stop
-   * cleanly. Non-2xx interpretation is left to the caller. `url` is a fully
-   * resolved absolute URL. `mayStartRun` marks a request that may create a run,
-   * whose `ApiUnreachableError` then says whether it may have (see `RunCreation`).
+   * cleanly. A body that arrived and could not be decoded, such as a `gzip` body that is not
+   * gzip, is an answer, so it throws the `ApiResponseError` of that answer, read as an answer
+   * with an empty body (see `isUndecodableBody`). Non-2xx interpretation is left to the caller.
+   * `url` is a fully resolved absolute URL. `mayStartRun` marks a request that may create a run,
+   * whose errors then say whether it may have (see `RunCreation`).
    * `idempotencyKey`, already checked by `idempotencyKeyOf`, is sent as the
-   * `Idempotency-Key` header; only `start` passes one.
+   * `Idempotency-Key` header; only `start` and `copyMethod` pass one.
    */
   async requestRaw(method, url, options = {}) {
     const hasBody = options.body !== void 0;
@@ -15928,11 +16222,14 @@ var PipelexApiClient = class {
       const code = extractNetworkErrorCode(
         controller.signal.aborted ? controller.signal.reason : err
       );
+      if (response !== void 0 && isUndecodableBody(code)) {
+        throw this.undecodableAnswer(method, url, response, code, err, options);
+      }
       throw new ApiUnreachableError(
         `Could not reach Pipelex API at ${this.baseUrl} (${code ?? "network error"})`,
         this.baseUrl,
         code,
-        { cause: err, mayStartRun: options.mayStartRun === true }
+        { cause: err, mayStartRun: options.mayStartRun === true, timeoutMs }
       );
     } finally {
       clearTimeout(timer);
@@ -15955,9 +16252,27 @@ var PipelexApiClient = class {
     };
   }
   /**
+   * The `ApiResponseError` of an answer whose body arrived and could not be decoded: the answer's
+   * status and headers, read as an answer with an empty body (`readHostedAnswer`), so a `2xx` is
+   * `client.response_unreadable` naming its status, or `client.outcome_unknown` on a request that
+   * may create a run, which the server accepted. `code` is the decompressor's, named in the
+   * message, and the decoding failure is its `cause`.
+   */
+  undecodableAnswer(method, url, response, code, cause, run) {
+    const path2 = new URL(url).pathname;
+    return new ApiResponseError(
+      `API ${method} ${path2} answered ${response.status} with a body that could not be decoded (${code ?? "decoding error"})`,
+      this.baseUrl,
+      response.status,
+      response.statusText,
+      "",
+      { cause, headers: response.headers, mayStartRun: run.mayStartRun === true }
+    );
+  }
+  /**
    * Issue a Pipelex-product request (`/v1/me`, `/v1/methods`, `/v1/billing/*`,
    * …) and parse its JSON body, mapping a non-2xx response to the typed
-   * `ApiResponseError` so callers branch on its `errorDomain` and `type`, not the
+   * `ApiResponseError` so callers branch on its problem's `code`, not the
    * HTTP status. Empty-body tolerant — DELETE / onboarding / updateRun
    * answer 2xx with no body, returned as `undefined`. Uses the management-call
    * timeout, not the blocking-execute ceiling.
@@ -16054,10 +16369,10 @@ var PipelexApiClient = class {
   }
   /**
    * One page of a cursor-paged product route (`listMethods`, `listMethodVersions`,
-   * `listMethodExamples`, `listRuns`), read as the platform always serializes it: `items` an
+   * `listMethodExamples`, `listRuns`, `listFiles`), read as the platform always serializes it: `items` an
    * array, `next_cursor` a string or `null`. A page breaking either is an answer the SDK cannot
-   * read, so it throws the `ApiResponseError` `unreadableAnswer` builds, `runtime` and not
-   * retryable, rather than handing the iterators a page they cannot walk: `items` that is not
+   * read, so it throws the `ApiResponseError` `unreadableAnswer` builds,
+   * `client.response_unreadable`, rather than handing the iterators a page they cannot walk: `items` that is not
    * iterable, or a missing cursor that is neither the end nor a next page, which `iterateRuns`
    * would follow forever. A route reading its rows itself passes `rows`: `parse` reads the page's
    * text, and `item` reads each row, throwing as `unreadableAnswer` does for one it cannot read.
@@ -16141,7 +16456,8 @@ var PipelexApiClient = class {
     const res = await this.requestRaw(method, this.url(endpoint), {
       body,
       timeoutMs: options.timeoutMs ?? POLL_REQUEST_TIMEOUT_MS2,
-      signal: options.signal
+      signal: options.signal,
+      idempotencyKey: options.idempotencyKey
     });
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError(method, endpoint, res);
@@ -16216,10 +16532,12 @@ var PipelexApiClient = class {
   /**
    * The `ApiResponseError` of a 2xx answer the SDK cannot read, its message
    * `API <method> <path> answered <status> with <what>`: the answer's status, its raw text as
-   * `responseBody`, no hosted problem member but the `X-Request-ID` header, the failure that made it
-   * unreadable as `cause`, and the verdict the fallback gives a 2xx, `runtime` and not retryable.
-   * An answer that carries signed links (`RawResponse.carriesLinks`) is held with every link
-   * hidden, and with no `cause`, which could quote one. On a request that may create a run, the run may have started: the server accepted it.
+   * `responseBody`, the failure that made it unreadable as `cause`, and the problem
+   * `client.response_unreadable` naming the status. On a request that may create a run, the run
+   * may exist, since the server accepted the request, so the problem is `client.outcome_unknown`
+   * instead, naming the run when the body names one. An answer that carries signed links
+   * (`RawResponse.carriesLinks`) is held with every link hidden, and with no `cause`, which could
+   * quote one.
    */
   unreadableAnswer(method, path2, res, what, cause, run = {}) {
     const carriesLinks = res.carriesLinks === true;
@@ -16229,51 +16547,42 @@ var PipelexApiClient = class {
       res.status,
       res.statusText,
       carriesLinks ? redactSignedLinks(res.body) : res.body,
-      void 0,
-      void 0,
-      void 0,
-      void 0,
       {
         cause: carriesLinks ? void 0 : cause,
-        details: { requestId: nonEmptyHeader(res.headers, REQUEST_ID_HEADER) },
-        headers: res.headers,
-        mayStartRun: run.mayStartRun === true
+        problem: run.mayStartRun === true ? outcomeUnknownProblem(runIdNamedBy(res.body)) : buildProblem("client.response_unreadable", { status: res.status }),
+        headers: res.headers
       }
     );
   }
   /**
    * Throw the `ApiResponseError` of a non-2xx answer, naming the route by its `path` from the
-   * origin (`/v1/...`, or `/health` for the liveness probe).
+   * origin (`/v1/...`, or `/health` for the liveness probe). The answer is read as its problem
+   * (`readHostedAnswer`): the body as received when it is a problem document, whose `detail` the
+   * message quotes, and otherwise the problem the edge's bare answer reads as, the message
+   * quoting the body as it came, or the status text for an empty one.
    */
   throwApiResponseErrorAt(method, path2, res, run = {}) {
-    const { errorType, serverMessage, validationErrors, code, details, document } = parseErrorBody(
-      res.body
+    const { problem, fromBody } = readHostedAnswer(
+      { status: res.status, headers: res.headers, body: res.body },
+      { createsRun: run.mayStartRun === true }
     );
-    const requestId = details.requestId ?? nonEmptyHeader(res.headers, REQUEST_ID_HEADER);
+    const said = fromBody ? problem.detail : res.body || res.statusText;
     throw new ApiResponseError(
-      `API ${method} ${path2} failed (${res.status}): ${serverMessage ?? (res.body || res.statusText)}`,
+      `API ${method} ${path2} failed (${res.status}): ${said}`,
       this.baseUrl,
       res.status,
       res.statusText,
       res.body,
-      errorType,
-      serverMessage,
-      validationErrors,
-      code,
-      {
-        details: { ...details, requestId },
-        problemDocument: document,
-        headers: res.headers,
-        mayStartRun: run.mayStartRun === true
-      }
+      { problem, headers: res.headers }
     );
   }
   /**
    * Translate a "route absent" 404 (a bare pipelex-api with no platform block)
-   * into a clear `RunLifecycleUnavailableError`. The platform's own 404s (run
-   * not found / cross-org) carry a structured error envelope (a `code` field)
-   * and are left for normal handling. `explanation` replaces the sentence saying
-   * why the route is missing, for a route a hosted API may also lack.
+   * into a clear `RunLifecycleUnavailableError`. A 404 a route answered on purpose (a run
+   * not found, cross-org included, or a method that does not exist) names its own `code`
+   * and is left for normal handling as `ApiResponseError` (`isMissingRoute404`).
+   * `explanation` replaces the sentence saying why the route is missing, for a route a
+   * hosted API may also lack.
    */
   throwIfLifecycleUnavailable(res, url, explanation = "PIPELEX_BASE_URL points at a bare runner that does not serve it.") {
     if (res.status !== 404) return;
@@ -16327,9 +16636,9 @@ var PipelexApiClient = class {
    * there this throws.
    *
    * It goes through the same transport as every route: an unreachable origin is an
-   * `ApiUnreachableError`, and a non-2xx answer an `ApiResponseError` whose verdict the SDK's
-   * fallback reads from the status, since the probe answers no problem document. So is a 2xx
-   * whose body is not a JSON object, such as a gateway's HTML page: `runtime`, not retryable.
+   * `ApiUnreachableError`, and a non-2xx answer an `ApiResponseError` whose problem is read from
+   * the status when the probe answers no problem document. So is a 2xx whose body is not a JSON
+   * object, such as a gateway's HTML page: `client.response_unreadable`.
    */
   async health() {
     const res = await this.requestRaw("GET", `${this.originUrl}/health`, {
@@ -16438,15 +16747,15 @@ var PipelexApiClient = class {
    *
    * `options.idempotencyKey` is sent as the `Idempotency-Key` header, and nothing
    * is sent without it: the hosted API answers the same start sent again under the
-   * same key with the run the first one started, so a failure whose
-   * `runMayHaveStarted` is true can be retried unchanged (see
+   * same key with the run the first one started, so a failure whose problem's
+   * `retry` is `outcome_unknown` can be retried unchanged (see
    * `PipelexStartRequestOptions`). A malformed key is a `RequestArgumentError`
    * before anything is sent.
    *
    * The method's tree is prepared before the request as `execute` prepares it. The prepared body
    * is the same for the same tree, so a start retried under its idempotency key sends the body the
    * key was bound to. A start whose hash entries name a blob the API does not hold yet is refused
-   * with a `422` `missing_blobs`, which releases its key: send it again unchanged, which asks the
+   * with a `422` `request.blobs_missing`, which releases its key: send it again unchanged, which asks the
    * blob route and uploads what is missing first.
    */
   async start(options) {
@@ -16502,7 +16811,9 @@ var PipelexApiClient = class {
    * `/validate` is a diagnostic endpoint: every produced verdict rides a **200**,
    * discriminated on `is_valid`. This returns the `PipelexValidationResult` union
    * verbatim — `is_valid: true` ⇒ the typed `PipelexValidationReport` (structural
-   * artifacts), `is_valid: false` ⇒ a `PipelexInvalidReport` (`validation_errors[]`).
+   * artifacts), `is_valid: false` ⇒ a `PipelexInvalidReport`, whose `errors[]` are problem
+   * items. Both arms' items, the invalid arm's `errors[]` and the valid arm's `warnings[]`, are
+   * read member by member (`readProblemItems`).
    * An invalid method is NOT thrown — the caller pattern-matches `is_valid`. Only a
    * *no-verdict* condition (a malformed request, a tree the route refuses, auth, a
    * server fault) is non-2xx and surfaces as `ApiResponseError`.
@@ -16532,8 +16843,8 @@ var PipelexApiClient = class {
    *
    * A selector-resolution failure (fetch failure, no package at the address, an
    * unknown or foreign-org id, a bare id of a method never published, `409`
-   * `method_not_published`, a version never published, `404`
-   * `method_version_not_found`, or a malformed suffix, `422`) is a non-2xx
+   * `pipelex.catalog.not_published`, a version never published, `404`
+   * `pipelex.catalog.not_found`, or a malformed suffix, `422`) is a non-2xx
    * `ApiResponseError` — never an `is_valid: false` verdict, which is reserved
    * for actual MTHDS content.
    *
@@ -16566,7 +16877,8 @@ var PipelexApiClient = class {
   async validate(source, allowSignatures = false, options = {}) {
     if (source === null || typeof source !== "object" || Array.isArray(source)) {
       throw new RequestArgumentError(
-        "validate() takes the method as an object naming exactly one of directory, contents, tree, files, method_ref or method_id."
+        "validate() takes the method as an object naming exactly one of directory, contents, tree, files, method_ref or method_id.",
+        { problem: argumentInvalidProblem("source", "not_an_object") }
       );
     }
     const forms = protocolTreeForms("validate", source);
@@ -16577,7 +16889,8 @@ var PipelexApiClient = class {
     if (methodId !== void 0) given.push("method_id");
     if (given.length !== 1) {
       throw new RequestArgumentError(
-        `validate() takes exactly one of the method's tree (directory, contents, tree or files), method_ref or method_id; got ${given.length === 0 ? "none" : given.join(" and ")}.`
+        `validate() takes exactly one of the method's tree (directory, contents, tree or files), method_ref or method_id; got ${given.length === 0 ? "none" : given.join(" and ")}.`,
+        { problem: argumentInvalidProblem("files", "not_exactly_one_selector") }
       );
     }
     const signal = options.signal;
@@ -16607,7 +16920,9 @@ var PipelexApiClient = class {
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", "validate", res);
     }
-    return this.readObjectAnswer("POST", "validate", res);
+    return withVerdictItems(
+      this.readObjectAnswer("POST", "validate", res)
+    );
   }
   // ── Tools extensions (Pipelex API — `/v1/lint`, `/v1/format`) ─────────
   //
@@ -16747,10 +17062,9 @@ var PipelexApiClient = class {
    * Returns a **200 verdict** whatever the resolution: a reference that resolves nowhere is
    * `resolution: "not_found"` with the names it may have meant, never a thrown error. Narrow
    * on `kind` to read the shape of `matches`. A request that cannot produce a verdict throws
-   * the typed `ApiResponseError`, a `422` whose `errorType` says why: `InvalidModelReference`
-   * (a blank reference, a sigil or a namespace alone, or one past the runner's length limit),
-   * `InvalidModelCategory` (an unknown `type`) or `ValidationError`. None of that is checked
-   * here, so the runner's rule is the only one.
+   * the typed `ApiResponseError`, a `422` problem whose `code` says why: a blank reference, a
+   * sigil or a namespace alone, one past the runner's length limit, or an unknown `type`. None of
+   * that is checked here, so the runner's rule is the only one.
    */
   async checkModelReference(reference, category) {
     const query = new URLSearchParams({ reference });
@@ -16797,9 +17111,9 @@ var PipelexApiClient = class {
   // serves both, verdict discipline intact (200 `is_valid:false`, 501, 422);
   // api-dev.pipelex.com has since 2026-08-13. `lint`/`format` are the two still
   // unexposed — see their section above for why that blocks nothing. `pipe-io` is
-  // newer: a runner serves it from `pipelex-api` v0.33.0, and types its selection
-  // refusals `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` from v0.33.1
-  // (v0.33.0 typed them `ValidationError`), and a hosted origin
+  // newer: a runner serves it from `pipelex-api` v0.33.0, and codes its selection
+  // refusals `request.pipe_not_found`, `request.pipe_unspecified` and
+  // `request.pipe_ambiguous`, and a hosted origin
   // serves it once the platform's proxy and the gateway list it (see
   // `docs/crate-routes.md`).
   //
@@ -16820,7 +17134,7 @@ var PipelexApiClient = class {
    *
    * Returns a **200 verdict**: pattern-match `is_valid` before reading the arm — a
    * closure that does not parse/load/validate comes back as `is_valid: false` with
-   * `validation_errors[]`, not as a thrown error. Only a no-verdict condition throws
+   * problem items in `errors[]`, not as a thrown error. Only a no-verdict condition throws
    * `ApiResponseError`: a malformed selector (none, or more than one, of
    * `files` / `method_ref` / `method_id`) is a 422; a selector-resolution failure
    * (fetch failure, no package at the address, an unknown or foreign-org id) is
@@ -16888,11 +17202,11 @@ var PipelexApiClient = class {
    * {@link resolve} (the request's members are posted as given, its `directory`, `tree` or
    * `contents` as the `files` map, and the selector XOR is the server's to enforce).
    * Only a no-verdict condition throws `ApiResponseError`: a malformed selector and an
-   * over-limit file are `ValidationError` `422`s; a selection the route refuses is a
-   * `422` whose `errorType` is `EntryPipeNotFoundError` (an unknown `pipe_ref`, no entry
-   * pipe) or `EntryPipeAmbiguousError` (an ambiguous code, several entry pipes), the
-   * candidates in its `serverMessage`; a registry-form `method_ref` is a `501`; a pipe
-   * whose artifacts cannot be derived is a `500`.
+   * over-limit file are `422` problems; a selection the route refuses is a `422` whose
+   * `code` is `request.pipe_not_found` (an unknown `pipe_ref`), `request.pipe_unspecified`
+   * (no entry pipe) or `request.pipe_ambiguous` (an ambiguous code, several entry pipes), the
+   * candidates in its `params`; a registry-form `method_ref` is a `501`; a pipe whose
+   * artifacts cannot be derived is a `500`.
    *
    * A `method_ref` gets the fetch-sized budget, as on the other crate routes. On the
    * hosted API the gateway caps a request at about 30 seconds whatever the client allows,
@@ -16952,7 +17266,7 @@ var PipelexApiClient = class {
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", endpoint, res);
     }
-    return this.readObjectAnswer("POST", endpoint, res);
+    return withVerdictItems(this.readObjectAnswer("POST", endpoint, res));
   }
   /**
    * The request budget for a crate route's closure (`resolve`, `codegen`, `pipeIo`): the
@@ -16979,9 +17293,9 @@ var PipelexApiClient = class {
    * is live and the run is stuck, its workflow task failing until the platform
    * ends it at `degradation.ends_at`. `retry_after_seconds` carries the server's
    * `Retry-After` hint when present, and `request_id` the id to quote to support.
-   * A failed run's stored report, `error`, and the `degradation` are each
-   * checked field by field (see `RunErrorReport` and `RunDegradation`), so
-   * neither ever fails the read. Throws `RunLifecycleUnavailableError` when the
+   * A failed run's problem, `error`, is kept when it is a problem document and
+   * read as `null` otherwise, and the `degradation` is checked field by field
+   * (see `RunDegradation`), so neither ever fails the read. Throws `RunLifecycleUnavailableError` when the
    * lifecycle routes are absent (a bare runner).
    */
   async getRunStatus(runId, options = {}) {
@@ -16996,7 +17310,7 @@ var PipelexApiClient = class {
       this.throwApiResponseError("GET", endpoint, res);
     }
     const run = withCheckedDegradation(
-      withCheckedReport(this.readObjectAnswer("GET", endpoint, res))
+      withCheckedProblem(this.readObjectAnswer("GET", endpoint, res))
     );
     const retryAfter = parseRetryAfter(res.headers);
     return retryAfter !== null ? { ...run, retry_after_seconds: retryAfter } : run;
@@ -17046,17 +17360,17 @@ var PipelexApiClient = class {
         `a snapshot whose ${fault2}`
       );
     }
-    return withCheckedProgressDegradations(answer);
+    return withCheckedProgressHealth(answer);
   }
   /**
    * Single-shot result lookup — `GET /v1/runs/{pipeline_run_id}/results`.
    * Maps the server's poll semantics to a discriminated union:
    * - HTTP 202 → `running` (with the `Retry-After` hint)
    * - HTTP 200 → `completed` (with the result artifacts)
-   * - HTTP 409 → `failed` (terminal non-`COMPLETED`), carrying the problem's `detail` as
-   *   `message`, its `run_status` member as `status` (recovered from `detail` on a platform
-   *   that predates the member) and its `error` member, the run's stored error report, typed
-   *   as `error`
+   * - HTTP 409 `run.failed` → `failed` (terminal non-`COMPLETED`), carrying the problem as
+   *   `problem`, its `detail` as `message`, the terminal status its `run_status` parameter names
+   *   as `status`, and the run's own problem, which it nests as `run_error`, as `error`; a `409`
+   *   `run.not_finished` → `running`, and any other `409` throws `ApiResponseError`
    * - HTTP 503 → `running` (Temporal degraded — retry, never fail a poller)
    *
    * `options.artifacts` narrows the read to the named artifacts, sent as one
@@ -17092,7 +17406,9 @@ var PipelexApiClient = class {
       };
     }
     if (res.status === 409) {
-      return runResultFailed(runId, res.body);
+      const conflict = runResultConflict(runId, res);
+      if (conflict !== void 0) return conflict;
+      this.throwApiResponseError("GET", endpoint, res);
     }
     this.throwIfLifecycleUnavailable(res, url);
     if (res.status < 200 || res.status >= 300) {
@@ -17131,8 +17447,8 @@ var PipelexApiClient = class {
    * real error; no answer at all propagates, uncached. An answer is anything the
    * server sent back: a non-2xx status, a body that is not JSON, not UTF-8 or no
    * version, and a body that arrived but could not be decoded, such as a broken
-   * gzip stream, which `requestRaw` reports as an `ApiUnreachableError` carrying
-   * the decompressor's code (see `isUndecodableBody`).
+   * gzip stream, which `requestRaw` reports as an `ApiResponseError` (see
+   * `isUndecodableBody`).
    *
    * `signal` stops the handshake: its abort is thrown as is and nothing is cached.
    *
@@ -17150,7 +17466,7 @@ var PipelexApiClient = class {
         this.lifecycleAvailable = !(typeof impl === "string" && impl === BARE_RUNNER_IMPLEMENTATION);
       } catch (error) {
         if (signal?.aborted === true) throw signal.reason;
-        if (error instanceof ApiUnreachableError && !isUndecodableBody(error)) throw error;
+        if (error instanceof ApiUnreachableError) throw error;
         this.lifecycleAvailable = true;
       }
     }
@@ -17182,11 +17498,13 @@ var PipelexApiClient = class {
    * rather than listing, reading and hashing the tree again.
    *
    * An error from the start, or from the blocking execute, says whether that request may still
-   * have started a run whose id never reached the caller (`runMayHaveStarted`); when it may have,
-   * it is not retryable, since calling this method again could pay for the run twice: look the run
-   * up in the run history first. An error from the wait, once `onStarted` has named the run,
-   * started nothing, so its `runMayHaveStarted` is false, and its `retryable` is about waiting
-   * again on that id with `waitForResult`, never about calling this method again.
+   * have started a run whose id never reached the caller: its problem's `retry` is then
+   * `outcome_unknown`, since calling this method again could pay for the run twice, unless it is
+   * made with the same `idempotencyKey`: look the run up in the run history first. An error from
+   * the wait, once `onStarted` has named the run, started nothing, and its problem is about that
+   * run: `client.follow_failed` for a wait that ran out of time, whose step is to read the run
+   * again with `waitForResult`, or `run.failed` for a run that ended without success, never a
+   * reason to call this method again.
    *
    * `options.idempotencyKey` rides the durable start, so a call that failed while its start may
    * have created a run can be made again with the same options and the same key: the hosted API
@@ -17240,7 +17558,7 @@ var PipelexApiClient = class {
   // The hosted catalog/account routes the webapp drives. Every one rides the
   // same `{base}/v1/*` surface, `Authorization: Bearer`, org-from-JWT contract
   // as the protocol routes, and maps a non-2xx `problem+json` to a typed
-  // `ApiResponseError` (branch on `.errorDomain` and `.type`, not the status).
+  // `ApiResponseError` (branch on its problem's `code`, not the status).
   /** The authenticated user's profile — `GET /v1/me`. */
   async getMe() {
     return this.requestProduct("GET", "me");
@@ -17317,10 +17635,11 @@ var PipelexApiClient = class {
    * and for an id that is empty, `.` or `..`, which the URL would resolve into another route's
    * path.
    *
-   * Throws `ApiResponseError`: `404` `not_found` for an unknown or foreign-org method, `409`
-   * `method_being_deleted` while its erasure runs, and a `409` whose verdict is `runtime` for a
-   * method whose draft names a tree the platform holds no record of. An answer whose `files` is
-   * not a listing is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown or foreign-org
+   * method, `409` `pipelex.catalog.being_deleted` while its erasure runs, and a `500`
+   * `runtime.unexpected` for a method whose draft names a tree the platform holds no record of. An
+   * answer whose `files` is not a listing is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` too.
    */
   async getMethod(methodId) {
     const endpoint = methodPath(methodId, "getMethod");
@@ -17329,8 +17648,8 @@ var PipelexApiClient = class {
   }
   /**
    * Create a method — `POST /v1/methods`. The new method holds its tree as its draft and has no
-   * published version, so its bare id answers `409 method_not_published` on the run and tooling
-   * routes until its first `publishMethod`; its draft runs as `mt_…@draft` at once.
+   * published version, so its bare id answers `409` `pipelex.catalog.not_published` on the run and
+   * tooling routes until its first `publishMethod`; its draft runs as `mt_…@draft` at once.
    *
    * The tree is `files`, sent as given, or `tree` or `contents`, which the client sends inline
    * when its inline map weighs 256 KiB or less, or when the platform keeps no blob store, and
@@ -17340,12 +17659,12 @@ var PipelexApiClient = class {
    *
    * Throws `RequestArgumentError` for two forms of the tree, or `contents` holding no file, before
    * any request; `MethodFileTransferError` when a file the organization lacks could not be
-   * uploaded, and nothing is saved. Throws `ApiResponseError`: `422` `invalid_method_files` for a
-   * map the standard refuses, with its `tree_refusal`; `422` `method_tree_too_large` for a tree
-   * past one of the deployment's limits, named in its `limit`; `422` `blob_mismatch` for a hash
-   * stated at another size than the one held; `422` `missing_blobs` for a hash entry whose bytes
-   * the organization does not hold; `413` `payload_too_large` for a method that would leave no
-   * room for a publish.
+   * uploaded, and nothing is saved. Throws `ApiResponseError`: `422` `method.package_invalid` for
+   * a map the standard refuses, naming the path in its `params`, and for a tree past one of the
+   * deployment's limits, its `params` carrying `reason` `too_large` and the integer `limit`;
+   * `422` `request.invalid` for a hash stated at another size than the one held; `422`
+   * `request.blobs_missing` for a hash entry whose bytes the organization does not hold; `413`
+   * `request.too_large` for a method that would leave no room for a publish.
    */
   async createMethod(input) {
     const source = await this.treeToSend("createMethod", input, SAVE_SENDING);
@@ -17366,23 +17685,24 @@ var PipelexApiClient = class {
    * `files: null` emptying the draft, or `tree` or `contents`, sent inline or by hash as
    * `createMethod` sends them. `input_data` is three-way (see `MethodDraftInput`). With
    * `expected_updated_at`, the write is a compare-and-swap on the draft token: a draft that
-   * moved since is refused with a `409` whose `code` is `method_update_conflict`, and nothing is
+   * moved since is refused with a `409` whose `code` is `pipelex.catalog.update_conflict`, and nothing is
    * written. Without it, last writer wins.
    *
    * Takes a bare catalog id, as `getMethod` does. Throws `RequestArgumentError` for a draft that
    * gives its tree in no form or in two, or `contents` holding no file, before any request;
    * `MethodFileTransferError` when a file the organization lacks could not be uploaded. Throws
-   * `ApiResponseError`: `404` `not_found` for an unknown or foreign-org method, `409`
-   * `method_being_deleted` while its erasure runs, the `422` refusals of a tree `createMethod`
-   * lists, `413` `payload_too_large` for a draft that would grow the method past the room a
-   * publish needs, `403` for a read-only key, and a `503` that wrote nothing, safe to retry,
+   * `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown or foreign-org method,
+   * `409` `pipelex.catalog.being_deleted` while its erasure runs, the `422` refusals of a tree
+   * `createMethod` lists, `413` `request.too_large` for a draft that would grow the method past the
+   * room a publish needs, `403` for a read-only key, and a `503` that wrote nothing, safe to retry,
    * when the method kept changing under the write.
    */
   async writeDraft(methodId, input) {
     const endpoint = `${methodPath(methodId, "writeDraft")}/draft`;
     if (treeFormsGiven(input).length === 0) {
       throw new RequestArgumentError(
-        "writeDraft() replaces the draft's whole tree: give it as directory, contents, tree or files (files: null empties the draft)."
+        "writeDraft() replaces the draft's whole tree: give it as directory, contents, tree or files (files: null empties the draft).",
+        { problem: argumentInvalidProblem("files", "missing") }
       );
     }
     const source = await this.treeToSend("writeDraft", input, SAVE_SENDING);
@@ -17504,7 +17824,8 @@ var PipelexApiClient = class {
     const given = treeFormsGiven(input);
     if (given.length > 1) {
       throw new RequestArgumentError(
-        `${call}() takes the method's tree in one form, directory, contents, tree or files; got ${given.join(" and ")}.`
+        `${call}() takes the method's tree in one form, directory, contents, tree or files; got ${given.join(" and ")}.`,
+        { problem: argumentInvalidProblem("files", "mutually_exclusive") }
       );
     }
     if (given[0] === "directory") {
@@ -17721,7 +18042,8 @@ var PipelexApiClient = class {
     const bytesSha256 = await sha256Hex2(bytes);
     if (bytes.length !== blob.size || bytesSha256 !== blob.sha256) {
       throw new RequestArgumentError(
-        `The tree read ${bytes.length} bytes hashing to ${bytesSha256} for '${file.path}', which its listing names as ${blob.size} bytes hashing to ${blob.sha256}, so they were not uploaded and ${sending.unsent}.`
+        `The tree read ${bytes.length} bytes hashing to ${bytesSha256} for '${file.path}', which its listing names as ${blob.size} bytes hashing to ${blob.sha256}, so they were not uploaded and ${sending.unsent}.`,
+        { problem: argumentInvalidProblem("tree", "changed_since_listed") }
       );
     }
     throwIfAborted(userSignal);
@@ -17737,11 +18059,11 @@ var PipelexApiClient = class {
    * draft, so the `updated_at` a caller holds stays valid for its next `writeDraft` or
    * `publishMethod`.
    *
-   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404` `not_found`,
-   * `409` `method_being_deleted`, `403` for a read-only key, `422` for an empty name or one
-   * holding a lone surrogate, `413` `payload_too_large` for a name so long it would leave the
-   * method too large to publish, and a `503` that wrote nothing, safe to retry, when draft
-   * writes kept landing under the rename.
+   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404`
+   * `pipelex.catalog.not_found`, `409` `pipelex.catalog.being_deleted`, `403` for a read-only key,
+   * `422` for an empty name or one holding a lone surrogate, `413` `request.too_large` for a name
+   * so long it would leave the method too large to publish, and a `503` that wrote nothing, safe
+   * to retry, when draft writes kept landing under the rename.
    */
   async renameMethod(methodId, input) {
     return this.requestMethodData("PATCH", methodPath(methodId, "renameMethod"), {
@@ -17759,16 +18081,17 @@ var PipelexApiClient = class {
    * The answer is a `MethodPublishResult` discriminated on `outcome` — branch on it:
    * `published` with the new `version`; `unchanged` with the existing latest `version`;
    * `refused` with a `reason` (`invalid`, or `not_runnable` for a draft that validates with
-   * pending signatures), a `message` and the runner's `validation` verdict. Every arm carries the
-   * `method`. A publish moves no token.
+   * pending signatures), a `message` and the runner's `validation` verdict, whose problem items
+   * are read member by member as `validate` reads them. Every arm carries the `method`. A publish
+   * moves no token.
    *
    * Takes a bare catalog id, as `getMethod` does. Throws `RequestArgumentError` when
    * `expected_draft_updated_at` is not a string, before any request. Throws `ApiResponseError`
-   * when no verdict was produced: `409` `method_update_conflict` for a draft that moved since
-   * the token, `409` `method_being_deleted`, `404` `not_found`, `422` for a draft with no
-   * `.mthds` file or whose file names a run could not assemble (one name used by a `.mthds` and
-   * a Python file), `413` `payload_too_large` for a draft too large to publish, and `403` for a
-   * read-only key.
+   * when no verdict was produced: `409` `pipelex.catalog.update_conflict` for a draft that moved since
+   * the token, `409` `pipelex.catalog.being_deleted`, `404` `pipelex.catalog.not_found`, `422` for
+   * a draft with no `.mthds` file or whose file names a run could not assemble (one name used by a
+   * `.mthds` and a Python file), `413` `request.too_large` for a draft too large to publish, and
+   * `403` for a read-only key.
    *
    * Only a draft that differs from the latest version reaches the runner, and a runner that
    * cannot be reached, answers unusably or does not finish within the platform's deadline is a
@@ -17776,14 +18099,16 @@ var PipelexApiClient = class {
    * itself is relayed under its own status. A retry of a publish that landed while its answer was
    * lost, as on a client timeout, answers `unchanged` with the version it wrote.
    *
-   * An answer whose `outcome` is not one of the outcomes above, or that carries no `method`
-   * object, is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   * An answer whose `outcome` is not one of the outcomes above, that carries no `method` object,
+   * or a refusal whose `validation` is not a verdict object with a boolean `is_valid`, is an answer
+   * the SDK cannot read, thrown as an `ApiResponseError` too.
    */
   async publishMethod(methodId, input) {
     const token = input?.expected_draft_updated_at;
     if (typeof token !== "string") {
       throw new RequestArgumentError(
-        "publishMethod() needs expected_draft_updated_at: the draft token (the method's updated_at) the caller last saw, so a publish never takes a draft it has not seen."
+        "publishMethod() needs expected_draft_updated_at: the draft token (the method's updated_at) the caller last saw, so a publish never takes a draft it has not seen.",
+        { problem: argumentInvalidProblem("expected_draft_updated_at", "not_a_string") }
       );
     }
     const endpoint = `${methodPath(methodId, "publishMethod")}/publish`;
@@ -17795,7 +18120,25 @@ var PipelexApiClient = class {
       outcomes: ["published", "unchanged", "refused"],
       member: "method"
     });
-    return { ...answer, outcome, method: subject };
+    const method = subject;
+    if (outcome !== "refused") {
+      return { ...answer, outcome, method };
+    }
+    const validation = answer.validation;
+    if (!isPlainObject(validation) || typeof validation.is_valid !== "boolean") {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a publish result whose `validation` is not an object"
+      );
+    }
+    return {
+      ...answer,
+      outcome,
+      validation: withVerdictItems(validation),
+      method
+    };
   }
   /**
    * One page of a method's published versions, newest first, without their files —
@@ -17805,10 +18148,11 @@ var PipelexApiClient = class {
    * may be short while `nextCursor` is set, because the platform reads versions whole. A method
    * never published answers an empty page.
    *
-   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404` `not_found`
-   * for an unknown method, `409` `method_being_deleted`, `400` `malformed_request` for a cursor
-   * the listing did not issue for this method, `422` for a `limit` outside 1 to 100. A page whose `items` is not an array or whose `next_cursor` is neither a string nor `null`
-   * is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404`
+   * `pipelex.catalog.not_found` for an unknown method, `409` `pipelex.catalog.being_deleted`, and
+   * `422` `request.invalid` for a cursor the listing did not issue for this method or a `limit`
+   * outside 1 to 100. A page whose `items` is not an array or whose `next_cursor` is neither a
+   * string nor `null` is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
    */
   async listMethodVersions(methodId, query = {}) {
     const search = productQuery({ limit: query.limit, cursor: query.cursor });
@@ -17822,17 +18166,18 @@ var PipelexApiClient = class {
    *
    * Takes a bare catalog id, as `getMethod` does, and the version number. Throws
    * `RequestArgumentError` for a `version` that is not a positive integer, before any request.
-   * Throws `ApiResponseError`: `404` `method_version_not_found` for a version the method never
-   * published, `404` `not_found` for an unknown method, `409` `method_being_deleted`, and `409`
-   * `conflict`, whose verdict is `runtime`, for a version stored before methods were trees and
-   * never rewritten as one, which names no tree to serve.
+   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for a version the method never
+   * published and for an unknown method, `409` `pipelex.catalog.being_deleted`, and `500`
+   * `runtime.unexpected` for a version stored before methods were trees and never rewritten as
+   * one, which names no tree to serve.
    */
   async getMethodVersion(methodId, version) {
     if (!Number.isSafeInteger(version) || version < 1) {
       throw argumentRefusal(
         "getMethodVersion",
-        "a version number, a positive integer",
-        describeNumberArgument(version)
+        { name: "version", what: "a version number, a positive integer" },
+        describeNumberArgument(version),
+        "not_a_positive_integer"
       );
     }
     const endpoint = `${methodPath(methodId, "getMethodVersion")}/versions/${version}`;
@@ -17843,6 +18188,145 @@ var PipelexApiClient = class {
       withLinks(res),
       "a published version"
     );
+  }
+  /**
+   * Copy a method into an organization the caller may change methods in —
+   * `POST /v1/methods/{id}/copy`: the method's own organization for a duplicate, another team, or
+   * the caller's personal workspace.
+   *
+   * The copy is a new, unpublished method of the destination, the caller's, holding the
+   * original's draft tree (the same `draft_digest`), its name unless `name` gives another, its
+   * form inputs and every saved example, each stored file they name copied into the destination,
+   * and `copied_from` naming the original. Published versions and runs are not copied, and the
+   * original stays as it was. The copy takes the draft, never the latest published version; with
+   * `expected_draft_updated_at`, it takes exactly the draft the caller last saw.
+   *
+   * The answer is a `MethodCopyResult` discriminated on `outcome` — branch on it: `copied` with
+   * the copy as `method`, `examples_copied` and `stored_files_copied`; `refused` with the
+   * `reason` `bundle_names_other_storage`, a `message` and every `references` entry (`{ path, uri
+   * }`) a `.mthds` file of the draft holds that the destination cannot read and, in a duplicate,
+   * that names a file under the original's run files, which erasing the original would remove,
+   * nothing written.
+   *
+   * The route serves web sessions only: a Pipelex API key belongs to one organization and cannot
+   * speak for another. `options.idempotencyKey` is sent as the `Idempotency-Key` header, so a copy
+   * sent again under the same key is answered with the first one's answer rather than copied
+   * twice (see `MethodCopyRequestOptions`).
+   *
+   * Takes a bare catalog id, as `getMethod` does. Sends `destination_org_id` and, when given,
+   * `name` and `expected_draft_updated_at`, and nothing else: the body is closed, and a `null`
+   * reads as not given. Throws `RequestArgumentError` before any request for a
+   * `destination_org_id` that is not a non-empty string, a `name` or an
+   * `expected_draft_updated_at` given that is not a string, and a malformed idempotency key.
+   * Throws `ApiResponseError` when no verdict was produced, each refusal writing nothing a reader
+   * sees but for the `503` whose `detail` names the copy: `403` `auth.forbidden` for a request
+   * that is not from a web session, or for a role that may not change methods, in the method's
+   * organization or in the destination; `404` `pipelex.org.not_found` for a destination the
+   * caller does not belong to, still being set up or unknown, alike; `404`
+   * `pipelex.catalog.not_found` for an unknown method; `409` `pipelex.catalog.being_deleted`;
+   * `409` `pipelex.catalog.update_conflict` for a draft that moved since
+   * `expected_draft_updated_at`; a `409` whose `domain` is `runtime` and `retry` `no`, for a
+   * draft whose tree the method's organization holds no record of or no longer holds every file
+   * of; `413`
+   * `request.too_large` for a copied example, or the copy's row, too large for one stored item,
+   * the row keeping room for the summary a publish adds, so a `name` that would leave none is
+   * refused; `422` `request.invalid` for a body that does not validate, such as a name holding a
+   * lone surrogate; `422` `pipelex.catalog.copy_too_large` past one of the copy's bounds on the
+   * stored files it copies, named by the problem's `limit` member (`MethodCopyLimit`); a `502`
+   * `runtime.unavailable`, with `retry` `yes`, when the platform could not read the caller's
+   * memberships; a `503` `pipelex.storage.unavailable`, with `retry` `yes`, when storage failed,
+   * and a `500` `pipelex.storage.not_configured`, with `retry` `no`, when the platform has no
+   * usable credentials for storage; and a `503` `runtime.unavailable`, with `retry` `yes`, past
+   * the copy's deadline, when a stored file it copies is written over meanwhile, or when DynamoDB
+   * fails. When DynamoDB failed both the copy's row write and the read that would confirm it,
+   * that `503`'s `detail` names the copy's method id: the copy may stand in the destination, so
+   * look for that id there before copying again, since a retry may make a second copy. An answer
+   * whose `outcome` is neither arm's, a `copied` one whose `method` is not an object or a
+   * `refused` one whose `references` is not an array, is an answer the SDK cannot read, thrown as
+   * an `ApiResponseError` too.
+   */
+  async copyMethod(methodId, input, options = {}) {
+    const call = "copyMethod";
+    const endpoint = `${methodPath(methodId, call)}/copy`;
+    const {
+      destination_org_id: destinationOrgId,
+      name,
+      expected_draft_updated_at: token
+    } = input ?? {};
+    const body = {
+      destination_org_id: requireNonEmptyId(destinationOrgId, call, COPY_DESTINATION_ARGUMENT)
+    };
+    if (name != null) {
+      if (typeof name !== "string") {
+        throw argumentRefusal(
+          call,
+          COPY_NAME_ARGUMENT,
+          describeNumberArgument(name),
+          "not_a_string"
+        );
+      }
+      body.name = name;
+    }
+    if (token != null) {
+      if (typeof token !== "string") {
+        throw argumentRefusal(
+          call,
+          COPY_DRAFT_TOKEN_ARGUMENT,
+          describeNumberArgument(token),
+          "not_a_string"
+        );
+      }
+      body.expected_draft_updated_at = token;
+    }
+    const idempotencyKey = idempotencyKeyOf(options, "copy the method");
+    const res = await this.requestProductAnswer("POST", endpoint, body, { idempotencyKey });
+    const answer = this.readObjectAnswer("POST", endpoint, res);
+    let fault2;
+    switch (answer.outcome) {
+      case "copied":
+        if (!isPlainObject(answer.method)) {
+          fault2 = "a `copied` copy result whose `method` is not an object";
+        }
+        break;
+      case "refused":
+        if (!Array.isArray(answer.references)) {
+          fault2 = "a `refused` copy result whose `references` is not an array";
+        }
+        break;
+      default:
+        fault2 = `a copy result whose \`outcome\` is not ${inWords(
+          METHOD_COPY_OUTCOMES.map((outcome) => `\`${outcome}\``),
+          "or"
+        )}`;
+    }
+    if (fault2 !== void 0) {
+      throw this.unreadableAnswer("POST", `/${API_PREFIX2}/${endpoint}`, res, fault2);
+    }
+    return answer;
+  }
+  /**
+   * One page of the copies made of a method, in the order of the copies' ids, which says nothing
+   * of when each was made — `GET /v1/methods/{id}/copies`.
+   *
+   * Each row is the `MethodCopyMarker` the original keeps of a copy: the copy's id, the
+   * destination's id, the member who made it and when. The destination is named by its id alone,
+   * never its name, so a surface shows a destination's name only from the reader's own
+   * memberships, and a copy in an organization the reader does not belong to stays a bare id. A
+   * marker stays when its copy is erased, and the copy then reads as not found. Pass the page's
+   * `nextCursor` back as `cursor` to continue; `null` is the last page. A method never copied,
+   * and a copy itself, answer an empty page. The listing is open to every member of the method's
+   * organization, a runner included, as every read of a method is.
+   *
+   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404`
+   * `pipelex.catalog.not_found` for an unknown method, `409` `pipelex.catalog.being_deleted`, and
+   * `422` `request.invalid` for a cursor the listing did not issue for this method or a `limit`
+   * outside 1 to 100. A page whose `items` is not an array or whose `next_cursor` is neither a
+   * string nor `null` is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async listMethodCopies(methodId, query = {}) {
+    const search = productQuery({ limit: query.limit, cursor: query.cursor });
+    const endpoint = `${methodPath(methodId, "listMethodCopies")}/copies`;
+    return this.requestPage(`${endpoint}${search}`);
   }
   /**
    * Erase a method and everything it produced — `DELETE /v1/methods/{id}`.
@@ -17857,7 +18341,7 @@ var PipelexApiClient = class {
    * it with a `409`.
    *
    * A double-clicked delete is safe: the claim is a conditional write, so the
-   * second call is an `ApiResponseError` (`409 method_being_deleted`) rather than a
+   * second call is an `ApiResponseError` (`409` `pipelex.catalog.being_deleted`) rather than a
    * second cascade over the same runs. An unknown or foreign-org id is a `404`. The
    * erasure deletes the method's published versions with the rest. Takes a bare catalog id,
    * as `getMethod` does: the whole method is erased, never one of its versions.
@@ -17868,8 +18352,9 @@ var PipelexApiClient = class {
   // ── Method examples (`/v1/methods/{id}/examples`) ──────────────────────
   //
   // Every example route takes a bare catalog id, as `getMethod` does, and answers `404`
-  // `not_found` for an unknown method or example and `409` `method_being_deleted` while the
-  // method's erasure runs. The writes are `403` to a read-only key, which may still read.
+  // `pipelex.catalog.not_found` for an unknown method or example and `409`
+  // `pipelex.catalog.being_deleted` while the method's erasure runs. The writes are `403` to a
+  // read-only key, which may still read.
   //
   // Every answer carrying an example is read with `parseExactJson`, so an integer past
   // `Number.MAX_SAFE_INTEGER` in its inputs, which another client may have saved, is a `bigint`
@@ -17886,8 +18371,8 @@ var PipelexApiClient = class {
    * closed, and a `null` `run_id` reads as not given. Throws `RequestArgumentError` before any
    * request when `name` or `inputs` is not given (`null` counting as not given), and for a
    * `run_id` that is given but is not a non-empty string. Throws `ApiResponseError`: `404`
-   * `run_not_found` for a `run_id` that is not one of this method's runs in the caller's
-   * organization, with nothing written; `413` `payload_too_large` for an example larger than one
+   * `run.not_found` for a `run_id` that is not one of this method's runs in the caller's
+   * organization, with nothing written; `413` `request.too_large` for an example larger than one
    * stored item holds; `422` for a name that is empty, blank or over 200 characters, or inputs
    * that are not a JSON object; and the codes every example route answers.
    */
@@ -17898,14 +18383,7 @@ var PipelexApiClient = class {
       inputs,
       run_id: runId
     } = input ?? {};
-    if (name == null || inputs == null) {
-      let got;
-      if (name == null && inputs == null) got = "neither";
-      else got = name == null ? "no name" : "no inputs";
-      throw new RequestArgumentError(
-        `createMethodExample() needs the example's name and its inputs; got ${got}.`
-      );
-    }
+    requireNameAndInputs(name, inputs, "createMethodExample", "the example's name and its inputs");
     const body = { name, inputs };
     if (runId != null) {
       body.run_id = requireNonEmptyId(runId, "createMethodExample", CREATE_RUN_ID_ARGUMENT);
@@ -17920,12 +18398,12 @@ var PipelexApiClient = class {
    * may be short while `nextCursor` is set, because the platform reads examples whole and stops
    * a read at 1 MB; `iterateMethodExamples` follows the cursor for a caller that wants them all.
    *
-   * Throws `ApiResponseError`: `400` `malformed_request` for a cursor the listing did not issue
-   * for this method, `422` for a `limit` outside 1 to 100, and the codes every example route
-   * answers. A page whose `items` is not an array, whose `next_cursor` is neither a string nor
-   * `null`, or one of whose items is not an example `readMethodExample` can read, is an answer
-   * the SDK cannot read, thrown as an `ApiResponseError` too. An example whose inputs hold an
-   * integer past the safe range is read like any other, that integer as a `bigint`.
+   * Throws `ApiResponseError`: `422` `request.invalid` for a cursor the listing did not issue for
+   * this method or a `limit` outside 1 to 100, and the codes every example route answers. A page
+   * whose `items` is not an array, whose `next_cursor` is neither a string nor `null`, or one of
+   * whose items is not an example `readMethodExample` can read, is an answer the SDK cannot read,
+   * thrown as an `ApiResponseError` too. An example whose inputs hold an integer past the safe
+   * range is read like any other, that integer as a `bigint`.
    */
   async listMethodExamples(methodId, query = {}) {
     const search = productQuery({ limit: query.limit, cursor: query.cursor });
@@ -17993,7 +18471,7 @@ var PipelexApiClient = class {
    *
    * Throws `RequestArgumentError` before any request for an example id that is empty, `.` or
    * `..`, or when neither `name` nor `inputs` is given. Throws `ApiResponseError`: `413`
-   * `payload_too_large` for inputs larger than one stored item holds, `422` for a name that is
+   * `request.too_large` for inputs larger than one stored item holds, `422` for a name that is
    * empty, blank or over 200 characters, or inputs that are not a JSON object, a `503` that wrote
    * nothing, safe to retry, when concurrent edits kept landing under the write, and the codes
    * every example route answers.
@@ -18006,7 +18484,8 @@ var PipelexApiClient = class {
     if (inputs != null) body.inputs = inputs;
     if (Object.keys(body).length === 0) {
       throw new RequestArgumentError(
-        "updateMethodExample() needs a new name, new inputs, or both; got neither."
+        "updateMethodExample() needs a new name, new inputs, or both; got neither.",
+        { problem: argumentInvalidProblem("name", "nothing_to_update") }
       );
     }
     return this.requestMethodExample("PATCH", endpoint, body);
@@ -18023,13 +18502,13 @@ var PipelexApiClient = class {
    * since and nothing was written. A stale run is the expected end of a run that outlasted an
    * edit, so it is answered, never thrown. Both arms carry the `example` as it stands.
    *
-   * Throws `RequestArgumentError` before any request, checking in this order: an example id that
-   * is empty, `.` or `..`, or holds a lone surrogate, a `run_id` that is not a non-empty string,
-   * and an `input_revision` that is not a positive integer. Throws `ApiResponseError` when no
-   * verdict was produced: `404` `not_found` for an example deleted since, `404` `run_not_found`
-   * for a run that is not one of this method's, with nothing written, and the codes every example
-   * route answers. An answer whose `outcome` is neither arm's, or whose `example` is not an
-   * example `readMethodExample` can read, is an answer the SDK cannot read, thrown as an
+   * Throws `RequestArgumentError` before any request, checking in this order: an example id that is
+   * empty, `.` or `..`, or holds a lone surrogate, a `run_id` that is not a non-empty string, and
+   * an `input_revision` that is not a positive integer. Throws `ApiResponseError` when no verdict
+   * was produced: `404` `pipelex.catalog.not_found` for an example deleted since, `404`
+   * `run.not_found` for a run that is not one of this method's, with nothing written, and the codes
+   * every example route answers. An answer whose `outcome` is neither arm's, or whose `example` is
+   * not an example `readMethodExample` can read, is an answer the SDK cannot read, thrown as an
    * `ApiResponseError` too, read as `publishMethod` reads its verdict.
    */
   async recordMethodExampleLatestRun(methodId, exampleId, input) {
@@ -18040,8 +18519,12 @@ var PipelexApiClient = class {
     if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1) {
       throw argumentRefusal(
         call,
-        "an input_revision, the example's revision whose inputs the run used, a positive integer",
-        describeNumberArgument(revision)
+        {
+          name: "input_revision",
+          what: "an input_revision, the example's revision whose inputs the run used, a positive integer"
+        },
+        describeNumberArgument(revision),
+        "not_a_positive_integer"
       );
     }
     const res = await this.requestProductAnswer("PUT", endpoint, {
@@ -18059,13 +18542,94 @@ var PipelexApiClient = class {
     return { ...answer, outcome, example: subject };
   }
   /**
+   * Save the build assistant's test inputs as its example of the method —
+   * `POST /v1/methods/{id}/examples/assistant-save` — **never writing over a person's edit**.
+   *
+   * The assistant keeps one example of a method current with its test inputs, until a person
+   * edits that example's inputs. Find its example as the method's newest with `kept_by_assistant`
+   * true (`listMethodExamples` answers them oldest first), and send its `example_id` with the
+   * `input_revision` you read it at. The platform writes the inputs into it only while it still
+   * exists, still carries the flag and still holds that revision, in one conditional write that it
+   * never retries. Otherwise, and when no example is named, which is how the first save on a
+   * method creates the assistant's example, it saves the inputs as a new example flagged as the
+   * assistant's, under `name`.
+   *
+   * The answer is a `MethodExampleAssistantSaveResult` discriminated on `outcome` — branch on it:
+   * `kept`, the named example now holds the inputs, its name untouched; `created`, a new example
+   * holds them. Both carry the `example`, which is the assistant's from then on. A retry of a save
+   * that landed answers `kept` and writes nothing again.
+   *
+   * Sends `name`, `inputs` and, when given, `example_id` with `input_revision`, and nothing else:
+   * the body is closed, and `null` reads as not given. Throws `RequestArgumentError` before any
+   * request when `name` or `inputs` is not given, for an `example_id` that is not a non-empty
+   * string or an `input_revision` that is not a positive integer, and when only one of the two is
+   * given. Throws `ApiResponseError`: `403` `auth.forbidden` for a role that may not change
+   * methods, such as a runner; `413` `request.too_large` for an example larger than one stored item
+   * holds; `422` for a name that is empty, blank or over 200 characters, or inputs that are not a
+   * JSON object; and the codes every example route answers. An answer whose `outcome` is neither
+   * arm's, or whose `example` is not an example `readMethodExample` can read, is an answer the SDK
+   * cannot read, thrown as an `ApiResponseError` too.
+   */
+  async saveAssistantMethodExample(methodId, input) {
+    const call = "saveAssistantMethodExample";
+    const endpoint = `${methodPath(methodId, call)}/examples/assistant-save`;
+    const {
+      name,
+      inputs,
+      example_id: exampleId,
+      input_revision: revision
+    } = input ?? {};
+    requireNameAndInputs(name, inputs, call, "the name a new example takes and the inputs");
+    const body = { name, inputs };
+    if (exampleId != null) {
+      body.example_id = requireNonEmptyId(exampleId, call, ASSISTANT_EXAMPLE_ID_ARGUMENT);
+    }
+    if (revision != null) {
+      if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1) {
+        throw argumentRefusal(
+          call,
+          ASSISTANT_REVISION_ARGUMENT,
+          describeNumberArgument(revision),
+          "not_a_positive_integer"
+        );
+      }
+      body.input_revision = revision;
+    }
+    if (body.example_id === void 0 !== (body.input_revision === void 0)) {
+      throw new RequestArgumentError(
+        `${call}() names the assistant's example by both its example_id and the input_revision it was read at, or neither; got only ${body.example_id === void 0 ? "input_revision" : "example_id"}.`,
+        {
+          problem: argumentInvalidProblem(
+            body.example_id === void 0 ? "example_id" : "input_revision",
+            "missing"
+          )
+        }
+      );
+    }
+    const res = await this.requestProductAnswer("POST", endpoint, body);
+    const { answer, outcome, subject } = this.readVerdict("POST", endpoint, res, {
+      verdict: "an assistant save result",
+      outcomes: ["kept", "created"],
+      member: "example",
+      parse: parseExactJson,
+      readMember: (value) => this.readMethodExample(
+        "POST",
+        endpoint,
+        res,
+        value,
+        "an assistant save result's `example`"
+      )
+    });
+    return { ...answer, outcome, example: subject };
+  }
+  /**
    * Delete an example — `DELETE /v1/methods/{id}/examples/{example_id}`. The platform answers
    * `204`. Deleting the example leaves its latest run in the method's history.
    *
-   * Throws `RequestArgumentError` for an example id that is empty, `.` or `..`, before any
-   * request: `..` would address the method, and its erasure would answer the delete. Throws
-   * `ApiResponseError`: `404` `not_found` when there is no such example, one already deleted
-   * included, and the codes every example route answers.
+   * Throws `RequestArgumentError` for an example id that is empty, `.` or `..`, before any request:
+   * `..` would address the method, and its erasure would answer the delete. Throws
+   * `ApiResponseError`: `404` `pipelex.catalog.not_found` when there is no such example, one
+   * already deleted included, and the codes every example route answers.
    */
   async deleteMethodExample(methodId, exampleId) {
     await this.requestProduct(
@@ -18086,6 +18650,47 @@ var PipelexApiClient = class {
     const segment = idPathSegment(orgId, "renameOrganization", ORG_ID_ARGUMENT);
     return this.requestProduct("PATCH", `organizations/${segment}`, input);
   }
+  /**
+   * The branding of the caller's active organization — `GET /v1/branding`: its name, its light
+   * and dark colour sets and its two logos. Any role reads it, `runner` included, by web session
+   * or API key, so an app scaffolded from the method-app template reads its organization's
+   * branding with its own key. A personal workspace, or a team that set nothing, answers every
+   * colour and logo `null`. A logo's `uri` is a `pipelex-storage://` reference, which
+   * `resolveStorageUrl` turns into a short-lived link to its bytes.
+   *
+   * Throws `ApiResponseError`: `400` when the caller has no active organization, `404` when its
+   * row is missing, and an answer that is not a JSON object, an empty one included.
+   */
+  async getBranding() {
+    return this.requestProductObject("GET", "branding");
+  }
+  /**
+   * Set or clear an organization's branding — `PATCH /v1/organizations/{org_id}/branding`, an
+   * admin's write to the active organization. Every key of `input` is optional: a value sets it,
+   * `null` clears it, and a key left out keeps its value (`OrganizationBrandingUpdate`), so `{}`
+   * writes nothing. A new logo is the `pipelex-storage://` URI of a file the organization uploaded
+   * on its own, which the platform reads and measures, then copies under `branding/`: the answer's
+   * `uri` is that copy, and sending it back unchanged keeps the logo. The logo a write replaces or
+   * clears is erased. Answers the branding as the write left it.
+   *
+   * Throws `RequestArgumentError` for an organization id that is empty, `.` or `..`, before any
+   * request. Throws `ApiResponseError`, refusing every change of the request when it refuses one:
+   * `403` `pipelex.org.mismatch` when `orgId` is not the active organization, `403`
+   * `auth.forbidden` for a caller who is not its admin, `404` `pipelex.org.not_found` for a missing
+   * organization, `409` `pipelex.org.not_manageable` for a personal workspace, which has no
+   * branding, and `422` `request.invalid` for a colour that is not `#rrggbb` or a key the body does
+   * not know. A logo's refusal names its slot in its problem's `errors`, each item's
+   * `location.field` being `square_logo` or `wide_logo` and its `detail` the sentence to show under
+   * that slot: `422` `pipelex.storage.uri_invalid` for a URI that is not a storage URI, `403`
+   * `pipelex.org.mismatch` for another organization's file, and `422` `request.invalid` with an
+   * item per broken rule, its code one `LogoRefusalCode` names, for a file the platform refused. A
+   * `503` `runtime.unavailable` is a failure of the platform's storage or its database, after which
+   * the write may have landed or not: the same input sent again is safe.
+   */
+  async updateOrganizationBranding(orgId, input) {
+    const segment = idPathSegment(orgId, "updateOrganizationBranding", ORG_ID_ARGUMENT);
+    return this.requestProductObject("PATCH", `organizations/${segment}/branding`, input);
+  }
   /** The active org's subscription state — `GET /v1/billing/subscription`. */
   async getSubscription() {
     return this.requestProduct("GET", "billing/subscription");
@@ -18104,7 +18709,7 @@ var PipelexApiClient = class {
   }
   /**
    * Switch the existing subscription's plan — `POST /v1/billing/change-plan`.
-   * A 409 `conflict` (`ApiResponseError.code`) means there is no subscription
+   * A 409 `pipelex.billing.subscription_conflict` (`ApiResponseError.code`) means there is no subscription
    * to change — start one via `createCheckout` first.
    */
   async changePlan(input) {
@@ -18112,7 +18717,7 @@ var PipelexApiClient = class {
   }
   /**
    * A Stripe billing-portal session URL — `GET /v1/billing/portal`. A 409
-   * `conflict` (`ApiResponseError.code`) means there is no subscription yet.
+   * `pipelex.billing.subscription_conflict` (`ApiResponseError.code`) means there is no subscription yet.
    */
   async getBillingPortal() {
     return this.requestProduct("GET", "billing/portal");
@@ -18123,7 +18728,7 @@ var PipelexApiClient = class {
   }
   /**
    * Mint a Pipelex API key — `POST /v1/pipelex-api-keys`. The plaintext
-   * `api_key` is returned ONCE. A 409 `pipelex_api_key_limit_reached`
+   * `api_key` is returned ONCE. A 409 `pipelex.billing.plan_limit`
    * (`ApiResponseError.code`) means the per-account key limit is hit.
    */
   async createPipelexApiKey(input) {
@@ -18194,9 +18799,11 @@ var PipelexApiClient = class {
     return downloadArtifacts(this, request);
   }
   /**
-   * Upload a base64 file — `POST /v1/upload`. An answer with no non-empty string `uri` names no
-   * stored file, so it is an answer the SDK cannot read: an `ApiResponseError`, `runtime` and
-   * not retryable, which `uploadFile` wraps as an `UploadTransportError` with code `unexpected`.
+   * Upload a base64 file — `POST /v1/upload`, answering the file's `uri`, the `filename` as sent
+   * and the `file_id` of its record. An answer with no non-empty string `uri` names no
+   * stored file, so it is an answer the SDK cannot read: an `ApiResponseError` whose problem is
+   * `client.response_unreadable`, which `uploadFile` wraps as an `UploadTransportError` with the
+   * reason `unexpected`.
    */
   async upload(input) {
     const res = await this.requestProductAnswer("POST", "upload", input);
@@ -18218,18 +18825,24 @@ var PipelexApiClient = class {
   /**
    * Request a grant to upload one file straight to storage — `POST /v1/upload/grant`.
    * `upload` for a caller that holds the bytes but not this client's credential, such
-   * as a browser page: the credential-holding side asks for the grant, hands it over,
-   * and the holder of the bytes sends them with `uploadWithGrant`, from the
-   * browser-safe `@pipelex/sdk/upload` entry. The bytes cross neither this client nor
-   * the API gateway, so the gateway's request quota does not cap the file below the
-   * service's own limit (`max_bytes`).
+   * as a browser page: the holder of the bytes describes the file with `describeUpload`,
+   * its SHA-256 included, the credential-holding side asks for the grant with that
+   * description and hands the grant over, and the holder of the bytes sends them with
+   * `uploadWithGrant`. Both are on the browser-safe `@pipelex/sdk/upload` entry. The
+   * bytes cross neither this client nor the API gateway, so the gateway's request quota
+   * does not cap the file below the service's own limit (`max_bytes`).
    *
-   * The grant describes one new object: its `uri` exists once the `PUT` succeeds, and
-   * not before. It is create-only and short-lived, and it is a bearer capability, so
-   * keep it out of logs. The route never replays a grant: ask again for a new one
-   * rather than retrying. A declared `size` over the cap is a `413` `ApiResponseError`
-   * (`code` `payload_too_large`); a deployment without the route answers a `404`. See
-   * `docs/input-preparation.md`.
+   * **Branch on the answer's `stored`.** With the file's `sha256`, the object is named
+   * after its bytes: when the organization already holds them, the grant answers
+   * `stored: true` with the file's `uri` and `file_id` and no upload target, and nothing
+   * is to be sent. Otherwise, and always without a `sha256`, it answers a presigned,
+   * create-only `PUT` whose `uri` exists once the `PUT` succeeds, and not before. That
+   * target is short-lived and a bearer capability, so keep it out of logs. The route
+   * never replays a grant: ask again for a new one rather than retrying; with a
+   * `sha256`, a new grant answers the same file record. A declared `size` over the cap
+   * is a `413` `ApiResponseError` (`code` `request.too_large`), a malformed `sha256` and
+   * a `size` other than the one the organization holds those bytes at are a `422`
+   * (`request.invalid`), and a deployment without the route answers a `404`. See `docs/input-preparation.md`.
    */
   async requestUploadGrant(input, options = {}) {
     return this.requestProductObject("POST", "upload/grant", input, options);
@@ -18238,9 +18851,11 @@ var PipelexApiClient = class {
    * Upload one local asset and return its {@link UploadRecord} — the single-asset
    * convenience over {@link upload}. Accepts `Blob`/`File`/`ArrayBuffer`/`Uint8Array`
    * in every runtime; a path string is Node-only (it fails instructively elsewhere).
-   * The record guarantees `uri`, `contentType`, `size`, and `filename`. Transport
-   * failures surface as the semantic input-preparation errors (rejected asset, auth,
-   * unsupported capability, transport). See `docs/input-preparation.md`.
+   * The record guarantees `uri`, `contentType`, `size`, and `filename`. A `kind` and its
+   * `method_id` in the options record the upload as a method's test file, checked before the
+   * asset is read. Transport failures surface as the semantic input-preparation errors
+   * (rejected asset, refused test file, auth, unsupported capability, transport). See
+   * `docs/input-preparation.md`.
    */
   async uploadFile(asset, options) {
     return uploadFile(this, asset, options);
@@ -18278,6 +18893,446 @@ var PipelexApiClient = class {
     return prepareInputs(this, request);
   }
   /**
+   * One page of the organization's files, newest first — `GET /v1/files`.
+   *
+   * Rows are `FileSummary`: the record's id, its `uri`, which a run's inputs take as they take
+   * any address, the name a person sees, its type, size and kind, and where it came from. A list
+   * never holds a file a run made along the way, nor an upload whose bytes have not been seen
+   * stored. Every role of the organization reads every file of it.
+   *
+   * `methodId`, `runId` and `createdBy` choose which list serves the page: the method's files
+   * (what its runs and examples took or made), the run's own files (its final outputs and inline
+   * inputs, in the order of their addresses), one member's (`"me"` for the caller's own), or the
+   * organization's. `q`, `kind`, `format`, `mediaType`, `createdFrom` and `createdTo` filter that
+   * list server-side; `format` and `mediaType` are sent as one repeated parameter per value, and
+   * an empty list of either is a `RequestArgumentError` before any request. The filters run after
+   * the index read, so **a filtered page can hold fewer rows than `limit`, or none, and still
+   * carry a `nextCursor`**: keep following it until it is `null`, with the same filters, since a
+   * cursor is bound to the list and filters that issued it.
+   *
+   * Throws `ApiResponseError`: `400` for a date bound that is not an instant with an offset, a
+   * range whose start is after its end, or a cursor of another list or other filters; `404`
+   * `run.not_found` for a run that is not the organization's; `422` for a `limit` outside 1 to
+   * 200, an unknown `kind`, more than 100 values of `format` or `mediaType`, or an id that cannot
+   * be one. A page whose `items` is not an array or whose `next_cursor` is neither a string nor
+   * `null` is an `ApiResponseError` of an answer the SDK cannot read. See `docs/files.md`.
+   */
+  async listFiles(query = {}) {
+    const search = productQuery({
+      method_id: query.methodId,
+      run_id: query.runId,
+      created_by: query.createdBy,
+      kind: query.kind,
+      format: repeatedFilter("listFiles", "format", query.format),
+      media_type: repeatedFilter("listFiles", "mediaType", query.mediaType),
+      created_from: query.createdFrom,
+      created_to: query.createdTo,
+      q: query.q,
+      limit: query.limit,
+      cursor: query.cursor
+    });
+    return this.requestPage(`files${search}`);
+  }
+  /**
+   * Every file of the organization the query selects, streamed — follows the cursor for you.
+   *
+   * ```ts
+   * for await (const file of client.iterateFiles({ kind: "uploaded", format: ["pdf"] })) {
+   *   if (file.name === "March invoice.pdf") break; // stop whenever you like
+   * }
+   * ```
+   *
+   * **Prefer `listFiles`** for anything user-facing: this makes as many round trips as the data
+   * demands. It is an iterator rather than an all-at-once helper for the reason `iterateRuns` is
+   * one: a helper returning an array needs a page cap, and a cap returns a truncated list with no
+   * error.
+   *
+   * It keeps going **through an empty page that carries a cursor**, which under any filter means
+   * "nothing matched in the slice just read", not "done", sending the same filters with every
+   * page. It stops on a `null` cursor or on a cursor the server failed to advance, and throws
+   * `PagingNotTerminatingError` past a page ceiling no real file list reaches.
+   */
+  async *iterateFiles(query = {}) {
+    yield* followCursor("listFiles", (cursor) => this.listFiles({ ...query, cursor }));
+  }
+  /**
+   * One file with its provenance, the methods whose lists hold it, and one page of its uses —
+   * `GET /v1/files/{file_id}`.
+   *
+   * The answer is a `FileDetail`: the file's whole record (`FileRecord`), its `method_ids`, and
+   * `uses`, one page of the examples that hold its address, then the runs that took it. Page the
+   * uses by passing `uses.next_cursor` back as `usesCursor`; `null` is the last page. A record whose
+   * upload looked unfinished past the upload grant's lifespan is settled by the read, so it answers
+   * `stored` when its bytes are there.
+   *
+   * Throws `RequestArgumentError` for a file id that is empty, `.` or `..`, or holds a lone
+   * surrogate, before any request. Throws `ApiResponseError`: `404` `pipelex.storage.not_found` for
+   * a file that is not the organization's; `422` for a `usesLimit` outside 1 to 200 or an id that
+   * cannot be one. An answer that is not an object, or whose `uses` is not a page of `items` and
+   * `next_cursor`, is an answer the SDK cannot read, thrown as an `ApiResponseError` too. See
+   * `docs/files.md`.
+   */
+  async getFile(fileId, query = {}) {
+    const search = productQuery({ uses_limit: query.usesLimit, uses_cursor: query.usesCursor });
+    const endpoint = `files/${idPathSegment(fileId, "getFile", FILE_ID_ARGUMENT)}${search}`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    const detail = this.readObjectAnswer("GET", endpoint, res);
+    const uses = detail.uses;
+    if (!isPlainObject(uses) || !Array.isArray(uses.items) || uses.next_cursor !== null && typeof uses.next_cursor !== "string") {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a file whose `uses` is not a page of `items` and `next_cursor`"
+      );
+    }
+    return detail;
+  }
+  /**
+   * The records holding one `pipelex-storage://` address — `GET /v1/files/by-uri` — in the order a
+   * surface picks the one to show, the first being it.
+   *
+   * Several records hold one address when several members uploaded the same bytes. With `runId`,
+   * the records of the member who started that run come first, so a run's inputs show the name its
+   * starter gave the file; then the caller's; then the rest, each group oldest first. A record
+   * whose upload has not finished is answered with its `state`, `pending`. An address no record
+   * holds answers an empty `items`, which is how a client tells a file stored before the platform
+   * kept records.
+   *
+   * Throws `RequestArgumentError` for a `uri` that is not a non-empty string, before any request.
+   * Throws `ApiResponseError`: `pipelex.storage.uri_invalid` for a malformed address, `403`
+   * `pipelex.org.mismatch` for another organization's, `404` `run.not_found` for a run that is not
+   * the organization's, and `422` for an address over 512 characters. An answer whose `items` is
+   * not an array is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async getFilesByUri(uri, options = {}) {
+    const checkedUri = requireNonEmptyId(uri, "getFilesByUri", STORAGE_URI_ARGUMENT);
+    const endpoint = `files/by-uri${productQuery({ uri: checkedUri, run_id: options.runId })}`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    const answer = this.readObjectAnswer("GET", endpoint, res);
+    if (!Array.isArray(answer.items)) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "an answer whose `items` is not an array"
+      );
+    }
+    return answer;
+  }
+  /**
+   * Rename a file — `PATCH /v1/files/{file_id}` — and return its record as it now stands.
+   *
+   * **The platform holds the name to one rule, for every client**: it removes the characters no
+   * list or header can show (control and format characters, a right-to-left override among
+   * them), trims the ends, refuses a name with nothing left, and adds the file's own extension,
+   * the one its `original_name` ends with, when the name does not end with it, case aside:
+   * `March invoice` becomes `March invoice.pdf`, and `March.docx` becomes `March.docx.pdf`. A file
+   * whose original name has no extension gains none. Read the saved name from the answer's
+   * `name`. The rename changes `name` alone, never the file's bytes, its address or its
+   * `original_name`.
+   *
+   * An `admin` or a `member` renames any file; any other role, a runner among them, only the files
+   * whose record names it as `created_by`: its own uploads and the outputs of the runs it started.
+   *
+   * Sends `name` alone: the body is closed. Throws `RequestArgumentError` for a file id that is
+   * empty, `.` or `..`, or holds a lone surrogate, and for a `name` that is not a string, before
+   * any request. Throws `ApiResponseError`: `403` `auth.forbidden` past the rule above; `404`
+   * `pipelex.storage.not_found` for a file that is not the organization's; `422` for a name over
+   * 512 characters or with nothing left once cleaned. An answer that is not an object is an answer the SDK cannot
+   * read, thrown as an `ApiResponseError` too.
+   */
+  async renameFile(fileId, input) {
+    const segment = idPathSegment(fileId, "renameFile", FILE_ID_ARGUMENT);
+    const { name } = input ?? {};
+    if (typeof name !== "string") {
+      throw argumentRefusal(
+        "renameFile",
+        RENAME_NAME_ARGUMENT,
+        describeNumberArgument(name),
+        "not_a_string"
+      );
+    }
+    return this.requestProductObject("PATCH", `files/${segment}`, { name });
+  }
+  /**
+   * Fresh links to read files — `POST /v1/files/links` — one per requested file, in the request's
+   * order, each named by exactly one of its record's id (`file_id`) and its address (`uri`).
+   *
+   * **Branch on each item's `error`, never on the status**: the request is a `200` whenever every
+   * file got a verdict. A linked file carries its `url`, a presigned `GET` valid for fifteen
+   * minutes, with its `expires_at`, the `name` the download saves under and its `media_type`, and
+   * a `null` `error`. A file that got no link carries `error`, `{ code, detail }`, and `null` link
+   * members: `not_found` for an unknown file id, `conflict` for a file whose upload has not
+   * finished, `invalid_storage_uri` for a malformed address and `forbidden` for another
+   * organization's.
+   *
+   * Each link is signed with a `Content-Disposition` naming the file, so a download saves under
+   * the name a person sees rather than the bytes' hash. It opens in place (`inline`) for an image,
+   * a PDF or plain text and downloads (`attachment`) for every other type, SVG, HTML and XML
+   * included, so a file that could run scripts never opens from a link. A file named by its id is
+   * linked under its record's name; an address under the name of its first stored record, the
+   * caller's before another member's, whose id the item's `file_id` names. A link is a bearer
+   * capability: keep it out of logs, and ask again for a fresh one rather than storing it.
+   *
+   * Sends each file as `{ file_id }` or `{ uri }` and nothing else: the body is closed. Throws
+   * `RequestArgumentError` before any request when `files` is not a list, or one of its items does
+   * not name exactly one of `file_id` and `uri` as a non-empty string. Throws `ApiResponseError`:
+   * `422` `request.invalid` for more than 100 files, or an id or address longer than one can be;
+   * `500` `pipelex.storage.not_configured` when the platform cannot sign at all. An answer that is not one item per requested file, each an
+   * object with its `url` or its `error`, is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` whose body hides every link.
+   */
+  async linkFiles(files) {
+    if (!Array.isArray(files)) {
+      throw argumentRefusal(
+        "linkFiles",
+        { name: "files", what: "a list of files to link" },
+        describeNumberArgument(files),
+        "not_a_list"
+      );
+    }
+    const targets = files.map((target) => fileLinkTarget(target));
+    const res = withLinks(
+      await this.requestProductAnswer("POST", "files/links", { files: targets })
+    );
+    const answer = this.readObjectAnswer("POST", "files/links", res);
+    const items = answer.items;
+    if (!Array.isArray(items) || items.length !== targets.length) {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/files/links`,
+        res,
+        "an answer that is not one item per requested file"
+      );
+    }
+    for (const item of items) {
+      const linked = isPlainObject(item) && item.error === null && typeof item.url === "string";
+      const refused = isPlainObject(item) && isPlainObject(item.error) && item.url === null;
+      if (!linked && !refused) {
+        throw this.unreadableAnswer(
+          "POST",
+          `/${API_PREFIX2}/files/links`,
+          res,
+          "an item that carries neither a link nor an error"
+        );
+      }
+    }
+    return answer;
+  }
+  /**
+   * Ask for one zip of chosen files, or of a run's files — `POST /v1/files/archives` — and return
+   * the archive, `queued`.
+   *
+   * The platform cannot build a zip inside a request, so the zip is two calls: this one queues the
+   * archive and answers at once (`202`), and `getFileArchive` reads it until its `state` is `ready`,
+   * whose `url` downloads the zip, or `failed`, whose `failure` says why. Name the files by exactly
+   * one of `file_ids`, in the order the zip holds them, and `run_id`, whose zip holds what went in
+   * and what came out of the run, never a file it made along the way nor an input given as a web
+   * link. `name` is the name the zip downloads under (see `FileArchiveRequest`). An archive is never
+   * a file: no list shows it, and it is gone a day after it was asked for.
+   *
+   * Sends `file_ids` or `run_id`, and `name` when given, and nothing else: the body is closed, and a
+   * `null` member reads as not given. Throws `RequestArgumentError` before any request when the
+   * request names both or neither of `file_ids` and `run_id`, when `file_ids` is not a non-empty
+   * list of non-empty strings, when `run_id` is not a non-empty string, and when `name` is not a
+   * string. Throws `ApiResponseError`:
+   *
+   * - `422` `pipelex.files.archive_too_large` past a cap, at most 500 files or 2,000,000,000
+   *   bytes, whose problem's `limit` member names it (`FileArchiveLimit`), so the person can be told
+   *   how far over the selection is;
+   * - `422` `request.invalid` for more than 1,000 ids listed, or an id longer than one can be;
+   * - `404` `pipelex.storage.not_found` for a file that is not the organization's, the `detail`
+   *   naming up to five of them, or a run whose files hold nothing stored to zip; `404`
+   *   `run.not_found` for a run that is not the organization's;
+   * - `409` `run.not_finished`, `retry` `yes`, for a run whose files are not all recorded yet,
+   *   which the same request clears a few seconds after the run ends, and a `409` with `retry` `no`
+   *   for a selected file whose upload has not finished;
+   * - `503` `runtime.unavailable`, `retry` `yes`, when the archive could not be queued: the same
+   *   request sent again asks for a new archive.
+   *
+   * An answer that is not an archive, an object with a string `archive_id` and a known `state`, is
+   * an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async requestFileArchive(request) {
+    const call = "requestFileArchive";
+    if (!isPlainObject(request)) {
+      throw argumentRefusal(
+        call,
+        { name: "request", what: "an archive request, an object naming `file_ids` or `run_id`" },
+        describeNumberArgument(request),
+        "not_an_object"
+      );
+    }
+    const raw = request;
+    const fileIds = raw.file_ids ?? void 0;
+    const runId = raw.run_id ?? void 0;
+    const name = raw.name ?? void 0;
+    if (fileIds === void 0 === (runId === void 0)) {
+      throw new RequestArgumentError(
+        `${call}() names the files to zip by exactly one of file_ids and run_id; got ${fileIds === void 0 ? "neither" : "both"}.`,
+        { problem: argumentInvalidProblem("file_ids", "not_exactly_one") }
+      );
+    }
+    const body = {};
+    if (fileIds !== void 0) {
+      if (!Array.isArray(fileIds) || fileIds.length === 0) {
+        throw argumentRefusal(
+          call,
+          { name: "file_ids", what: "file_ids, a non-empty list of the file ids to zip" },
+          Array.isArray(fileIds) ? "an empty list" : describeNumberArgument(fileIds),
+          Array.isArray(fileIds) ? "empty" : "not_a_list"
+        );
+      }
+      body.file_ids = fileIds.map(
+        (id) => requireNonEmptyId(id, call, ARCHIVE_FILE_ID_ARGUMENT)
+      );
+    } else {
+      body.run_id = requireNonEmptyId(runId, call, ARCHIVE_RUN_ID_ARGUMENT);
+    }
+    if (name !== void 0) {
+      if (typeof name !== "string") {
+        throw argumentRefusal(
+          call,
+          ARCHIVE_NAME_ARGUMENT,
+          describeNumberArgument(name),
+          "not_a_string"
+        );
+      }
+      body.name = name;
+    }
+    const res = await this.requestProductAnswer("POST", "files/archives", body);
+    return this.readFileArchive("POST", "files/archives", res);
+  }
+  /**
+   * Where an archive stands — `GET /v1/files/archives/{archive_id}` — with a fresh link to its zip
+   * once it is `ready`.
+   *
+   * **Branch on `state`.** `queued` and `building` mean read it again shortly: a zip of a few files
+   * is ready within seconds, and the largest the caps allow within a few minutes. `ready` carries
+   * `url`, a presigned `GET` of the zip valid for fifteen minutes and signed with a
+   * `Content-Disposition` naming the archive's `name`, with `archive_bytes` and `ready_at`; each read
+   * signs a fresh link, so a caller that let one lapse reads the archive again. `failed` carries
+   * `failure`, `file_gone` or `build_failed`, and the remedy for both is a new request. An archive
+   * still `queued` or `building` an hour after it was asked for reads as `failed`.
+   *
+   * Throws `RequestArgumentError` for an archive id that is empty, `.` or `..`, or holds a lone
+   * surrogate, before any request. Throws `ApiResponseError`: `404` `pipelex.storage.not_found` for
+   * an archive that is not the organization's, never existed, or has expired, a day after
+   * `created_at`; `500` when the link cannot be signed. An answer that is not an archive is an
+   * answer the SDK cannot read, thrown as an `ApiResponseError` whose body hides the link.
+   */
+  async getFileArchive(archiveId) {
+    const segment = idPathSegment(archiveId, "getFileArchive", ARCHIVE_ID_ARGUMENT);
+    const endpoint = `files/archives/${segment}`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    return this.readFileArchive("GET", endpoint, res);
+  }
+  /**
+   * An archive as `res` carried it, checked to be one: an object with a string `archive_id` and a
+   * `state` this SDK knows, the field a caller branches on. Anything else is an answer the SDK
+   * cannot read, thrown as the `ApiResponseError` `unreadableAnswer` builds with every link hidden,
+   * since a ready archive's answer carries one.
+   */
+  readFileArchive(method, endpoint, res) {
+    const linked = withLinks(res);
+    const archive = this.readObjectAnswer(method, endpoint, linked);
+    if (typeof archive.archive_id !== "string") {
+      throw this.unreadableAnswer(
+        method,
+        `/${API_PREFIX2}/${endpoint}`,
+        linked,
+        "an archive whose `archive_id` is not a string"
+      );
+    }
+    if (!FILE_ARCHIVE_STATES.includes(archive.state)) {
+      throw this.unreadableAnswer(
+        method,
+        `/${API_PREFIX2}/${endpoint}`,
+        linked,
+        `an archive whose \`state\` is not ${inWords(
+          FILE_ARCHIVE_STATES.map((state) => `\`${state}\``),
+          "or"
+        )}`
+      );
+    }
+    return archive;
+  }
+  /**
+   * Copy one of the organization's files into a method's draft —
+   * `POST /v1/methods/{id}/draft/files/from-file`, "Add to method files".
+   *
+   * The file becomes a file of the draft at `path`, replacing a file already there. Its bytes are
+   * copied into the organization's blob store by the storage service itself, so they never cross
+   * the client or the API whatever their size, and are skipped when the store already holds them.
+   * The method file then lives apart from its source: erasing the file's record, the run that made
+   * it or the method it came from leaves it readable.
+   *
+   * The answer is a `DraftFileFromFileResult`, a `200` discriminated on `blob`: `copied`, or
+   * `already_held` when the store held the bytes and nothing was copied. Both carry the `file` as
+   * the draft's tree now names it and the `method` as the draft write stored it, whose
+   * `updated_at` is the new draft token. With `expected_updated_at`, the write is a
+   * compare-and-swap on the draft token; without it, the file is added to the draft as it stands,
+   * never erasing someone else's save.
+   *
+   * Takes a bare catalog id, as `writeDraft` does. Sends `file_id`, `path` and, when given,
+   * `expected_updated_at`, and nothing else: the body is closed, and a `null` token reads as not
+   * given. Throws `RequestArgumentError` before any request for a `file_id` or a `path` that is not
+   * a non-empty string, and an `expected_updated_at` that is not a string. Throws
+   * `ApiResponseError`: `403` `auth.forbidden` for a role that may not change methods; `404`
+   * for an unknown method or a file that is not the organization's; `409` `pipelex.catalog.being_deleted`,
+   * `409` `pipelex.catalog.update_conflict` for a stale `expected_updated_at`, and `409` `conflict` for a
+   * file whose upload has not finished or whose stored bytes do not match its record; and `422`
+   * `method.package_invalid` for a path the draft cannot hold, such as `.env` or `../logo.png`,
+   * naming the path in its `params`, and past the deployment's limits, its `params` carrying
+   * `reason` `too_large` and the integer `limit`. An answer whose `blob` is neither arm's, or
+   * whose `file` or `method` is not an object, is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` too.
+   */
+  async copyFileIntoDraft(methodId, input) {
+    const call = "copyFileIntoDraft";
+    const endpoint = `${methodPath(methodId, call)}/draft/files/from-file`;
+    const {
+      file_id: fileId,
+      path: path2,
+      expected_updated_at: token
+    } = input ?? {};
+    const body = {
+      file_id: requireNonEmptyId(fileId, call, FILE_ID_ARGUMENT),
+      path: requireNonEmptyId(path2, call, DRAFT_PATH_ARGUMENT)
+    };
+    if (token != null) {
+      if (typeof token !== "string") {
+        throw argumentRefusal(
+          call,
+          DRAFT_TOKEN_ARGUMENT,
+          describeNumberArgument(token),
+          "not_a_string"
+        );
+      }
+      body.expected_updated_at = token;
+    }
+    const res = await this.requestProductAnswer("POST", endpoint, body);
+    const answer = this.readObjectAnswer("POST", endpoint, res);
+    let fault2;
+    if (!DRAFT_FILE_BLOBS.includes(answer.blob)) {
+      fault2 = `whose \`blob\` is not ${inWords(
+        DRAFT_FILE_BLOBS.map((blob) => `\`${blob}\``),
+        "or"
+      )}`;
+    } else if (!isPlainObject(answer.file)) fault2 = "whose `file` is not an object";
+    else if (!isPlainObject(answer.method)) fault2 = "whose `method` is not an object";
+    if (fault2 !== void 0) {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a copy into a draft ${fault2}`
+      );
+    }
+    return answer;
+  }
+  /**
    * One PAGE of a method's runs, newest first — `GET /v1/runs?method_id=`.
    *
    * **This returns a page, not the whole history.** The API serves it from a
@@ -18292,7 +19347,7 @@ var PipelexApiClient = class {
    * `iterateRuns` does the latter for you.
    *
    * Each item is a `RunHistoryItem` — the id, status, timestamps, pipe and,
-   * for a failed run, its error report. The run's organization, creator,
+   * for a failed run, its own problem. The run's organization, creator,
    * method and workflow id are not on the list; `getRunDetail` returns them.
    *
    * `createdFrom` / `createdTo` are applied server-side as index key
@@ -18323,7 +19378,7 @@ var PipelexApiClient = class {
       cursor: query.cursor
     });
     const page = await this.requestPage(`runs${search}`);
-    return { items: page.items.map(withCheckedReport), nextCursor: page.nextCursor };
+    return { items: page.items.map(withCheckedProblem), nextCursor: page.nextCursor };
   }
   /**
    * Every run of a method, streamed — follows the cursor for you.
@@ -18361,8 +19416,8 @@ var PipelexApiClient = class {
    * The whole record for one run — `GET /v1/runs/{id}`.
    *
    * The ONLY call that returns what the run actually executed and its
-   * `inputs`. Kept off the status read, which pollers hit every few seconds. A failed run's stored report, `error`, is checked field by
-   * field (see `RunErrorReport`).
+   * `inputs`. Kept off the status read, which pollers hit every few seconds. A failed run's problem, `error`, is kept when it is a
+   * problem document and read as `null` otherwise.
    *
    * Read with `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in the inputs is a
    * `bigint` holding its exact digits, and the inputs passed back to `start` or saved as an
@@ -18371,9 +19426,57 @@ var PipelexApiClient = class {
   async getRunDetail(runId) {
     const endpoint = `runs/${idPathSegment(runId, "getRunDetail", RUN_ID_ARGUMENT)}`;
     const res = await this.requestProductAnswer("GET", endpoint, void 0);
-    return withCheckedReport(
+    return withCheckedProblem(
       this.readObjectAnswer("GET", endpoint, res, {}, parseExactJson)
     );
+  }
+  /**
+   * One page of a run's files, sorted by where they sit in the run — `GET /v1/runs/{id}/files`.
+   *
+   * Each entry carries its `mark`, `input`, `final` or `intermediate`, and the record a surface
+   * shows for it (`RunFileEntry`): `inputs` are what went in, the inputs given by their address
+   * with the record of the member who started the run first, then the inline inputs; `outputs` are
+   * the run's final outputs; `intermediates` the files it made along the way. An input given as a
+   * web link gets no record and is listed in `links`, with the warning that replaying the run needs
+   * it to still serve the same file.
+   *
+   * **`state` is `listing` until the platform has recorded every file of the run**, a few seconds
+   * after it ends: read it again until it is `listed` before taking the list as whole. The run's
+   * own records are paged by address with `limit` and `cursor`; the inputs by address and the links
+   * come on the first page only. Pass `nextCursor` back as `cursor`; `null` is the last page.
+   *
+   * Throws `RequestArgumentError` for a run id that is empty, `.` or `..`, or holds a lone
+   * surrogate, before any request. Throws `ApiResponseError`: `404` for a run that is not the
+   * organization's, exactly as for one that does not exist; `400` for a run id holding a character
+   * outside letters, digits, `_` and `-`, or a cursor another listing issued; `422` for a `limit`
+   * outside 1 to 200. A page whose `state` is unknown, whose lists are not arrays, or whose `next_cursor` is neither a
+   * string nor `null`, is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async listRunFiles(runId, query = {}) {
+    const segment = idPathSegment(runId, "listRunFiles", RUN_ID_ARGUMENT);
+    const search = productQuery({ limit: query.limit, cursor: query.cursor });
+    const endpoint = `runs/${segment}/files${search}`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    const page = this.readObjectAnswer("GET", endpoint, res);
+    const { next_cursor: nextCursor, ...rest } = page;
+    const notAList = RUN_FILES_LISTS.find((list) => !Array.isArray(page[list]));
+    let fault2;
+    if (!RUN_FILES_STATES.includes(page.state)) {
+      fault2 = "whose `state` is not `listing` or `listed`";
+    } else if (notAList !== void 0) {
+      fault2 = `whose \`${notAList}\` is not an array`;
+    } else if (nextCursor !== null && typeof nextCursor !== "string") {
+      fault2 = "whose `next_cursor` is neither a string nor null";
+    }
+    if (fault2 !== void 0) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a page of a run's files ${fault2}`
+      );
+    }
+    return { ...rest, nextCursor };
   }
   /** Patch a run's status (admin/manual) — `PUT /v1/runs/{id}`. */
   async updateRun(runId, input) {
@@ -18395,7 +19498,8 @@ var PipelexApiClient = class {
     const treeForms = treeFormsGiven(forms);
     if (!options.pipe_code && treeForms.length === 0 && Object.keys(api).length === 0 && Object.keys(hosted).length === 0 && Object.keys(extensions).length === 0) {
       throw new RequestArgumentError(
-        `Either pipe_code, the method's tree (directory, contents, tree or files), a method_ref, a hosted method_id or a server-specific extension arg (extra) must be provided to ${call}().`
+        `Either pipe_code, the method's tree (directory, contents, tree or files), a method_ref, a hosted method_id or a server-specific extension arg (extra) must be provided to ${call}().`,
+        { problem: argumentInvalidProblem("pipe_code", "nothing_to_run") }
       );
     }
     assertMethodRefPairsWithNothing(options, treeForms);
@@ -18493,7 +19597,8 @@ function buildExtensions2(extra) {
   const reserved = Object.keys(snapshot).filter((key) => RESERVED_EXTRA_KEYS.has(key));
   if (reserved.length > 0) {
     throw new RequestArgumentError(
-      `extra carries reserved request args [${reserved.sort().join(", ")}] \u2014 pass them as named options instead.`
+      `extra carries reserved request args [${reserved.sort().join(", ")}] \u2014 pass them as named options instead.`,
+      { problem: argumentInvalidProblem("extra", "reserved_argument") }
     );
   }
   const result = {};
@@ -18537,14 +19642,16 @@ function carriesExtraBundle(extensions) {
 }
 function directoryRefusal(call) {
   return new RequestArgumentError(
-    `${call}() got a directory that is not a path: give the method's directory as a string.`
+    `${call}() got a directory that is not a path: give the method's directory as a string.`,
+    { problem: argumentInvalidProblem("directory", "not_a_string") }
   );
 }
 function checkedTreeSource(call, value) {
   const fault2 = treeShapeFault(value);
   if (fault2 !== void 0) {
     throw new RequestArgumentError(
-      `${call}() got a tree that is not a listed method tree \u2014 its files, its digest and a readFile \u2014 such as the MethodTree listMethodTree returns; got ${fault2}.`
+      `${call}() got a tree that is not a listed method tree \u2014 its files, its digest and a readFile \u2014 such as the MethodTree listMethodTree returns; got ${fault2}.`,
+      { problem: argumentInvalidProblem("tree", "not_a_tree") }
     );
   }
   return value;
@@ -18570,7 +19677,8 @@ async function inlineWithin(tree, call, sending, maxInlineBytes, read, signal) {
 }
 function inlineLimitRefusal(call, sending, measured, weight, limit) {
   return new RequestArgumentError(
-    `${call}() cannot send the method's tree: the API keeps no blob store, so the tree travels inline, and ${measured} ${weight} bytes, past the ${limit} bytes it takes inline (its max_inline_bytes), so ${sending.unsent}.`
+    `${call}() cannot send the method's tree: the API keeps no blob store, so the tree travels inline, and ${measured} ${weight} bytes, past the ${limit} bytes it takes inline (its max_inline_bytes), so ${sending.unsent}.`,
+    { problem: argumentInvalidProblem("files", "past_inline_limit") }
   );
 }
 function buildApiRunExtensions(options) {
@@ -18586,8 +19694,8 @@ function protocolTreeForms(call, options) {
   try {
     assertOneMethodSource({ files: options.files ?? null, tree: options.tree ?? null });
   } catch (err) {
-    if (err instanceof PipelineRequestError) {
-      throw new RequestArgumentError(err.message, { cause: err });
+    if (err instanceof ProblemError) {
+      throw new RequestArgumentError(err.message, { cause: err, problem: err.problem });
     }
     throw err;
   }
@@ -18614,12 +19722,14 @@ function assertMethodRefPairsWithNothing(options, treeForms) {
   if (nonEmptyString3(options.method_ref) === void 0) return;
   if (treeForms.length > 0) {
     throw new RequestArgumentError(
-      `method_ref and the method's tree (${treeForms.join(", ")}) are mutually exclusive: a published method's tree is its package's own. Send one or the other.`
+      `method_ref and the method's tree (${treeForms.join(", ")}) are mutually exclusive: a published method's tree is its package's own. Send one or the other.`,
+      { problem: argumentInvalidProblem("method_ref", "mutually_exclusive") }
     );
   }
   if (nonEmptyString3(options.method_id) !== void 0) {
     throw new RequestArgumentError(
-      "method_ref and method_id are mutually exclusive: an address run carries its own provenance and takes no run-history linkage id. Send exactly one method selector."
+      "method_ref and method_id are mutually exclusive: an address run carries its own provenance and takes no run-history linkage id. Send exactly one method selector.",
+      { problem: argumentInvalidProblem("method_ref", "mutually_exclusive") }
     );
   }
 }
@@ -18628,7 +19738,8 @@ function assertLinkageMethodIdIsBare(options, treeForms) {
   if (methodId === void 0 || !methodId.includes("@")) return;
   if (treeForms.length === 0) return;
   throw new RequestArgumentError(
-    `method_id "${methodId}" beside the method's tree is run-history linkage and must be a bare catalog id: the tree is what runs, so a version suffix would claim a version that did not. Send the bare id (parseMethodSelector(...).method_id), or drop the tree to run the version the selector names.`
+    `method_id "${methodId}" beside the method's tree is run-history linkage and must be a bare catalog id: the tree is what runs, so a version suffix would claim a version that did not. Send the bare id (parseMethodSelector(...).method_id), or drop the tree to run the version the selector names.`,
+    { problem: argumentInvalidProblem("method_id", "version_suffix_beside_inline_source") }
   );
 }
 function nonEmptyString3(value) {
@@ -18637,22 +19748,27 @@ function nonEmptyString3(value) {
 var IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 var MAX_IDEMPOTENCY_KEY_LENGTH = 255;
 var VISIBLE_ASCII = /^[\x21-\x7E]+$/;
-function idempotencyKeyOf(options) {
+function idempotencyKeyOf(options, request = "start the run") {
   const key = options.idempotencyKey;
   if (key == null) return void 0;
   const fault2 = idempotencyKeyFault(key);
   if (fault2 !== void 0) {
     throw new RequestArgumentError(
-      `The idempotency key must be 1 to ${MAX_IDEMPOTENCY_KEY_LENGTH} visible ASCII characters (\`!\` to \`~\`), and this one ${fault2}. Leave it out to start the run without one.`
+      `The idempotency key must be 1 to ${MAX_IDEMPOTENCY_KEY_LENGTH} visible ASCII characters (\`!\` to \`~\`), and this one ${fault2.words}. Leave it out to ${request} without one.`,
+      { problem: argumentInvalidProblem("idempotency_key", fault2.reason) }
     );
   }
   return key;
 }
 function idempotencyKeyFault(key) {
-  if (typeof key !== "string") return "is not a string";
-  if (key.length === 0) return "is empty";
-  if (!VISIBLE_ASCII.test(key)) return "holds a character outside visible ASCII";
-  if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) return `is ${key.length} characters long`;
+  if (typeof key !== "string") return { words: "is not a string", reason: "not_a_string" };
+  if (key.length === 0) return { words: "is empty", reason: "empty" };
+  if (!VISIBLE_ASCII.test(key)) {
+    return { words: "holds a character outside visible ASCII", reason: "not_visible_ascii" };
+  }
+  if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+    return { words: `is ${key.length} characters long`, reason: "too_long" };
+  }
   return void 0;
 }
 function withValidateMarkdownRender2(render) {
@@ -18663,13 +19779,15 @@ function withValidateMarkdownRender2(render) {
 var GATEWAY_TIMEOUT_THRESHOLD_MS = 28e3;
 function isGatewayCutOff(error, elapsedMs) {
   if (elapsedMs < GATEWAY_TIMEOUT_THRESHOLD_MS) return false;
-  if (error instanceof ApiResponseError) return error.status === 503 || error.status === 504;
-  if (error instanceof ApiUnreachableError) return error.code === "ABORT_TIMEOUT";
+  if (error instanceof ApiResponseError) {
+    return (error.status === 503 || error.status === 504) && readProblemBody(error.responseBody) === void 0;
+  }
+  if (error instanceof ApiUnreachableError) return error.networkCode === ABORT_TIMEOUT;
   return false;
 }
 var UNDECODABLE_BODY_CODE = /^(Z_|ERR__ERROR_|ZSTD_error_)/;
-function isUndecodableBody(error) {
-  return error.code !== void 0 && UNDECODABLE_BODY_CODE.test(error.code);
+function isUndecodableBody(code) {
+  return code !== void 0 && UNDECODABLE_BODY_CODE.test(code);
 }
 var SHA256_HEX3 = /^[0-9a-f]{64}$/;
 function withLinks(res) {
@@ -18719,12 +19837,10 @@ function extractNetworkErrorCode(err) {
   return void 0;
 }
 function isMissingRoute404(body) {
-  if (!body) return true;
   const reading = parseJsonBody(body);
-  if (!reading.ok) return true;
-  const parsed = reading.value;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return true;
-  return !("code" in parsed);
+  if (!reading.ok || !isPlainObject(reading.value)) return true;
+  const code = reading.value["code"];
+  return typeof code !== "string" || code === "" || code === "request.not_found";
 }
 function isCompletedRunAnswer(answer) {
   const { pipeline_run_id: runId, pipe_output: pipeOutput } = answer;
@@ -18738,21 +19854,38 @@ function parseRetryAfter(headers) {
   const seconds = Number(raw);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
-var REQUEST_ID_HEADER = "x-request-id";
-function runResultFailed(runId, body) {
-  const { serverMessage, document } = parseErrorBody(body);
-  const message = serverMessage ?? "Run finished without a result.";
+function runResultConflict(runId, res) {
+  const problem = readProblemBody(res.body);
+  if (problem === void 0) return void 0;
+  if (problem.code === "run.not_finished") {
+    const retryAfter = problem.retry_after !== void 0 ? Math.ceil(problem.retry_after) : parseRetryAfter(res.headers);
+    return {
+      state: "running",
+      pipeline_run_id: runId,
+      retry_after_seconds: retryAfter ?? DEFAULT_DEGRADED_RETRY_SECONDS
+    };
+  }
+  if (problem.code !== "run.failed") return void 0;
+  const nested = problem.run_error;
   return {
     state: "failed",
     pipeline_run_id: runId,
-    status: knownRunStatus(document?.run_status) ?? statusFromDetail(message) ?? "FAILED",
-    message,
-    error: readRunErrorReport(document?.error)
+    status: knownRunStatus(problem.params?.run_status) ?? "FAILED",
+    message: problem.detail,
+    problem: problem.status === void 0 ? { ...problem, status: res.status } : problem,
+    error: isProblem(nested) ? nested : null
   };
 }
-function withCheckedReport(record) {
+function withVerdictItems(answer) {
+  if (!isPlainObject(answer)) return answer;
+  const read = { ...answer };
+  if (answer.is_valid === false) read.errors = readProblemItems(answer.errors);
+  else if (Object.hasOwn(answer, "warnings")) read.warnings = readProblemItems(answer.warnings);
+  return read;
+}
+function withCheckedProblem(record) {
   if (!isPlainObject(record) || !Object.hasOwn(record, "error")) return record;
-  return { ...record, error: readRunErrorReport(record.error) };
+  return { ...record, error: isProblem(record.error) ? record.error : null };
 }
 function withCheckedDegradation(run) {
   if (!Object.hasOwn(run, "degradation")) return run;
@@ -18760,72 +19893,6 @@ function withCheckedDegradation(run) {
 }
 function knownRunStatus(value) {
   return typeof value === "string" && RUN_STATUSES.includes(value) ? value : void 0;
-}
-function statusFromDetail(detail) {
-  return knownRunStatus(/status\s+([A-Z_]+)/.exec(detail)?.[1]);
-}
-function parseErrorBody(body) {
-  const empty = {
-    errorType: void 0,
-    serverMessage: void 0,
-    validationErrors: void 0,
-    code: void 0,
-    details: {},
-    document: void 0
-  };
-  if (!body) return empty;
-  const reading = parseJsonBody(body);
-  if (!reading.ok || !isPlainObject(reading.value)) {
-    return empty;
-  }
-  const root = reading.value;
-  const detail = root.detail;
-  let errorType;
-  let serverMessage;
-  if (detail && typeof detail === "object") {
-    const d = detail;
-    if (typeof d.error_type === "string") errorType = d.error_type;
-    if (typeof d.message === "string") serverMessage = d.message;
-  } else if (typeof detail === "string") {
-    serverMessage = detail;
-  }
-  if (errorType === void 0 && typeof root.error_type === "string") errorType = root.error_type;
-  if (serverMessage === void 0 && typeof root.message === "string") serverMessage = root.message;
-  const validationErrors = Array.isArray(root.validation_errors) ? root.validation_errors.filter(isValidationItem) : void 0;
-  const code = typeof root.code === "string" ? root.code : void 0;
-  const details = {
-    type: stringMember(root.type),
-    title: stringMember(root.title),
-    instance: stringMember(root.instance),
-    requestId: stringMember(root.request_id),
-    errorDomain: stringMember(root.error_domain),
-    errorCategory: stringMember(root.error_category),
-    retryable: typeof root.retryable === "boolean" ? root.retryable : void 0,
-    userAction: parseUserAction(root.user_action),
-    model: stringMember(root.model),
-    provider: stringMember(root.provider),
-    // The nested members are checked one level down by the readers a stored report goes
-    // through, so a misfit field reads as absent here exactly as it does there.
-    providerMetadata: isPlainObject(root.provider_metadata) ? readProviderMetadata(root.provider_metadata) : void 0,
-    migration: isPlainObject(root.migration) ? readMigration(root.migration) : void 0,
-    errors: Array.isArray(root.errors) ? root.errors.filter(isPlainObject).map(readFieldError) : void 0
-  };
-  return { errorType, serverMessage, validationErrors, code, details, document: root };
-}
-function stringMember(value) {
-  return typeof value === "string" && value.length > 0 ? value : void 0;
-}
-function parseUserAction(value) {
-  if (!isPlainObject(value)) return void 0;
-  const { kind, detail } = value;
-  if (typeof kind !== "string" || typeof detail !== "string" || detail.length === 0) {
-    return void 0;
-  }
-  return { kind, detail };
-}
-function nonEmptyHeader(headers, name) {
-  const value = headers.get(name)?.trim();
-  return value ? value : void 0;
 }
 
 // src/hooks/validate-client.ts
@@ -18857,11 +19924,12 @@ async function runValidateStage(filePath, options = {}) {
       };
     }
     if (result.is_valid === false) {
+      const answer = { ...result };
       return {
         status: "invalid",
-        message: result.message,
-        validationErrors: Array.isArray(result.validation_errors) ? result.validation_errors : [],
-        renderedMarkdown: result.rendered_markdown,
+        message: stringMember(answer.message),
+        errors: readProblemItems(answer.errors),
+        renderedMarkdown: stringMember(answer.rendered_markdown),
         withheld
       };
     }
@@ -18869,6 +19937,9 @@ async function runValidateStage(filePath, options = {}) {
   } catch {
     return { status: "unavailable" };
   }
+}
+function stringMember(value) {
+  return typeof value === "string" ? value : void 0;
 }
 
 // src/hooks/claude-mthds-check.ts
