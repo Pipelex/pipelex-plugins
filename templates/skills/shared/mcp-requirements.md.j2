@@ -1,26 +1,27 @@
 {#- The Pipelex MCP requirements, shared by every MCP-backed skill: its two stops.
 
    Box F of the size diet's design (L-260923-a9bdfe) shrank this block to the stops a
-   model must have read before it acts — an absent tool, a `config`-class error
-   surfaced verbatim — and moved what to tell the user about connecting the
-   workshop and where its key comes from into `shared/credentials.md`, a
-   reference rendered per target and read when one of those stops fires. The
-   stop stays here; only its recovery moved.
+   model must have read before it acts — an absent tool, and a problem in the
+   `account` domain (a missing or refused key, a role, the organization's credit)
+   or an unreachable API, its next step relayed verbatim — and moved what to tell
+   the user about connecting the workshop and where its key comes from into
+   `shared/credentials.md`, a reference rendered per target and read when one of
+   those stops fires. The stop stays here; only its recovery moved.
 
    The including template sets what it changes with `{% set %}` before the
    include; anything it leaves alone falls back to the common wording:
 
      mcp_absent_lead          — "the tool is" (default), "the tools are", "a tool is"
      mcp_absent_suffix        — a sentence appended to the absent-tool bullet
-     mcp_config_parenthetical — the aside between the `config` class and the comma
-     mcp_config_suffix        — a sentence appended to the config-error bullet
-     mcp_requirements_extra   — a bullet rendered after the config-error bullet,
+     mcp_config_parenthetical — the aside between the problem it names and the comma
+     mcp_config_suffix        — a sentence appended to the account-problem bullet
+     mcp_requirements_extra   — a bullet rendered after the account-problem bullet,
                                 for a skill whose own tool note sits there
 
    The fragment strips its own trailing newline (the closing comment below), so
    it can be included inline as well as on a line of its own. -#}
 - **If {{ mcp_absent_lead | default("the tool is") }} absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference]({{ shared_dir }}/credentials.md#the-tool-is-absent) says for {{ harness_name }}.{{ mcp_absent_suffix | default("") }}
-- **If a call returns `status: "error"` with an error of class `config`**{{ mcp_config_parenthetical | default(" (missing or rejected `PIPELEX_API_KEY`, unreachable API)") }}, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from]({{ shared_dir }}/credentials.md#where-the-key-comes-from) before saying anything more.{{ mcp_config_suffix | default("") }}
+- **If a call returns a problem in the `account` domain, or `client.unreachable`**{{ mcp_config_parenthetical | default(" (missing or rejected `PIPELEX_API_KEY`, unreachable API)") }}, STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from]({{ shared_dir }}/credentials.md#where-the-key-comes-from) before saying anything more.{{ mcp_config_suffix | default("") }}
 {%- if mcp_requirements_extra is defined %}
 {{ mcp_requirements_extra }}
 {%- endif %}

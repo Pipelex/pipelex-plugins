@@ -67,8 +67,8 @@ class TestPipelexRunSkill:
         at_the_decision = {
             "as `method_ref`: read [": ("references/by-id.md", "references/published-address.md"),
             "an address's verdict is reported as [": ("references/published-address.md",),
-            "Give `failure_message` **verbatim** first": ("references/failed-run.md",),
-            "| `mthds_run`: `input_domain` at `method_id`": ("references/linked-run.md",),
+            "Give the run's `run_error` **verbatim** first": ("references/failed-run.md",),
+            "| `mthds_run`: `pipelex.catalog.not_found`": ("references/linked-run.md",),
             "1. **Values the user gave in the request**": ("../shared/team-files.md",),
         }
         for decision, targets in at_the_decision.items():

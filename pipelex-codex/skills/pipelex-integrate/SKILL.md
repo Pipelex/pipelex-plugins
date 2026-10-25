@@ -12,7 +12,7 @@ Leave a project calling a method through one typed module, over generated types 
 ## Requirements
 
 - **If a tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Codex.
-- **If a call returns `status: "error"` with an error of class `config`**, STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. A **403** on `mthds_codegen` is a feature gate, not a key problem.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`**, STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more. A **403** on `mthds_codegen` is a feature gate, not a key problem.
 - **`mthds_list_methods`** is optional, for a method named without its id; never stop for it.
 
 ## Guards
@@ -75,7 +75,7 @@ Put the generated directory and the gate script step 10 copies in the formatter'
 
 - `status: "ok"`, `is_valid: true`, `output_dir` present → written; clean when `is_current: true` with an empty `orphans[]`.
 - **`orphans[]` non-empty and `drifts[]` empty** → carry on to step 7 and read [references/orphans.md](references/orphans.md). Read it off the two lists, never from `is_current`; `drifts[]` is present only when non-empty, so no `drifts` is the empty case.
-- **`output_dir already holds …, which this tool does not own`** → that file is the user's: never delete, move or clear it, and never offer to; choose or ask for another directory, before the call too.
+- **`client.target_exists`, a file this tool does not own** → that file is the user's: never delete, move or clear it, and never offer to; choose or ask for another directory, before the call too.
 - anything else (`drifts[]` included) → the stops.
 
 ### 7. The sidecar
@@ -126,10 +126,10 @@ What was generated and where, the target and why, the call site's signature, the
 
 | Condition | Do this |
 |---|---|
-| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `validation_errors[]` to `/pipelex-design` or `/pipelex-edit`, else finish it in `/pipelex-design` |
-| `input_domain` at `method_ref` / `method_id` | report it in the tool's words |
-| `runtime` | retry once (codegen: only if `retryable: true`, same `output_dir`), then report what landed |
-| `input_domain` at `output_dir`, outside the server's directory | step 1's containment: STOP, relaunch, say what is already written |
+| invalid, unrunnable, or `pending_signatures` | STOP, nothing generated: `errors[]` to `/pipelex-design` or `/pipelex-edit`, else finish it in `/pipelex-design` |
+| `domain: "input"` on `method_ref` / `method_id` | report it in the tool's words |
+| `retry: "yes"`, or codegen's `client.write_failed` | retry once (codegen: same `output_dir`), then report what landed |
+| `outside_workspace` at `output_dir` | step 1's containment: STOP, relaunch, say what is already written |
 | `is_current: false`, not step 6's orphans case | report `drifts[]` verbatim and stop; commit nothing |
 | no signature, by address or id | STOP as the fallback reference says; never guess the output concept |
 | `python-structures`, its `pipelex-sdk` after step 8 unread or below the floor, templated bundle | STOP, nothing generated: [python.md](references/python.md) |

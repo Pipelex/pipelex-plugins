@@ -1,6 +1,10 @@
 # A failed run
 
-Read this at step 8 when a run failed, after giving its `failure_message` verbatim and before routing it. Route once, on what the failure says, and stop; the guards of the skill's step 8 hold throughout.
+Read this at step 8 when a run failed, after giving its problem verbatim and before routing it. Route once, on what the failure says, and stop; the guards of the skill's step 8 hold throughout.
+
+The problem the run ended with is `run_error` on the failed state of `mthds_run_results`, `mthds_show_images` and `mthds_download_artifacts`, and `error` on `mthds_run_status`: its `code` (such as `run.timed_out`, `run.cancelled` or `model.unavailable`), its `domain` and `retry`, its `title`, `detail` and `next_step`, and its `errors`, the run's faults, of which `errors_omitted` counts those left out. The tool's summary renders it and closes with a support line, the run id, the code and the time the run ended: keep that line in the report, since it is what the people who run the platform find the run by. A run that stored no problem carries its status alone, and the summary says so.
+
+**Read the `domain` beside the wording.** `input` says the inputs must change and `method` that the method must; `runtime`, `account` and `operator` point away from both, at a provider, a quota, the organization's account or the platform, which is reported with its `next_step` rather than routed, unless the failure's own words match a row below.
 
 | What the failure says | Where it goes |
 |---|---|
@@ -13,7 +17,7 @@ Read this at step 8 when a run failed, after giving its `failure_message` verbat
 
 A folder, like listed `files`, sends `.mthds` files and the templates their steps name, never a `.py` file, and a linked id fetches nothing: a caller-supplied source takes precedence over the stored method, which is read only when no folder or files were sent at all, so a linked run gains its history entry and nothing else, the stored `.py` files included. A bundle whose `PipeFunc` names a module of its own folder therefore has **no channel for its Python on any run of the directory**, linked or not. The path that carries it is `/pipelex-catalog`: a saved method run by its id alone has its `.mthds` and `.py` assembled into the run bundle server-side, the draft's as `mt_…@draft` and a version's once it is published.
 
-So on a run of the directory the suspicion sharpens, but only when the failure says so. Where `failure_message` implicates finding or importing that function or its module, say that as the cause rather than offering it as one candidate among several, and give the cure: `/pipelex-catalog` saves the bundle with its Python as the method's draft, and `mt_…@draft`, run by its id alone, gets both. **Where it says anything else, route on what it says** — a missing input, a model or prompt fault, a failure upstream of the custom pipe — and leave the `PipeFunc` a suspect rather than promoting it: a bundle holding one is not evidence that it is what failed, and saving it with its Python cures nothing but that.
+So on a run of the directory the suspicion sharpens, but only when the failure says so. Where the run's problem implicates finding or importing that function or its module, say that as the cause rather than offering it as one candidate among several, and give the cure: `/pipelex-catalog` saves the bundle with its Python as the method's draft, and `mt_…@draft`, run by its id alone, gets both. **Where it says anything else, route on what it says** — a missing input, a model or prompt fault, a failure upstream of the custom pipe — and leave the `PipeFunc` a suspect rather than promoting it: a bundle holding one is not evidence that it is what failed, and saving it with its Python cures nothing but that.
 
 ## A published address
 

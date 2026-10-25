@@ -24,7 +24,7 @@ Start where the project stands: when `lab/<method>/` exists, read it and take up
 The loop needs the workshop: `/pipelex-run` starts and follows each run, and this skill reads each result with **`mthds_run_results`**, and with `mthds_run_status` and `mthds_download_artifacts`.
 
 - **If those tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. That stop comes at the loop: framing and setting up need no tool, so frame and set up, then stop before the loop.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 
 ## The lab directory
 

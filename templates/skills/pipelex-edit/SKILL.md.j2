@@ -52,7 +52,7 @@ Check the requested change against the scope split at the top. Structural or con
 Validate the whole bundle **before editing**: call `mthds_validate` on the bundle directory, and branch on the structured verdict, never on transport. {% include "skills/shared/validate-call.md.j2" %}
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
-- `is_valid: false` → the bundle is broken **before** your change: surface the `validation_errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
+- `is_valid: false` → the bundle is broken **before** your change: surface the `errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
 
 ### Step 4: Apply the edits
 
@@ -84,8 +84,8 @@ State what changed (files and constructs), give the verdict line from the summar
 
 | Condition | Do this |
 |---|---|
-| `status: "error"`, class `input_domain` | fix the call |
-| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| `status: "error"`, `domain: "input"` | fix the call |
+| any other `status: "error"` | report it, after one retry when its `retry` is `"yes"` |
 | the same construct fails twice after your edit | pause and show the user instead of thrashing |
 
 ## References

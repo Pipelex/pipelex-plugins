@@ -89,7 +89,7 @@ When the inputs came from a lab case and the lab did not start this run, offer `
 
 ### 8. A failed run is reported, then routed, never bisected
 
-Give `failure_message` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: {% include 'skills/shared/pipefunc-warning.md.j2' %} Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
+Give the run's `run_error` **verbatim** first, then read [failed-run.md](references/failed-run.md) before routing it; route once, and stop. When the method holds a `PipeFunc`, name it as a suspect: {% include 'skills/shared/pipefunc-warning.md.j2' %} Per-pipe bisection is not this skill's. Do not re-run a failed method with altered inputs to see what happens — that spends credit on a guess.
 
 ## Follow a run
 
@@ -105,7 +105,7 @@ An unknown run id is reported in the tool's own words.
 
 | Condition | Do this |
 |---|---|
-| `mthds_run`: `input_domain` at `method_id`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
+| `mthds_run`: `pipelex.catalog.not_found`, on a linked run | nothing was spent: read [linked-run.md](references/linked-run.md) before replying |
 | `mthds_download_artifacts` absent | say nothing was saved to disk and report the stored references as they came back; the run still completed |
 | `mthds_download_artifacts` refuses a `dir` the user named | take step 7's ignore check, then call again without it, which saves into `runs/<run_id>/`, and say so. A refused `dir` is not a failed save |
 
@@ -113,4 +113,4 @@ An unknown run id is reported in the tool's own words.
 
 {% include 'skills/shared/reference-names.md.j2' %}- [by-id.md](references/by-id.md), [published-address.md](references/published-address.md): an `mt_…` or a `method_ref` target, before the first call.
 - [failed-run.md](references/failed-run.md): a failed run, before routing it.
-- [linked-run.md](references/linked-run.md): a linked run refused at `method_id`.
+- [linked-run.md](references/linked-run.md): a linked run whose id is unknown.

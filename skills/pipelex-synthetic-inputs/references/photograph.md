@@ -58,7 +58,7 @@ Its description says what changes (the side, the angle, the damage) and repeats 
 
 **A room seen from two places keeps its materials and loses its walls.** The model draws what the description puts on the left and the right of the frame, but as a view straight down the room, wherever the photographer was said to stand. A second view "from the opposite corner", with the windows on its left and the fireplace on its right, therefore puts the two on facing walls, when the first photograph had them side by side. Write the room's plan before the first description, naming what is on each wall, and describe the second view by the wall it faces and what stands on the walls to its left and right: "facing the fireplace wall, the two windows on the right-hand wall, a bare wall on the left".
 
-Follow each run with `mthds_run_status` at the hint it gives, then `mthds_run_results` once it is terminal. A failed run is reported with its `failure_message` verbatim, and that photograph is left without a path; do not retry it with a reworded description on a guess.
+Follow each run with `mthds_run_status` at the hint it gives, then `mthds_run_results` once it is terminal. A failed run is reported with its problem, `run_error` (`error` on the status), verbatim, and that photograph is left without a path; do not retry it with a reworded description on a guess.
 
 ## 3. Save it
 
