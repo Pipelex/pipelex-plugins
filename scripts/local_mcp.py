@@ -66,6 +66,16 @@ MAKE_STATE = frozenset({"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL"})
 # user's shell, it belongs to some other tool, which the Makefile never reads, and stays.
 TARGET_VARIABLES = frozenset({"MCP", "MCP_VERSION", "WORKDIR", "ARGS"})
 
+# The interpreter the Makefile exports to every recipe, so that its own uv commands use this
+# repository's `.python-version` (or the `PYTHON_VERSION` or `UV_PYTHON` that asked for another).
+# It is this repository's pin, and in the session it would override the `.python-version` of the
+# project the agent works in, as it would the pin of the pipelex-mcp checkout `make build-local`
+# builds. So `UV_PYTHON` is always withheld: make sets it on every run, so one from the user's shell
+# cannot be told from it. `PYTHON_VERSION` is withheld as a target variable is, only when make's
+# command line gave it, and one the user's shell exports stays.
+MAKEFILE_EXPORTS = frozenset({"UV_PYTHON"})
+INTERPRETER_VARIABLES = frozenset({"PYTHON_VERSION"})
+
 # A word of `MAKEFLAGS` that assigns a variable: `NAME=value`, a space inside a value escaped with a backslash.
 MAKEFLAGS_ASSIGNMENT = re.compile(r"(?:^|(?<!\\)\s)([A-Za-z_][A-Za-z0-9_]*)=")
 
@@ -100,9 +110,12 @@ def without_make_handoff() -> dict[str, str]:
     the environment, and every make started below reads them there as its own command line: `ARGS`
     or `MCP` would override or fill the checkout's Makefile, and in the harness's session they
     would reach every make the agent runs, a project's own or a nested `make claude-local-mcp`.
-    A target variable `MAKEFLAGS` does not name came from the user's shell, and is kept.
+    A target variable `MAKEFLAGS` does not name came from the user's shell, and is kept. The
+    interpreter the Makefile exports is withheld whatever its source, since it is this repository's
+    pin and not the project's: see `MAKEFILE_EXPORTS`.
     """
-    handed = MAKE_STATE | (TARGET_VARIABLES & make_command_line(os.environ.get("MAKEFLAGS", "")))
+    given = make_command_line(os.environ.get("MAKEFLAGS", ""))
+    handed = MAKE_STATE | MAKEFILE_EXPORTS | ((TARGET_VARIABLES | INTERPRETER_VARIABLES) & given)
     return {name: value for name, value in os.environ.items() if name not in handed}
 
 

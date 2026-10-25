@@ -20,7 +20,7 @@ Every gesture between a bundle directory and the organization's catalog: [list a
 
 - **`mthds_list_methods`**, **`mthds_save_method`**, **`mthds_publish_method`** and **`mthds_get_method`** are required, with no fallback.
 - **If the catalog tools are absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Claude Code. Never report a method id, a name, a version, or a method as saved or published when the answer did not come from these tools.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 
 ## Guards
 
@@ -66,10 +66,10 @@ The target is a bundle directory.
 | a templated bundle answers `is_valid: false`, its template *not supplied with its bundle* | expected, as step 4 says: the draft runs only from its directory and cannot be published to run by id. **Never route it to editing** |
 | a save or a publish answers `is_valid: false` | a **produced verdict**, not an error: the save stored the draft anyway, and the publish published nothing. Report `validation_errors[]`; route a contract-preserving fix to `/pipelex-edit`, a structural one to `/pipelex-design` |
 | the bundle is valid with pending signatures | A **valid bundle with pending signatures is saved**, as a draft: say plainly that the method does not run yet, and which signatures are still open |
-| `input_domain` at `expected_updated_at`: the draft moved since this directory synced, or it holds a pulled version | nothing was written. Read [conflict.md](references/conflict.md) before replying: unless it finds this session's own save, give the user the timestamps and the ways forward it describes. **Never choose between them.** |
-| `input_domain` at `expected_draft_updated_at` | nothing was published: the draft moved since it was seen. Publish only once the user has seen it, saved or pulled, **never under the token the refusal names** |
-| `input_domain` at `method_id` | read [unknown-id.md](references/unknown-id.md) before concluding anything: several faults land there. A dead link is removed only on the user's yes, the one thing this skill ever takes off disk |
-| a create fails on a timeout or a transport fault | **does not retry.** A create carries no idempotency key yet, so a retry mints a second method: list the catalog first and see whether the first one landed |
+| a problem at `expected_updated_at`: the draft moved since this directory synced, or it holds a pulled version | nothing was written. Read [conflict.md](references/conflict.md) before replying: unless it finds this session's own save, give the user the timestamps and the ways forward it describes. **Never choose between them.** |
+| a problem at `expected_draft_updated_at` | nothing was published: the draft moved since it was seen. Publish only once the user has seen it, saved or pulled, **never under the token the refusal names** |
+| `pipelex.catalog.not_found`, or a problem at `method_id` | read [unknown-id.md](references/unknown-id.md) before concluding anything: its `code` tells the faults apart. A dead link is removed only on the user's yes, the one thing this skill ever takes off disk |
+| a create answers `client.outcome_unknown` | **does not retry.** A retry mints a second method: list the catalog first and see whether the first one landed |
 | the pull's directory holds a bundle of its own, or a link naming another method | somebody else's work: pull into another directory |
 | the pull's directory is linked to this method, files identical | only the link's `synced_updated_at` was refreshed: say the directory was already up to date |
 | linked, files differ, the saved method has **not** moved | the difference is local work this directory never saved: offer to [save](#save) it, or to pull into a new sibling directory to compare |
@@ -81,4 +81,4 @@ The target is a bundle directory.
 - [python.md](references/python.md): the bundle holds a `PipeFunc`, before choosing `python`.
 - [link-file.md](references/link-file.md): a save's `link_file` came back `written: false`.
 - [conflict.md](references/conflict.md): a save refused at `expected_updated_at`, or a restore.
-- [unknown-id.md](references/unknown-id.md): an `input_domain` error at `method_id`.
+- [unknown-id.md](references/unknown-id.md): a miss, or a problem at `method_id`.

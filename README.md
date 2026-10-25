@@ -84,7 +84,7 @@ Your agent picks the skill your request calls for, and you can also name one you
 
 #### Prepare inputs
 
-- **`/pipelex-inputs`** prepares a method's inputs from your files, from synthetic data or from a template, ready to run.
+- **`/pipelex-inputs`** prepares a method's inputs from your files or your team's, from synthetic data or from a template, ready to run.
 - **`/pipelex-synthetic-inputs`** makes the test files a method needs when you have none: PDFs, images, Word and Excel files rendered from code, and photographs from an image model.
 
 #### Run and save
@@ -121,7 +121,7 @@ Which Pipelex product each app takes, and every agent's install in detail, are i
 - **API key.** `npx -y @pipelex/mcp@latest login` creates one in your browser and saves it in `~/.pipelex/.env`, where the Pipelex tools read it in every agent. A key you give the agent wins over it, and only such a key reaches the hook, which validates with it: in Claude Code, the plugin configuration dialog, which stores the key in your OS keychain, or else `PIPELEX_API_KEY` in your environment; in Codex and Mistral Vibe, `PIPELEX_API_KEY` exported in your shell. Keys are also created in your console at [app.pipelex.com](https://app.pipelex.com). [The key, in detail](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#the-key).
 - **Base URL.** Optional, for a deployment other than the hosted API: the dialog's base URL field, or `PIPELEX_BASE_URL`. It defaults to `https://api.pipelex.com`.
 - **Without a key**, the hook still lints and formats every edit and skips only the validation, and the skills that need the Pipelex tools stop and say how to set one: the login. The hook never blocks an edit because Node.js is missing or the API is unreachable.
-- **Privacy.** With a key set, each validation sends the `.mthds` files around the edited one to the Pipelex API. Leave the key unset, in the dialog and in your environment, to keep the hook's checks on your machine.
+- **Privacy.** With a key set, each validation sends the edited file's method to the Pipelex API, as the tree a run would send: its `.mthds` files and every other file beside them that the MTHDS membership rule keeps, leaving out names starting with a dot, such as `.env`, a run's inputs file, and what a `.gitignore` inside the method's directory (the one holding its `METHODS.toml`, else the edited file's) or `METHODS.toml`'s `exclude` keeps out. Files that look like secrets, named like a key or credentials file or holding a private key or a provider's key, stay on your machine too, and the hook names them in a note. A `.gitignore` above that directory, such as your repository's root one, keeps nothing out, and the screen only recognizes well-known shapes, so keep keys and credentials out of a method's directory, or list them in a `.gitignore` inside it. Your test documents never join the method's tree: `/pipelex-inputs` uploads each of your files from where it lies and `/pipelex-synthetic-inputs` makes its files in a temporary directory, so the method's directory receives nothing but the `inputs.json` naming them, which the rule leaves out. Leave the key unset, in the dialog and in your environment, to keep the hook's checks on your machine.
 
 ## Documentation
 

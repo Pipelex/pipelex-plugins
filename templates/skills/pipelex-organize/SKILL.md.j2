@@ -75,7 +75,7 @@ One short summary: the layout, one line per file saying what it holds, and the p
 | Condition | Do this |
 |---|---|
 | `is_valid: false` at the baseline | never reorganize a broken library: report the verdict and point to `{{ skill_prefix }}pipelex-design` to fix it first |
-| `status: "error"`, class `input_domain` | fix the call |
-| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| `status: "error"`, `domain: "input"` | fix the call |
+| any other `status: "error"` | report it, after one retry when its `retry` is `"yes"` |
 | the candidate still differs from the baseline after two fixes of the composition | stop, leave the original layout untouched, and report the discrepancy |
 | the regrouping seems to need a semantic edit (a rename, a contract fix, a missing declaration) | stop and report it: that is `{{ skill_prefix }}pipelex-design`'s work |

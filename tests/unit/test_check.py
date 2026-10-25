@@ -20,6 +20,7 @@ from scripts.check import (
     check_matched_target_versions,
     check_no_claude_artifacts,
     check_no_templates_in_output,
+    check_python_pin,
     check_shared_files_exist,
     check_skill_argument_placeholders,
     check_skill_ceiling,
@@ -103,7 +104,7 @@ def skill_tree(tmp_path: Path) -> Path:
     """Create a minimal valid skill directory structure with target configs."""
     template_shared = tmp_path / "templates" / "skills" / "shared"
     template_shared.mkdir(parents=True)
-    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2"]:
+    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2", "team-files.md.j2"]:
         (template_shared / name).write_text("# placeholder\n")
 
     (tmp_path / "pipelex" / "skills" / "shared").mkdir(parents=True)
@@ -866,6 +867,135 @@ class TestVersionFloors:
         assert unanchored == []
 
 
+class TestPythonPin:
+    """`.python-version` names the Python the repository develops on, and it is the floor.
+
+    The bug this rule closes was three places naming an interpreter, or failing to name one,
+    with nothing comparing them: a new worktree was built on the newest Python on the machine
+    while CI ran the floor. So every disagreement is named with the file that has to change.
+    """
+
+    PYPROJECT = (
+        '[project]\nname = "fixture"\nrequires-python = ">=3.13"\n\n'
+        '[tool.mypy]\npython_version = "3.13"\n\n'
+        '[tool.pyright]\npythonVersion = "3.13"\n\n'
+        '[tool.ruff]\ntarget-version = "py313"\n'
+    )
+    SETUP_PYTHON_WITH_FILE = "      - uses: actions/setup-python@v5\n        with:\n          python-version-file: .python-version\n"
+    WORKFLOW_HEAD = "name: Tests\non:\n  pull_request:\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5\n"
+
+    def _tree(self, tmp_path: Path, *, pin: str | None = "3.13\n", pyproject: str | None = None, setup_python: str | None = None) -> Path:
+        if pin is not None:
+            (tmp_path / ".python-version").write_text(pin)
+        (tmp_path / "pyproject.toml").write_text(self.PYPROJECT if pyproject is None else pyproject)
+        workflows = tmp_path / ".github" / "workflows"
+        workflows.mkdir(parents=True)
+        step = self.SETUP_PYTHON_WITH_FILE if setup_python is None else setup_python
+        (workflows / "tests.yml").write_text(self.WORKFLOW_HEAD + step + "      - run: make agent-test\n")
+        # A workflow that installs no Python is none of this rule's business.
+        (workflows / "guard.yml").write_text(self.WORKFLOW_HEAD + "      - run: echo guarded\n")
+        return tmp_path
+
+    def test_the_repository_as_it_stands_passes(self) -> None:
+        repo_root = Path(__file__).parents[2]
+        assert check_python_pin(repo_root) == []
+
+    def test_a_consistent_tree_passes(self, tmp_path: Path) -> None:
+        assert check_python_pin(self._tree(tmp_path)) == []
+
+    def test_a_missing_pin_is_named(self, tmp_path: Path) -> None:
+        errors = check_python_pin(self._tree(tmp_path, pin=None))
+        assert len(errors) == 1
+        assert errors[0].startswith(".python-version is missing")
+
+    @pytest.mark.parametrize(
+        "pin",
+        [
+            pytest.param("3.13.17\n", id="a patch version"),
+            pytest.param("cpython\n", id="not a version"),
+            pytest.param("3.13\n3.14\n", id="two versions"),
+        ],
+    )
+    def test_a_pin_that_is_not_a_single_minor_version_is_named(self, tmp_path: Path, pin: str) -> None:
+        errors = check_python_pin(self._tree(tmp_path, pin=pin))
+        assert len(errors) == 1
+        assert errors[0].startswith(".python-version holds")
+        assert "not a single X.Y version" in errors[0]
+
+    def test_a_requires_python_floor_above_the_pin_is_named(self, tmp_path: Path) -> None:
+        pyproject = self.PYPROJECT.replace('requires-python = ">=3.13"', 'requires-python = ">=3.14"')
+        errors = check_python_pin(self._tree(tmp_path, pyproject=pyproject))
+        assert errors == ["pyproject.toml: the floor of [project] requires-python is 3.14, but .python-version pins 3.13"]
+
+    def test_a_requires_python_with_no_floor_is_named(self, tmp_path: Path) -> None:
+        pyproject = self.PYPROJECT.replace('requires-python = ">=3.13"', 'requires-python = "<3.15"')
+        errors = check_python_pin(self._tree(tmp_path, pyproject=pyproject))
+        assert len(errors) == 1
+        assert errors[0].startswith("pyproject.toml: [project] requires-python states no >= floor")
+
+    def test_an_upper_bound_beside_the_floor_is_not_a_disagreement(self, tmp_path: Path) -> None:
+        pyproject = self.PYPROJECT.replace('requires-python = ">=3.13"', 'requires-python = ">=3.13,<4"')
+        assert check_python_pin(self._tree(tmp_path, pyproject=pyproject)) == []
+
+    @pytest.mark.parametrize(
+        ("line", "replacement", "label"),
+        [
+            pytest.param('python_version = "3.13"', 'python_version = "3.14"', "[tool.mypy] python_version", id="mypy"),
+            pytest.param('pythonVersion = "3.13"', 'pythonVersion = "3.14"', "[tool.pyright] pythonVersion", id="pyright"),
+            pytest.param('target-version = "py313"', 'target-version = "py314"', "[tool.ruff] target-version", id="ruff"),
+        ],
+    )
+    def test_a_tool_version_that_differs_from_the_pin_is_named(self, tmp_path: Path, line: str, replacement: str, label: str) -> None:
+        errors = check_python_pin(self._tree(tmp_path, pyproject=self.PYPROJECT.replace(line, replacement)))
+        assert len(errors) == 1
+        assert errors[0].startswith(f"pyproject.toml: {label} is ")
+        assert "but .python-version pins 3.13" in errors[0]
+
+    def test_a_tool_version_that_is_not_set_is_named(self, tmp_path: Path) -> None:
+        pyproject = self.PYPROJECT.replace('[tool.mypy]\npython_version = "3.13"\n\n', "")
+        errors = check_python_pin(self._tree(tmp_path, pyproject=pyproject))
+        assert errors == ["pyproject.toml: [tool.mypy] python_version is not set; it should be '3.13', the version .python-version pins"]
+
+    def test_a_raised_pin_names_every_floor_it_left_behind(self, tmp_path: Path) -> None:
+        """Raising the pin alone is the half-move the rule exists for: the floors are named, and
+        the workflows, which read the file, are not."""
+        errors = check_python_pin(self._tree(tmp_path, pin="3.14\n"))
+        assert len(errors) == 4
+        assert all(error.startswith("pyproject.toml: ") for error in errors)
+
+    def test_a_workflow_with_a_literal_python_version_is_named(self, tmp_path: Path) -> None:
+        setup_python = '      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.13"\n'
+        errors = check_python_pin(self._tree(tmp_path, setup_python=setup_python))
+        assert len(errors) == 1
+        assert errors[0].startswith(
+            ".github/workflows/tests.yml: job `test`, step 2 (actions/setup-python@v5) passes the literal python-version '3.13'"
+        )
+
+    def test_a_workflow_passing_both_keys_is_named_for_its_literal(self, tmp_path: Path) -> None:
+        setup_python = (
+            '      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.13"\n          python-version-file: .python-version\n'
+        )
+        errors = check_python_pin(self._tree(tmp_path, setup_python=setup_python))
+        assert len(errors) == 1
+        assert ".github/workflows/tests.yml" in errors[0]
+        assert "passes the literal python-version" in errors[0]
+
+    @pytest.mark.parametrize(
+        "setup_python",
+        [
+            pytest.param("      - uses: actions/setup-python@v5\n", id="neither key"),
+            pytest.param("      - uses: actions/setup-python@v5\n        with:\n          cache: pip\n", id="other inputs only"),
+            pytest.param("      - uses: actions/setup-python@v5\n        with:\n          python-version-file: pyproject.toml\n", id="another file"),
+        ],
+    )
+    def test_a_workflow_that_does_not_read_the_pin_is_named(self, tmp_path: Path, setup_python: str) -> None:
+        errors = check_python_pin(self._tree(tmp_path, setup_python=setup_python))
+        assert errors == [
+            ".github/workflows/tests.yml: job `test`, step 2 (actions/setup-python@v5) does not pass python-version-file: .python-version, "
+            "so CI does not run the version the repository pins"
+        ]
+
+
 class TestSharedFilesExist:
     def test_all_present(self, skill_tree: Path) -> None:
         assert check_shared_files_exist(skill_tree) == []
@@ -879,7 +1009,9 @@ class TestSharedFilesExist:
     def test_all_missing(self, tmp_path: Path) -> None:
         (tmp_path / "templates" / "skills" / "shared").mkdir(parents=True)
         errors = check_shared_files_exist(tmp_path)
-        assert len(errors) == len(["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2"])
+        assert len(errors) == len(
+            ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2", "team-files.md.j2"]
+        )
 
 
 class TestNoTemplatesInOutput:

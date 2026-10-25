@@ -134,6 +134,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -163,6 +164,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -976,8 +978,8 @@ class TestSkillFailureDiscipline:
     def test_credential_sentence_names_the_platform_channel(self, target_name: str) -> None:
         """Where the workshop gets its API key from differs per harness, so the
         sentence differs per harness — it used to be shared by Claude and Codex.
-        It lives in `shared/credentials.md`, read when a `config` error is about
-        the key, and no skill restates it.
+        It lives in `shared/credentials.md`, read when a problem in the `account`
+        domain is about the key, and no skill restates it.
 
         On every harness the workshop takes the host's key first and the key its
         login saved in `~/.pipelex/.env` otherwise, so the login is the answer to
@@ -1180,18 +1182,20 @@ class TestSharedSkillIncludes:
         longer claims to be the one form the hosted console accepts: the console's
         tools are `pipelex_*` and take no files at all.
 
-        Every skill but the catalog's save and integrate passes the bundle directory as `method_dir`, and the workshop
+        Every skill but the catalog's save passes the bundle directory as `method_dir`, and the workshop
         finds the `.mthds` files and the template files their `PipeDocGen` steps name, lists
         what it sent in `files_sent`, and keeps out what a `.gitignore` inside the folder
         excludes, which is how a saved run stays out of the method (`pipelex-mcp`, SPEC.md,
         "The method folder"). Its sentence ends on the pointer to the language reference's
         fallback for a workshop older than the folder form, which lists the files instead.
-        The catalog's save and integrate keep the listing form: `mthds_save_method` takes no
-        folder, and integrate submits the set its call site loads. A template file travels
-        only from disk, so in both forms the inline fallback is one for a bundle with no
-        template file, and a templated bundle out of the workshop's reach is a stop and the
-        relaunch. The catalog's save sends no template file, since `mthds_save_method` takes
-        `.mthds` and `.py` files alone, and integrate states its own set.
+        The catalog's save keeps the listing form, since `mthds_save_method` takes no folder.
+        Integrate passed the listing too, the set its call site loaded, until its call site sent
+        the bundle directory as the method's tree, which the same standard's lister lists: the
+        folder's `files_sent` is that tree's set, so it takes the folder form like the rest. A
+        template file travels only from disk, so in both forms the inline fallback is one for a
+        bundle with no template file, and a templated bundle out of the workshop's reach is a stop
+        and the relaunch. The catalog's save sends no template file, since `mthds_save_method`
+        takes `.mthds` and `.py` files alone.
 
         In the listing form the workshop reads every `{ path }` item from at or under the
         directory of the first one, so the root `.mthds` file goes first; the catalog states
@@ -1206,7 +1210,7 @@ class TestSharedSkillIncludes:
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
             if "{% set validate_call_folder = false %}" in _skill_source(path.parent)
         )
-        assert listing == ["pipelex-catalog", "pipelex-integrate"], "only the catalog's save and integrate list the files"
+        assert listing == ["pipelex-catalog"], "only the catalog's save lists the files"
         assert set(listing) < set(includers)
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
@@ -1228,6 +1232,10 @@ class TestSharedSkillIncludes:
         )
         template_files = "and every template file a `PipeDocGen` step names"
         root_first = "**the root `.mthds` file first**, as nothing above its directory is read"
+        tree_only = (
+            "**Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir`"
+            " or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop."
+        )
         for skill in includers:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
             assert cure in body, f"{target_name}/{skill}: the cure is unnamed"
@@ -1239,8 +1247,15 @@ class TestSharedSkillIncludes:
             else:
                 assert body.count(folder) == 1, f"{target_name}/{skill}: the bundle directory is not passed as method_dir"
                 assert "It refuses one outside **its own** working directory" in body, f"{target_name}/{skill}: the refusal is unnamed"
-                assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
-                assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                if skill == "pipelex-integrate":
+                    # Its call site sends the folder's tree, which no fallback sends: the inline form sends the listing's set,
+                    # named in `files_sent` by tree paths a gate cannot find, and an older workshop's fallback is the listing.
+                    assert folder_fallback not in body and older not in body, f"{target_name}/{skill}: a fallback is not the call site's tree"
+                    assert tree_only in body, f"{target_name}/{skill}: a bundle the folder cannot reach is not a stop"
+                else:
+                    assert folder_fallback in body, f"{target_name}/{skill}: the inline fallback is gone"
+                    assert body.count(older) == 1, f"{target_name}/{skill}: an older workshop is not sent to the reference's fallback"
+                    assert tree_only not in body, f"{target_name}/{skill}: only integrate replaces the fallbacks with a stop"
                 assert "Prefer the path form" not in body and template_files not in body, f"{target_name}/{skill}: the folder form lists no file"
             if skill == "pipelex-catalog":
                 assert templated_stop not in body, "the save tool is the workshop's alone, and the inline form leaves a save unlinked"
@@ -1248,16 +1263,15 @@ class TestSharedSkillIncludes:
                 assert root_first not in body, "the catalog states the order at its save step, with its own reason"
                 assert "with the **root file first**" in body and "the workshop reads nothing above its directory" in body
             elif skill == "pipelex-integrate":
-                assert templated_stop in body, f"{target_name}/{skill}: the inline fallback is gone"
-                assert root_first in body, f"{target_name}/{skill}: the root file no longer goes first"
-                assert template_files not in body, "integrate states the set its call site loads"
+                assert "record and hash what step 2's `files_sent` lists." in body, f"{target_name}/{skill}: the folder's set is not what it records"
 
     def test_no_skill_that_passes_the_folder_lists_the_bundle_s_files_elsewhere(self) -> None:
         """A skill that passes the bundle directory as `method_dir` to one call and lists its files to
         the next sends different sets, the folder's rule and a hand-made list, and loses the
         template files the folder finds. So a skill in the folder form names `method_dir` wherever it
-        calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save
-        and integrate, which set the include's listing form."""
+        calls a folder-taking tool on the bundle again, and the listing is left to the catalog's save,
+        which sets the include's listing form. Integrate's references are left out of the sweep: the Python
+        reference's branch for an SDK from before the method tree reads the bundle's files by hand."""
         listings = ("whole-bundle `files`", "with `files` for every file", "the same files", "the file set step 5 submits", "bundle `files`")
         for path in sorted((self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")):
             body = _skill_source(path.parent)
@@ -1277,9 +1291,9 @@ class TestSharedSkillIncludes:
     def test_a_folder_form_skill_names_files_only_where_the_folder_cannot_go(self, target_name: str) -> None:
         """The structural half of the sweep above, which a rewording cannot slip past: in every skill
         that passes the folder, `files` is named only where the folder cannot go. That is the
-        include's inline fallback in every one of them, explain's single file, whose folder may hold
-        other methods, and in inputs the stop row of a workshop that answers a prepare at `files`.
-        Every other mention would be a listing the folder replaced."""
+        include's inline fallback in every one of them but integrate, which has none, explain's single
+        file, whose folder may hold other methods, and in inputs the stop row of a workshop that answers
+        a prepare at `files`. Every other mention would be a listing the folder replaced."""
         folder_form = sorted(
             path.parent.name
             for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2")
@@ -1290,14 +1304,16 @@ class TestSharedSkillIncludes:
         everywhere = "Inline `files` ("
         exceptions = {
             "pipelex-explain": "**A single file goes as `files` instead**",
-            "pipelex-inputs": "`input_domain` at `files`",
+            "pipelex-inputs": "refused at `files`",
         }
         repo_root = self.REPO_TEMPLATES.parent
         config = load_target_config(repo_root / "targets", target_name)
         rendered = render_templates(self.REPO_TEMPLATES, repo_root, config.template_vars, include_skills=folder_form, target_name=config.name)
         for skill in folder_form:
             body = next(content for path, content in rendered.items() if path.match(f"skills/{skill}/SKILL.md"))
-            assert body.count(everywhere) == 1, f"{target_name}/{skill}: the inline fallback is not named once"
+            assert body.count(everywhere) == (0 if skill == "pipelex-integrate" else 1), (
+                f"{target_name}/{skill}: the inline fallback is not named once"
+            )
             allowed = body.count(everywhere)
             if skill in exceptions:
                 assert body.count(exceptions[skill]) == 1, f"{target_name}/{skill}: its own use of `files` is gone"
@@ -1331,14 +1347,14 @@ class TestSharedSkillIncludes:
         among them. The skills that report a verdict read them: design and edit, which fix what they wrote,
         explain's verdict line and run's proof before spending credit. Integrate's validation is a gate it
         reports nothing of, and the save, the inputs template and organize's proof carry no such verdict, so the
-        roster is pinned here, with the pointer to where a `template_check_warning` is read."""
+        roster is pinned here, with the pointer to where a `pipelex.docgen.template_warning` is read."""
         include = "skills/shared/validate-warnings.md.j2"
         carriers = sorted(
             path.parent.name for path in (self.REPO_TEMPLATES / "skills").glob("*/SKILL.md.j2") if include in _skill_source(path.parent)
         )
         assert carriers == ["pipelex-design", "pipelex-edit", "pipelex-explain", "pipelex-run"]
         partial = (self.REPO_TEMPLATES / "skills" / "shared" / include.rsplit("/", 1)[1]).read_text(encoding="utf-8")
-        assert "({{ shared_dir }}/writing-mthds.md#template-files) before acting on a `template_check_warning`" in partial
+        assert "({{ shared_dir }}/writing-mthds.md#template-files) before acting on a `pipelex.docgen.template_warning`" in partial
 
     @pytest.mark.parametrize("skill", MCP_SKILLS)
     def test_mcp_backed_skill_includes_the_requirements_block(self, skill: str) -> None:
@@ -1419,12 +1435,20 @@ class TestPipelexRunSkill:
         files leave in — so a method that emits or echoes one would submit its own output
         as source. The workshop writes a `.gitignore` of `*` into a `runs/` it creates; a
         `runs/` saved into before it did carries none, so step 2 writes one before the
-        first call that reads the folder."""
+        first call that reads the folder. The same sweep marks what an earlier release of
+        `/pipelex-inputs` left beside the bundle (`L-261022-b695eb`), a folder nothing migrates
+        since the skill stopped writing there (`L-260924-208499`): an `inputs/` beside an
+        `inputs.json` holds the user's documents, and `inputs.prepared.json` the run's values,
+        neither of which the membership rule keeps out on its own. Each mark
+        is written only where it is missing, so a second run announces nothing and appends no
+        second line, and an `inputs/` whose own `.gitignore` lacks `*` still gets the line."""
         body = self.run_skill
         assert 'include "skills/shared/validate-call.md.j2"' in body
         assert "validate_call_folder" not in body, "run passes the folder"
         mark = (
-            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`**,"
+            "**first write a `.gitignore` holding `*` into each `runs/` in it that lacks one and whose folders hold `main_stuff.json`; "
+            "add `*` to the `.gitignore` of each `inputs/` beside an `inputs.json`, and `/inputs.prepared.json` to the one beside that file, "
+            "wherever the line is missing**,"
             " saying so, then one `mthds_validate` call on it."
         )
         step_2 = body[body.index("### 2. Prove the target before spending credit") : body.index("### 3. The inputs")]
@@ -1448,9 +1472,11 @@ class TestPipelexRunSkill:
         every other key and fails the template check as drift. A sample with an `https`
         document needs no preparation, so no prepared file exists and the base is
         `inputs.json` (`L-260927-235a99`): "prove it on the sample with the question asked
-        in French" keeps the sample's document. The paid run's line names the replaced keys."""
+        in French" keeps the sample's document. The paid run's line names the replaced keys.
+        A prepared file is written in a lab case alone since `L-260924-208499`, so only a
+        lab case's is a base."""
         body = self.run_skill
-        assert "laid over a current `inputs.prepared.json`, else over `inputs.json`" in body
+        assert "laid over a current `inputs.prepared.json` in a lab case, `lab/<method>/cases/<case>/`, else over `inputs.json`" in body
         assert "replace only the keys the user named and keep every other" in body
         assert "With neither file, the request's values are the whole set." in body
         assert "With no prepared file, the request's values are the whole set." not in body
@@ -1461,14 +1487,19 @@ class TestPipelexRunSkill:
         alone, so a saved method's sample lives only in a directory on disk, the one
         `/pipelex-inputs` writes for an id or the one its link file names (`L-260927-d7c594`).
         The two are peers, since ranking them picks one sample over another in silence, and
-        a run on the wrong sample is paid, so two candidates holding one is a question."""
+        a run on the wrong sample is paid, so two candidates holding one is a question. The two places are
+        the id's branch, so they are named in the id reference, which an id target reads at step 1, and step 3
+        keeps the directory the user named, the choice and its guard."""
         body = self.run_skill
         assert (
-            "For an id, in the one the user named, else in `./<method_id>/` or a directory below the working directory "
-            "whose `pipelex-method.json` names the id: take the one holding an `inputs.json`, and say which."
+            "For an id, in the one the user named, else where [by-id.md](references/by-id.md) says: "
+            "take the one holding an `inputs.json`, and say which."
         ) in body
         assert "**When several do, ask which; never choose.**" in body
         assert "by default `./<method_id>/`" not in body
+        by_id = (self.REPO_ROOT / "skills" / "pipelex-run" / "references" / "by-id.md").read_text(encoding="utf-8")
+        assert ("in `./mt_abc123/`, and in any directory below the working directory whose `.pipelex/method.json` names `mt_abc123`") in by_id
+        assert "The two are peers: when both hold an `inputs.json`, step 3 asks which." in by_id
 
     def test_a_missing_optional_input_is_not_drift_on_the_main_pipe(self) -> None:
         """The light template lists every declared input and marks none optional, so a sample
@@ -1496,23 +1527,25 @@ class TestPipelexRunSkill:
         ) in body
         assert "is the prepare rewrite; neither is drift." in body
 
-    def test_the_worked_example_never_writes_back_over_the_source(self) -> None:
-        """The example is the most-copied part of a skill: one that still overwrites
-        `inputs.json` destroys the source form this change exists to preserve. The size
-        diet moved the worked examples into the strategy references, so every file the
-        skill ships is held to it, and to the sentences `L-260922-e01c73` caught still
-        saying preparation rewrites `inputs.json`."""
+    def test_the_worked_examples_write_where_step_5_does(self) -> None:
+        """The example is the most-copied part of a skill, so it says what step 5 does.
+        Since `L-260924-208499` a method's folder gets no prepared file: the returned
+        values are written over `inputs.json`, which is then run-ready as it stands, and
+        only a lab case keeps `inputs.json` naming its copies with the prepared values
+        beside it. An example still writing a prepared file beside a method, or still
+        saying that preparation never rewrites `inputs.json`, teaches the retired layout."""
         references = self.REPO_ROOT / "skills" / "pipelex-inputs" / "references"
         texts = {"SKILL.md.j2": self.inputs_skill} | {path.name: path.read_text(encoding="utf-8") for path in sorted(references.glob("*.md"))}
         for name, text in texts.items():
             for retired in (
-                "written back over `inputs.json`",
-                "rewrites `inputs.json`",
-                "is what `inputs.json` holds from then on",
-                "rewrites it to",
+                "prepare never rewrites it",
+                "beside an unchanged `inputs.json`",
+                "leaving `inputs.json` as saved",
             ):
-                assert retired not in text, f"{name} still says preparation rewrites inputs.json: {retired!r}"
-        assert "written to `inputs.prepared.json` beside an unchanged `inputs.json`" in texts["user-data.md"]
+                assert retired not in text, f"{name} still teaches the prepared file beside a method: {retired!r}"
+        assert "which is written over `inputs.json`" in texts["user-data.md"]
+        assert "the run-ready list would go to `inputs.prepared.json` beside it" in texts["user-data.md"]
+        assert "writes the run-ready form over `inputs.json`" in texts["synthetic.md"]
 
     def test_preparation_is_skipped_only_for_values_already_remote(self) -> None:
         """`data:` URLs and inline bytes are not local files but still need uploading,
@@ -1531,9 +1564,11 @@ class TestPipelexRunSkill:
         here, which skips again, and takes a current-looking one as run-ready. So the
         deletion comes before the pass-through skip and before the user can decline the
         upload, and after the Template strategy's skip: a template pass prepares nothing,
-        and the prepared file may be the only run-ready copy of values it just replaced."""
+        and the prepared file may be the only run-ready copy of values it just replaced.
+        Since `L-260924-208499` only a lab case's copies get a prepared file, so the
+        deletion is theirs."""
         body = self.inputs_skill
-        delete = body.index("Otherwise **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
+        delete = body.index("Otherwise, for a case's copies, **first delete any `inputs.prepared.json` an earlier prepare left in `<output_dir>`**")
         assert body.index("Skip the call for the Template strategy") < delete
         assert delete < body.index("Skip the call too **when every file-ish value is already")
         assert delete < body.index("If the user declines, stop before the call")
@@ -1552,24 +1587,20 @@ class TestPipelexRunSkill:
         user_data = (references / "user-data.md").read_text(encoding="utf-8")
         synthetic = (references / "synthetic.md").read_text(encoding="utf-8")
         assert "A list input's files go in a directory named after the input, each named by its position" in user_data
-        assert "`<output_dir>/inputs/<input_variable>/1.<ext>`" in synthetic
+        assert "`<tmp>/<input_variable>/1.<ext>`" in synthetic
         for text in (user_data, synthetic):
             assert "`<input_variable>_1.<ext>`" not in text
             assert not re.search(r"\[\s*\"inputs/[^/\"]+\"", text), "a list example puts its files flat under inputs/"
 
-    def test_a_user_s_file_is_copied_into_the_bundle_never_linked(self) -> None:
-        """For a local bundle `<output_dir>` is the bundle directory, which the skills pass as
-        `method_dir`, and the workshop refuses a folder holding a symbolic link its rule does not
-        exclude (`pipelex-mcp`, SPEC.md, "The method folder"). The reference used to offer a
-        symlink beside the copy, which made every later submission of the bundle refuse it, and the
-        prepare reads the copy by the bundle's folder too. A link that offer already left behind would
-        keep refusing the folder, so the next preparation replaces it with a copy of its target."""
+    def test_a_case_s_copy_is_never_linked(self) -> None:
+        """The reference used to offer a symlink beside a copy in the bundle's folder, which the
+        workshop refuses as a method's folder (`pipelex-mcp`, SPEC.md, "The method folder"). Since
+        `L-260924-208499` only a lab case gets copies, and a link there names a path on this machine,
+        so the case would not run from another clone. A link an earlier preparation left behind is
+        replaced by a copy of its target."""
         user_data = (Path(__file__).parents[2] / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
         assert "or symlink" not in user_data
-        assert (
-            "**Never link it there**: for a local bundle that directory is the bundle's, and the workshop refuses a folder holding a symbolic link."
-            in user_data
-        )
+        assert "**Never link it there**: a link names a path on this machine, which no other clone holds." in user_data
         assert "A link an earlier preparation left in `inputs/` is replaced by a copy of the file it points to, under the same name" in user_data
         assert "calls `mthds_prepare_inputs` with the same `method_dir` and these `inputs`" in user_data
 
@@ -1577,14 +1608,14 @@ class TestPipelexRunSkill:
         """No prepared file is written when nothing needed uploading, so an offer that
         hard-codes `inputs.prepared.json` names a file that is not there."""
         body = self.inputs_skill
-        assert "`inputs.prepared.json` where prepare wrote one, `inputs.json` where prepare was skipped" in body
+        assert "`inputs.prepared.json` where prepare wrote one, else `inputs.json`" in body
 
     def test_it_routes_a_failure_and_never_bisects(self) -> None:
         body = self.run_skill
         assert "never bisected" in body or "never bisects" in body
         assert "Per-pipe bisection is not this skill's" in body
         assert "Do not re-run a failed method with altered inputs" in body
-        assert "`failure_message` **verbatim**" in body
+        assert "`run_error` **verbatim**" in body
 
     def test_a_stuck_run_is_named_rather_than_waited_on(self) -> None:
         """A durable run sitting in RUNNING with no error may be a workflow task that
@@ -1635,22 +1666,24 @@ class TestPipelexRunSkill:
             for tool in ("mthds_run", "mthds_run_status", "mthds_run_results", "mthds_download_artifacts"):
                 assert f"mcp__plugin_pipelex_pipelex__{tool}" in run, f"{target_name}: pipelex-run must declare {tool}"
 
-    def test_prepare_writes_a_separate_file_and_never_rewrites_the_source(self) -> None:
-        """The in-place rewrite destroyed the source form: the storage references
-        are scoped to one org on one plane, so the committed file was unusable by
-        a teammate and after a move between planes."""
+    def test_prepare_writes_over_inputs_json_and_a_case_keeps_its_source(self) -> None:
+        """The prepared file kept `inputs.json` readable with local paths, and was gitignored
+        for its references, scoped to one organization on one plane. Since `L-260924-208499`
+        a method's folder gets no prepared file: the references go into `inputs.json`, which
+        then works only inside the organization that uploaded its files, a trade-off the
+        design accepts. A lab case keeps the old split, since its `inputs.json` names the
+        copies so that the case runs from any clone."""
         body = self.inputs_skill
-        assert "leave `inputs.json` exactly as it is" in body
-        assert "prepare never rewrites it" in body
+        assert "**write the returned `inputs` over `<output_dir>/inputs.json`**" in body
+        assert "leaving `inputs.json` and the copies exactly as they are" in body
         assert "no envelope, no hash and no sidecar" in body
-        # The prepared file's references are scoped to one organization on one plane, and it carries every
-        # other value of `inputs.json` word for word, so it takes the shared ignore procedure, second check
-        # and tracked-path guard included, rather than a rule of step 5's own.
+        # A case's prepared file carries every value of its `inputs.json` word for word, so it takes the shared
+        # ignore procedure, second check and tracked-path guard included, rather than a rule of step 5's own.
         assert (
-            "{% set git_ignore_paths %}each copy's path before writing it, `inputs.json` when a value holds a file's text, "
-            "and `inputs.prepared.json` before step 5's call{% endset -%}"
+            "{% set git_ignore_paths %}`inputs.json` when a value holds a file's text, a case's copies before writing them "
+            "and its `inputs.prepared.json` before step 5's call{% endset -%}"
         ) in body
-        assert "`inputs.json` or `inputs.prepared.json`{% endset -%}" in body
+        assert "`inputs.json` or `inputs.prepared.json`, anchored with a leading `/`,{% endset -%}" in body
         assert "add `inputs.prepared.json` to the nearest `.gitignore`" not in body
 
     def test_design_points_at_the_run_without_running(self) -> None:
@@ -1883,14 +1916,17 @@ class TestPipelexCatalogSkill:
             assert "flat, process-wide function registry" not in text, "the registry reading is retired and must not come back"
             assert "never an import path" not in text, "the registry reading is retired and must not come back"
 
-    def test_an_input_domain_error_at_method_id_is_not_read_as_an_unknown_id(self) -> None:
-        """A rejected payload, an organization-context failure and the workshop's own
-        refusal when the link names another method all land at `method_id`. Reading
-        the location alone removes a good `pipelex-method.json` and mints a duplicate
-        nothing in this plugin can delete."""
+    def test_a_problem_at_method_id_is_not_read_as_an_unknown_id(self) -> None:
+        """A rejected payload, an organization-context failure, a version suffix and the
+        workshop's own refusal when the link names another method all land on the same
+        id. Reading the location alone removes a good `pipelex-method.json` and mints a
+        duplicate nothing in this plugin can delete, so the reference reads the code."""
         unknown_id = self.catalog_reference("unknown-id.md")
-        assert "The location alone never tells them apart**" in unknown_id
-        assert "only the not-found answer names `pipelex-method.json` and the `api_host`" in unknown_id
+        assert "**the problem's `code` tells them apart**, never its location or its wording" in unknown_id
+        assert "Only `pipelex.catalog.not_found` whose `params.resource` is `method` is a miss" in unknown_id
+        assert "`client.target_exists` at `method_id`" in unknown_id
+        assert "**A version suffix is refused there, as `version_suffix`, and is not a miss.**" in unknown_id
+        assert "report the miss **with the `api_host` the link file records**" in unknown_id
         assert "read [unknown-id.md](references/unknown-id.md) before concluding anything" in self.catalog_skill
 
     def test_the_landing_path_is_stated_relative_to_the_workshop(self) -> None:
@@ -2145,14 +2181,14 @@ class TestPipelexInputsSizeLimitDiscipline:
     derived file uploaded in place of the user's is silently wrong — so it stays in
     `SKILL.md`, once, at the prepare step. The failure branches announce themselves
     by the error, so they moved to `references/prepare-errors.md`, which the stop
-    table points at, keyed on the error's `location`.
+    table points at, keyed on the problem's `code`.
     """
 
     REPO_ROOT = Path(__file__).parents[2]
     TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-inputs" / "SKILL.md.j2"
     REFERENCE = REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md"
-    SIZE_BRANCH = '## `location: "inputs"` and the response reports a storage size limit'
-    NON_SIZE_BRANCH = '## `location: "inputs"` and the response is not a size-limit failure'
+    SIZE_BRANCH = "## `upload_too_large`: a file over the storage size limit"
+    NON_SIZE_BRANCH = "## A file the walk could not read or take"
     GUARDRAILS = (
         "A preflight size check may inform the report, but it is never a reason to transform, derive, or substitute the asset",
         "Do not compress, optimize, re-encode, resize, downsample, split, truncate, extract pages or content, or convert it",
@@ -2176,12 +2212,13 @@ class TestPipelexInputsSizeLimitDiscipline:
 
         size_branch = self.reference.split(self.SIZE_BRANCH, maxsplit=1)[1].split(self.NON_SIZE_BRANCH, maxsplit=1)[0]
         assert "This is a terminal branch for the current preparation attempt." in size_branch
-        assert "quote the tool's exact `message` and `hint` verbatim" in size_branch
+        assert "`client.argument_invalid` at `inputs` whose `params.reason` is `upload_too_large`" in size_branch
+        assert "quote the tool's exact `message` and `next_step` verbatim" in size_branch
         assert "actual file size and the allowed limit whenever the response provides them" in size_branch
         assert "preparation failed, the inputs are not run-ready, and no run will be offered" in size_branch
         assert "preserve the user's original file" in size_branch
         assert "write no `inputs.prepared.json`" in size_branch
-        assert "`inputs.json` keeps its local-path form because prepare never rewrites it" in size_branch
+        assert "`inputs.json` keeps its local-path form because step 5 writes the prepared values only on success" in size_branch
         assert "Continue only after the user supplies a different acceptable input or reference, or the service limit changes" in size_branch
         assert "resolve its path to absolute" not in size_branch
         # The reference names the guard rather than restating it: a guard lives in SKILL.md once.
@@ -2211,7 +2248,7 @@ class TestPipelexInputsSizeLimitDiscipline:
         for guardrail in self.GUARDRAILS:
             assert guardrail in body, f"{target_name}: missing oversized-asset guardrail: {guardrail}"
         # The stop table sends the model to the branch, and says the size limit is terminal on its own line.
-        stop_row = next(line for line in body.splitlines() if line.startswith("| prepare: `input_domain` at `inputs`"))
+        stop_row = next(line for line in body.splitlines() if line.startswith("| prepare: an `input` or `method` problem"))
         assert "](references/prepare-errors.md)" in stop_row
         assert "a storage size limit at `inputs` is terminal for this attempt" in stop_row
         shipped = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-inputs" / "references" / "prepare-errors.md"
@@ -2755,7 +2792,7 @@ class TestPipelexExplainSkill:
 
     def test_an_invalid_remote_method_is_reported_and_not_routed_to_disk(self) -> None:
         """Round 1, Codex: an invalid id or address projects no `main_pipe` and
-        answers `validation_errors[]` instead of shapes, so there is nothing to
+        answers `errors[]` instead of shapes, so there is nothing to
         explain — and `/pipelex-edit` cannot reach a method that is not on disk.
         The routing is the not-on-disk reference's since the size diet; the
         stop rows stay in the skill."""
@@ -2936,7 +2973,7 @@ class TestEditClassifiesFirstAndTriggersStopColliding:
         )
         body = next(content for path, content in rendered.items() if path.match("skills/pipelex-inputs/SKILL.md"))
         assert "**Default**: automatic — name the strategy and the assumptions it rests on in one line" in body
-        assert "carry the chosen strategy through to its own end without stopping" in body
+        assert "then carry it through to its own end, pausing only where a wrong guess would waste work" in body
         assert "**Go interactive** when the user asks for it" in body
         assert "when the table below lands on its no-signal row" in body
         assert "**Either mode can turn into the other mid-run**" in body
@@ -3168,7 +3205,7 @@ class TestPublishedAddressTarget:
         # A second selector is a refusal, not a normalization the skill performs silently
         # on the user's behalf.
         assert "drops the extra one" not in body + reference
-        assert "refused with an `input_domain` error before anything runs" in reference
+        assert "refused as `client.argument_invalid` before anything runs" in reference
         # And the skill does not resolve the ambiguity itself: a run is paid, so two
         # targets in hand is a question for the user, not a selector to quietly omit.
         # The stop row that restated it went in the size diet; the guard at step 1 holds it.
@@ -3206,7 +3243,7 @@ class TestPublishedAddressTarget:
         was supplied, NOT at `method_ref`. An agent told to look for the latter reads a
         stale workshop as a missing bundle and goes hunting for files that do not exist.
         The reading is the address reference's, and the stop table keys on the error."""
-        assert "`input_domain` at `files`" in self.inputs_skill
+        assert "refused at `files`" in self.inputs_skill
         body = self.inputs_address_reference
         assert "Provide MTHDS files or a method_id" in body
         assert "npx -y @pipelex/mcp@latest" in body
@@ -3216,21 +3253,24 @@ class TestPublishedAddressTarget:
         assert "restarts the server" in body
         assert "leaving them refreshing in a loop" in body
 
-    def test_the_address_config_refusal_names_the_gate_without_suppressing_the_credential(self) -> None:
-        """Prepare resolves an address through the run route, so a published package
-        shipping in-process Python is refused there — in the same `config` arm, wearing
-        the deployment's authentication wording. Naming that cause is worth doing; the
-        first draft went further and told the agent the credential was fine, which the
-        round refuted: preparation uploads with the key and templating never exercises
-        that, so a template call that succeeded rules nothing out, and the arm also
-        covers a paywall, an unreachable API and a missing upload route. The credential
-        stays the first thing checked, because it is the one the user can act on."""
-        assert "`config` (the credential first, as the requirements say)" in self.inputs_skill
+    def test_an_address_account_problem_on_prepare_is_the_credential_alone(self) -> None:
+        """Prepare once read an address's signature through the run route, so a published
+        package shipping in-process Python was refused there, wearing the credential's
+        wording, and the reference named that second cause (L-260923-4ce273). Prepare now
+        reads `POST /v1/pipe-io`, which loads the package's `.mthds` files alone, so the
+        execution-locus gate never fires on it: a problem in the `account` domain is the
+        credential and only the credential, and the deployment's refusal of Python meets
+        the run. A template call that succeeded still rules nothing out, since preparation
+        uploads with the key and templating never exercises that."""
+        address_row = next(line for line in self.inputs_skill.splitlines() if line.startswith("| prepare, by address:"))
+        assert "an `account` problem" in address_row
         body = self.inputs_address_reference
-        assert "in-process Python" in body
-        assert "the credential first" in body
+        assert "## Prepare, a problem in the `account` domain: the credential, and only the credential" in body
+        assert "deal with the credential first" in body
         assert "rules nothing out" in body
-        assert "the key is not what failed" not in body
+        assert "never reaches it" in body
+        assert "`pipelex.deployment.custom_code_requires_sandbox`, meets the run instead" in body
+        assert "wearing the deployment's authentication wording" not in body
 
 
 class TestCatalogIdInEverySkill:
@@ -3374,9 +3414,9 @@ class TestCatalogIdInEverySkill:
         # A link the save could not refresh makes the next save from the directory a refusal that a later
         # session reads as somebody else's save, so the notice relays the tool's words on it.
         assert "and its words on a link it could not write" in body
-        # A key that may validate but not write the catalog makes the save a `config`-class error; that is
-        # this save's failure alone, never a reason to stop over a change already validated on disk.
-        assert "when the tool is absent or refuses, a `config`-class error included" in body
+        # A key that may validate but not write the catalog makes the save a problem in the `account` domain; that
+        # is this save's failure alone, never a reason to stop over a change already validated on disk.
+        assert "when the tool is absent or refuses, a problem in the `account` domain included" in body
         assert "Leave the save to `{{ skill_prefix }}pipelex-catalog`, saying the change is not saved" in body
         bridge = (self.TEMPLATES / "shared" / "catalog-id-bridge.md.j2").read_text(encoding="utf-8")
         assert "`{{ skill_prefix }}pipelex-catalog` is what compares the two" in bridge
@@ -3414,14 +3454,14 @@ class TestCatalogIdInEverySkill:
         assert "do not let the filing read as the saved method having run" in body
 
     def test_a_files_run_blames_the_pipefunc_only_when_the_failure_does(self) -> None:
-        """Step 8's standing rule is to route once from `failure_message`.
+        """Step 8's standing rule is to route once from the run's problem, `run_error`.
         Holding a `PipeFunc` is not evidence that one failed: a run that dies on
         a missing input upstream of the custom pipe would otherwise be declared
         a failure to find its function and sent to `/pipelex-catalog`, which is a
         deployment gesture and no cure for a missing input. The reading is the
         failure reference's since the size diet, and step 8 points at it before routing."""
         body = self.run_reference("failed-run.md")
-        assert "Where `failure_message` implicates finding or importing that function or its module" in body
+        assert "Where the run's problem implicates finding or importing that function or its module" in body
         assert "**Where it says anything else, route on what it says**" in body
         assert "not evidence that it is what failed" in body
         assert "then read [failed-run.md](references/failed-run.md) before routing it" in self.skill("pipelex-run")
@@ -3439,20 +3479,18 @@ class TestCatalogIdInEverySkill:
         assert "never a `.py` file" in body
         assert "assembled into the run bundle server-side" in body
 
-    def test_an_unknown_linkage_id_is_read_off_a_location_that_discriminates(self) -> None:
-        """`RUN_START_MIXED_ERROR_OPTIONS` splits the locations deliberately: a
-        rejected payload and a refused execution locus land at `files`, which the
-        workshop relocates to `method_dir` for a folder, and only the unknown-method
-        arm lands at `method_id`. That is the opposite of
-        `/pipelex-catalog`'s save, where one location carries several causes —
-        so the reason is stated, and an agent does not carry either rule to the
-        other place. The reading is `linked-run.md`'s, which the stop table's row
-        for that refusal points at."""
+    def test_an_unknown_linkage_id_is_read_off_its_code(self) -> None:
+        """A rejected payload and a refused execution locus on a linked run answer
+        with codes of their own, located at `method_dir` or `files`, and only the
+        unknown method answers `pipelex.catalog.not_found`, which names the id. The
+        code is the discriminator, as it is in `/pipelex-catalog`'s save, where one
+        location carries several causes. The reading is `linked-run.md`'s, which the
+        stop table's row for that refusal points at."""
         body = self.run_reference("linked-run.md")
-        assert "that location is the discriminator rather than a coincidence" in body
+        assert "the problem's `code` is the discriminator rather than its wording" in body
         assert "api_host` the link file records" in body
         assert "without** the id" in body
-        assert "| `mthds_run`: `input_domain` at `method_id`, on a linked run |" in self.skill("pipelex-run")
+        assert "| `mthds_run`: `pipelex.catalog.not_found`, on a linked run |" in self.skill("pipelex-run")
 
     def test_explain_reads_a_saved_method_and_writes_none_of_it(self) -> None:
         """Box F.4 amended. `mthds_get_method`'s other arm writes the sources
@@ -3481,7 +3519,7 @@ class TestCatalogIdInEverySkill:
         assert "Never describe a withheld file's pipes as absent." in body
 
     def test_explain_keeps_an_empty_stored_source_distinct_from_an_unknown_id(self) -> None:
-        """Both are `input_domain` at `method_id`; one is somebody's draft and
+        """`method.package_invalid` and `pipelex.catalog.not_found`; one is somebody's draft and
         the other is a wrong id, and collapsing them sends the user hunting for
         a typo in an id that is correct."""
         body = self.skill("pipelex-explain")

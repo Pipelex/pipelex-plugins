@@ -45,7 +45,7 @@ SKILL_TEMPLATE = REPO_ROOT / "templates" / "skills" / "pipelex-synthetic-inputs"
 # holds it to that one block.
 VENV_REFERENCE = REFERENCES_DIR / "venv.md"
 
-OUTPUT_DIR_PLACEHOLDER = "<output_dir>"
+OUTPUT_DIR_PLACEHOLDER = "<target_dir>"
 # A block carrying this placeholder is a template the agent fills in (the
 # "Verify" snippets), not a runnable recipe — running it would open a file
 # literally named "<name>.png".
@@ -226,8 +226,8 @@ class TestRecipes:
         # A recipe must stay inside the output directory it was given. An absolute
         # or climbing OUT would make the assertions below inspect a file on the
         # real filesystem while the recipe wrote somewhere else entirely.
-        assert not Path(recipe.output).is_absolute(), f"{recipe.heading}: OUT escapes <output_dir> — {recipe.output}"
-        assert ".." not in Path(recipe.output).parts, f"{recipe.heading}: OUT climbs out of <output_dir> — {recipe.output}"
+        assert not Path(recipe.output).is_absolute(), f"{recipe.heading}: OUT escapes <target_dir> — {recipe.output}"
+        assert ".." not in Path(recipe.output).parts, f"{recipe.heading}: OUT climbs out of <target_dir> — {recipe.output}"
 
         result = _bash(recipe.script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
         assert result.returncode == 0, f"{recipe.reference}:{recipe.heading} failed\n{result.stderr}"

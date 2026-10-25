@@ -714,7 +714,7 @@ A dry run composes the document for real against mock inputs, which checks the t
 
 **The catalog stores no template file yet**: `mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template file does not load by its id, while its directory still validates and runs as `method_dir`.
 
-**A `template_check_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, located by its `pipe_code`, `template_file` and `template_location`, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
+**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, a problem item located at the step's pipe (`location.pipe`) whose `params` carry `template_file`, the file as the step names it, and `template_location`, where in the file, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
 
 ### PipeFunc — call a Python function of the method's folder
 

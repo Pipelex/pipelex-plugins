@@ -223,12 +223,13 @@ class TestLanguageReference:
 
     def test_the_catalog_and_the_template_check_are_said_where_template_files_are(self) -> None:
         """`mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template
-        file does not load by its id; and a valid verdict's `template_check_warning` is acted on by whoever wrote
+        file does not load by its id; and a valid verdict's `pipelex.docgen.template_warning` is acted on by whoever wrote
         the template, which the skills that report a verdict point at."""
         docgen = section(rendered_shared("prod", "writing-mthds.md"), "### PipeDocGen — ")
         assert "**The catalog stores no template file yet**" in docgen
         assert "does not load by its id, while its directory still validates and runs as `method_dir`" in docgen
-        assert "**A `template_check_warning` in a valid verdict's `warnings`**" in docgen
+        assert "**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`**" in docgen
+        assert "located at the step's pipe (`location.pipe`) whose `params` carry `template_file`" in docgen
         assert "It never changes `is_valid`, but the printed file may show it." in docgen
         assert "a template the user supplied is theirs, so name the finding and ask before changing it" in docgen
 

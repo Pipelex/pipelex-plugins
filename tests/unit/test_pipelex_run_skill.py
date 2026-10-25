@@ -67,8 +67,9 @@ class TestPipelexRunSkill:
         at_the_decision = {
             "as `method_ref`: read [": ("references/by-id.md", "references/published-address.md"),
             "an address's verdict is reported as [": ("references/published-address.md",),
-            "Give `failure_message` **verbatim** first": ("references/failed-run.md",),
-            "| `mthds_run`: `input_domain` at `method_id`": ("references/linked-run.md",),
+            "Give the run's `run_error` **verbatim** first": ("references/failed-run.md",),
+            "| `mthds_run`: `pipelex.catalog.not_found`": ("references/linked-run.md",),
+            "1. **Values the user gave in the request**": ("../shared/team-files.md",),
         }
         for decision, targets in at_the_decision.items():
             line = self.the_line(body, decision)
@@ -81,6 +82,23 @@ class TestPipelexRunSkill:
         index = body.split("## References", 1)[1]
         for name in self.REFERENCES:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_file_the_team_holds_is_looked_up_before_it_is_asked_for(self, target_name: str) -> None:
+        """A request such as "run it on the invoice uploaded this morning" names a file the organization already
+        holds, which `mthds_list_files` finds with its `pipelex-storage://` address, a value a run takes as it is.
+        The lookup is the shared reference's, pointed at where the request's values are settled, and the tool is
+        optional like the other read-only lookups: a workshop older than it answers every other tool, so its
+        absence never stops a run."""
+        body = self.render(target_name)
+        values = self.the_line(body, "1. **Values the user gave in the request**")
+        assert "For a file named but not on disk, read [team-files.md](../shared/team-files.md) before asking for it." in values
+        assert "**`mthds_list_files`**: optional, never stop for one." in self.the_line(body, "**`mthds_download_artifacts`**, ")
+        frontmatter = body.split("\n---\n", 1)[0]
+        if target_name == "prod":
+            assert "  - mcp__plugin_pipelex_pipelex__mthds_list_files" in frontmatter
+        else:
+            assert "mcp__" not in frontmatter
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_stuck_run_is_named_while_it_is_followed(self, target_name: str) -> None:
@@ -108,7 +126,32 @@ class TestPipelexRunSkill:
         assert "**carry its `pipe_ref` through every call**, the code qualified by its own file's domain." in self.the_step(body, 1)
         assert "for another pipe, pass step 1's `pipe_ref` as `pipe_code`." in self.the_step(body, 5)
         assert "a pipe's code" not in body
-        assert "Running the main pipe `summarize.summarize_pdf` from" in self.the_step(body, 4)
+        assert "Running `summarize.summarize_pdf` from `summarize_pdf/`" in self.the_step(body, 4)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_method_folder_runs_from_inputs_json_and_a_local_path_goes_back_to_be_uploaded(self, target_name: str) -> None:
+        """`L-260924-208499`: `/pipelex-inputs` writes a method folder's run-ready values over `inputs.json` and no
+        `inputs.prepared.json` beside it, so a run reads `inputs.json` there, and a value still naming a file on this
+        machine has not been uploaded: it goes back to `/pipelex-inputs`, which uploads it from where it lies, and
+        nothing is spent. A prepared file is read only in a lab case, the one place that keeps copies and writes one;
+        one an earlier release left beside a method is not read, since nothing migrates those folders and its
+        references may name another organization's uploads."""
+        body = self.render(target_name)
+        prefix = load_target_config(self.REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+        step_3 = self.the_step(body, 3)
+        assert "2. **A lab case's current `inputs.prepared.json`**. **Current** means" in step_3
+        assert "laid over a current `inputs.prepared.json` in a lab case, `lab/<method>/cases/<case>/`, else over `inputs.json`" in step_3
+        assert "3. **An `inputs.json` whose every file-ish value is an `http(s)` URL or a `pipelex-storage://` reference.**" in step_3
+        refused = self.the_line(step_3, "Anything else — a placeholder, a local path,")
+        assert f"is not run-ready, and nothing is spent: name the input at fault and how, and hand to `{prefix}pipelex-inputs`" in refused
+        # A lab case goes back with its directory, so that `/pipelex-inputs` keeps the case's copies rather than writing
+        # addresses over its `inputs.json`, and a stale prepared file falls through to this one hand-off.
+        assert f"hand to `{prefix}pipelex-inputs`, naming a lab case's directory as its `<output_dir>`" in refused
+        assert self.the_line(step_3, "Not current is not run-ready").endswith("Not current is not run-ready.")
+        assert "Do not prepare inputs here." in refused
+        assert step_3.index("3. **An `inputs.json` whose every file-ish value") < step_3.index("Anything else — a placeholder, a local path,")
+        assert "with the inputs in `inputs.json`. This spends inference credit." in self.the_step(body, 4)
+        assert "A current `inputs.prepared.json`" not in body, "a method folder's prepared file is no longer a source"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_stop_table_holds_only_what_a_tool_reports(self, target_name: str) -> None:

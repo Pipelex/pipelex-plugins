@@ -151,6 +151,38 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "Then report as step 6 says" in self.the_line(body, "**stop gracefully**")
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_hand_back_says_the_file_goes_up_as_a_test_file(self, target_name: str) -> None:
+        """This skill uploads nothing: `/pipelex-inputs` uploads the files it makes, with `kind: "test"`, so the
+        team's files list them as the method's test files rather than among the members' own uploads. The
+        hand-back says so, and the upload stays the inputs skill's."""
+        hand_back = self.the_line(self.render(target_name), "uploads the file with `mthds_prepare_inputs`")
+        assert "uploads the file with `mthds_prepare_inputs` as the method's test file, and offers the run" in hand_back
+        assert "never uploads anything" in self.render(target_name)
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_default_target_is_a_temporary_directory_never_beside_a_method(self, target_name: str) -> None:
+        """`L-260924-208499`: the factory once wrote into an `inputs/` beside the bundle, which it marked with a
+        `.gitignore` of `*`; but every surface sends a method's folder whole, and a `uv_build` wheel ships it whatever
+        a `.gitignore` says. A test file reaches a run as an upload, so by default it is made in a fresh temporary
+        directory, standalone too, and `/pipelex-inputs` uploads it from there with `kind: "test"`. A target the
+        caller names is honoured: the lab names a case's `inputs/`, outside every method. The temporary path goes
+        into the report, with the file's name among the team's files."""
+        body = self.render(target_name)
+        target = self.the_line(body, "- `target`: the path to write;")
+        assert target == (
+            "- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in a fresh temporary directory "
+            "made once with `mktemp -d`, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. "
+            "A target the caller or the user names is honoured."
+        )
+        assert "./inputs/" not in body
+        assert ".gitignore` holding `*`" not in body, "nothing the factory writes by default lies in a tree it must mark"
+        synthetic = (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "synthetic.md").read_text(encoding="utf-8")
+        assert "`<tmp>` being a temporary directory made once for the preparation with `mktemp -d`" in synthetic
+        assert "For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>`" in synthetic
+        assert "No `target` lies beside the method" in synthetic
+        assert "The report gives each generated file's temporary path" in synthetic
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_failure_removes_the_recipes_partial_file(self, target_name: str) -> None:
         """Every recipe renders to a hidden `PART` beside `OUT` and renames it on success, so a recipe that crashes
         mid-save leaves that file behind. Step 4's cleanup names it, spelled as the recipes compute it, or "a
@@ -161,7 +193,7 @@ class TestPipelexSyntheticInputsSkillShape:
             recipes = text.count("os.replace(PART, OUT)")
             assert recipes > 0, f"references/{name} has no recipe renaming PART onto OUT"
             assert text.count(part_line) == recipes, f"references/{name}: a recipe computes its partial file another way"
-        example = Path("inputs/invoice.pdf")
+        example = Path("invoice.pdf")
         partial = example.with_name(f".{example.stem}.part{example.suffix}")
         cleanup = self.render(target_name).split("### Step 4", 1)[1].split("### Step 5", 1)[0]
         assert f"`{partial.as_posix()}` for `{example.as_posix()}`" in cleanup

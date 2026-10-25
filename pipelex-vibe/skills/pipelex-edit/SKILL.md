@@ -14,7 +14,7 @@ Modify an existing MTHDS method bundle. There are two classes of change; this sk
 
 - **`mthds_validate`** is required: it proves every edit. **Never declare an edit done on the hook's silence alone**: its semantic stage is skipped without an API key.
 - **If the tool is absent from this session**, the Pipelex MCP server isn't connected: STOP, and tell the user in one line what [the connection reference](../shared/credentials.md#the-tool-is-absent) says for Mistral Vibe.
-- **If a call returns `status: "error"` with an error of class `config`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and surface the error's `hint` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
+- **If a call returns a problem in the `account` domain, or `client.unreachable`** (missing or rejected `PIPELEX_API_KEY`, unreachable API), STOP the same way and relay its `next_step` verbatim; when it is about the key, read [where the key comes from](../shared/credentials.md#where-the-key-comes-from) before saying anything more.
 - **`mthds_inputs_template`** is needed only by Step 6, when the edit could have touched the input template. **`mthds_models`** serves a model change in Step 4, and its absence is no stop: the model references say what to do without it.
 
 ## Mode Selection
@@ -46,7 +46,7 @@ Check the requested change against the scope split at the top. Structural or con
 Validate the whole bundle **before editing**: call `mthds_validate` on the bundle directory, and branch on the structured verdict, never on transport. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. Inline `files` (the bundle's `.mthds` files outside `runs/`, root file first, as `{content, uri}`) are the fallback for a bundle with no template file; **for a templated one, stop and ask for that relaunch**. A workshop whose tools lack `method_dir`, or answer it *Provide MTHDS files*, is older: read [the reference](../shared/writing-mthds.md#template-files) first.
 
 - `is_valid: true` → record whether it is runnable or a scaffold (non-empty `pending_signatures`). That same state must hold after your edits.
-- `is_valid: false` → the bundle is broken **before** your change: surface the `validation_errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
+- `is_valid: false` → the bundle is broken **before** your change: surface the `errors[]` and the Markdown summary, and offer to repair first. **Never edit on a broken baseline.**
 
 ### Step 4: Apply the edits
 
@@ -60,7 +60,7 @@ Before editing a construct you have not touched recently, read [the MTHDS refere
 
 ### Step 5: Re-validate
 
-Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable or scaffold state unchanged (a renamed pending signature renames its backlog entry; nothing else in the pending set moves). **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `template_check_warning`. On `is_valid: false` the failure is in your edit: use the summary's locators, fix, re-validate. On `status: "error"` the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1, or to retry once the server is reachable again.
+Same whole-bundle `mthds_validate` call as Step 3. The bar is the **baseline verdict restored**: `is_valid: true`, and the runnable or scaffold state unchanged (a renamed pending signature renames its backlog entry; nothing else in the pending set moves). **Report a valid verdict's `warnings`**, and read [template files](../shared/writing-mthds.md#template-files) before acting on a `pipelex.docgen.template_warning`. On `is_valid: false` the failure is in your edit: use the summary's locators, fix, re-validate. On `status: "error"` the edit is applied but **unproven** — never report it as done: tell the user it is on disk but could not be validated, and offer to restore the pre-edit content you still hold from Step 1, or to retry once the server is reachable again.
 
 ### Step 6: Inputs refresh check
 
@@ -72,14 +72,14 @@ State what changed (files and constructs), give the verdict line from the summar
 
 **Generated types may now be stale.** Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree, never beside the bundle. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, or whose `templates` name a template file it changed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex:pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
-**Save the linked method's draft.** A `pipelex-method.json` beside the root `.mthds` file links this directory to a saved method, which lacks this change. Once this skill's own final verdict has proven the change, call `mthds_save_method` with the validated `.mthds` files as `{ path }`, root first, and the link's `method_id`, and nothing else: **no `name`, no `expected_updated_at`, no `python`, no `link_dir`**, and no template file — the workshop sends the link's token itself. Report it by name and id, with what the tool says `mt_…@draft` and the bare id now run, and its words on a link it could not write. With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory. **Never publish here: a publish is `/pipelex:pipelex-catalog`'s, on the user's request.** Leave the save to `/pipelex:pipelex-catalog`, saying the change is not saved, when the tool is absent or refuses, a `config`-class error included, when the workshop will not read the path, or when this work changed a `PipeFunc`'s Python; never retry with a token or inline. No link file means there is nothing to save to. Never write or edit `pipelex-method.json`: it is the workshop's.
+**Save the linked method's draft.** A `pipelex-method.json` beside the root `.mthds` file links this directory to a saved method, which lacks this change. Once this skill's own final verdict has proven the change, call `mthds_save_method` with the validated `.mthds` files as `{ path }`, root first, and the link's `method_id`, and nothing else: **no `name`, no `expected_updated_at`, no `python`, no `link_dir`**, and no template file — the workshop sends the link's token itself. Report it by name and id, with what the tool says `mt_…@draft` and the bare id now run, and its words on a link it could not write. With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory. **Never publish here: a publish is `/pipelex:pipelex-catalog`'s, on the user's request.** Leave the save to `/pipelex:pipelex-catalog`, saying the change is not saved, when the tool is absent or refuses, a problem in the `account` domain included, when the workshop will not read the path, or when this work changed a `PipeFunc`'s Python; never retry with a token or inline. No link file means there is nothing to save to. Never write or edit `pipelex-method.json`: it is the workshop's.
 
 ## Stops
 
 | Condition | Do this |
 |---|---|
-| `status: "error"`, class `input_domain` | fix the call |
-| `status: "error"`, class `runtime` | report it, and retry once before stopping |
+| `status: "error"`, `domain: "input"` | fix the call |
+| any other `status: "error"` | report it, after one retry when its `retry` is `"yes"` |
 | the same construct fails twice after your edit | pause and show the user instead of thrashing |
 
 ## References

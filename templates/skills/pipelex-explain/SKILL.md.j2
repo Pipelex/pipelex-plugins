@@ -24,7 +24,7 @@ Read a method and say what it does, in plain language. Reading costs nothing and
 - **A catalog id or a published address needs the workshop**, since nothing of it is on disk. Where `mthds_get_method` is absent while the other tools answer, an id is explained at contract level, as an address is, and the explanation says which reading it is: a narrower explanation, not a stop.
 {% set mcp_absent_lead %}the workshop is{% endset -%}
 {% set mcp_absent_suffix %} That stop is only for a target that lives on the platform — a bundle directory on disk is still explained from its source, with the verdict line left out.{% endset -%}
-{% set mcp_config_suffix %} Same scope: on a local bundle a `config` error costs the verdict line and nothing else — carry on and say it was not checked.{% endset -%}
+{% set mcp_config_suffix %} Same scope: on a local bundle such a problem costs the verdict line and nothing else — carry on and say it was not checked.{% endset -%}
 {% include "skills/shared/mcp-requirements.md.j2" %}
 
 ## Guards
@@ -88,11 +88,11 @@ Output: final_output
 | the workshop is absent, on an id or an address | stop per the Requirements: there is nothing to read |
 | `mthds_get_method` is absent while the other tools answer | explain the id at contract level, say the source was not read, and name the cause [not-on-disk.md](references/not-on-disk.md) gives |
 | an id's source comes back `truncated` | name the files you could not read and say the explanation is partial. Never describe a withheld file's pipes as absent. |
-| an id is refused at `method_id` | give the tool's answer: an unknown id and an empty stored source are different answers, and an empty one is somebody's draft, not a wrong id |
-| a selector call answers a no-verdict error | report the error and its `hint` verbatim; hosted address and id resolution is not live everywhere yet |
+| an id is refused | give the tool's answer: an unknown id (`pipelex.catalog.not_found`) and an empty stored source (`method.package_invalid`) are different answers, and an empty one is somebody's draft, not a wrong id |
+| a selector call answers a no-verdict problem | report its `detail` and `next_step` verbatim; hosted address and id resolution is not live everywhere yet |
 | a **local bundle** does not validate | explain it anyway from the source, say what the verdict was, and route a fix to `{{ skill_prefix }}pipelex-edit` or `{{ skill_prefix }}pipelex-design` |
-| a **catalog id** does not validate | explain it from the source read above with `validation_errors[]` beside it, and say the fix is not on this disk |
-| a published **address** does not validate | report `validation_errors[]` and stop: there is no source to explain, and the fix is upstream |
+| a **catalog id** does not validate | explain it from the source read above with its `errors[]` beside it, and say the fix is not on this disk |
+| a published **address** does not validate | report its `errors[]` and stop: there is no source to explain, and the fix is upstream |
 | the verdict carries no `main_pipe` | say so, and which cause the tool's message points to: the method settles no entry pipe, the contract did not come back whole, or the workshop predates the field. Do not reconstruct a signature from the input template. |
 {% include "skills/pipelex-explain/parts/change-route.md.j2" %}
 

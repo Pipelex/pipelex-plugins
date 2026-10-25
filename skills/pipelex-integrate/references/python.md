@@ -1,8 +1,8 @@
 # Integrating into a Python project
 
-Companion to `/pipelex-integrate` for a project that has a `pyproject.toml` (or `setup.py` / `requirements.txt`). The SDK facts were checked against `pipelex-sdk` as of 2026-09 and move only when that package does.
+Companion to `/pipelex-integrate` for a project that has a `pyproject.toml` (or `setup.py` / `requirements.txt`). The SDK facts were checked against `pipelex-sdk` 0.48.0, the floor step 8 installs for `python-pydantic`, and move only when that package does.
 
-**A bundle whose `PipeDocGen` steps name template files stops the integration**, the skill's stop for a Python target. A bundle sent as content has no directory, so the runner loads it only with the template files its steps name, sent beside it, and `pipelex-sdk` sends none yet. A module written now would type-check and pass the gate, and every call would be refused, the step's template file not supplied, so generate nothing and write no module. Tell the user the integration waits on a `pipelex-sdk` release that sends a bundle's template files, and that until then the method runs through the run skill, which submits the bundle with them, or from a TypeScript project, naming that skill to the user the way this skill's own hand-offs name a sibling. On a refresh, regenerate nothing either, and say that the module already there fails on every call until that release.
+**A `python-structures` project runs on the `pipelex-sdk` its `pipelex` pins exactly, so settle at step 1 which `pipelex-sdk` it will run on once step 8 has run**, not only which one is installed now. When step 8 keeps the project's `pipelex`, that is the one installed with it: read it in the project's own environment (`importlib.metadata.version("pipelex-sdk")`, under `uv run python` for a uv project). A read that raises `PackageNotFoundError` means the environment is not synced, or its `pipelex` is below step 8's floor and brings no `pipelex-sdk` at all, as **Where `pipelex_sdk` comes from** below says: sync the environment with the project's package manager (`uv sync`, `poetry install`) and read again. When step 8 will raise `pipelex`, the installed version says nothing of the run: resolve the requirement step 8 will write without installing it, `echo 'pipelex>=<the version step 8 raises to>' | uv pip compile -`, which prints the `pipelex-sdk` that `pipelex` pins (without uv, the `pipelex-sdk` that release lists among its requirements on PyPI), and read that one. At step 8's `python-pydantic` floor or later, the call site below applies as written. Below it, **or when no read succeeds**, the module sends the bundle the older way, as the branch after the call site shows, and **a bundle whose `PipeDocGen` steps name template files stops the integration**: such a release takes no method tree and sends no template file, so a module written now would type-check and pass the gate, and every call would be refused, the step's template file not supplied. Generate nothing and write no module. Tell the user the integration waits on a `pipelex` release that pins a `pipelex-sdk` at that floor or later, and that until then the method runs through the run skill, which submits the bundle with its template files, or from a `python-pydantic` or TypeScript project, naming that skill to the user the way this skill's own hand-offs name a sibling. On a refresh, regenerate nothing either, and say that the module already there fails on every call until that release. At step 9, once step 8 has run, read the version once more: the module follows the one installed then, and when it falls below the floor over a templated bundle, the stop applies there, writing no module and naming the generated tree in the report.
 
 ## Detecting the project
 
@@ -55,7 +55,7 @@ One module per method. `summarize_pdf` with a `document: native.Document` input,
 """Run the summarize_pdf method through the hosted Pipelex API.
 
 `document` is an http(s) URL or a pipelex-storage:// reference, as ``{"url": ...}``. For a
-local file or bytes, call ``client.prepare_inputs(files=[...], inputs=...)`` first: it uploads
+local file or bytes, call ``client.prepare_inputs(tree=BUNDLE_DIR, inputs=...)`` first: it uploads
 and rewrites the value. It treats any string it does not recognise as data:, http(s):// or
 pipelex-storage:// as a LOCAL FILE PATH it reads and uploads, so gate schemes before handing
 values from an untrusted caller to it.
@@ -74,21 +74,14 @@ from pipelex_sdk.runs import RunResults
 from <package>.generated.summarize_pdf.models import DocumentSummary
 
 PIPE_CODE = "summarize.summarize_pdf"
+# The method's tree, sent whole with every run. A bundle is one closure: a main file that imports a
+# sibling needs that sibling sent with it, or the run fails to load what the generated models were
+# projected from. The SDK lists this directory under the MTHDS standard's membership rule and sends
+# every file it keeps, the `.mthds` files and the files a step reads, such as a `PipeDocGen` step's
+# template, among them. Names starting with a dot, a run's `inputs.json` and what a `.gitignore`
+# inside the tree keeps out stay home; nothing screens the rest for secrets. A missing or empty
+# directory is refused before any run starts, naming the path.
 BUNDLE_DIR = Path(__file__).resolve().parent.parent / "methods" / "summarize_pdf"
-
-
-def _read_bundle() -> list[str]:
-    """Every `.mthds` file of the bundle, sorted. A bundle is one closure: a main file that
-    imports a sibling needs that sibling submitted with it, or the run fails to load what the
-    generated models were projected from."""
-    contents = [path.read_text(encoding="utf-8") for path in sorted(BUNDLE_DIR.rglob("*.mthds"))]
-    if not contents:
-        # `rglob` on a missing or empty directory returns nothing and raises nothing, so without
-        # this the run goes out with `mthds_contents=[]` and fails server-side, naming the pipe
-        # rather than the path that is actually wrong. The TypeScript twin gets this for free:
-        # `readdir` throws ENOENT.
-        raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")
-    return contents
 
 
 @dataclass(frozen=True)
@@ -111,7 +104,7 @@ async def summarize_pdf(*, document: dict[str, Any], context: str | None = None)
     async with PipelexAPIClient() as client:
         results = await client.start_and_wait(
             pipe_code=PIPE_CODE,
-            mthds_contents=_read_bundle(),
+            tree=BUNDLE_DIR,
             inputs=inputs,
         )
     return SummarizePdfRun(output=DocumentSummary.model_validate(results.main_stuff), results=results)
@@ -146,12 +139,35 @@ Codegen emits a model per concept and no wrapper for the envelope, so nothing in
 
 Follow the project's conventions where you can see them — module style, quoting, error handling — and the SDK's defaults where you cannot.
 
-Variants by selector, replacing the `mthds_contents=` argument and dropping `BUNDLE_DIR` and `_read_bundle`:
+**A `python-structures` project on a `pipelex-sdk` below step 8's `python-pydantic` floor** (the version step 1 settles for after step 8, read again at step 9, or none read) has no `tree` argument to send, so its module reads the bundle's `.mthds` texts itself and sends them as `mthds_contents`, the closure kept whole by reading every file, and its docstring names `prepare_inputs` with them as a list of `MthdsFileItem`. A bundle naming template files has already stopped at step 1. In place of the comment and the `tree=` argument above:
+
+```python
+from pipelex_sdk.crate_models import MthdsFileItem  # for the docstring's prepare_inputs call
+
+
+def _read_bundle() -> list[str]:
+    """Every `.mthds` file of the bundle, sorted, as the run's `mthds_contents`."""
+    contents = [path.read_text(encoding="utf-8") for path in sorted(BUNDLE_DIR.rglob("*.mthds"))]
+    if not contents:
+        # `rglob` on a missing or empty directory returns nothing and raises nothing, so without
+        # this the run goes out with `mthds_contents=[]` and fails server-side, naming the pipe
+        # rather than the path that is actually wrong.
+        raise FileNotFoundError(f"no .mthds files under {BUNDLE_DIR}")
+    return contents
+
+
+# In the async function: `mthds_contents=_read_bundle(),` in place of `tree=BUNDLE_DIR,`.
+# In the docstring: ``client.prepare_inputs(files=[MthdsFileItem(content=text) for text in _read_bundle()], inputs=...)``.
+```
+
+Its `_read_bundle` reads every `.mthds` file under the bundle, a rule of its own that the folder step 1 passes does not follow: a `.mthds` file a `.gitignore` inside the bundle keeps out, or one under a hidden directory, is sent by this module though the types were not generated from it, so keep no such file in a bundle this module runs. That module fails once the project's `pipelex` brings a `pipelex-sdk` at that floor, which takes no `mthds_contents`, and a refresh then rewrites it to the template above, as the refresh reference says.
+
+Variants by selector, replacing the `tree=` argument and dropping `BUNDLE_DIR`, the docstring's `prepare_inputs` call taking the same selector in its place (`prepare_inputs(method_ref="…", inputs=...)`, `prepare_inputs(method_id="…", inputs=...)`):
 
 - **`method_ref`**, a published address: `method_ref="github.com/<owner>/<repo>[/<selector>][@<tag>]"`, with `pipe_code=PIPE_CODE` or omitted to run the package's declared pipe. The tag is optional and is the pin; without one the address resolves to the default branch at its head on every run, so the call site can run a method the committed types were never generated from; when the address carries no tag, the module docstring says it floats.
 - **`method_id`**: `method_id="mt_…@<n>"` — the platform resolves the id: `mt_…@<n>` runs published version n for good, a bare `mt_…` the latest published version and `mt_…@draft` the draft. The module docstring names the id it runs and, for a bare or `@draft` id, says that a publish or a save changes what runs under the committed types.
 
-Facts the module leans on: `PipelexAPIClient()` reads `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` (default `https://api.pipelex.com`) itself; it is async-only and used as an async context manager; there is **no barrel** in `pipelex_sdk` by design, so every import is a full module path (`pipelex_sdk.client`, `pipelex_sdk.runs`, `pipelex_sdk.errors`); `start_and_wait(...)` takes the durable path on the hosted API (default 2 s poll, 20 min budget, `wait_options=WaitForResultOptions(...)` to change them) and falls back to blocking on a bare runner, returning `RunResults` whose `main_stuff` is always present for a completed run. Let the typed errors from `pipelex_sdk.errors` propagate — `RunFailedError`, `RunTimeoutError` (the run keeps going; resume by `pipeline_run_id`), `ApiResponseError` (branch on `.code`), `ApiUnreachableError`, `MissingMainStuffError` — and add the project's own handling only where it already wraps its other clients. Their common base, for a command that catches them all at its top, is `PipelineRequestError`, imported from `mthds.protocol.exceptions`: `pipelex_sdk.errors` uses it without re-exporting it.
+Facts the module leans on: `PipelexAPIClient()` reads `PIPELEX_API_KEY` and `PIPELEX_BASE_URL` (default `https://api.pipelex.com`) itself; it is async-only and used as an async context manager; there is **no barrel** in `pipelex_sdk` by design, so every import is a full module path (`pipelex_sdk.client`, `pipelex_sdk.runs`, `pipelex_sdk.errors`); `start_and_wait(...)` takes the durable path on the hosted API (default 2 s poll, 20 min budget, `wait_options=WaitForResultOptions(...)` to change them) and falls back to blocking on a bare runner, returning `RunResults` whose `main_stuff` is always present for a completed run. `tree=BUNDLE_DIR` is listed under the standard's membership rule, rooted at the nearest `METHODS.toml` at or above it, else at the directory itself. **Step 1 stops over a `METHODS.toml` above the bundle**, since the workshop roots the folder step 1 passes at the folder itself: the run would send files the types were not generated from, and no refresh could record them, so the gate would report `stale-source` until the bundle moves. Look for it as Manifest Discovery does, in each parent of the resolved `BUNDLE_DIR` in turn, stopping after the one holding a `.git` entry, or at the filesystem root, and count only a regular file named `METHODS.toml`; then tell the user to move the bundle out from under it, or to integrate the package's own directory as the bundle. The tree travels inline when small and by hash otherwise; a missing directory raises `TreeSourceError` and an empty one `EmptyMethodTreeError`, both from `mthds.method_tree.exceptions`, before any run starts. Let the typed errors from `pipelex_sdk.errors` propagate — `RunFailedError`, `RunTimeoutError` (the run keeps going; resume by `pipeline_run_id`), `ApiResponseError` (branch on `.code`), `ApiUnreachableError`, `MissingMainStuffError` — and add the project's own handling only where it already wraps its other clients. Their common base, for a command that catches them all at its top, is `PipelineRequestError`, imported from `mthds.protocol.exceptions`: `pipelex_sdk.errors` uses it without re-exporting it.
 
 **Where `pipelex_sdk` comes from.** A `python-pydantic` project gets it from the `pipelex-sdk` step 8 installs. A `python-structures` project gets it from `pipelex` itself, which depends on `pipelex-sdk`, at one exact version, starting from the `pipelex` 0.79.0 that step 8 raises the project to; an older `pipelex` does not bring it, so this module fails on its first import there. Add no `pipelex-sdk` requirement of the project's own: pipelex's exact pin decides the version, and a second requirement adds nothing but a place for the two to disagree.
 
@@ -171,7 +187,7 @@ Parameters are keyword-only, typed from the signature: `str` for Text and Date (
 
 ## The offline gate
 
-**`python-pydantic`.** Copy `references/codegen_check.py` to `scripts/codegen_check.py` with step 10's `cp`, never by reading and rewriting it, at the project root and never inside the import package, where a wheel would ship it, and never format or lint it: step 5 put it in the formatter and linter exclusions beside the generated directory. It imports only the standard library and `pipelex-sdk`, and runs `pipelex_sdk.codegen_check.run_codegen_check` over each generated directory — the SDK's mirror of `pipelex codegen check`, pure hashing with no engine, no network, no key and no `pipelex` runtime, present in the `pipelex-sdk` 0.10.2 that step 8 installs — then compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file under the sidecar's `bundle_dir`, listed with the same `rglob("*.mthds")` the call site's `_read_bundle` uses — so a file added to the bundle is `stale-source` too, although every recorded hash still matches. Do not add `pipelex` as a dependency to get a gate: that reverses the decision the target expresses, and this gate needs nothing the consumer does not already have. The script writes through `sys.stdout` / `sys.stderr`, so a no-print rule (Ruff's `T201`) does not fire, and it passes pyright's strict mode, so leave it inside the type checker's coverage.
+**`python-pydantic`.** Copy `references/codegen_check.py` to `scripts/codegen_check.py` with step 10's `cp`, never by reading and rewriting it, at the project root and never inside the import package, where a wheel would ship it, and never format or lint it: step 5 put it in the formatter and linter exclusions beside the generated directory. It imports only the standard library, `pipelex-sdk` and the `mthds` package that SDK depends on, and runs `pipelex_sdk.codegen_check.run_codegen_check` over each generated directory — the SDK's mirror of `pipelex codegen check`, pure hashing with no engine, no network, no key and no `pipelex` runtime, present in the `pipelex-sdk` 0.48.0 that step 8 installs — then compares the SHA-256 recorded for each source in `sources.json` against the `.mthds` file on disk, and the recorded sources against every `.mthds` file of the tree the call site sends from the sidecar's `bundle_dir`, listed by `mthds.method_tree.lister.list_method_tree`, the lister of the `mthds` package `pipelex-sdk` depends on and lists `tree=` with, so the gate keeps out what the run keeps out — so a file added to the bundle, or one a `.gitignore` inside the tree or the manifest's `exclude` now keeps out or lets in, is `stale-source` too, although every recorded hash still matches, and so is a recorded template file the tree no longer carries. Do not add `pipelex` as a dependency to get a gate: that reverses the decision the target expresses, and this gate needs nothing the consumer does not already have. The script writes through `sys.stdout` / `sys.stderr`, so a no-print rule (Ruff's `T201`) does not fire, and it passes pyright's strict mode, so leave it inside the type checker's coverage.
 
 Run it from the project root with **the project's own environment**, the one step 8 put `pipelex-sdk` in: `uv run python scripts/codegen_check.py …` under uv, `poetry run python …` under poetry, `pipenv run python …` under pipenv, and the active environment's `python` otherwise. An interpreter without the SDK does not guess: it exits `2` and names the fix. An SDK that is installed but raises something else while it loads — a pydantic-core that does not match pydantic, a corrupt file — is `2` as well, naming the exception and pointing at a reinstall of the project's dependencies, because that environment is broken rather than the wrong one. A check that raises instead of reaching a verdict — a lock `tomllib` refuses, a directory the process cannot search — is `2` too, for that directory, with the error on stderr, and the directories after it are still checked. The SDK import and each check are the only two places the script catches `Exception`, and a project whose Ruff selects `BLE001` needs no per-file ignore for them: the step-5 exclusion keeps the script out of Ruff altogether, and the script is never edited to satisfy a rule. Extend the project's existing gate rather than inventing one — for a Makefile, a target the `check` target depends on:
 

@@ -48,7 +48,7 @@ Given pending signature `S` with frozen `inputs`, `output`, `description`, and `
 The new file bounds the ordinary fix:
 
 - **Contract mismatch:** conform the definition to the frozen header. If the header itself is wrong, that is a propagating contract change; pause and revise the parent region deliberately rather than silently changing the header.
-- **Other semantic errors:** use `validation_errors[]`, the Markdown locators, and the relevant section of the authoring reference; fix the added file and re-validate.
+- **Other semantic errors:** use the verdict's `errors[]`, each item's `code`, `detail` and `location`, and the relevant section of the authoring reference; fix the added file and re-validate.
 
 ## Stopping early
 
