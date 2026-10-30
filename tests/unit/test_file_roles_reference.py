@@ -82,11 +82,24 @@ class TestFileRolesReference:
     def test_each_role_says_what_it_asks_of_the_method(self, target_name: str) -> None:
         text = reference(target_name)
         asks = section(text, "## What each role asks of the method")
-        assert "**The real data of an example stays out of the method.**" in asks
+        assert "**An example's values appear nowhere in the method.**" in asks
         assert "**A brief goes through [fit.md](fit.md).**" in asks
         assert "**A brief is not kept with the method.**" in asks
         assert "**An example output becomes a template too only when the user wants the result as that kind of file.**" in asks
         assert "It is written into the prompts when it is stable" in text and "made an input when it changes from one run to the next" in text
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_an_example_s_values_appear_nowhere_in_the_method(self, target_name: str) -> None:
+        """Forbidding only a sample answer in a prompt let an example's own dates and totals in as format examples."""
+        rule = the_line(
+            section(reference(target_name), "## What each role asks of the method"), "**An example's values appear nowhere in the method.**"
+        )
+        assert "into any description, a field's, a pipe's or the bundle's, not even as a format example" in rule
+        assert "a format example takes made-up values of the same shape" in rule
+        assert "name an example by its kind" in rule and "never by its client, its people or its figures" in rule
+        assert "Write the values in only when the user asks for it." in rule
+        assert "search the files you wrote for the example's names, dates and amounts" in rule and "never say it from memory" in rule
+        assert "sample answer" not in rule
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_template_is_the_language_reference_s_to_describe(self, target_name: str) -> None:
