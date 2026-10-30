@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…). A shallow, fully understood graph is written directly, and deep, uncertain or staged work goes stepwise.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…).
 ---
 
 # Design a MTHDS bundle top-down at the right depth
@@ -17,6 +17,7 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 - **Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**
 - **Never write `inputs.json`.** Only a sample input, or a run on real data, goes to `/pipelex:pipelex-inputs`.
+- **An example's values, numbers too, stay out of the method and its test inputs.**
 - **This skill never runs a method**: a run needs inputs and spends inference credit.
 
 ## Process

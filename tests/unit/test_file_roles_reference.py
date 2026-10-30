@@ -82,24 +82,61 @@ class TestFileRolesReference:
     def test_each_role_says_what_it_asks_of_the_method(self, target_name: str) -> None:
         text = reference(target_name)
         asks = section(text, "## What each role asks of the method")
-        assert "**An example's values appear nowhere in the method.**" in asks
+        assert "**An example's values appear nowhere in the method, its test inputs included.**" in asks
         assert "**A brief goes through [fit.md](fit.md).**" in asks
         assert "**A brief is not kept with the method.**" in asks
         assert "**An example output becomes a template too only when the user wants the result as that kind of file.**" in asks
         assert "It is written into the prompts when it is stable" in text and "made an input when it changes from one run to the next" in text
 
+    @staticmethod
+    def values_rule(target_name: str) -> str:
+        return the_line(
+            section(reference(target_name), "## What each role asks of the method"),
+            "**An example's values appear nowhere in the method, its test inputs included.**",
+        )
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_an_example_s_values_appear_nowhere_in_the_method(self, target_name: str) -> None:
         """Forbidding only a sample answer in a prompt let an example's own dates and totals in as format examples."""
-        rule = the_line(
-            section(reference(target_name), "## What each role asks of the method"), "**An example's values appear nowhere in the method.**"
-        )
+        rule = self.values_rule(target_name)
         assert "into any description, a field's, a pipe's or the bundle's, not even as a format example" in rule
-        assert "a format example takes made-up values of the same shape" in rule
         assert "name an example by its kind" in rule and "never by its client, its people or its figures" in rule
-        assert "Write the values in only when the user asks for it." in rule
-        assert "search the files you wrote for the example's names, dates and amounts" in rule and "never say it from memory" in rule
+        assert "Write the example's values in only when the user asks for it" in rule
+        assert "never say it from memory" in rule
         assert "sample answer" not in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_format_example_makes_up_its_numbers_too(self, target_name: str) -> None:
+        """A replay of the build assistant kept a report's own percentages as format examples, `(52 for 52%)`, having
+        read "made-up values" as names and dates alone."""
+        rule = self.values_rule(target_name)
+        assert "The names, dates, amounts, percentages, readings and identifiers" in rule
+        assert "a format example takes made-up values of the same shape, numbers too, never the example's own amounts or percentages" in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_method_built_from_an_example_output_gets_made_up_test_inputs(self, target_name: str) -> None:
+        """The same replay rebuilt the report's whole case into `inputs.json`, which the build assistant saves as the
+        method's example for the whole team: test inputs are the method's too, and only a sample input becomes one."""
+        rule = self.values_rule(target_name)
+        assert "The test inputs are saved with the method" in rule
+        assert "a method built from an example output gets test inputs made up in the same shape" in rule
+        assert "never the example's own case rebuilt from its values" in rule
+        assert "only a sample input, a case the user gave the method to run, becomes a test input as it was given" in rule
+        offer = rule.index("your closing message may offer to load its own figures as test inputs")
+        assert "so that the user can compare the result with their document, and you load them only on their yes" in rule[offer:]
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_search_covers_every_file_and_the_numbers(self, target_name: str) -> None:
+        """The search before the closing message has to reach the test inputs and the figures, where the replay leaked."""
+        rule = self.values_rule(target_name)
+        assert "search every file you wrote, the test inputs included, for the example's names, dates and numbers" in rule
+        assert rule.index("search every file you wrote") > rule.index("your closing message may offer"), "the search comes last, before that message"
+        assert "search the files you wrote for the example's names, dates and amounts" not in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_filled_report_case_makes_its_test_inputs_up(self, target_name: str) -> None:
+        case = the_line(section(reference(target_name), "## Cases"), '**A filled report, with "it should produce this".**')
+        assert "its test inputs describe a made-up visit" in case
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_template_is_the_language_reference_s_to_describe(self, target_name: str) -> None:
@@ -138,6 +175,18 @@ class TestFileRolesReference:
         assert "provides files or paths" not in body
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_each_skill_that_writes_from_an_example_states_the_values_guard(self, target_name: str) -> None:
+        """A shared reference never carries a guard alone: design, which builds the method and, in the build assistant,
+        writes its test inputs, states it among the guards spanning its steps; edit at its pointer; inputs in the guard
+        that settles which file fills an input."""
+        guards = section(skill_body(target_name, "pipelex-design"), "## Guards")
+        assert "- **An example's values, numbers too, stay out of the method and its test inputs.**" in guards
+        classify = section(skill_body(target_name, "pipelex-edit"), "### Step 2: Classify the change")
+        assert "**An example's values, numbers too, stay out of the method.**" in classify
+        strategy = section(skill_body(target_name, "pipelex-inputs"), "### 3. The strategy")
+        assert "**A file or its values fill an input only when its role is a sample input**" in strategy
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_edit_reads_it_before_classifying(self, target_name: str) -> None:
         classify = section(skill_body(target_name, "pipelex-edit"), "### Step 2: Classify the change")
         assert f"[file-roles.md{POINTER}, before classifying it**" in classify
@@ -148,7 +197,7 @@ class TestFileRolesReference:
     def test_inputs_takes_a_file_only_as_a_sample_input(self, target_name: str) -> None:
         """The strategy table picked User data on phrases such as "this file", whatever the file was for."""
         strategy = section(skill_body(target_name, "pipelex-inputs"), "### 3. The strategy")
-        guard = the_line(strategy, "**A file fills an input only when its role is a sample input**")
+        guard = the_line(strategy, "**A file or its values fill an input only when its role is a sample input**")
         assert f"[file-roles.md{POINTER} before matching" in guard
         assert strategy.index(guard) < strategy.index("| Signal | Strategy |"), "the role is checked before the table picks a strategy"
         assert "| Files or folders the user gives as sample inputs |" in strategy
