@@ -82,7 +82,7 @@ class TestFileRolesReference:
     def test_each_role_says_what_it_asks_of_the_method(self, target_name: str) -> None:
         text = reference(target_name)
         asks = section(text, "## What each role asks of the method")
-        assert "**An example's values appear nowhere in the method, its test inputs included.**" in asks
+        assert "**An example's values appear nowhere in the method, and in its test inputs only as a sample input the user gave.**" in asks
         assert "**A brief goes through [fit.md](fit.md).**" in asks
         assert "**A brief is not kept with the method.**" in asks
         assert "**An example output becomes a template too only when the user wants the result as that kind of file.**" in asks
@@ -92,7 +92,7 @@ class TestFileRolesReference:
     def values_rule(target_name: str) -> str:
         return the_line(
             section(reference(target_name), "## What each role asks of the method"),
-            "**An example's values appear nowhere in the method, its test inputs included.**",
+            "**An example's values appear nowhere in the method, and in its test inputs only as a sample input the user gave.**",
         )
 
     @pytest.mark.parametrize("target_name", TARGETS)
@@ -132,6 +132,26 @@ class TestFileRolesReference:
         assert "search every file you wrote, the test inputs included, for the example's names, dates and numbers" in rule
         assert rule.index("search every file you wrote") > rule.index("your closing message may offer"), "the search comes last, before that message"
         assert "search the files you wrote for the example's names, dates and amounts" not in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_given_sample_input_keeps_its_values_in_its_test_input(self, target_name: str) -> None:
+        """The rule kept every example's values out of the test inputs, a sample input's too, although a sample input
+        becomes a test input as it was given, so the search before the closing message would have rewritten it."""
+        rule = self.values_rule(target_name)
+        assert "and in its test inputs only as a sample input the user gave" in rule
+        exception = "rewrite any you find, except a given sample input's own values in its test input, which stay as they were given"
+        assert exception in rule
+        assert rule.index(exception) > rule.index("search every file you wrote"), "the exception qualifies the search"
+        assert "None of them goes into a prompt or into any description" in rule, "a sample input's values still stay out of the prompts"
+        assert "in a sample input or an example output become structure, fields and format, never text of the method" in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_reference_material_made_an_input_is_that_input_s_sample_input(self, target_name: str) -> None:
+        """Reference material that changes from run to run is an input, so the file the user gave fills it; left out of
+        the inventory, it was replaced by a synthesized one."""
+        material = the_line(section(reference(target_name), "## The roles"), "- **Reference material** ")
+        made_an_input = material.index("it is made an input when it changes from one run to the next")
+        assert "the file the user gave then fills that input as its sample input" in material[made_an_input:]
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_filled_report_case_makes_its_test_inputs_up(self, target_name: str) -> None:
@@ -180,7 +200,8 @@ class TestFileRolesReference:
         writes its test inputs, states it among the guards spanning its steps; edit at its pointer; inputs in the guard
         that settles which file fills an input."""
         guards = section(skill_body(target_name, "pipelex-design"), "## Guards")
-        assert "- **An example's values, numbers too, stay out of the method and its test inputs.**" in guards
+        assert "- **An example's values, numbers too, stay out of the method and any test input but a given sample input.**" in guards
+        assert "stay out of the method and its test inputs.**" not in guards, "a given sample input is a test input as it was given"
         classify = section(skill_body(target_name, "pipelex-edit"), "### Step 2: Classify the change")
         assert "**An example's values, numbers too, stay out of the method.**" in classify
         strategy = section(skill_body(target_name, "pipelex-inputs"), "### 3. The strategy")
@@ -209,6 +230,13 @@ class TestFileRolesReference:
         inventory = section(user_data, "## Inventory")
         assert "Collect every file the user has provided as a sample input" in inventory
         assert "A file given earlier as a brief, an example output, a template or reference material is left out" in inventory
+
+    def test_the_user_data_inventory_keeps_reference_material_taken_as_an_input(self) -> None:
+        """Leaving out all reference material dropped a job ad per opening or a style guide per client, which the method
+        takes as an input, so the user's real file never filled it and Mixed synthesized one instead."""
+        user_data = (REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
+        exclusion = the_line(section(user_data, "## Inventory"), "reference material is left out")
+        assert "however the later request is worded, unless it is reference material the method takes as an input," in exclusion
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_lab_reads_it_at_the_first_move(self, target_name: str) -> None:

@@ -50,7 +50,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**",
         "**Never write `inputs.json`.**",
         "Only a sample input, or a run on real data, goes to `/pipelex-inputs`.",
-        "**An example's values, numbers too, stay out of the method and its test inputs.**",
+        "**An example's values, numbers too, stay out of the method and any test input but a given sample input.**",
         "**This skill never runs a method**: a run needs inputs and spends inference credit.",
         "write the closest in-scope equivalent and call out the deviation",
         "**On a method app, ask first**",
