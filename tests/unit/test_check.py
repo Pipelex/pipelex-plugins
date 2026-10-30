@@ -104,7 +104,15 @@ def skill_tree(tmp_path: Path) -> Path:
     """Create a minimal valid skill directory structure with target configs."""
     template_shared = tmp_path / "templates" / "skills" / "shared"
     template_shared.mkdir(parents=True)
-    for name in ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2", "team-files.md.j2"]:
+    for name in [
+        "writing-mthds.md.j2",
+        "native-content-types.md.j2",
+        "credentials.md.j2",
+        "catalog-id.md.j2",
+        "fit.md.j2",
+        "team-files.md.j2",
+        "file-roles.md.j2",
+    ]:
         (template_shared / name).write_text("# placeholder\n")
 
     (tmp_path / "pipelex" / "skills" / "shared").mkdir(parents=True)
@@ -1010,7 +1018,15 @@ class TestSharedFilesExist:
         (tmp_path / "templates" / "skills" / "shared").mkdir(parents=True)
         errors = check_shared_files_exist(tmp_path)
         assert len(errors) == len(
-            ["writing-mthds.md.j2", "native-content-types.md.j2", "credentials.md.j2", "catalog-id.md.j2", "fit.md.j2", "team-files.md.j2"]
+            [
+                "writing-mthds.md.j2",
+                "native-content-types.md.j2",
+                "credentials.md.j2",
+                "catalog-id.md.j2",
+                "fit.md.j2",
+                "team-files.md.j2",
+                "file-roles.md.j2",
+            ]
         )
 
 

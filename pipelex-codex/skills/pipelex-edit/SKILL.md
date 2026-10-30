@@ -39,7 +39,7 @@ Read **every** `.mthds` file of the bundle directory outside `runs/` — the roo
 
 ### Step 2: Classify the change
 
-Check the requested change against the scope split at the top. Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
+Check the requested change against the scope split at the top. **Read a file the user gives with the change, and [file-roles.md](../shared/file-roles.md), before classifying it**: a file given as what the result should look like, such as "make it look like this", is an example output, and when following it adds, drops or reshapes an output field, the change is a contract change; one that moves only a prompt's wording or format stays here. **An example's values, numbers too, stay out of the method.** Structural or contract-changing → hand off to `/pipelex-design` now, before any files change. Everything else proceeds to the baseline. Classification calls no tool, so it comes before the baseline verdict on purpose.
 
 ### Step 3: Baseline verdict
 
@@ -87,3 +87,4 @@ State what changed (files and constructs), give the verdict line from the summar
 - [MTHDS reference](../shared/writing-mthds.md): before editing a construct you have not touched recently.
 - [Model references](../shared/writing-mthds.md#model-references): before writing or changing a `model` field.
 - [Native content types](../shared/native-content-types.md): editing a prompt or construct path that field-reads a native concept (`Image.url`, `Page.text_and_images`, …).
+- [file-roles.md](../shared/file-roles.md): a file the user gives with the change, before classifying it.
