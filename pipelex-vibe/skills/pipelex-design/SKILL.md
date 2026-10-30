@@ -16,18 +16,20 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 ## Guards
 
 - **Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**
-- **Never write `inputs.json`.** When the user provides files or paths, or wants to run with real data, invoke `/pipelex:pipelex-inputs`.
+- **Never write `inputs.json`.** Only a sample input, or a run on real data, goes to `/pipelex:pipelex-inputs`.
 - **This skill never runs a method**: a run needs inputs and spends inference credit.
 
 ## Process
 
 ### 1. Capture the contract
 
+**Requirements may come as a file: read it and [file-roles.md](../shared/file-roles.md) before fixing the contract.**
+
 **When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
 
 Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**. For what it does not cover, such as `PipeStructure`, write the closest in-scope equivalent and call out the deviation.
 
-Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
+Fix the **input concept(s)**, the **output concept** and the **description**, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
 **Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, without waiting for a reply. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. **A `PipeFunc` computes; it never calls another service or holds a credential.** Discuss only genuine ambiguity, or when the user asks to collaborate.
 
@@ -71,7 +73,7 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, [file-roles.md](../shared/file-roles.md) for a given file, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
@@ -88,4 +90,3 @@ These references name a skill by its bare `/pipelex-<name>`; to the user, write 
 - [writing-mthds.md](../shared/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a re-entry.
-- [Native content types](../shared/native-content-types.md): a native's fields, for `$var.field` and `from`.

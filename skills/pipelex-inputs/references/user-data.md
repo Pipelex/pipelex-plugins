@@ -6,7 +6,7 @@ In interactive mode, ask which of the user's files goes to which input wherever 
 
 ## Inventory
 
-Collect every file the user has provided: explicit paths, folders, and files mentioned earlier in the conversation. A file the user names that is not on disk, such as one already uploaded to Pipelex, is looked up among the team's files as the skill's step 3 says, and fills its input by its address, with nothing to upload. Determine each one's type:
+Collect every file the user has provided as a sample input: explicit paths, folders, and files mentioned earlier in the conversation whose role was settled as one. A file given earlier as a brief, an example output, a template or reference material is left out, however the later request is worded, and a file whose role was never settled is settled first, as the skill's step 3 says, before it is matched. A file the user names that is not on disk, such as one already uploaded to Pipelex, is looked up among the team's files as the skill's step 3 says, and fills its input by its address, with nothing to upload. Determine each one's type:
 
 | Extension | Detected type | Maps to |
 |---|---|---|

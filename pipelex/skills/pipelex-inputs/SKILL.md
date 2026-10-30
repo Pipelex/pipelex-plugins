@@ -1,6 +1,6 @@
 ---
 name: pipelex-inputs
-description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo, optional /selector and @tag) — also when the user names one, e.g. "prepare inputs for mt_abc123". Handles user-provided files, synthetic data generation, placeholder templates, and mixed approaches.
+description: Prepare inputs for MTHDS methods. Use when user says "prepare inputs", "create inputs", "use my files", "generate test data", "synthesize inputs", "mock inputs", "I have a PDF/image/document to use", "make sample data", or wants to create inputs.json for running a .mthds pipeline. Works from a local .mthds bundle, from a registered method's catalog id (mt_…), or from a published method's address (github.com/owner/repo, optional /selector and @tag) — also when the user names one, e.g. "prepare inputs for mt_abc123".
 allowed-tools:
   - Bash
   - Read
@@ -54,11 +54,11 @@ Call **`mthds_inputs_template`** with the selector and **`explicit: false`**, fo
 
 ### 3. The strategy
 
-Evaluated in order:
+**A file fills an input only when its role is a sample input**: read [file-roles.md](../shared/file-roles.md) before matching one whose role is unsettled. Then, in order:
 
 | Signal | Strategy |
 |---|---|
-| User gives file or folder paths, or says "my data" / "this file" / "use these images" / "here's my PDF" | **User data**, or **Mixed** if inputs remain unfilled |
+| Files or folders the user gives as sample inputs | **User data**, or **Mixed** if inputs remain unfilled |
 | User says "test data" / "generate inputs" / "synthesize" / "fake data" / "sample data" | **Synthetic** |
 | User says "template" / "schema" / "placeholder" / "what inputs does it need?" | **Template** |
 | No clear signal (e.g. right after `/pipelex-design`, with no further context) | **Template**, then offer to populate |

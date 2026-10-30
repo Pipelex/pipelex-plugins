@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The skills work out what each file you give is for**: a file you attach, name by its path or URL, or pick from your team's files is read and taken as a sample input, a brief, an example output, a template or reference material, from your words first, and the skill states its reading in one line, or asks first when the clues disagree or a wrong guess would change what the method takes in or gives back, as the new shared reference `skills/shared/file-roles.md` describes. `pipelex-design` reads a file as the requirements before fixing the contract or changing a method and sends only a sample input to `pipelex-inputs`; `pipelex-edit` reads a file given as "make it look like this" as an example output, so a change that reshapes the output goes to `pipelex-design`; `pipelex-inputs` matches a file to an input only once its role is a sample input, so a brief or an example you gave earlier never becomes one; and `pipelex-lab` seeds the brief's Right means and a case's answer key from an example output. An example's real names and amounts never go into a method's prompts, and a brief is not copied into the method's folder.
+
 ## [0.17.0] - 2026-10-25
 
 ### Added
