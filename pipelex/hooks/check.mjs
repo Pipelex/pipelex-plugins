@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.54.1 (bc448bf) + @pipelex/tools-wasm 0.6.1 (npm)
+// Provenance: @pipelex/sdk 0.59.0 (de7fbe5) + @pipelex/tools-wasm 0.6.1 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -60,7 +60,7 @@ var init_exceptions = __esm({
 var MTHDS_ERROR_REGISTRY_VERSION, CORE_ERROR_BASE_URL, EXTENSION_PREFIXES, ERROR_FAMILIES, ERROR_CODES, CORE_REGISTRY;
 var init_registry_generated = __esm({
   "node_modules/mthds/dist/problems/registry.generated.js"() {
-    MTHDS_ERROR_REGISTRY_VERSION = "8.0.0";
+    MTHDS_ERROR_REGISTRY_VERSION = "8.0.1";
     CORE_ERROR_BASE_URL = "https://mthds.ai/errors";
     EXTENSION_PREFIXES = [
       { prefix: "pipelex", owner: "Pipelex", base_url: "https://docs.pipelex.com/errors" }
@@ -122,11 +122,11 @@ var init_registry_generated = __esm({
       INPUT_MISSING: "input.missing",
       /** An input the method does not declare */
       INPUT_UNEXPECTED: "input.unexpected",
-      /** An input is not the declared concept */
+      /** An input is not of the kind the method declares */
       INPUT_WRONG_CONCEPT: "input.wrong_concept",
-      /** An input has the wrong number of items */
+      /** An input has the wrong form or the wrong number of items */
       INPUT_WRONG_MULTIPLICITY: "input.wrong_multiplicity",
-      /** An input does not fit its concept's structure */
+      /** An input does not have the structure the method declares */
       INPUT_INVALID: "input.invalid",
       /** An input file cannot be read */
       INPUT_FILE_UNREADABLE: "input.file_unreadable",
@@ -218,31 +218,31 @@ var init_registry_generated = __esm({
       METHOD_INPUT_PRESENCE_VACUOUS: "method.input_presence_vacuous",
       /** An optional force is redundant */
       METHOD_OPTIONAL_FORCE_REDUNDANT: "method.optional_force_redundant",
-      /** A pipe's output does not have the declared multiplicity */
+      /** A step produced a list instead of one result, or the reverse */
       PIPE_OUTPUT_MULTIPLICITY: "pipe.output_multiplicity",
-      /** A pipe's output does not fit its concept */
+      /** A step's result does not have the structure the method declares */
       PIPE_OUTPUT_INVALID: "pipe.output_invalid",
-      /** The method's function raised */
+      /** The method's function failed */
       PIPE_FUNCTION_RAISED: "pipe.function_raised",
       /** The method's function ran past its time limit */
       PIPE_FUNCTION_TIMED_OUT: "pipe.function_timed_out",
-      /** A template failed to render */
+      /** A template in the method could not be filled in */
       PIPE_TEMPLATE_RENDER_FAILED: "pipe.template_render_failed",
-      /** A template exceeded its render budget */
+      /** A template in the method tried to do more than it may */
       PIPE_TEMPLATE_BUDGET_EXCEEDED: "pipe.template_budget_exceeded",
       /** A condition matched no outcome */
       PIPE_CONDITION_UNMATCHED: "pipe.condition_unmatched",
       /** The method refused these inputs */
       PIPE_CONDITION_REFUSED: "pipe.condition_refused",
-      /** A binding step could not bind its value */
+      /** A step could not find a field in the value it reads */
       PIPE_BINDING_FAILED: "pipe.binding_failed",
-      /** A pipe could not read a value it needs */
+      /** A step could not read a value it needs */
       PIPE_INPUT_UNRESOLVED: "pipe.input_unresolved",
-      /** A forced input was absent */
+      /** A value the method counts on was missing */
       PIPE_FORCED_INPUT_ABSENT: "pipe.forced_input_absent",
-      /** A pipe's prompt is empty */
+      /** A step's prompt came out empty */
       PIPE_PROMPT_EMPTY: "pipe.prompt_empty",
-      /** The run nested pipes deeper than the limit */
+      /** The run nested its steps deeper than the limit */
       PIPE_STACK_OVERFLOW: "pipe.stack_overflow",
       /** The method names a model that does not exist */
       MODEL_UNKNOWN: "model.unknown",
@@ -254,9 +254,9 @@ var init_registry_generated = __esm({
       MODEL_CAPABILITY_UNSUPPORTED: "model.capability_unsupported",
       /** The inputs exceed what the model can read */
       MODEL_CONTEXT_EXCEEDED: "model.context_exceeded",
-      /** The answer was cut at the method's token cap */
+      /** The model's answer was cut off at the method's length limit */
       MODEL_OUTPUT_TRUNCATED: "model.output_truncated",
-      /** The model's structured output did not match its schema */
+      /** The model's answer did not have the expected structure */
       MODEL_OUTPUT_SCHEMA_MISMATCH: "model.output_schema_mismatch",
       /** The provider refused the content */
       MODEL_CONTENT_REFUSED: "model.content_refused",
@@ -310,9 +310,9 @@ var init_registry_generated = __esm({
       SECURITY_INPUT_PATH_REFUSED: "security.input_path_refused",
       /** A path the method names was refused */
       SECURITY_METHOD_PATH_REFUSED: "security.method_path_refused",
-      /** A template was refused by the template sandbox */
+      /** A template in the method reached for something it may not use */
       SECURITY_TEMPLATE_REFUSED: "security.template_refused",
-      /** An output schema was refused */
+      /** The method declares an output structure the runtime refuses */
       SECURITY_SCHEMA_REFUSED: "security.schema_refused",
       /** A dependency's content differs from its lock */
       SECURITY_INTEGRITY_MISMATCH: "security.integrity_mismatch",
@@ -776,7 +776,7 @@ var init_registry_generated = __esm({
       },
       "input.wrong_concept": {
         code: "input.wrong_concept",
-        title: "An input is not the declared concept",
+        title: "An input is not of the kind the method declares",
         domain: "input",
         retry: "no",
         raised_as: "problem",
@@ -800,7 +800,7 @@ var init_registry_generated = __esm({
       },
       "input.wrong_multiplicity": {
         code: "input.wrong_multiplicity",
-        title: "An input has the wrong number of items",
+        title: "An input has the wrong form or the wrong number of items",
         domain: "input",
         retry: "no",
         raised_as: "problem",
@@ -813,7 +813,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "change_input",
-            detail: "Pass this to the caller, who must give the input '{input}' with the multiplicity the method declares."
+            detail: "Pass this to the caller, who must give the input '{input}' as the method declares it: one item, a list, or a list of a set length."
           }
         },
         params: {
@@ -825,7 +825,7 @@ var init_registry_generated = __esm({
       },
       "input.invalid": {
         code: "input.invalid",
-        title: "An input does not fit its concept's structure",
+        title: "An input does not have the structure the method declares",
         domain: "input",
         retry: "no",
         raised_as: "problem",
@@ -1835,7 +1835,7 @@ var init_registry_generated = __esm({
       },
       "pipe.output_multiplicity": {
         code: "pipe.output_multiplicity",
-        title: "A pipe's output does not have the declared multiplicity",
+        title: "A step produced a list instead of one result, or the reverse",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -1848,7 +1848,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to make the output '{output}' of pipe '{pipe}' match its declared multiplicity."
+            detail: "Ask the method's owner to make the step '{pipe}' produce its output '{output}' as one item or as a list, as the method declares it."
           }
         },
         params: {
@@ -1860,7 +1860,7 @@ var init_registry_generated = __esm({
       },
       "pipe.output_invalid": {
         code: "pipe.output_invalid",
-        title: "A pipe's output does not fit its concept",
+        title: "A step's result does not have the structure the method declares",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -1873,7 +1873,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to make pipe '{pipe}' produce an output that fits its concept."
+            detail: "Ask the method's owner to make the step '{pipe}' produce a result with the structure the method declares."
           }
         },
         params: {
@@ -1884,7 +1884,7 @@ var init_registry_generated = __esm({
       },
       "pipe.function_raised": {
         code: "pipe.function_raised",
-        title: "The method's function raised",
+        title: "The method's function failed",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -1897,7 +1897,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to fix the function '{function}' of pipe '{pipe}'."
+            detail: "Ask the method's owner to fix the function '{function}' of the step '{pipe}'."
           }
         },
         params: { pipe: { type: "identifier" }, function: { type: "identifier" } }
@@ -1928,7 +1928,7 @@ var init_registry_generated = __esm({
       },
       "pipe.template_render_failed": {
         code: "pipe.template_render_failed",
-        title: "A template failed to render",
+        title: "A template in the method could not be filled in",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -1941,14 +1941,14 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to fix the template of pipe '{pipe}'."
+            detail: "Ask the method's owner to fix the template of the step '{pipe}'."
           }
         },
         params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
       },
       "pipe.template_budget_exceeded": {
         code: "pipe.template_budget_exceeded",
-        title: "A template exceeded its render budget",
+        title: "A template in the method tried to do more than it may",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -1961,7 +1961,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to make the template of pipe '{pipe}' do less in one render."
+            detail: "Ask the method's owner to make the template of the step '{pipe}' do less."
           }
         },
         params: {
@@ -1985,7 +1985,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to map every value of the condition of pipe '{pipe}'."
+            detail: "Ask the method's owner to give the condition of the step '{pipe}' an outcome for every value it can take."
           }
         },
         params: { pipe: { type: "identifier" } }
@@ -2012,7 +2012,7 @@ var init_registry_generated = __esm({
       },
       "pipe.binding_failed": {
         code: "pipe.binding_failed",
-        title: "A binding step could not bind its value",
+        title: "A step could not find a field in the value it reads",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2025,7 +2025,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to fix the binding '{binding}' of pipe '{pipe}'."
+            detail: "Ask the method's owner to fix how the step '{pipe}' reads '{binding}'."
           }
         },
         params: {
@@ -2036,7 +2036,7 @@ var init_registry_generated = __esm({
       },
       "pipe.input_unresolved": {
         code: "pipe.input_unresolved",
-        title: "A pipe could not read a value it needs",
+        title: "A step could not read a value it needs",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2056,7 +2056,7 @@ var init_registry_generated = __esm({
       },
       "pipe.forced_input_absent": {
         code: "pipe.forced_input_absent",
-        title: "A forced input was absent",
+        title: "A value the method counts on was missing",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2069,14 +2069,14 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to handle the absence of '{variable}' in pipe '{pipe}'."
+            detail: "Ask the method's owner to handle a missing '{variable}' in the step '{pipe}'."
           }
         },
         params: { pipe: { type: "identifier" }, variable: { type: "identifier" } }
       },
       "pipe.prompt_empty": {
         code: "pipe.prompt_empty",
-        title: "A pipe's prompt is empty",
+        title: "A step's prompt came out empty",
         domain: "input",
         retry: "no",
         raised_as: "problem",
@@ -2089,7 +2089,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "change_input",
-            detail: "Pass this to the caller, whose inputs leave the prompt of pipe '{pipe}' empty."
+            detail: "Pass this to the caller, whose inputs leave the prompt of the step '{pipe}' empty."
           }
         },
         params: {
@@ -2099,7 +2099,7 @@ var init_registry_generated = __esm({
       },
       "pipe.stack_overflow": {
         code: "pipe.stack_overflow",
-        title: "The run nested pipes deeper than the limit",
+        title: "The run nested its steps deeper than the limit",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2112,7 +2112,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to stop the method's pipes from nesting without end."
+            detail: "Ask the method's owner to stop the method's steps from calling each other without end."
           }
         },
         params: { limit: { type: "integer" } }
@@ -2241,7 +2241,7 @@ var init_registry_generated = __esm({
       },
       "model.output_truncated": {
         code: "model.output_truncated",
-        title: "The answer was cut at the method's token cap",
+        title: "The model's answer was cut off at the method's length limit",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2254,7 +2254,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to raise the step's token cap."
+            detail: "Ask the method's owner to raise the step's length limit."
           }
         },
         params: {
@@ -2265,7 +2265,7 @@ var init_registry_generated = __esm({
       },
       "model.output_schema_mismatch": {
         code: "model.output_schema_mismatch",
-        title: "The model's structured output did not match its schema",
+        title: "The model's answer did not have the expected structure",
         domain: "runtime",
         retry: "yes",
         raised_as: "problem",
@@ -2685,7 +2685,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to change the URL pipe '{pipe}' names."
+            detail: "Ask the method's owner to change the URL the step '{pipe}' names."
           }
         },
         params: {
@@ -2751,14 +2751,14 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to change the path pipe '{pipe}' names."
+            detail: "Ask the method's owner to change the path the step '{pipe}' names."
           }
         },
         params: { pipe: { type: "identifier" }, file: { type: "identifier" } }
       },
       "security.template_refused": {
         code: "security.template_refused",
-        title: "A template was refused by the template sandbox",
+        title: "A template in the method reached for something it may not use",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2771,14 +2771,14 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to remove '{name}' from the templates of pipe '{pipe}'."
+            detail: "Ask the method's owner to remove '{name}' from the templates of the step '{pipe}'."
           }
         },
         params: { pipe: { type: "identifier" }, name: { type: "identifier" } }
       },
       "security.schema_refused": {
         code: "security.schema_refused",
-        title: "An output schema was refused",
+        title: "The method declares an output structure the runtime refuses",
         domain: "method",
         retry: "no",
         raised_as: "problem",
@@ -2791,7 +2791,7 @@ var init_registry_generated = __esm({
           },
           other: {
             kind: "contact_owner",
-            detail: "Ask the method's owner to remove the extensions from the concept '{concept}'."
+            detail: "Ask the method's owner to remove the code that the output structure '{concept}' carries."
           }
         },
         params: { concept: { type: "identifier" } }
@@ -3170,7 +3170,7 @@ var init_registry_generated = __esm({
 var MTHDS_ERROR_REGISTRY_TARGET_VERSION;
 var init_registry_target = __esm({
   "node_modules/mthds/dist/problems/registry-target.js"() {
-    MTHDS_ERROR_REGISTRY_TARGET_VERSION = "8.0.0";
+    MTHDS_ERROR_REGISTRY_TARGET_VERSION = "8.0.1";
   }
 });
 
@@ -3904,7 +3904,7 @@ var init_method_files = __esm({
 var MTHDS_PROTOCOL_VERSION, MODEL_CATEGORIES;
 var init_models = __esm({
   "node_modules/mthds/dist/protocol/models.js"() {
-    MTHDS_PROTOCOL_VERSION = "2.0.0";
+    MTHDS_PROTOCOL_VERSION = "2.0.1";
     MODEL_CATEGORIES = ["llm", "extract", "img_gen", "search", "judgment"];
   }
 });
@@ -5444,7 +5444,7 @@ var init_config = __esm({
 var MTHDS_JS_VERSION;
 var init_version = __esm({
   "node_modules/mthds/dist/version.js"() {
-    MTHDS_JS_VERSION = "0.33.0";
+    MTHDS_JS_VERSION = "0.34.0";
   }
 });
 
@@ -14002,7 +14002,7 @@ function isLimitExceeded(err) {
 init_protocol();
 
 // src/version.ts
-var SDK_VERSION = "0.54.1";
+var SDK_VERSION = "0.59.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -15965,6 +15965,10 @@ var ARCHIVE_ID_ARGUMENT = {
   name: "archive_id",
   what: "an archive id, the archive's non-empty `archive_id`"
 };
+var DELIVERY_ID_ARGUMENT = {
+  name: "delivery_id",
+  what: "a delivery id, the delivery's non-empty `delivery_id`"
+};
 var CREATE_RUN_ID_ARGUMENT = {
   name: "run_id",
   what: "a run_id naming a run of this method that used these inputs, a non-empty string, or none"
@@ -16013,6 +16017,19 @@ var DRAFT_TOKEN_ARGUMENT = {
   name: "expected_updated_at",
   what: "the draft token the caller last read, the method's `updated_at`, a string, or none"
 };
+var RUN_LIST_QUERY_ARGUMENT = {
+  name: "query",
+  what: "its query as an object, naming the method as `{ methodId }` or leaving it out for every method"
+};
+function checkRunListQuery(call, query) {
+  if (isPlainObject(query)) return;
+  throw argumentRefusal(
+    call,
+    RUN_LIST_QUERY_ARGUMENT,
+    describeNumberArgument(query),
+    "not_an_object"
+  );
+}
 var COPY_DESTINATION_ARGUMENT = {
   name: "destination_org_id",
   what: "a destination_org_id, the canonical id of the organization to copy into, a non-empty string"
@@ -16200,7 +16217,8 @@ var PipelexApiClient = class {
    * `url` is a fully resolved absolute URL. `mayStartRun` marks a request that may create a run,
    * whose errors then say whether it may have (see `RunCreation`).
    * `idempotencyKey`, already checked by `idempotencyKeyOf`, is sent as the
-   * `Idempotency-Key` header; only `start` and `copyMethod` pass one.
+   * `Idempotency-Key` header; only `start`, `copyMethod`, `rotateWebhookSecret` and
+   * `replayRunWebhookDelivery` pass one.
    */
   async requestRaw(method, url, options = {}) {
     const hasBody = options.body !== void 0;
@@ -18707,6 +18725,39 @@ var PipelexApiClient = class {
     const segment = idPathSegment(orgId, "updateOrganizationBranding", ORG_ID_ARGUMENT);
     return this.requestProductObject("PATCH", `organizations/${segment}/branding`, input);
   }
+  /**
+   * The organization's webhook signing secret — `GET /v1/organizations/{org_id}/webhook-secret`:
+   * the `whsec_` secret every caller webhook of the organization is signed with, which a receiver
+   * hands to `verifyWebhook`. The platform generates it on this first read when the organization
+   * has none. Treat the answer as a credential: never log or cache it.
+   *
+   * An admin's route, from a web session only: the hosted gateway refuses an API key on it. Throws
+   * `ApiResponseError`: `403` `auth.forbidden` whose `params.requirement` names `admin` for any
+   * other role, `403` `pipelex.org.mismatch` for an organization other than the caller's active
+   * one, and `404` `pipelex.org.not_found` for one with no record.
+   */
+  async getWebhookSecret(orgId) {
+    const segment = idPathSegment(orgId, "getWebhookSecret", ORG_ID_ARGUMENT);
+    return this.requestProductObject("GET", `organizations/${segment}/webhook-secret`);
+  }
+  /**
+   * Rotate the organization's webhook signing secret — `POST
+   * /v1/organizations/{org_id}/webhook-secret/rotate`: a new secret is current at once, and the
+   * one it replaces keeps signing beside it for 24 hours, then is dropped, so a receiver has a day
+   * to take the new one. An organization with no secret yet gets its first. Answers the new secret,
+   * as `getWebhookSecret` does, with its guards and refusals.
+   *
+   * `options.idempotencyKey` is sent as the `Idempotency-Key` header. The answer carries a secret,
+   * so the platform never replays it: the same key sent again is refused `409`
+   * `request.already_executed` and rotates nothing more, and the secret is then read with
+   * `getWebhookSecret`. A malformed key is a `RequestArgumentError` before anything is sent.
+   */
+  async rotateWebhookSecret(orgId, options = {}) {
+    const endpoint = `organizations/${idPathSegment(orgId, "rotateWebhookSecret", ORG_ID_ARGUMENT)}/webhook-secret/rotate`;
+    const idempotencyKey = idempotencyKeyOf(options, "rotate the secret");
+    const res = await this.requestProductAnswer("POST", endpoint, void 0, { idempotencyKey });
+    return this.readObjectAnswer("POST", endpoint, res);
+  }
   /** The active org's subscription state — `GET /v1/billing/subscription`. */
   async getSubscription() {
     return this.requestProduct("GET", "billing/subscription");
@@ -18981,7 +19032,9 @@ var PipelexApiClient = class {
    * upload looked unfinished past the upload grant's lifespan is settled by the read, so it answers
    * `stored` when its bytes are there. Each use's `created_by` names who started the run or saved
    * the example; a use the platform answers without the member, as one that predates it does, or
-   * with a member that is not a string, reads as `null`.
+   * with a member that is not a string, reads as `null`. Each use's `method_version` names the
+   * version or draft its run ran; a use answered without it, or with anything but an integer or
+   * `"draft"`, reads as `null`.
    *
    * Throws `RequestArgumentError` for a file id that is empty, `.` or `..`, or holds a lone
    * surrogate, before any request. Throws `ApiResponseError`: `404` `pipelex.storage.not_found` for
@@ -19007,7 +19060,7 @@ var PipelexApiClient = class {
     const items = uses.items;
     return {
       ...detail,
-      uses: { ...uses, items: items.map(withUseCreator) }
+      uses: { ...uses, items: items.map(withCheckedUse) }
     };
   }
   /**
@@ -19355,43 +19408,58 @@ var PipelexApiClient = class {
     return answer;
   }
   /**
-   * One PAGE of a method's runs, newest first — `GET /v1/runs?method_id=`.
+   * One PAGE of the run history, newest first — `GET /v1/runs`.
    *
    * **This returns a page, not the whole history.** The API serves it from a
    * time-ordered index, so its cost is the page size rather than the size of
    * the history; a method with 100k runs answers as fast as one with 50. To
    * read further, pass the previous response's `nextCursor` back as
-   * `query.cursor` until it comes back `null`.
+   * `query.cursor`, with the same `methodId`, until it comes back `null`. A
+   * cursor is bound to the list that issued it: the cursor of one method's runs
+   * is refused on the organization's, and the other way round.
    *
-   * Breaking in v0.10.0: this used to return `PipelineRun[]` — the complete
-   * history in one array. Code that rendered that array directly should now
-   * either read `page.items` (accepting the first page) or follow the cursor.
-   * `iterateRuns` does the latter for you.
+   * The method is one filter among the others. `methodId` lists that method's
+   * runs; omitted, the page holds the organization's runs of every method. Each
+   * row names its method (`method_id`), the version it ran (`method_version`)
+   * and who started it (`created_by_user_id`), so a list across methods can name
+   * each from the catalog and the organization's members.
    *
-   * Each item is a `RunHistoryItem` — the id, status, timestamps, pipe and,
-   * for a failed run, its own problem. The run's organization, creator,
-   * method and workflow id are not on the list; `getRunDetail` returns them.
+   * Each item is a `RunHistoryItem` — the id, method, author, status,
+   * timestamps, pipe and, for a failed run, its own problem. A row also says
+   * whether its results are stored (`results_stored`), so a history reads no
+   * results for a row whose results were not kept, such as a blocking
+   * `execute` run's, whose `getRunResult` would answer
+   * `404 run.results_not_stored`. A platform that predates the field leaves it
+   * out, and an absent field does not mean `false`. The run's organization,
+   * workflow id and result location are not on the list; `getRunDetail`
+   * returns them.
    *
    * `createdFrom` / `createdTo` are applied server-side as index key
    * conditions, so a bounded page genuinely reads less. They are INSTANTS,
    * not days — see `ListRunsQuery`.
    *
    * `createdBy: "me"` keeps the caller's own runs and `status` the runs in any of the given
-   * statuses, sent as `created_by=me` and one repeated `status=` parameter per status. Both are
-   * filters applied after the index read, so a filtered page can hold fewer runs than `limit`,
-   * or none, and still carry a `nextCursor`: an empty page is not the end, a `null` cursor is.
-   * An empty `status` list, or a name that is no `RunStatus`, is a `RequestArgumentError`
-   * before any request.
+   * statuses, sent as `created_by=me` and one repeated `status=` parameter per status. The
+   * platform may apply either after its index read, so a filtered page can hold fewer runs than
+   * `limit`, or none, and still carry a `nextCursor`: an empty page is not the end, a `null`
+   * cursor is. An empty `status` list, or a name that is no `RunStatus`, is a
+   * `RequestArgumentError` before any request, and so is a `query` that is not an object, such as
+   * the method id a call written for the former `listRuns(methodId, query)` passes first.
    *
-   * Takes a bare catalog id: the history files the runs of every version and
-   * of the draft together under it, so `mt_…@3` names no history of its own
-   * and the platform refuses it with a `400`. Strip a suffix with
-   * `parseMethodSelector`, and read which version a run ran from its
+   * `methodId` is a bare catalog id: the history files the runs of every
+   * version and of the draft together under it, so `mt_…@3` names no history of
+   * its own and the platform refuses it as `request.invalid`. Strip a suffix
+   * with `parseMethodSelector`, and read which version a run ran from its
    * `method_version`.
+   *
+   * Breaking in v0.10.0: this used to return `PipelineRun[]` — the complete
+   * history in one array. `iterateRuns` follows the cursor for a caller that
+   * wants every run.
    */
-  async listRuns(methodId, query = {}) {
+  async listRuns(query = {}) {
+    checkRunListQuery("listRuns", query);
     const search = productQuery({
-      method_id: methodId,
+      method_id: query.methodId,
       created_from: query.createdFrom,
       created_to: query.createdTo,
       created_by: query.createdBy,
@@ -19403,10 +19471,10 @@ var PipelexApiClient = class {
     return { items: page.items.map(withCheckedProblem), nextCursor: page.nextCursor };
   }
   /**
-   * Every run of a method, streamed — follows the cursor for you.
+   * Every run the query selects, streamed — follows the cursor for you.
    *
    * ```ts
-   * for await (const run of client.iterateRuns(methodId)) {
+   * for await (const run of client.iterateRuns({ methodId })) {
    *   if (isTheOne(run)) break;   // stop whenever you like
    * }
    * ```
@@ -19429,10 +19497,15 @@ var PipelexApiClient = class {
    * a `null` cursor or on a cursor the server failed to advance, and throws
    * `PagingNotTerminatingError` past a page ceiling no real history reaches.
    *
-   * Takes a bare catalog id, as `listRuns` does.
+   * Takes the query `listRuns` takes, the cursor aside, and sends it with every page: with a
+   * `methodId`, that method's runs; without one, the organization's runs of every method. A
+   * `query` that is not an object, such as the method id a call written for the former
+   * `iterateRuns(methodId)` passes, is a `RequestArgumentError` thrown at the call, before the
+   * iterator exists.
    */
-  async *iterateRuns(methodId, query = {}) {
-    yield* followCursor("listRuns", (cursor) => this.listRuns(methodId, { ...query, cursor }));
+  iterateRuns(query = {}) {
+    checkRunListQuery("iterateRuns", query);
+    return followCursor("listRuns", (cursor) => this.listRuns({ ...query, cursor }));
   }
   /**
    * The whole record for one run — `GET /v1/runs/{id}`.
@@ -19500,6 +19573,92 @@ var PipelexApiClient = class {
     }
     return { ...rest, nextCursor };
   }
+  /**
+   * A run's caller-webhook deliveries — `GET /v1/runs/{id}/webhook-deliveries`: one per URL the
+   * run registered in `callback_urls`, in their order, once the run has ended, each with its
+   * state and every attempt, its URL redacted. A run that registered none, or has not ended, lists
+   * none. Any member of the organization reads them, by web session or API key.
+   *
+   * Throws `RequestArgumentError` for a run id that is empty, `.` or `..`, or holds a lone
+   * surrogate, before any request. Throws `ApiResponseError`: `404` `run.not_found` for a run that
+   * is not the organization's, exactly as for one that does not exist. An answer whose
+   * `deliveries` is not an array is an answer the SDK cannot read, thrown as an `ApiResponseError`
+   * too.
+   */
+  async listRunWebhookDeliveries(runId) {
+    const segment = idPathSegment(runId, "listRunWebhookDeliveries", RUN_ID_ARGUMENT);
+    const endpoint = `runs/${segment}/webhook-deliveries`;
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    const list = this.readObjectAnswer("GET", endpoint, res);
+    if (!Array.isArray(list.deliveries)) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a run's deliveries whose `deliveries` is not an array"
+      );
+    }
+    return list;
+  }
+  /**
+   * One delivery of a run's webhooks, with its event —
+   * `GET /v1/runs/{id}/webhook-deliveries/{delivery_id}`: the body its latest attempt sent, or,
+   * before any attempt, the body its first attempt will send. Every attempt and replay of the
+   * delivery sends that body, only its `attempt` changing, so the event matches what a receiver
+   * logged only once an attempt was made: it then equals, as JSON, the body that attempt brought
+   * the receiver. Compare the two as parsed JSON values, never as text: the read promises the same
+   * value, not the same bytes.
+   * `deliveryId` is the delivery's `delivery_id`, the receiver's `webhook-id`.
+   *
+   * Throws `RequestArgumentError` for an id that is empty, `.` or `..`, or holds a lone surrogate,
+   * before any request. Throws `ApiResponseError`: `404` `run.not_found` for a run the caller
+   * cannot read, and `422` `request.invalid` naming `delivery_id` for a delivery the run does not
+   * have.
+   */
+  async getRunWebhookDelivery(runId, deliveryId) {
+    const call = "getRunWebhookDelivery";
+    const run = idPathSegment(runId, call, RUN_ID_ARGUMENT);
+    const delivery = idPathSegment(deliveryId, call, DELIVERY_ID_ARGUMENT);
+    return this.requestProductObject("GET", `runs/${run}/webhook-deliveries/${delivery}`);
+  }
+  /**
+   * Send a settled delivery again — `POST /v1/runs/{id}/webhook-deliveries/{delivery_id}/replay`:
+   * one new attempt under the same `webhook-id`, with the same `data`, the next `attempt`, a fresh
+   * timestamp, and the signatures of the secrets live when it is sent. A replay the receiver
+   * accepts marks the delivery `delivered`; one it does not leaves its state as it was, and the
+   * attempt is recorded either way. A replay never returns a delivery to `pending`. Anyone who
+   * can read the run asks for one, an API key included, under the organization's replay rate.
+   *
+   * Answers the attempt number the replay is sent under; a replay asked again before it is sent is
+   * that same attempt.
+   *
+   * `options.idempotencyKey` is sent as the `Idempotency-Key` header, and nothing is sent when it
+   * is absent or `null`. The platform stores the replay's answer under the key, so the same replay
+   * sent again under the same key, as after an answer lost to a time limit, gets the stored answer,
+   * naming the same attempt, and the delivery is not sent twice. A key reused for another request
+   * is refused `409` `request.idempotency_conflict`, and one whose earlier request is still being
+   * handled `409` `request.idempotency_key_in_use`, whose `retry` is `yes`: send it again under the
+   * same key after its `retry_after`. See `WebhookReplayOptions`.
+   *
+   * Throws `RequestArgumentError` for an id that is empty, `.` or `..`, or holds a lone surrogate,
+   * or for an idempotency key that is not 1 to 255 visible ASCII characters, before any request.
+   * Throws `ApiResponseError`: `404` `run.not_found` for a run the caller cannot read; `422`
+   * `request.invalid` naming `delivery_id` for a delivery the run does not have; `409`
+   * `pipelex.org.not_manageable` with the reason `webhook_delivery_pending` for a delivery still on
+   * its retry schedule, or `webhook_delivery_attempts_exhausted` for one holding the most attempts
+   * a delivery holds; `429` `account.rate_limited`, with its `retry_after`, past the
+   * organization's replay rate; and a `500` or `503` when the replay could not be queued, which
+   * then counts nothing against the rate.
+   */
+  async replayRunWebhookDelivery(runId, deliveryId, options = {}) {
+    const call = "replayRunWebhookDelivery";
+    const run = idPathSegment(runId, call, RUN_ID_ARGUMENT);
+    const delivery = idPathSegment(deliveryId, call, DELIVERY_ID_ARGUMENT);
+    const endpoint = `runs/${run}/webhook-deliveries/${delivery}/replay`;
+    const idempotencyKey = idempotencyKeyOf(options, "replay the delivery");
+    const res = await this.requestProductAnswer("POST", endpoint, void 0, { idempotencyKey });
+    return this.readObjectAnswer("POST", endpoint, res);
+  }
   /** Patch a run's status (admin/manual) — `PUT /v1/runs/{id}`. */
   async updateRun(runId, input) {
     const segment = idPathSegment(runId, "updateRun", RUN_ID_ARGUMENT);
@@ -19516,6 +19675,7 @@ var PipelexApiClient = class {
     const extensions = buildExtensions2(options.extra);
     const api = buildApiRunExtensions(options);
     const hosted = buildHostedRunExtensions(options);
+    const webhooks = buildCallbackUrls(call, options);
     const forms = protocolTreeForms(call, options);
     const treeForms = treeFormsGiven(forms);
     if (!options.pipe_code && treeForms.length === 0 && Object.keys(api).length === 0 && Object.keys(hosted).length === 0 && Object.keys(extensions).length === 0) {
@@ -19526,13 +19686,13 @@ var PipelexApiClient = class {
     }
     assertMethodRefPairsWithNothing(options, treeForms);
     assertLinkageMethodIdIsBare(options, treeForms);
-    return { forms, extensions, api, hosted };
+    return { forms, extensions, api, hosted, webhooks };
   }
   /**
    * Blocking `POST /v1/execute` adapted onto `RunResults` — the bare-runner
    * path. Forwards every protocol field PLUS every extension surface: the
-   * runner-resolved `method_ref`, the hosted `method_id`, and the generic
-   * `extra` passthrough. An extension-only call (`{ extra }` with no
+   * runner-resolved `method_ref`, the run's `callback_urls`, the hosted
+   * `method_id`, and the generic `extra` passthrough. An extension-only call (`{ extra }` with no
    * pipe_code/bundle) or a vendor selector riding `extra` must survive this
    * path, not just the durable one — a `method_ref` run must run the same
    * fetched package here, and a hosted `method_id` must reach the server too,
@@ -19555,6 +19715,8 @@ var PipelexApiClient = class {
         tree: options.tree ?? void 0,
         files: options.files ?? void 0,
         method_ref: options.method_ref ?? void 0,
+        // A runner calls the run's webhooks once the blocking run has ended, as the platform does.
+        callback_urls: options.callback_urls ?? void 0,
         method_id: options.method_id ?? void 0,
         extra: options.extra ?? void 0
       },
@@ -19603,7 +19765,7 @@ var PROTOCOL_REQUEST_KEYS = [
   "dynamic_output_concept_ref",
   "files"
 ];
-var PIPELEX_API_REQUEST_KEYS = ["method_ref"];
+var PIPELEX_API_REQUEST_KEYS = ["method_ref", "callback_urls"];
 var HOSTED_REQUEST_KEYS = ["method_id"];
 var CLIENT_ONLY_KEYS = ["directory", "contents", "tree", "bundleMain"];
 var RESERVED_EXTRA_KEYS = /* @__PURE__ */ new Set([
@@ -19648,6 +19810,7 @@ function runRequestBody2(call, options, files, parts) {
     dynamic_output_concept_ref: dropNull ? options.dynamic_output_concept_ref ?? void 0 : options.dynamic_output_concept_ref,
     files: files ?? void 0,
     ...parts.api,
+    ...parts.webhooks,
     ...parts.hosted,
     ...parts.extensions
   };
@@ -19706,6 +19869,23 @@ function inlineLimitRefusal(call, sending, measured, weight, limit) {
 function buildApiRunExtensions(options) {
   const methodRef = nonEmptyString3(options.method_ref);
   return methodRef === void 0 ? {} : { method_ref: methodRef };
+}
+function buildCallbackUrls(call, options) {
+  const urls = options.callback_urls;
+  if (urls == null) return {};
+  if (!Array.isArray(urls)) {
+    throw new RequestArgumentError(
+      `${call}() takes callback_urls as an array of URLs; got ${typeof urls}.`,
+      { problem: argumentInvalidProblem("callback_urls", "not_a_list") }
+    );
+  }
+  const copy = [...urls];
+  if (copy.some((url) => typeof url !== "string")) {
+    throw new RequestArgumentError(`${call}() takes each of callback_urls as a string URL.`, {
+      problem: argumentInvalidProblem("callback_urls", "not_a_string")
+    });
+  }
+  return copy.length === 0 ? {} : { callback_urls: copy };
 }
 function buildHostedRunExtensions(options) {
   const methodId = nonEmptyString3(options.method_id);
@@ -19909,9 +20089,14 @@ function withCheckedProblem(record) {
   if (!isPlainObject(record) || !Object.hasOwn(record, "error")) return record;
   return { ...record, error: isProblem(record.error) ? record.error : null };
 }
-function withUseCreator(use) {
+function withCheckedUse(use) {
   if (!isPlainObject(use)) return use;
-  return { ...use, created_by: typeof use.created_by === "string" ? use.created_by : null };
+  const version = use.method_version;
+  return {
+    ...use,
+    created_by: typeof use.created_by === "string" ? use.created_by : null,
+    method_version: Number.isInteger(version) || version === "draft" ? version : null
+  };
 }
 function withCheckedDegradation(run) {
   if (!Object.hasOwn(run, "degradation")) return run;
