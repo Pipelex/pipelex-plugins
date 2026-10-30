@@ -1,6 +1,6 @@
 ---
 name: pipelex-design
-description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…). A shallow, fully understood graph is written directly, and deep, uncertain or staged work goes stepwise.
+description: Design a MTHDS method bundle (.mthds files) top-down, contract-first. Use when the user says "design a method", "create a pipeline", "build a .mthds", "write a method that does X", "turn this workflow into MTHDS", or asks for a structural or contract change to an existing bundle — "add a step", "rewire this pipeline", "change what this pipe takes or produces", "refactor the flow", "add a step to mt_abc123". A re-entry takes a bundle directory or a catalog id (mt_…).
 ---
 
 # Design a MTHDS bundle top-down at the right depth
@@ -16,18 +16,21 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 ## Guards
 
 - **Every claimed checkpoint or completion state comes from `mthds_validate` over all bundle files.**
-- **Never write `inputs.json`.** When the user provides files or paths, or wants to run with real data, invoke `/pipelex-inputs`.
+- **Never write `inputs.json`.** Only a sample input, or a run on real data, goes to `/pipelex-inputs`.
+- **An example's values, numbers too, stay out of the method and any test input but a given sample input.**
 - **This skill never runs a method**: a run needs inputs and spends inference credit.
 
 ## Process
 
 ### 1. Capture the contract
 
+**Requirements may come as a file: read it and [file-roles.md](../shared/file-roles.md) before fixing the contract.**
+
 **When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
 
 Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**. For what it does not cover, such as `PipeStructure`, write the closest in-scope equivalent and call out the deviation.
 
-Fix the **input concept(s)**, the **output concept** and the **description**, precise enough to implement against, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
+Fix the **input concept(s)**, the **output concept** and the **description**, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 
 **Announce the captured contract in one line** (inputs → output, one-sentence semantics), with the bundle home resolved below in the same line, before writing, without waiting for a reply. **If the design will emit a `PipeFunc`, say so in that same line**, warning rather than refusing: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs. **A `PipeFunc` computes; it never calls another service or holds a credential.** Discuss only genuine ambiguity, or when the user asks to collaborate.
 
@@ -62,7 +65,7 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 2. **Project the input schema**: `mthds_inputs_template` with the gate's source and `explicit: false`; show the compact template.
 3. **Present the flow** as concise text. **When the verdict carries `graph_page.written: true`, give the page's `path` before the text flow**, for a browser to open. Pass on a new page's note that a project under git may want to ignore it. A `graph_page.error` gets one line, and the verdict stands.
 4. **Warn again for a `PipeFunc`**, naming its pipes: **`PipeFunc` is experimental on the hosted plane.** Its Python runs in a sandbox with no network access, and the feature is still in development, so a method that validates can still fail when it runs.
-5. **Hand off**: `/pipelex-inputs` prepares the user's files, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
+5. **Hand off**: `/pipelex-inputs` prepares sample inputs, or test files with planted facts, then `/pipelex-run` runs the method, and `/pipelex-lab` writes answer keys and scores the runs; `/pipelex-catalog` saves it under an `mt_…` id; `/pipelex-integrate` wires it into a codebase (a `package.json` or a `pyproject.toml`), and with neither, `/pipelex-scaffold` creates an app around it.
 6. Search the whole project for `sources.json` files carrying `"generator": "pipelex-integrate"` — `grep -rl '"pipelex-integrate"' --include=sources.json .` — which sit beside each generated tree, never beside the bundle. Keep each one whose `sources` name a `.mthds` file this change rewrote, moved or removed, or whose `templates` name a template file it changed, **or whose `bundle_dir` holds a `.mthds` file this change created** — a new file is in no `sources` map, yet the call site loads every `.mthds` file under that directory. For each, say the generated types in that directory are now stale and offer `/pipelex-integrate` to refresh them: it regenerates in place and touches the call site only if the types no longer fit it.
 
 **Save the linked method's draft.** A `pipelex-method.json` beside the root `.mthds` file links this directory to a saved method, which lacks this change. Once this skill's own final verdict has proven the change, call `mthds_save_method` with the validated `.mthds` files as `{ path }`, root first, and the link's `method_id`, and nothing else: **no `name`, no `expected_updated_at`, no `python`, no `link_dir`**, and no template file — the workshop sends the link's token itself. Report it by name and id, with what the tool says `mt_…@draft` and the bare id now run, and its words on a link it could not write. With a `template_file`, say the catalog stores no template file yet: the draft reports it missing and runs only from this directory. **Never publish here: a publish is `/pipelex-catalog`'s, on the user's request.** Leave the save to `/pipelex-catalog`, saying the change is not saved, when the tool is absent or refuses, a problem in the `account` domain included, when the workshop will not read the path, or when this work changed a `PipeFunc`'s Python; never retry with a token or inline. No link file means there is nothing to save to. Never write or edit `pipelex-method.json`: it is the workshop's.
@@ -71,7 +74,7 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 
 **For a catalog id (`mt_…`) or a published address**, read [the catalog-id reference](../shared/catalog-id.md) before reading any file. **When several directories are linked to the method, ask which is the work; never choose.** **Never present a linked directory as the saved method's current content.**
 
-**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
+**The baseline, before every edit**: read every `.mthds` file outside `runs/`, validate the whole bundle, and record whether it is runnable or a scaffold, with its exact pending set. Then read [re-entry.md](references/re-entry.md) before editing any file, [writing-mthds.md](../shared/writing-mthds.md) before writing one, [file-roles.md](../shared/file-roles.md) for a given file, and [stepwise.md](references/stepwise.md) too for a signature-driven re-entry. **Never redesign on a broken baseline**: repair it first. **Retain the original contents until the final verdict is restored.** **If a post-edit call returns no verdict, or the edited region cannot be made valid after two focused fixes, restore the retained baseline contents and report the failure**; otherwise deliver as step 6 says.
 
 ## Stops
 
@@ -86,4 +89,3 @@ For a completed method, validate once more and confirm **`is_valid: true`, `is_r
 - [writing-mthds.md](../shared/writing-mthds.md): before writing any `.mthds` file.
 - [stepwise.md](references/stepwise.md): stepwise, or a signature-driven re-entry.
 - [re-entry.md](references/re-entry.md): a re-entry.
-- [Native content types](../shared/native-content-types.md): a native's fields, for `$var.field` and `from`.

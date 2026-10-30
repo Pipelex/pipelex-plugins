@@ -135,6 +135,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
+    (shared / "file-roles.md.j2").write_text("File roles.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -165,6 +166,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
+    (shared / "file-roles.md.j2").write_text("File roles.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 

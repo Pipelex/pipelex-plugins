@@ -1,6 +1,6 @@
 # Framing a use case
 
-Read this at the first move, before asking the user anything. It holds the questions that open the framing, the shape of a candidate, and the brief. What the platform can and cannot do, in the builder's terms, is in the shared fit reference the lab reads beside this one.
+Read this at the first move, before asking the user anything. It holds the questions that open the framing, what the files the user gives seed, the shape of a candidate, and the brief. What the platform can and cannot do, in the builder's terms, is in the shared fit reference the lab reads beside this one.
 
 ## The questions
 
@@ -10,6 +10,15 @@ Ask about the workflow, not about Pipelex, and ask no more than you need:
 - **What gets decided or written?** The output a person produces today: a verdict, a set of fields, a memo, a reply, a ranking.
 - **Who checks it today, and how?** This is the seed of a key: whatever a reviewer compares against is what "right" means.
 - **What does a mistake cost?** A missed clause, a wrong total, a reply sent to the wrong person. Mistakes that cost the most become the traps of a case.
+
+## Files the user gives
+
+The shared file-roles reference, read at this move whenever the user gives a file, settles what each one is for. A file can answer a question before you ask it, so ask only what the files leave open.
+
+- **An example output seeds Right means.** A result the user once produced by hand, or one shown as what the method should give, says what a correct output gets right: write that into the brief's Right means as what holds for every case, such as the fields it fills, the order it keeps and the rules it follows, never as its real names and amounts, since the brief is about the method and not about one case.
+- **An input given with its expected output seeds a case and its key.** Name the pair in the brief, so that the setup makes it a case: the input is the case's input, and each fact the expected output shows becomes a Must line of its key, written with the real values once the input has been opened and shown to hold them.
+- **A sample input given alone** answers what arrives, and can become a case's input on the user's say-so.
+- **A brief** answers what gets decided or written, and often who checks it: frame from it, and keep its steps that no method does for the carriers.
 
 ## The shape of a candidate
 
