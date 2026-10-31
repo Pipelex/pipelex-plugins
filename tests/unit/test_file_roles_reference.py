@@ -192,6 +192,9 @@ class TestFileRolesReference:
         assert "Once the method is built, its input settles the reading" in rule
         assert "`Invoice[]` against `Invoice`" in rule
         assert "the rule for doubt below applies: ask before fixing the contract or filling any input" in rule
+        prefix = load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+        lab = f"`{prefix}pipelex-lab` makes each of them a case of its own instead, as its framing reference says."
+        assert rule.endswith(lab), "the lab scores every example, so it never leaves one as a case to try next"
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_cases_show_both_readings_of_files_given_together(self, target_name: str) -> None:
@@ -265,16 +268,20 @@ class TestFileRolesReference:
         assert "however the later request is worded, unless it is reference material the method takes as an input," in exclusion
 
     def test_files_given_together_fill_a_list_input_like_a_folder(self) -> None:
-        """Rules 2 and 3 match one file to one input, so read literally they left all but one of three PDFs given
-        together for a `Document[]` input to rule 5, reported as unmatched."""
+        """Rules 1 to 3 match one file to one input, so read literally they left all but one of three PDFs given
+        together for a `Document[]` input to rule 5, reported as unmatched, and an exact name split the batch."""
         user_data = (REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
         assert "**A folder, or files given together**: list a folder's files" in user_data
         match = section(user_data, "## Match")
+        exact_name = the_line(match, "1. **Exact name**")
+        assert "a list input named like a file given together with others of its type takes them all, by rule 4, never that file alone" in exact_name
         assert "for an input that takes a single file" in the_line(match, "3. **Type, several candidates**")
         files_to_list = the_line(match, "4. **Files to list**")
         assert (
             "or several files of one type given together, goes whole to an input expecting a list of that type, in the order given" in files_to_list
         )
+        assert "rules 1 to 3 never take one of these files alone, not even by its exact name" in files_to_list
+        assert "a list input `invoices` given `march.pdf`, `invoices.pdf` and `may.pdf` together takes all three" in files_to_list
         assert "rule 5 reports none of them as unmatched" in files_to_list
         unmatched = the_line(match, "5. **An unmatched file**")
         assert "the report names the others as cases to try next" in unmatched
@@ -293,3 +300,13 @@ class TestFileRolesReference:
         assert "**An example output seeds Right means.**" in files
         assert "**An input given with its expected output seeds a case and its key.**" in files
         assert "never as its real names and amounts" in files
+
+    def test_the_frame_reference_makes_each_example_given_together_a_case(self) -> None:
+        """The shared rule names the examples left over as cases to try next; in the lab, an example only named would
+        never be scored, so each one seeds a case of its own, and a batch is one case."""
+        frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
+        together = the_line(section(frame, "## Files the user gives"), "**Several sample inputs given together**")
+        assert "read as the shared file-roles reference says" in together
+        assert "each one seeds a case of its own, with its own key" in together
+        assert "rather than one of them filling the test inputs and the others being named as cases to try next" in together
+        assert "they are one case, whose list input holds them all in the order given" in together

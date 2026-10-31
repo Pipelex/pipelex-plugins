@@ -30,10 +30,10 @@ Collect every file the user has provided as a sample input: explicit paths, fold
 
 For each input variable of the template, apply these rules in order:
 
-1. **Exact name**: the input `invoice` matches a file named `invoice.pdf`.
+1. **Exact name**: the input `invoice` matches a file named `invoice.pdf`; a list input named like a file given together with others of its type takes them all, by rule 4, never that file alone.
 2. **Type, one candidate**: if only one input expects `native.Image` and the user provided exactly one image, match them.
 3. **Type, several candidates**: for an input that takes a single file, in automatic mode, match by name similarity, variable name against filename; in interactive mode, ask the user which file goes where.
-4. **Files to list**: a folder holding files of a single type, or several files of one type given together, goes whole to an input expecting a list of that type, in the order given, a folder's files in the order listed. Rules 2 and 3 match one file to an input that takes one, so they leave these files to this rule, and rule 5 reports none of them as unmatched.
+4. **Files to list**: a folder holding files of a single type, or several files of one type given together, goes whole to an input expecting a list of that type, in the order given, a folder's files in the order listed. When the list is the method's only input of that type, rules 1 to 3 never take one of these files alone, not even by its exact name: a list input `invoices` given `march.pdf`, `invoices.pdf` and `may.pdf` together takes all three, in that order, and rule 5 reports none of them as unmatched.
 5. **An unmatched file**: report it, and ask whether it should be ignored or mapped to a specific input. Files of one type given together for an input that takes one file are the exception: they are cases of that input, as the shared file-roles reference says, so the one rule 3 matched fills it and the report names the others as cases to try next.
 6. **An input still unfilled** after matching stays a placeholder or is filled with synthetic data, which is the Mixed strategy.
 
