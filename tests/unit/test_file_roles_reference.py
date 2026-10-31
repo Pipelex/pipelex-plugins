@@ -171,12 +171,49 @@ class TestFileRolesReference:
         for case in (
             '**A process document, with "build me this".**',
             '**A CV, with "match CVs to this job ad".**',
+            '**Invoices attached together, with "total these invoices".**',
             '**A filled report, with "it should produce this".**',
             "**A contract, with no words.**",
         ):
             assert case in cases, f"{target_name}: the cases lack {case}"
         ambiguous = the_line(cases, "**A contract, with no words.**")
         assert "so ask before designing" in ambiguous and ambiguous.endswith('?"')
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_files_given_together_are_one_batch_or_several_cases(self, target_name: str) -> None:
+        """The skills had no rule for several files of one kind given together, so whether they became the items of one
+        list input was the model's guess. The two readings give different contracts, `Invoice[]` against `Invoice`, so
+        the words decide, and the skill asks when they do not."""
+        rule = the_line(section(reference(target_name), "## The roles"), "**Files given together are one batch or several cases.**")
+        assert "attached to one message or named in one breath" in rule
+        assert "When the words act on them together" in rule and "a list input, and they fill it in the order given" in rule
+        assert "When the words offer them as examples of what the method will get" in rule
+        # Which one is said, so that a host whose design writes the test inputs picks the file pipelex-inputs would.
+        assert (
+            "one of them, the first given unless one is named after the input, fills the test inputs, "
+            "and your closing message names the others as cases to try next"
+        ) in rule
+        assert "Once the method is built, its inputs settle the reading" in rule
+        assert "a list input takes the files no input of one claims, and an input of one with no list beside it takes one of them" in rule, (
+            "a list beside an input of one does not take the files that input claims"
+        )
+        assert "`Invoice[]` against `Invoice`" in rule
+        assert "the rule for doubt below applies: ask before fixing the contract or filling any input" in rule
+        prefix = load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
+        lab = f"`{prefix}pipelex-lab` makes each of them a case of its own instead, as its framing reference says."
+        assert rule.endswith(lab), "the lab scores every example, so it never leaves one as a case to try next"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_cases_show_both_readings_of_files_given_together(self, target_name: str) -> None:
+        """The CV case read CVs as arriving "one after another", a contract its words never settled; it now reads only
+        the one CV given, and the invoices case beside it shows both readings and the question."""
+        cases = section(reference(target_name), "## Cases")
+        assert "one after another" not in the_line(cases, '**A CV, with "match CVs to this job ad".**')
+        invoices = the_line(cases, '**Invoices attached together, with "total these invoices".**')
+        assert "the method takes a list, `Invoice[]`, and the three files fill that one input in the order given" in invoices
+        assert "the method would take one `Invoice`" in invoices and "name the other two as cases to try next" in invoices
+        assert "`march.pdf` would fill the test inputs, as the first given with none named after the input" in invoices
+        assert "so ask before fixing the contract" in invoices and invoices.endswith('?"')
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_it_names_a_skill_as_the_target_does(self, target_name: str) -> None:
@@ -238,6 +275,37 @@ class TestFileRolesReference:
         exclusion = the_line(section(user_data, "## Inventory"), "reference material is left out")
         assert "however the later request is worded, unless it is reference material the method takes as an input," in exclusion
 
+    def test_files_given_together_fill_a_list_input_like_a_folder(self) -> None:
+        """Rules 1 to 3 match one file to one input, so read literally they left all but one of three PDFs given
+        together for a `Document[]` input to rule 5, reported as unmatched, and an exact name split the batch."""
+        user_data = (REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
+        assert "**A folder, or files given together**: list a folder's files" in user_data
+        match = section(user_data, "## Match")
+        exact_name = the_line(match, "1. **Exact name**")
+        assert "A list input named like one file of several given together never takes that file alone" in exact_name
+        assert "all of them when the list is the method's only input of that type." in exact_name, "beside another input it takes only the rest"
+        assert "for an input that takes a single file" in the_line(match, "3. **Type, several candidates**")
+        files_to_list = the_line(match, "4. **Files to list**")
+        assert "or several files of one type given together, goes to an input expecting a list of that type, in the order given" in files_to_list
+        only_input = "When that list is the method's only input of that type, they go to it whole, and rules 1 to 3 never take one of them alone"
+        assert only_input in files_to_list
+        assert "a list input `invoices` given `march.pdf`, `invoices.pdf` and `may.pdf` together takes all three" in files_to_list
+        assert "rule 5 reports none of them as unmatched" in files_to_list
+        # Applied input by input, the batch went whole to every list that could take it: a job ad among the CVs.
+        several = files_to_list.index("When several inputs could take them")
+        assert "no file goes to two inputs" in files_to_list[several:]
+        assert "An input that takes one file takes its file by rules 1 to 3 and the list takes the rest, in the order given" in files_to_list
+        assert "`job_ad` gets `job-ad.pdf` and `cvs` the other two" in files_to_list
+        assert "Between two lists, split the files by name similarity only where it places every file beyond doubt" in files_to_list
+        assert "otherwise ask the user which files go to which input, in automatic mode too" in files_to_list
+        unmatched = the_line(match, "5. **An unmatched file**")
+        # With no file named like the input, nothing matches, and the first given still fills it rather than synthetic data.
+        assert (
+            "so the one rules 1 to 3 matched fills it, or the first given when none did, and the report names the others as cases to try next"
+            in unmatched
+        )
+        assert "Folder to list" not in user_data
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_lab_reads_it_at_the_first_move(self, target_name: str) -> None:
         body = skill_body(target_name, "pipelex-lab")
@@ -251,3 +319,13 @@ class TestFileRolesReference:
         assert "**An example output seeds Right means.**" in files
         assert "**An input given with its expected output seeds a case and its key.**" in files
         assert "never as its real names and amounts" in files
+
+    def test_the_frame_reference_makes_each_example_given_together_a_case(self) -> None:
+        """The shared rule names the examples left over as cases to try next; in the lab, an example only named would
+        never be scored, so each one seeds a case of its own, and a batch is one case."""
+        frame = (REPO_ROOT / "skills" / "pipelex-lab" / "references" / "frame.md").read_text(encoding="utf-8")
+        together = the_line(section(frame, "## Files the user gives"), "**Several sample inputs given together**")
+        assert "read as the shared file-roles reference says" in together
+        assert "each one seeds a case of its own, with its own key" in together
+        assert "rather than one of them filling the test inputs and the others being named as cases to try next" in together
+        assert "they are one case, whose list input holds them all in the order given" in together
