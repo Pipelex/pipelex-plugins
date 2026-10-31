@@ -171,12 +171,38 @@ class TestFileRolesReference:
         for case in (
             '**A process document, with "build me this".**',
             '**A CV, with "match CVs to this job ad".**',
+            '**Invoices attached together, with "total these invoices".**',
             '**A filled report, with "it should produce this".**',
             "**A contract, with no words.**",
         ):
             assert case in cases, f"{target_name}: the cases lack {case}"
         ambiguous = the_line(cases, "**A contract, with no words.**")
         assert "so ask before designing" in ambiguous and ambiguous.endswith('?"')
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_files_given_together_are_one_batch_or_several_cases(self, target_name: str) -> None:
+        """The skills had no rule for several files of one kind given together, so whether they became the items of one
+        list input was the model's guess. The two readings give different contracts, `Invoice[]` against `Invoice`, so
+        the words decide, and the skill asks when they do not."""
+        rule = the_line(section(reference(target_name), "## The roles"), "**Files given together are one batch or several cases.**")
+        assert "attached to one message or named in one breath" in rule
+        assert "When the words act on them together" in rule and "a list input, and they fill it in the order given" in rule
+        assert "When the words offer them as examples of what the method will get" in rule
+        assert "one of them fills the test inputs, and your closing message names the others as cases to try next" in rule
+        assert "Once the method is built, its input settles the reading" in rule
+        assert "`Invoice[]` against `Invoice`" in rule
+        assert "the rule for doubt below applies: ask before fixing the contract or filling any input" in rule
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_cases_show_both_readings_of_files_given_together(self, target_name: str) -> None:
+        """The CV case read CVs as arriving "one after another", a contract its words never settled; it now reads only
+        the one CV given, and the invoices case beside it shows both readings and the question."""
+        cases = section(reference(target_name), "## Cases")
+        assert "one after another" not in the_line(cases, '**A CV, with "match CVs to this job ad".**')
+        invoices = the_line(cases, '**Invoices attached together, with "total these invoices".**')
+        assert "the method takes a list, `Invoice[]`, and the three files fill that one input in the order given" in invoices
+        assert "the method would take one `Invoice`" in invoices and "name the other two as cases to try next" in invoices
+        assert "so ask before fixing the contract" in invoices and invoices.endswith('?"')
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_it_names_a_skill_as_the_target_does(self, target_name: str) -> None:
@@ -237,6 +263,22 @@ class TestFileRolesReference:
         user_data = (REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
         exclusion = the_line(section(user_data, "## Inventory"), "reference material is left out")
         assert "however the later request is worded, unless it is reference material the method takes as an input," in exclusion
+
+    def test_files_given_together_fill_a_list_input_like_a_folder(self) -> None:
+        """Rules 2 and 3 match one file to one input, so read literally they left all but one of three PDFs given
+        together for a `Document[]` input to rule 5, reported as unmatched."""
+        user_data = (REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "user-data.md").read_text(encoding="utf-8")
+        assert "**A folder, or files given together**: list a folder's files" in user_data
+        match = section(user_data, "## Match")
+        assert "for an input that takes a single file" in the_line(match, "3. **Type, several candidates**")
+        files_to_list = the_line(match, "4. **Files to list**")
+        assert (
+            "or several files of one type given together, goes whole to an input expecting a list of that type, in the order given" in files_to_list
+        )
+        assert "rule 5 reports none of them as unmatched" in files_to_list
+        unmatched = the_line(match, "5. **An unmatched file**")
+        assert "the report names the others as cases to try next" in unmatched
+        assert "Folder to list" not in user_data
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_lab_reads_it_at_the_first_move(self, target_name: str) -> None:

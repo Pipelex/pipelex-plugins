@@ -24,7 +24,7 @@ Collect every file the user has provided as a sample input: explicit paths, fold
 
 **An Office file goes in as the PDF exported from it.** Extraction reads a PDF, an image or a web page, and nothing else, so a Word, Excel or PowerPoint file under a `Document` input fails the run at its first step. Where `soffice` is on PATH, convert each file on its own into a fresh temporary directory (`soffice --headless --convert-to pdf --outdir "$(mktemp -d)" <file>`), never beside the method or the original: LibreOffice names the PDF after the source file and replaces a file of that name without asking, so two sources sharing a stem would overwrite each other, and an export beside the method would travel as one of its files. Say so, and from then on treat that PDF as the file selected for the input: `inputs.json` names it where it lies, in its temporary directory, a case's copy names it after its input like any other, and step 5 of the skill sends it as it is, in place of the original. Without `soffice`, ask the user to export it to PDF, and leave that input unfilled until they do. Never rename an Office file to `.pdf`.
 
-**A folder**: list its files — non-recursively by default, recursively if the user asks — keep the supported types, group them by detected type, and match them to list inputs (`Image[]`, `Document[]`, …). A folder `./invoices/` holding five PDFs, for a method expecting `documents: Document[]`, maps all five to that one input.
+**A folder, or files given together**: list a folder's files — non-recursively by default, recursively if the user asks — and take files given together, attached to one message or named in one breath, as the user gave them; keep the supported types, group them by detected type, and match them to list inputs (`Image[]`, `Document[]`, …). A folder `./invoices/` holding five PDFs, or five PDFs attached to one message, for a method expecting `documents: Document[]`, maps all five to that one input.
 
 ## Match
 
@@ -32,9 +32,9 @@ For each input variable of the template, apply these rules in order:
 
 1. **Exact name**: the input `invoice` matches a file named `invoice.pdf`.
 2. **Type, one candidate**: if only one input expects `native.Image` and the user provided exactly one image, match them.
-3. **Type, several candidates**: in automatic mode, match by name similarity, variable name against filename; in interactive mode, ask the user which file goes where.
-4. **Folder to list**: a folder holding files of a single type goes to an input expecting a list of that type.
-5. **An unmatched file**: report it, and ask whether it should be ignored or mapped to a specific input.
+3. **Type, several candidates**: for an input that takes a single file, in automatic mode, match by name similarity, variable name against filename; in interactive mode, ask the user which file goes where.
+4. **Files to list**: a folder holding files of a single type, or several files of one type given together, goes whole to an input expecting a list of that type, in the order given, a folder's files in the order listed. Rules 2 and 3 match one file to an input that takes one, so they leave these files to this rule, and rule 5 reports none of them as unmatched.
+5. **An unmatched file**: report it, and ask whether it should be ignored or mapped to a specific input. Files of one type given together for an input that takes one file are the exception: they are cases of that input, as the shared file-roles reference says, so the one rule 3 matched fills it and the report names the others as cases to try next.
 6. **An input still unfilled** after matching stays a placeholder or is filled with synthetic data, which is the Mixed strategy.
 
 ## Where the files lie
@@ -55,7 +55,7 @@ Set each matched input's light value:
 - a web page Document: the URL string, `"page": "https://example.com/article"`;
 - an Image: the file's absolute path, `"photo": "/Users/jane/photos/storefront.jpg"`, or a case's copy, `"photo": "inputs/photo.jpg"`;
 - a Text from a `.txt` or `.md` file: the file's actual content as the string value;
-- a list, from a folder for instance: a list of those values, `"images": ["/Users/jane/product-photos/shoe.jpg", "/Users/jane/product-photos/hat.png"]`, or a case's copies, `["inputs/images/1.jpg", "inputs/images/2.png"]`;
+- a list, from a folder or from files given together: a list of those values in the order given, `"images": ["/Users/jane/product-photos/shoe.jpg", "/Users/jane/product-photos/hat.png"]`, or a case's copies, `["inputs/images/1.jpg", "inputs/images/2.png"]`;
 - a file from the team's files: its address as listed, `"invoice": "pipelex-storage://…"`, which step 5 passes through.
 
 Fill the skill's step 2 template in place and save it as `<output_dir>/inputs.json` (the skill's step 4); the skill's step 5 then prepares it, since a local path is one a run cannot reach until it is uploaded. In the Mixed strategy, the inputs no file matched are filled with synthetic data before saving, and step 5 then uploads both sources' files, in two calls when the user's files need an upload too, since only the factory's go up as test files.
