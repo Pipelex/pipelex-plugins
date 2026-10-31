@@ -188,7 +188,11 @@ class TestFileRolesReference:
         assert "attached to one message or named in one breath" in rule
         assert "When the words act on them together" in rule and "a list input, and they fill it in the order given" in rule
         assert "When the words offer them as examples of what the method will get" in rule
-        assert "one of them fills the test inputs, and your closing message names the others as cases to try next" in rule
+        # Which one is said, so that a host whose design writes the test inputs picks the file pipelex-inputs would.
+        assert (
+            "one of them, the first given unless one is named after the input, fills the test inputs, "
+            "and your closing message names the others as cases to try next"
+        ) in rule
         assert "Once the method is built, its inputs settle the reading" in rule
         assert "a list input takes the files no input of one claims, and an input of one with no list beside it takes one of them" in rule, (
             "a list beside an input of one does not take the files that input claims"
@@ -208,6 +212,7 @@ class TestFileRolesReference:
         invoices = the_line(cases, '**Invoices attached together, with "total these invoices".**')
         assert "the method takes a list, `Invoice[]`, and the three files fill that one input in the order given" in invoices
         assert "the method would take one `Invoice`" in invoices and "name the other two as cases to try next" in invoices
+        assert "`march.pdf` would fill the test inputs, as the first given with none named after the input" in invoices
         assert "so ask before fixing the contract" in invoices and invoices.endswith('?"')
 
     @pytest.mark.parametrize("target_name", TARGETS)
@@ -294,7 +299,11 @@ class TestFileRolesReference:
         assert "Between two lists, split the files by name similarity only where it places every file beyond doubt" in files_to_list
         assert "otherwise ask the user which files go to which input, in automatic mode too" in files_to_list
         unmatched = the_line(match, "5. **An unmatched file**")
-        assert "the report names the others as cases to try next" in unmatched
+        # With no file named like the input, nothing matches, and the first given still fills it rather than synthetic data.
+        assert (
+            "so the one rules 1 to 3 matched fills it, or the first given when none did, and the report names the others as cases to try next"
+            in unmatched
+        )
         assert "Folder to list" not in user_data
 
     @pytest.mark.parametrize("target_name", TARGETS)
