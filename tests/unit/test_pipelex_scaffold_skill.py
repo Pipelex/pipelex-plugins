@@ -585,7 +585,9 @@ class TestMethodAppBranch:
 
     def test_the_key_reaches_the_gesture_without_crossing_the_conversation(self) -> None:
         for body in _bodies():
-            assert "`write-env-file.sh` moves it on one branch and `make create` on the other" in body
+            assert "`write-env-file.sh` moves it on one branch; on the other, **the user writes their own key into `.env.local`, never you**" in body
+            # `make create` copies no key into `.env.local`, so the skill never says the file holds one.
+            assert "the method app's `.env.local` hold" not in body
             row = next(line for line in body.splitlines() if line.startswith("| `refused: no-key` |"))
             assert "a harness restarted from a shell that exports the key" in row
             # An unattended model took the second way itself in the phase 5b smoke sessions.
@@ -605,6 +607,10 @@ class TestMethodAppBranch:
             assert "Nothing is run through the method." in body
             assert "**On the method app, the URL comes first**" in body
             assert "how the verdict says to stop it" in body
+            # The running app took the key from the shell that started it; a restart from another shell
+            # reads `.env.local`, where the user's own key goes.
+            assert "the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `make serve`" in body
+            assert "`make serve` inside the project restarts it" not in body
             # The warnings are relayed, the LICENSE holder first.
             assert "first that `LICENSE` still names the template's holder when it does" in body
             # The method app's `git:` line says what happened, a repository under an ignored path included.
@@ -704,6 +710,11 @@ class TestUncreatedCopyReference:
         assert "cannot be undone by running `make create` again" in reference
         # The key reaches the gesture from the shell or a file the user wrote, and is never read back.
         assert "`make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back" in reference
+        # A kept `.env.local` already holds the user's key, so the report does not send them to put it there.
+        assert "the report says it was kept, in place of telling the user where their key goes" in reference
+        assert "or from an env file already in the project, `.env.local` or `.env`, and refuses without one" in reference
+        assert "so the log's tail is safe to read, and no env file is." in reference
+        assert "the `.env.local` it wrote is not" not in reference
         # The report's plane rule falls back to production, which a file the user wrote may contradict.
         assert "names its plane only from a `PIPELEX_BASE_URL` the shell exports, never production by default" in reference
 

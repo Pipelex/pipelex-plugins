@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`pipelex-scaffold` tells you where the method app's key goes**: the report on a new method app now says to put your own key in the project's `.env.local` before restarting the app from another shell with `make serve`, since the app it leaves running took its key from the shell that started it, and the template's `make create`, from the `@pipelex/create-method-app` release after 0.54.0, no longer copies that key into the project. The skill no longer says that `.env.local` holds a key, never writes one there itself, and after you wrote `.env.local` yourself because the shell had no key, says only that the file was kept.
+
 ## [0.19.0] - 2026-10-31
 
 ### Changed
