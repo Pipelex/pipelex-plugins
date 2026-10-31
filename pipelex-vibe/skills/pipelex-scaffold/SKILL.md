@@ -12,7 +12,7 @@ Give a user with no project one that runs their method, or one ready for `/pipel
 
 **The starters are not scaffolded from**: a user who names `pipelex-starter-js` or `pipelex-starter-python` is told so and offered the method app or the initializer. This skill is not a template engine (no cookiecutter, no copier, no framework matrix of its own), a runner or a deployer, and it needs no MCP tool; it **writes no client for another service before reading [fit.md](../shared/fit.md)**.
 
-**Never print a key, and never ask for one in the conversation.** The initializer's `.env` and the method app's `.env.local` hold one, and **the value moves only through a shell that expands the variable itself, and never through you**: `write-env-file.sh` moves it on one branch and `make create` on the other. Never `env | grep PIPELEX`, never echo either value, never move one with a file-editing tool, and **no reading an env file back**: a key in the transcript is a key to rotate.
+**Never print a key, and never ask for one in the conversation.** The initializer's `.env` may hold one, and **the value moves only through a shell that expands the variable itself, and never through you**: `write-env-file.sh` moves it on one branch; on the other, **the user writes their own key into `.env.local`, never you**. Never `env | grep PIPELEX`, never echo a key, never move one with a file-editing tool, and **no reading an env file back**: a key in the transcript is a key to rotate.
 
 ## Choosing the branch
 
@@ -61,7 +61,7 @@ It never prompts and reads a bundle path from where it runs. **Run it in the for
 make -C '<dir>' serve
 ```
 
-It starts the dev server in the background, on loopback, and requests the page. Its verdict is its last line not opening with `make`: `serving <url> — "<title>"`, or `already-serving`. **Never report a URL that did not answer**: only those two verdicts give one. **Never start the server any other way** (`make dev`, `npm run dev`, an `APP_HOST`): its Server Actions spend the key for anyone who can reach it. Nothing is run through the method.
+Its verdict is its last line not opening with `make`: `serving <url> — "<title>"`, or `already-serving`. **Never report a URL that did not answer**: only those two verdicts give one. **Never start the server any other way** (`make dev`, `npm run dev`, an `APP_HOST`): its Server Actions spend the key for anyone who can reach it. Nothing is run through the method.
 
 ## Branch B — the ecosystem's initializer
 
@@ -83,7 +83,7 @@ It starts the dev server in the background, on loopback, and requests the page. 
 
 ## The report
 
-**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that `make serve` inside the project restarts it. Then say what was created and where, with its name and title; the template's version and the git outcome; that `make create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `make create` wrote, `u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other`; and `make add-method METHOD=…` for a second method, `npm run codegen` after a bundle edit.
+**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `make serve`. Then say what was created and where, with its name and title; the template's version and the git outcome; that `make create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `make create` wrote, `u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other`; and `make add-method METHOD=…` for a second method, `npm run codegen` after a bundle edit.
 
 **On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it, or on `inside:` that the project is new files of that repository; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the `unversioned:`, `nested:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL. A key reported `filled` was taken from the environment **and not validated**.
 
