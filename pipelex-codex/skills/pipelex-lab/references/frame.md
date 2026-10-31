@@ -18,6 +18,7 @@ The shared file-roles reference, read at this move whenever the user gives a fil
 - **An example output seeds Right means.** A result the user once produced by hand, or one shown as what the method should give, says what a correct output gets right: write that into the brief's Right means as what holds for every case, such as the fields it fills, the order it keeps and the rules it follows, never as its real names and amounts, since the brief is about the method and not about one case.
 - **An input given with its expected output seeds a case and its key.** Name the pair in the brief, so that the setup makes it a case: the input is the case's input, and each fact the expected output shows becomes a Must line of its key, written with the real values once the input has been opened and shown to hold them.
 - **A sample input given alone** answers what arrives, and can become a case's input on the user's say-so.
+- **Several sample inputs given together** are one batch or several cases, read as the shared file-roles reference says. Given as several cases of what arrives, each one seeds a case of its own, with its own key, on the same say-so, rather than one of them filling the test inputs and the others being named as cases to try next. Given as one batch the method takes at once, they are one case, whose list input holds them all in the order given.
 - **A brief** answers what gets decided or written, and often who checks it: frame from it, and keep its steps that no method does for the carriers.
 
 ## The shape of a candidate

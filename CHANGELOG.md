@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The skills read several files you give together as one batch or as several cases**: files of one kind attached to one message or named in one breath become the items of one list input, filled in the order you gave them, when your words act on them together, such as "total these invoices", and several cases of an input the method takes one at a time when your words offer them as examples of what it will get, in which case one of them fills the test inputs, the skill names the others as cases to try next, and `pipelex-lab` gives each one a case and a key of its own. When your words do not say which, the skill asks before fixing what the method takes in. `pipelex-inputs` now matches files given together to a list input as it matched a folder, never giving one of them alone to that input by its name, reporting the others as unmatched or giving one file to two inputs, and asks you which files go to which list when two lists could take them and their names do not settle it.
+
 ## [0.18.0] - 2026-10-30
 
 ### Changed
