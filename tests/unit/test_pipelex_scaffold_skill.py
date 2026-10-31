@@ -139,7 +139,6 @@ class TestPipelexScaffoldSkill:
         "**the value moves only through a shell that expands the variable itself, and never through you**",
         "never move one with a file-editing tool",
         "**no reading an env file back**",
-        "**and not validated**",
         "One thing always confirms, in every mode: **`gh repo create`**",
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
         "Nothing beyond what the initializer writes is authored by this skill",
@@ -332,8 +331,13 @@ class TestPipelexScaffoldSkill:
             "**An initializer not in the tables below that would run `git init` gets its no-git flag when `<dir>` lies inside another work tree**"
             in initializers
         )
-        for word in ("**`filled`**", "**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
+        for word in ("**`kept`**", "**`empty`**", "**`base-url=copied`**", "**`base-url=file`**"):
             assert word in initializers, f"the reference does not say what {word} means"
+        # The script never copies the shell's key, so `filled` is no verdict, and the report sends the user's
+        # own key to the file without offering to copy the exported one there.
+        assert "**`filled`**" not in initializers
+        assert "say that the user puts their own key on `.env`'s `PIPELEX_API_KEY=` line" in initializers
+        assert "The script never copies the key the shell exports, whatever key that is, so never offer to copy it there either" in initializers
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
 
     @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
@@ -585,9 +589,12 @@ class TestMethodAppBranch:
 
     def test_the_key_reaches_the_gesture_without_crossing_the_conversation(self) -> None:
         for body in _bodies():
-            assert "`write-env-file.sh` moves it on one branch; on the other, **the user writes their own key into `.env.local`, never you**" in body
-            # `make create` copies no key into `.env.local`, so the skill never says the file holds one.
+            assert "`make create` reads it there, and **the user writes their own key into either file, never you**" in body
+            # Neither `make create` nor `write-env-file.sh` copies the shell's key into a file, so the skill
+            # never says a script moves one, and never reports a key as `filled`.
             assert "the method app's `.env.local` hold" not in body
+            assert "`write-env-file.sh` moves it" not in body
+            assert "`filled`" not in body
             row = next(line for line in body.splitlines() if line.startswith("| `refused: no-key` |"))
             assert "a harness restarted from a shell that exports the key" in row
             # An unattended model took the second way itself in the phase 5b smoke sessions.

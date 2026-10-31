@@ -287,7 +287,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "A lone `.git` is the only entry that does not make a directory non-empty, and that is a ruling about `.git` and nothing else",
         "**Never print a key, and never ask for one in the conversation.**",
         "**the value moves only through a shell that expands the variable itself, and never through you**",
-        "**the user writes their own key into `.env.local`, never you**",
+        "**the user writes their own key into either file, never you**",
         "**no reading an env file back**",
         "One thing always confirms, in every mode: **`gh repo create`**",
         "**Never install a toolchain, and never let a version manager download one.**",

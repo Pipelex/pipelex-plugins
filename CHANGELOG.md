@@ -6,6 +6,10 @@
 
 - **`pipelex-scaffold` tells you where the method app's key goes**: the report on a new method app now says to put your own key in the project's `.env.local` before restarting the app from another shell with `make serve`, since the app it leaves running took its key from the shell that started it, and the template's `make create`, from the `@pipelex/create-method-app` release after 0.54.0, no longer copies that key into the project. The skill no longer says that `.env.local` holds a key, never writes one there itself, and after you wrote `.env.local` yourself because the shell had no key, says only that the file was kept.
 
+### Security
+
+- **`pipelex-scaffold` no longer copies your shell's key into a new project's `.env`**: a Python project or a TypeScript project that is not a web app, set up by a language's own initializer, gets a `.env` with the base URL your shell sets and an empty `PIPELEX_API_KEY=` line, which the report tells you to fill with your own key, because an exported key is whichever key was exported last, often a test key or one of another organization, and copied into a project it would outlive the shell and bill that organization. A `.env` that already holds a key is still left as it is, a `.env` without one is now made readable by you alone whether or not your shell exports a key, and the env-file script no longer reports a key as `filled`.
+
 ## [0.19.0] - 2026-10-31
 
 ### Changed
