@@ -189,7 +189,10 @@ class TestFileRolesReference:
         assert "When the words act on them together" in rule and "a list input, and they fill it in the order given" in rule
         assert "When the words offer them as examples of what the method will get" in rule
         assert "one of them fills the test inputs, and your closing message names the others as cases to try next" in rule
-        assert "Once the method is built, its input settles the reading" in rule
+        assert "Once the method is built, its inputs settle the reading" in rule
+        assert "a list input takes the files no input of one claims, and an input of one with no list beside it takes one of them" in rule, (
+            "a list beside an input of one does not take the files that input claims"
+        )
         assert "`Invoice[]` against `Invoice`" in rule
         assert "the rule for doubt below applies: ask before fixing the contract or filling any input" in rule
         prefix = load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
@@ -274,15 +277,22 @@ class TestFileRolesReference:
         assert "**A folder, or files given together**: list a folder's files" in user_data
         match = section(user_data, "## Match")
         exact_name = the_line(match, "1. **Exact name**")
-        assert "a list input named like a file given together with others of its type takes them all, by rule 4, never that file alone" in exact_name
+        assert "A list input named like one file of several given together never takes that file alone" in exact_name
+        assert "all of them when the list is the method's only input of that type." in exact_name, "beside another input it takes only the rest"
         assert "for an input that takes a single file" in the_line(match, "3. **Type, several candidates**")
         files_to_list = the_line(match, "4. **Files to list**")
-        assert (
-            "or several files of one type given together, goes whole to an input expecting a list of that type, in the order given" in files_to_list
-        )
-        assert "rules 1 to 3 never take one of these files alone, not even by its exact name" in files_to_list
+        assert "or several files of one type given together, goes to an input expecting a list of that type, in the order given" in files_to_list
+        only_input = "When that list is the method's only input of that type, they go to it whole, and rules 1 to 3 never take one of them alone"
+        assert only_input in files_to_list
         assert "a list input `invoices` given `march.pdf`, `invoices.pdf` and `may.pdf` together takes all three" in files_to_list
         assert "rule 5 reports none of them as unmatched" in files_to_list
+        # Applied input by input, the batch went whole to every list that could take it: a job ad among the CVs.
+        several = files_to_list.index("When several inputs could take them")
+        assert "no file goes to two inputs" in files_to_list[several:]
+        assert "An input that takes one file takes its file by rules 1 to 3 and the list takes the rest, in the order given" in files_to_list
+        assert "`job_ad` gets `job-ad.pdf` and `cvs` the other two" in files_to_list
+        assert "Between two lists, split the files by name similarity only where it places every file beyond doubt" in files_to_list
+        assert "otherwise ask the user which files go to which input, in automatic mode too" in files_to_list
         unmatched = the_line(match, "5. **An unmatched file**")
         assert "the report names the others as cases to try next" in unmatched
         assert "Folder to list" not in user_data
