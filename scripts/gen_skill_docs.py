@@ -453,7 +453,11 @@ def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[
         msg = f"{template_name}: syntax error at line {exc.lineno}: {exc.message}"
         raise SystemExit(msg) from exc
     except UndefinedError as exc:
-        msg = f"{template_name}: undefined variable: {exc.message} — add it to targets/defaults.toml or the target config"
+        # A `{% from … import %}` of a name its template lacks raises this too, and no variable can supply that name.
+        if "does not export the requested name" in str(exc.message):
+            msg = f"{template_name}: missing macro: {exc.message} — define it in the template the import names"
+        else:
+            msg = f"{template_name}: undefined variable: {exc.message} — add it to targets/defaults.toml or the target config"
         raise SystemExit(msg) from exc
 
 

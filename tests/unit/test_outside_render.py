@@ -489,8 +489,11 @@ class TestOutsideRender:
         """`fit.md.j2` imports both phrases from the partial. A replacement that leaves one out fails by name, rather than
         rendering a sentence or a table with a hole in it past the consumer's checks. An empty macro is a choice, and passes."""
         target = load_outside_target(_fit_target(tmp_path, f"{macros}## The carriers\n\nThe fixture's own carrier.\n"))
-        with pytest.raises(SystemExit, match=re.escape(f"does not export the requested name '{missing}'")):
+        with pytest.raises(SystemExit, match=re.escape(f"does not export the requested name '{missing}'")) as raised:
             render_outside(target)
+        message = str(raised.value)
+        assert "define it in the template the import names" in message
+        assert "targets/defaults.toml" not in message, "no variable can supply a macro, so the hint must not send the author to one"
 
     def test_an_upstream_change_to_the_carriers_or_the_map_stops_the_render(self, tmp_path: Path) -> None:
         """Both declarations are what make the replacement safe: the replaced partial's hash asks the consumer to read
