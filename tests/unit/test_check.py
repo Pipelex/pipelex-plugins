@@ -110,6 +110,7 @@ def skill_tree(tmp_path: Path) -> Path:
         "credentials.md.j2",
         "catalog-id.md.j2",
         "fit.md.j2",
+        "framing.md.j2",
         "team-files.md.j2",
         "file-roles.md.j2",
     ]:
@@ -1024,6 +1025,7 @@ class TestSharedFilesExist:
                 "credentials.md.j2",
                 "catalog-id.md.j2",
                 "fit.md.j2",
+                "framing.md.j2",
                 "team-files.md.j2",
                 "file-roles.md.j2",
             ]

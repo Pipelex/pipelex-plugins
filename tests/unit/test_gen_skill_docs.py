@@ -134,6 +134,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("# Credentials\n")
     (shared / "catalog-id.md.j2").write_text("# Catalog id\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "framing.md.j2").write_text("Framing.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "file-roles.md.j2").write_text("File roles.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
@@ -165,6 +166,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "credentials.md.j2").write_text("Credentials.\n")
     (shared / "catalog-id.md.j2").write_text("Catalog id.\n")
     (shared / "fit.md.j2").write_text("Fit.\n")
+    (shared / "framing.md.j2").write_text("Framing.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "file-roles.md.j2").write_text("File roles.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
@@ -1067,6 +1069,12 @@ class TestSharedSkillIncludes:
         "give the page's `path` before the text flow": "skills/shared/graph-page.md.j2",
         "**Report a valid verdict's `warnings`**": "skills/shared/validate-warnings.md.j2",
         "say the catalog stores no template file yet: the draft reports it missing": "skills/shared/template-not-stored.md.j2",
+        "A carrier fetches the inputs, starts the run": "skills/shared/fit-carriers.md.j2",
+        "Say that the assistant the user is talking to does this": "skills/shared/fit-carriers.md.j2",
+        "**Inside a method, nothing that reaches another service.**": "skills/shared/fit-carriers.md.j2",
+        "State the limit once, as a property of the product": "skills/shared/fit-carriers.md.j2",
+        "**What gets decided or written?**": "skills/shared/framing.md.j2",
+        "Whatever a reviewer compares against": "skills/shared/framing.md.j2",
     }
 
     @pytest.mark.parametrize("sentence, owner", sorted(SHARED_BLOCK_OWNERS.items()))
