@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.20.0] - 2026-11-01
+
+### Added
+
+- **An outside target replaces `fit.md`'s carriers on their own**: the carriers, the usual answers, the code around a method, the answer, the sentence the Agent work row says and the opening's mention of the lab now live in the include-only partial `templates/skills/shared/fit-carriers.md.j2`, which a target declares under `[render.replaces]` while it pins `fit.md.j2`; the partial must define the macros `also_read_when`, which may be empty, and `agent_work`, and the render fails naming one that is missing. The rendered `fit.md` is unchanged on Claude Code, Codex and Mistral Vibe.
+- **`skills/shared/framing.md`, a shared reference that frames a need**: the questions on what arrives, what gets decided or written, who checks it today and what a mistake costs, and what "Right means" means, moved out of `pipelex-lab`'s `frame.md` in words that name no skill and no harness, so any skill can link them. `pipelex-lab` reads it at its first move and asks what it asked before; `frame.md` keeps what the answers seed, the candidates and the brief.
+
+### Changed
+
+- **`pipelex-scaffold` tells you where the method app's key goes**: the report on a new method app now says to put your own key in the project's `.env.local` before restarting the app from another shell with `make serve`, since the app it leaves running took its key from the shell that started it, and the template's `make create`, from the `@pipelex/create-method-app` release after 0.54.0, no longer copies that key into the project. The skill no longer says that `.env.local` holds a key, never writes one there itself, and after you wrote `.env.local` yourself because the shell had no key, says only that the file was kept.
+- **The validation hook is rebuilt from `pipelex-sdk` at a newer commit**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `0c06698`, the commit its header names, still embedding `@pipelex/sdk` 0.59.0 and `@pipelex/tools-wasm` 0.6.1. Only comments in the embedded SDK differ, so the hook's lint, format and validate verdicts, the request it sends and its `User-Agent` are unchanged.
+
+### Security
+
+- **`pipelex-scaffold` no longer copies your shell's key into a new project's `.env`**: a Python project or a TypeScript project that is not a web app, set up by a language's own initializer, gets a `.env` with the base URL your shell sets and an empty `PIPELEX_API_KEY=` line, which the report tells you to fill with your own key, because an exported key is whichever key was exported last, often a test key or one of another organization, and copied into a project it would outlive the shell and bill that organization. A `.env` that already holds a key is still left as it is, a `.env` without one is now made readable by you alone whether or not your shell exports a key, and the env-file script no longer reports a key as `filled`.
+
 ## [0.19.0] - 2026-10-31
 
 ### Changed

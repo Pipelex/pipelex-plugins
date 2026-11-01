@@ -560,7 +560,7 @@ class TestCommitPristine:
 
 
 class TestWriteEnvFile:
-    """The env file: the example, `.env` ignored, and `.env` filled from the shell and never printed."""
+    """The env file: the example, `.env` ignored, and `.env` given the shell's base URL, never its key, and never printed."""
 
     @staticmethod
     def project(tmp_path: Path, example: str | None = EXAMPLE) -> Path:
@@ -570,37 +570,34 @@ class TestWriteEnvFile:
         return project
 
     @pytest.mark.parametrize(
-        ("credentials", "expected_key", "expected_url", "verdict"),
+        ("credentials", "expected_url", "verdict"),
         [
-            pytest.param(
-                {"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL}, FAKE_KEY, FAKE_URL, "filled base-url=copied plane=other", id="both-set"
-            ),
+            pytest.param({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL}, FAKE_URL, "empty base-url=copied plane=other", id="both-set"),
             pytest.param(
                 {"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": f"{PRODUCTION_URL}/"},
-                FAKE_KEY,
                 f"{PRODUCTION_URL}/",
-                "filled base-url=copied plane=production",
+                "empty base-url=copied plane=production",
                 id="both-set-production-with-a-trailing-slash",
             ),
-            pytest.param({"PIPELEX_API_KEY": FAKE_KEY}, FAKE_KEY, PRODUCTION_URL, "filled base-url=file plane=production", id="key-only"),
+            pytest.param({"PIPELEX_API_KEY": FAKE_KEY}, PRODUCTION_URL, "empty base-url=file plane=production", id="key-only"),
             pytest.param(
                 {"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": ""},
-                FAKE_KEY,
                 PRODUCTION_URL,
-                "filled base-url=file plane=production",
+                "empty base-url=file plane=production",
                 id="key-beside-an-empty-base-url",
             ),
-            pytest.param({}, "", PRODUCTION_URL, "empty base-url=file plane=production", id="neither"),
-            pytest.param({"PIPELEX_BASE_URL": FAKE_URL}, "", FAKE_URL, "empty base-url=copied plane=other", id="base-url-without-a-key"),
+            pytest.param({}, PRODUCTION_URL, "empty base-url=file plane=production", id="neither"),
+            pytest.param({"PIPELEX_BASE_URL": FAKE_URL}, FAKE_URL, "empty base-url=copied plane=other", id="base-url-without-a-key"),
         ],
     )
     @pytest.mark.parametrize("example", [EXAMPLE, EXAMPLE.rstrip("\n"), None], ids=["example", "example-without-final-newline", "no-example"])
-    def test_it_writes_the_pair_the_shell_holds(
-        self, tmp_path: Path, example: str | None, credentials: dict[str, str], expected_key: str, expected_url: str, verdict: str
+    def test_it_writes_the_shell_s_base_url_and_never_its_key(
+        self, tmp_path: Path, example: str | None, credentials: dict[str, str], expected_url: str, verdict: str
     ) -> None:
-        """A base URL the shell sets is copied with a key or without one, since it is the plane the user
-        declared; the key only when the shell sets it; and a shell that sets neither leaves the example as
-        it came. The claim is about what a dotenv reader resolves, so the file is read back that way."""
+        """A base URL the shell sets is copied, since it is the plane the user declared; the key the shell
+        exports never is, since it is whichever key was exported last, so the key line stays empty for the
+        user's own; and a shell that sets no base URL leaves the example as it came. The claim is about what
+        a dotenv reader resolves, so the file is read back that way."""
         project = self.project(tmp_path, example)
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials=credentials)
         assert result.returncode == 0, result.stderr
@@ -608,15 +605,17 @@ class TestWriteEnvFile:
         written = (project / ".env").read_text(encoding="utf-8")
         shipped = (project / ".env.example").read_text(encoding="utf-8")
         reading = _dotenv_reading(written)
-        assert reading["PIPELEX_API_KEY"] == expected_key
+        assert reading["PIPELEX_API_KEY"] == ""
+        assert FAKE_KEY not in written
         assert reading["PIPELEX_BASE_URL"] == expected_url
-        # The example's lines come first and untouched, then the comment once and the supplied lines.
+        # The example's lines come first and untouched, then the comment once and the base URL.
         assert written.startswith(shipped)
         appended = [line for line in written[len(shipped) :].splitlines() if line]
-        supplied = [f"{name}={credentials[name]}" for name in ("PIPELEX_API_KEY", "PIPELEX_BASE_URL") if credentials.get(name)]
-        assert appended == ([COMMENT_LINE, *supplied] if supplied else [])
-        # `.env` is ignored before a key can reach it.
+        base_url = credentials.get("PIPELEX_BASE_URL")
+        assert appended == ([COMMENT_LINE, f"PIPELEX_BASE_URL={base_url}"] if base_url else [])
+        # `.env` is ignored, and closed to other users, before the user's key can reach it.
         assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
+        assert (project / ".env").stat().st_mode & 0o077 == 0
 
     @pytest.mark.parametrize(
         "carried",
@@ -651,13 +650,16 @@ class TestWriteEnvFile:
         (project / ".env").write_text(carried, encoding="utf-8")
         assert _run(WRITE_ENV_FILE, str(project), cwd=tmp_path).stdout == "kept base-url=file plane=other\n"
 
-    def test_a_key_the_file_empties_again_is_filled(self, tmp_path: Path) -> None:
-        """A dotenv reader resolves the last assignment, so a key followed by an empty one is no key."""
+    def test_a_key_the_file_empties_again_is_no_key(self, tmp_path: Path) -> None:
+        """A dotenv reader resolves the last assignment, so a key followed by an empty one is no key, and the
+        shell's key does not take its place."""
         project = self.project(tmp_path)
         (project / ".env").write_text("PIPELEX_API_KEY=plx_an_old_fake_key\nPIPELEX_API_KEY=\n", encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
-        assert _dotenv_reading((project / ".env").read_text(encoding="utf-8"))["PIPELEX_API_KEY"] == FAKE_KEY
+        assert result.stdout == "empty base-url=file plane=production\n"
+        written = (project / ".env").read_text(encoding="utf-8")
+        assert _dotenv_reading(written)["PIPELEX_API_KEY"] == ""
+        assert FAKE_KEY not in written
 
     def test_an_example_a_dotenv_star_rule_hid_is_made_visible(self, tmp_path: Path) -> None:
         """`create-next-app` ignores `.env*`, which hides the example from review, commit and clone."""
@@ -682,7 +684,7 @@ class TestWriteEnvFile:
             startup.write_text("set -x\n", encoding="utf-8")
             environment["BASH_ENV"] = str(startup)
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
-        assert result.stdout == "filled base-url=copied plane=other\n"
+        assert result.stdout == "empty base-url=copied plane=other\n"
         for value in (FAKE_KEY, FAKE_URL):
             assert value not in result.stdout and value not in result.stderr
 
@@ -731,7 +733,7 @@ class TestWriteEnvFile:
         environment = _environment({"PIPELEX_API_KEY": FAKE_KEY})
         _ignored_only_on_this_machine(tmp_path, project, where, ".env", environment)
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
 
     def test_an_env_file_the_initializer_wrote_gains_the_two_lines(self, tmp_path: Path) -> None:
@@ -753,15 +755,16 @@ class TestWriteEnvFile:
         assert result.stdout == "empty base-url=file plane=other\n"
         assert (project / name).read_text(encoding="utf-8") == f"{carried}\nPIPELEX_API_KEY=\n"
 
-    def test_a_key_written_into_an_existing_env_file_closes_it_to_other_users(self, tmp_path: Path) -> None:
-        """Round 3: an initializer writes `.env` under the user's umask, and the key was appended to it
-        with the mode it came with."""
+    def test_an_existing_env_file_without_a_key_is_closed_to_other_users(self, tmp_path: Path) -> None:
+        """Round 3: an initializer writes `.env` under the user's umask, and the report sends the user's own
+        key to its `PIPELEX_API_KEY=` line, so the file is closed to other users before they write it."""
         project = self.project(tmp_path)
         (project / ".env").write_text("DATABASE_URL=\n", encoding="utf-8")
         (project / ".env").chmod(0o644)
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".env").stat().st_mode & 0o777 == 0o600
+        assert FAKE_KEY not in (project / ".env").read_text(encoding="utf-8")
 
     def test_a_new_env_file_is_readable_by_its_owner_alone(self, tmp_path: Path) -> None:
         project = self.project(tmp_path)
@@ -770,12 +773,12 @@ class TestWriteEnvFile:
         assert (project / ".env").stat().st_mode & 0o077 == 0
 
     @pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root writes a read-only file")
-    def test_a_key_that_cannot_be_written_is_never_reported_filled(self, tmp_path: Path) -> None:
+    def test_a_base_url_that_cannot_be_written_is_never_reported_copied(self, tmp_path: Path) -> None:
         project = self.project(tmp_path)
         (project / ".gitignore").write_text(".env\n", encoding="utf-8")
         (project / ".env").write_text(EXAMPLE, encoding="utf-8")
         (project / ".env").chmod(0o444)
-        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_BASE_URL": FAKE_URL})
         assert result.stdout == "refused: write-failed\n"
         assert result.returncode == 1
 
@@ -789,7 +792,7 @@ class TestWriteEnvFile:
         project.mkdir()
         (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
         assert subprocess.run(["git", "-C", str(outer), "check-ignore", "-q", "app/.env"], check=False).returncode == 0
         assert not (outer / ".gitignore").exists()
@@ -805,7 +808,7 @@ class TestWriteEnvFile:
         project.mkdir()
         (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
         assert (outer / ".gitignore").read_text(encoding="utf-8") == ".env\n"
 
@@ -844,7 +847,7 @@ class TestWriteEnvFile:
         (project / "package.json").write_text("{}\n", encoding="utf-8")
         assert _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path).stdout.startswith("committed: ")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\ndist/\n.env\n"
         assert _git(project, "status", "--porcelain", "--untracked-files=all") == "?? .env.example"
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
@@ -870,7 +873,7 @@ class TestWriteEnvFile:
         (project / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
         assert _run(COMMIT_PRISTINE, str(project), "Scaffold TypeScript project", cwd=tmp_path).stdout.startswith("unversioned: ")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
-        assert result.stdout == "filled base-url=file plane=production\n"
+        assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules/\n\n.env\n"
         assert _git(outer, "status", "--porcelain", "--untracked-files=all") == ""
         assert _staged_once_made_a_repository(project) == [".env.example", ".gitignore", "package.json"]

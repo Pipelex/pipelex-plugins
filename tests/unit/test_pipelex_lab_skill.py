@@ -65,13 +65,14 @@ class TestPipelexLabSkill:
         """A pointer only in the closing index is a branch that will not be read, so each reference is named at
         the move that needs it, with the instruction to read it before acting."""
         body = render(target_name)
-        assert "Read [frame.md](references/frame.md) before asking anything" in the_move(body, 1)
-        assert "Read [fit.md](../shared/fit.md) with it, before any candidate" in the_move(body, 1)
+        assert "Read [framing.md](../shared/framing.md) and [frame.md](references/frame.md) before asking anything" in the_move(body, 1)
+        assert "Read [fit.md](../shared/fit.md) with them, before any candidate" in the_move(body, 1)
         assert "Read [key.md](references/key.md) before writing a key." in the_move(body, 2)
         assert "Read [log.md](references/log.md) before the first entry" in the_move(body, 3)
         index = body.split("## References", 1)[1]
         for name in self.REFERENCES:
             assert f"(references/{name})" in index, f"{target_name}: the reference index does not name {name}"
+        assert "- [framing.md](../shared/framing.md): at the first move, before asking anything." in index
 
     def test_the_references_are_static_and_say_when_they_are_read(self) -> None:
         """References are copied verbatim into every target and never rendered, so a template expression in one
@@ -309,9 +310,10 @@ class TestCapabilityMap:
     the reference's own words, so the two cannot drift apart."""
 
     MTHDS_REFERENCE = REPO_ROOT / "templates" / "skills" / "shared" / "writing-mthds.md.j2"
+    SHARED = REPO_ROOT / "templates" / "skills" / "shared"
 
     def rows(self) -> list[list[str]]:
-        fit = (REPO_ROOT / "templates" / "skills" / "shared" / "fit.md.j2").read_text(encoding="utf-8")
+        fit = (self.SHARED / "fit.md.j2").read_text(encoding="utf-8")
         table = fit.split("## What the platform can do", 1)[1].split("\n## ", 1)[0]
         lines = [line for line in table.splitlines() if line.startswith("| ") and not line.startswith("| In the builder")]
         return [[cell.strip() for cell in line.strip("|").split("|")] for line in lines]
@@ -347,3 +349,42 @@ class TestCapabilityMap:
         assert "`@default-extract-web-page`" in cells["Read a web page"] and "`@default-extract-web-page`" in reference
         assert "title, a URL and a snippet" in cells["Search the web"]
         assert "`sources` list with title, URL, and snippet" in reference
+
+    def test_the_only_list_of_what_a_method_can_do_stays_where_a_target_pins_it(self) -> None:
+        """An outside target replaces `fit-carriers.md.j2` and pins `fit.md.j2`, so a gap named in the partial would be a
+        gap the target could drop, and a carrier named in `fit.md.j2` one it could not replace."""
+        fit = (self.SHARED / "fit.md.j2").read_text(encoding="utf-8")
+        carriers = (self.SHARED / "fit-carriers.md.j2").read_text(encoding="utf-8")
+        for heading in ("## What a method is", "## What the platform can do", "## The parts of a request", "## The kinds of request"):
+            assert f"\n{heading}\n" in fit, f"{heading} left fit.md.j2"
+            assert heading not in carriers, f"fit-carriers.md.j2 also holds {heading}"
+        for heading in ("## The carriers", "## The code you write", "## The answer"):
+            assert f"\n{heading}\n" in carriers, f"{heading} left fit-carriers.md.j2"
+            assert heading not in fit, f"fit.md.j2 also holds {heading}"
+        assert "**Beyond the runtime today**" in fit
+        assert "**Beyond the runtime today**" not in carriers
+        assert "import also_read_when, agent_work with context" in fit, "fit.md.j2 no longer takes both phrases from the partial"
+        assert fit.endswith('\n\n{% include "skills/shared/fit-carriers.md.j2" %}\n'), "the carriers are no longer included at the end of fit.md.j2"
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_rendered_reference_reads_as_one_file(self, target_name: str) -> None:
+        """The Agent work row takes its last cell from the partial, whose body follows the kinds of request in order."""
+        config = load_target_config(REPO_ROOT / "targets", target_name)
+        files = render_templates(REPO_ROOT / "templates", REPO_ROOT, config.template_vars, include_skills=[], target_name=config.name)
+        body = next(content for path, content in files.items() if path.match("skills/shared/fit.md"))
+        assert (
+            "| **Agent work** | Initiative, conversation, memory, open-ended exploration | "
+            "Say that the assistant the user is talking to does this, and offer a method for the procedural core if it recurs |\n"
+        ) in body
+        assert re.findall(r"^## (.+)$", body, flags=re.MULTILINE) == [
+            "What a method is",
+            "What the platform can do",
+            "The parts of a request",
+            "The kinds of request",
+            "The carriers",
+            "The code you write",
+            "The answer",
+        ]
+        assert '"reply to the customer"), and at the lab\'s first move. It says what a method can and cannot do' in body
+        assert body.startswith("# What a method does, and what carries the rest\n")
+        assert body.endswith("Which one?\n")

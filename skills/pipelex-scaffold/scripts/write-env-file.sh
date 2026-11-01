@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # The env file of /pipelex-scaffold's initializer branch: `.env.example` with the two Pipelex
-# lines, `.env` ignored by git, then `.env` copied from the example and filled from the shell.
+# lines, `.env` ignored by git, then `.env` copied from the example, given the shell's base URL and
+# never the shell's key.
 #
 # Usage: write-env-file.sh <dir>
 #
 # It prints one line and never a value. The line opens with a verdict on the key, and the stop
 # table and the report key on it:
 #   <key> base-url=<origin> plane=<plane>
-#     <key>     filled   the key was copied from the shell's PIPELEX_API_KEY
-#               kept     `.env` already carried a key, so it was not touched
-#               empty    no key: the user fills `.env`'s PIPELEX_API_KEY= line
+#     <key>     kept     `.env` already carried a key, so it was not touched
+#               empty    no key: the user puts their own on `.env`'s PIPELEX_API_KEY= line, which
+#                        the shell's PIPELEX_API_KEY never fills
 #     <origin>  copied   the shell's PIPELEX_BASE_URL was copied into `.env`
 #               file     `.env`'s own line stands: the example's production URL, or the user's
 #     <plane>   production when the base URL `.env` resolves to is https://api.pipelex.com, or
@@ -17,9 +18,12 @@
 #   refused: <reason>   no key was written, and <reason> is one of usage, no-directory,
 #                       not-a-repository (<dir> is not where the pristine commit leaves it: it
 #                       has not run), not-ignored, write-failed (a file in <dir> could not be
-#                       written, or `.env` could not be closed to other users before the key
-#                       reached it)
+#                       written, or a `.env` without a key could not be closed to other users)
 # The exit code is presentation: 0 unless refused.
+#
+# Why the key the shell exports is never copied: it is whichever key was exported last, often a
+# test key or one of another organization, and copied into the project it would outlive the shell,
+# bill that organization and escape every rotation. The user puts their own key in `.env`.
 #
 # Why every value moves through this shell and never through the model: a value typed into a
 # command, a file-editing tool's parameters or a read of the file lands in the transcript, and a
@@ -140,8 +144,8 @@ fi
 # which no rule ignores: that repository answers for its own index.
 [ -z "$own_rules" ] || git -C "$dir" check-ignore -q -- .env || refuse not-ignored
 
-# An existing `.env` is never overwritten: it may hold a key the user filled. A new one is
-# readable by its owner alone, since it is about to hold a key.
+# An existing `.env` is never overwritten: it may hold a key the user wrote. A new one is
+# readable by its owner alone, since the user's key goes there next.
 if [ ! -e "$env" ]; then
   (umask 077 && cp "$example" "$env") || refuse write-failed
 fi
@@ -157,26 +161,23 @@ resolved() {
 # left as it is, because every dotenv reader resolves a repeated name to its later line, so an
 # append after the user's lines would silently replace them. The base URL cannot carry a test of
 # its own: the example ships its line non-empty. A file without a key gains the lines it lacks, so
-# the report's `PIPELEX_API_KEY=` line is there. A base URL the shell sets is copied with a key or
-# without one, since it is the plane the user declared, and a key is refused by every plane but
-# the one that issued it. The comment goes out once, and only when a line follows it.
+# the report's `PIPELEX_API_KEY=` line is there for the user's own key, and is closed to other
+# users before they write it. A base URL the shell sets is copied, since it is the plane the user
+# declared, and a key is refused by every plane but the one that issued it. The shell's key is
+# never copied. The comment goes out only with the line it introduces.
 origin=file
 key=empty
 if [ -n "$(resolved PIPELEX_API_KEY)" ]; then
   key=kept
 else
   add_missing_lines "$env"
-  if [ -n "${PIPELEX_API_KEY:-}${PIPELEX_BASE_URL:-}" ]; then
-    # A `.env` the initializer wrote was made under the user's umask, readable by others as often
-    # as not. Only the group's and others' bits go, so a file its owner made read-only stays so.
-    [ -z "${PIPELEX_API_KEY:-}" ] || chmod go-rwx "$env" || refuse write-failed
-    {
-      printf '\n# Copied from the shell environment; a later line overrides an earlier one.\n'
-      [ -z "${PIPELEX_API_KEY:-}" ] || printf 'PIPELEX_API_KEY=%s\n' "$PIPELEX_API_KEY"
-      [ -z "${PIPELEX_BASE_URL:-}" ] || printf 'PIPELEX_BASE_URL=%s\n' "$PIPELEX_BASE_URL"
-    } >> "$env" || refuse write-failed
-    [ -z "${PIPELEX_API_KEY:-}" ] || key=filled
-    [ -z "${PIPELEX_BASE_URL:-}" ] || origin=copied
+  # A `.env` the initializer wrote was made under the user's umask, readable by others as often
+  # as not. Only the group's and others' bits go, so a file its owner made read-only stays so.
+  chmod go-rwx "$env" || refuse write-failed
+  if [ -n "${PIPELEX_BASE_URL:-}" ]; then
+    printf '\n# Copied from the shell environment; a later line overrides an earlier one.\nPIPELEX_BASE_URL=%s\n' \
+      "$PIPELEX_BASE_URL" >> "$env" || refuse write-failed
+    origin=copied
   fi
 fi
 
