@@ -10,6 +10,7 @@
 ### Changed
 
 - **`pipelex-scaffold` tells you where the method app's key goes**: the report on a new method app now says to put your own key in the project's `.env.local` before restarting the app from another shell with `make serve`, since the app it leaves running took its key from the shell that started it, and the template's `make create`, from the `@pipelex/create-method-app` release after 0.54.0, no longer copies that key into the project. The skill no longer says that `.env.local` holds a key, never writes one there itself, and after you wrote `.env.local` yourself because the shell had no key, says only that the file was kept.
+- **The validation hook is rebuilt from `pipelex-sdk` at a newer commit**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `0c06698`, the commit its header names, still embedding `@pipelex/sdk` 0.59.0 and `@pipelex/tools-wasm` 0.6.1. Only comments in the embedded SDK differ, so the hook's lint, format and validate verdicts, the request it sends and its `User-Agent` are unchanged.
 
 ### Security
 
