@@ -114,6 +114,31 @@ def _every_skill(tmp_path: Path, layout: str) -> Path:
     )
 
 
+# What a replacement of `fit-carriers.md.j2` writes for a target with no lab: the opening's phrase, defined empty.
+_NO_LAB = "{%- macro also_read_when() -%}{%- endmacro -%}"
+
+
+def _fit_target(tmp_path: Path, carriers: str) -> Path:
+    """A target with a skill of its own, which keeps fit.md's map, pinned, and replaces what carries a method."""
+    partial = "templates/skills/shared/fit-carriers.md.j2"
+    fit = "templates/skills/shared/fit.md.j2"
+    source = tmp_path / "src"
+    _write(source / partial, carriers)
+    _write(
+        source / "templates/skills/house-guide/SKILL.md.j2",
+        "---\nname: house-guide\ndescription: The target's own guide.\n---\n\n# House guide\n\n"
+        "Read [framing.md]({{ shared_dir }}/framing.md) and [fit.md]({{ shared_dir }}/fit.md).\n",
+    )
+    return _write(
+        source / "fit-target.toml",
+        '[render]\noutput = "../rendered"\nshared = "in-each-skill"\n\n'
+        f'[render.replaces]\n"{partial}" = "{file_sha256(REPO_ROOT / partial)}"\n\n'
+        f'[render.pins]\n"{fit}" = "{file_sha256(REPO_ROOT / fit)}"\n\n'
+        '[skills]\ninclude = ["pipelex-design", "house-guide"]\n\n'
+        '[vars]\nplatform = "agent-skills"\nharness_name = "the harness"\nskill_dir = "<skill-dir>"\n',
+    )
+
+
 def _git_checkout(output: Path) -> None:
     subprocess.run(["git", "init", "--quiet", str(output)], check=True)
     _write(output / "README.md", "# Somebody's repository\n")
@@ -419,6 +444,68 @@ class TestOutsideRender:
         upstream_skills = {path.parent.name for path in (REPO_ROOT / "templates/skills").glob("*/SKILL.md.j2")}
         assert {rel.split("/")[0] for rel in files if rel.endswith("/SKILL.md")} == upstream_skills
         assert link_errors(target, files) == []
+
+    def test_a_target_replaces_what_carries_a_method_and_keeps_what_a_method_can_do(self, tmp_path: Path) -> None:
+        """The reason `fit-carriers.md.j2` is a file of its own: the target says its own carriers, the Agent work row's
+        sentence among them, drops the opening's mention of a lab it does not have, and upstream's list of what a method
+        can and cannot do reaches it untouched, under a pin that stops the render when that list changes. The framing
+        questions reach a skill of the target's by its link."""
+        carriers = (
+            f"{_NO_LAB}{{%- macro agent_work() -%}}Say that the fixture's assistant does not do this{{%- endmacro -%}}\n"
+            "## The carriers\n\nThe fixture's own carrier.\n{#- -#}\n"
+        )
+        target = load_outside_target(_fit_target(tmp_path, carriers))
+        assert declaration_errors(target) == []
+        files = render_outside(target)
+        assert link_errors(target, files) == []
+        upstream = (REPO_ROOT / "templates/skills/shared/fit.md.j2").read_text(encoding="utf-8")
+        for skill in ("pipelex-design", "house-guide"):
+            fit = files[f"{skill}/shared/fit.md"].content.decode()
+            assert (
+                "| **Agent work** | Initiative, conversation, memory, open-ended exploration | Say that the fixture's assistant does not do this |"
+                in fit
+            )
+            assert fit.endswith("## The carriers\n\nThe fixture's own carrier.\n")
+            assert '"reply to the customer"). It says what a method can and cannot do' in fit
+            assert "first move" not in fit
+            assert "the assistant the user is talking to" not in fit
+            assert "## The code you write" not in fit
+            kept = upstream.split("## What a method is", 1)[1].split("| **Mostly plumbing**", 1)[0]
+            assert kept in fit, "the capability map and the kinds of request did not reach the target as upstream wrote them"
+        guide = files["house-guide/SKILL.md"].content.decode()
+        assert "Read [framing.md](shared/framing.md) and [fit.md](shared/fit.md)." in guide
+        framing = files["house-guide/shared/framing.md"].content.decode()
+        assert "**What does a mistake cost?**" in framing
+        assert "pipelex-design/shared/framing.md" not in files, "a skill carries only the shared files it links to"
+
+    @pytest.mark.parametrize(
+        ("macros", "missing"),
+        [
+            ("{%- macro agent_work() -%}x{%- endmacro -%}\n", "also_read_when"),
+            (f"{_NO_LAB}\n", "agent_work"),
+        ],
+    )
+    def test_a_replacement_of_the_carriers_without_either_macro_fails_the_render(self, tmp_path: Path, macros: str, missing: str) -> None:
+        """`fit.md.j2` imports both phrases from the partial. A replacement that leaves one out fails by name, rather than
+        rendering a sentence or a table with a hole in it past the consumer's checks. An empty macro is a choice, and passes."""
+        target = load_outside_target(_fit_target(tmp_path, f"{macros}## The carriers\n\nThe fixture's own carrier.\n"))
+        with pytest.raises(SystemExit, match=re.escape(f"does not export the requested name '{missing}'")) as raised:
+            render_outside(target)
+        message = str(raised.value)
+        assert "define it in the template the import names" in message
+        assert "targets/defaults.toml" not in message, "no variable can supply a macro, so the hint must not send the author to one"
+
+    def test_an_upstream_change_to_the_carriers_or_the_map_stops_the_render(self, tmp_path: Path) -> None:
+        """Both declarations are what make the replacement safe: the replaced partial's hash asks the consumer to read
+        an upstream change to the carriers, and the pinned file's hash a change to the list of gaps."""
+        target_file = _fit_target(tmp_path, f"{_NO_LAB}{{%- macro agent_work() -%}}x{{%- endmacro -%}}\nCarriers.\n")
+        for path in ("templates/skills/shared/fit-carriers.md.j2", "templates/skills/shared/fit.md.j2"):
+            _edit(target_file, f'"{path}" = "{file_sha256(REPO_ROOT / path)}"', f'"{path}" = "{WRONG_HASH}"')
+        errors = declaration_errors(load_outside_target(target_file))
+        assert [error.split(":", 1)[0] for error in errors] == [
+            "[render.replaces] templates/skills/shared/fit-carriers.md.j2",
+            "[render.pins] templates/skills/shared/fit.md.j2",
+        ]
 
     def test_an_installed_upstream_in_an_environment_git_ignores_renders_as_the_checkout_does(self, tmp_path: Path) -> None:
         """The installed package carries the upstream inside itself, and git is never asked about it there: in a

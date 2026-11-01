@@ -157,7 +157,7 @@ STATIC_ASSET_DIRS = ("references", "scripts")
 # reference (`writing-mthds.md`, the one every skill that reads or writes a bundle
 # points at) and the native content types that ground the skills, and the files a
 # skill reads when one of its stops fires or one of its branches is taken, such as
-# `credentials.md`, `catalog-id.md`, `fit.md`, `team-files.md` and `file-roles.md`.
+# `credentials.md`, `catalog-id.md`, `fit.md`, `framing.md`, `team-files.md` and `file-roles.md`.
 # Paths are relative to the templates/ directory.
 #
 # The include-only partials under `skills/shared/` — `frontmatter.md.j2` and the
@@ -170,6 +170,7 @@ SHARED_TEMPLATES = [
     "skills/shared/credentials.md.j2",
     "skills/shared/catalog-id.md.j2",
     "skills/shared/fit.md.j2",
+    "skills/shared/framing.md.j2",
     "skills/shared/team-files.md.j2",
     "skills/shared/file-roles.md.j2",
 ]
@@ -452,7 +453,11 @@ def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[
         msg = f"{template_name}: syntax error at line {exc.lineno}: {exc.message}"
         raise SystemExit(msg) from exc
     except UndefinedError as exc:
-        msg = f"{template_name}: undefined variable: {exc.message} — add it to targets/defaults.toml or the target config"
+        # A `{% from … import %}` of a name its template lacks raises this too, and no variable can supply that name.
+        if "does not export the requested name" in str(exc.message):
+            msg = f"{template_name}: missing macro: {exc.message} — define it in the template the import names"
+        else:
+            msg = f"{template_name}: undefined variable: {exc.message} — add it to targets/defaults.toml or the target config"
         raise SystemExit(msg) from exc
 
 
