@@ -1071,6 +1071,7 @@ class TestSharedSkillIncludes:
         "say the catalog stores no template file yet: the draft reports it missing": "skills/shared/template-not-stored.md.j2",
         "A carrier fetches the inputs, starts the run": "skills/shared/fit-carriers.md.j2",
         "Say that the assistant the user is talking to does this": "skills/shared/fit-carriers.md.j2",
+        ", and at the lab's first move": "skills/shared/fit-carriers.md.j2",
         "**Inside a method, nothing that reaches another service.**": "skills/shared/fit-carriers.md.j2",
         "State the limit once, as a property of the product": "skills/shared/fit-carriers.md.j2",
         "**What gets decided or written?**": "skills/shared/framing.md.j2",

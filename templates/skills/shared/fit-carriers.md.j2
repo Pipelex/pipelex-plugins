@@ -8,12 +8,18 @@
    under `[render.replaces]` and pinned by hash, while it pins `fit.md.j2` under
    `[render.pins]` (docs/build-targets.md, "The fit reference's carriers").
 
-   A replacement provides both parts. The macro `agent_work` is the last cell of
-   the kinds of request's Agent work row, a sentence naming the assistant the user
-   is talking to, which has to stay in that row for the rendering to stay as it
-   is; a replacement without it fails the render, naming the macro. The body is
-   the rest, and it strips its own trailing newline (the closing comment below),
-   so the including template supplies the line break. -#}
+   A replacement provides three parts. Two are macros, each a phrase naming what a
+   target may not have, which `fit.md.j2` says where an include of the body cannot
+   go. `also_read_when` closes the opening's read condition, straight before its
+   full stop and starting at its comma, and a target with no lab defines it empty.
+   `agent_work` is the last cell of the kinds of request's Agent work row, a sentence
+   naming the assistant the user is talking to. A replacement without either fails
+   the render, naming the macro. The body is the rest, and it strips its own trailing
+   newline (the closing comment below), so the including template supplies the line
+   break. -#}
+{%- macro also_read_when() -%}
+, and at the lab's first move
+{%- endmacro -%}
 {%- macro agent_work() -%}
 Say that the assistant the user is talking to does this, and offer a method for the procedural core if it recurs
 {%- endmacro -%}

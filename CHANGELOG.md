@@ -4,7 +4,7 @@
 
 ### Added
 
-- **An outside target replaces `fit.md`'s carriers on their own**: the carriers, the usual answers, the code around a method, the answer and the sentence the Agent work row says now live in the include-only partial `templates/skills/shared/fit-carriers.md.j2`, which a target declares under `[render.replaces]` while it pins `fit.md.j2`; the partial must define a macro `agent_work`, and the render fails naming it otherwise. The rendered `fit.md` is unchanged on Claude Code, Codex and Mistral Vibe.
+- **An outside target replaces `fit.md`'s carriers on their own**: the carriers, the usual answers, the code around a method, the answer, the sentence the Agent work row says and the opening's mention of the lab now live in the include-only partial `templates/skills/shared/fit-carriers.md.j2`, which a target declares under `[render.replaces]` while it pins `fit.md.j2`; the partial must define the macros `also_read_when`, which may be empty, and `agent_work`, and the render fails naming one that is missing. The rendered `fit.md` is unchanged on Claude Code, Codex and Mistral Vibe.
 - **`skills/shared/framing.md`, a shared reference that frames a need**: the questions on what arrives, what gets decided or written, who checks it today and what a mistake costs, and what "Right means" means, moved out of `pipelex-lab`'s `frame.md` in words that name no skill and no harness, so any skill can link them. `pipelex-lab` reads it at its first move and asks what it asked before; `frame.md` keeps what the answers seed, the candidates and the brief.
 
 ### Changed

@@ -114,6 +114,10 @@ def _every_skill(tmp_path: Path, layout: str) -> Path:
     )
 
 
+# What a replacement of `fit-carriers.md.j2` writes for a target with no lab: the opening's phrase, defined empty.
+_NO_LAB = "{%- macro also_read_when() -%}{%- endmacro -%}"
+
+
 def _fit_target(tmp_path: Path, carriers: str) -> Path:
     """A target with a skill of its own, which keeps fit.md's map, pinned, and replaces what carries a method."""
     partial = "templates/skills/shared/fit-carriers.md.j2"
@@ -443,10 +447,11 @@ class TestOutsideRender:
 
     def test_a_target_replaces_what_carries_a_method_and_keeps_what_a_method_can_do(self, tmp_path: Path) -> None:
         """The reason `fit-carriers.md.j2` is a file of its own: the target says its own carriers, the Agent work row's
-        sentence among them, and upstream's list of what a method can and cannot do reaches it untouched, under a pin
-        that stops the render when that list changes. The framing questions reach a skill of the target's by its link."""
+        sentence among them, drops the opening's mention of a lab it does not have, and upstream's list of what a method
+        can and cannot do reaches it untouched, under a pin that stops the render when that list changes. The framing
+        questions reach a skill of the target's by its link."""
         carriers = (
-            "{%- macro agent_work() -%}Say that the fixture's assistant does not do this{%- endmacro -%}\n"
+            f"{_NO_LAB}{{%- macro agent_work() -%}}Say that the fixture's assistant does not do this{{%- endmacro -%}}\n"
             "## The carriers\n\nThe fixture's own carrier.\n{#- -#}\n"
         )
         target = load_outside_target(_fit_target(tmp_path, carriers))
@@ -461,6 +466,8 @@ class TestOutsideRender:
                 in fit
             )
             assert fit.endswith("## The carriers\n\nThe fixture's own carrier.\n")
+            assert '"reply to the customer"). It says what a method can and cannot do' in fit
+            assert "first move" not in fit
             assert "the assistant the user is talking to" not in fit
             assert "## The code you write" not in fit
             kept = upstream.split("## What a method is", 1)[1].split("| **Mostly plumbing**", 1)[0]
@@ -471,17 +478,24 @@ class TestOutsideRender:
         assert "**What does a mistake cost?**" in framing
         assert "pipelex-design/shared/framing.md" not in files, "a skill carries only the shared files it links to"
 
-    def test_a_replacement_of_the_carriers_without_the_agent_work_sentence_fails_the_render(self, tmp_path: Path) -> None:
-        """`fit.md.j2` imports the row's sentence from the partial. A replacement that holds only the body fails by name,
-        rather than rendering a table with a hole in it past the consumer's checks."""
-        target = load_outside_target(_fit_target(tmp_path, "## The carriers\n\nThe fixture's own carrier.\n"))
-        with pytest.raises(SystemExit, match=re.escape("does not export the requested name 'agent_work'")):
+    @pytest.mark.parametrize(
+        ("macros", "missing"),
+        [
+            ("{%- macro agent_work() -%}x{%- endmacro -%}\n", "also_read_when"),
+            (f"{_NO_LAB}\n", "agent_work"),
+        ],
+    )
+    def test_a_replacement_of_the_carriers_without_either_macro_fails_the_render(self, tmp_path: Path, macros: str, missing: str) -> None:
+        """`fit.md.j2` imports both phrases from the partial. A replacement that leaves one out fails by name, rather than
+        rendering a sentence or a table with a hole in it past the consumer's checks. An empty macro is a choice, and passes."""
+        target = load_outside_target(_fit_target(tmp_path, f"{macros}## The carriers\n\nThe fixture's own carrier.\n"))
+        with pytest.raises(SystemExit, match=re.escape(f"does not export the requested name '{missing}'")):
             render_outside(target)
 
     def test_an_upstream_change_to_the_carriers_or_the_map_stops_the_render(self, tmp_path: Path) -> None:
         """Both declarations are what make the replacement safe: the replaced partial's hash asks the consumer to read
         an upstream change to the carriers, and the pinned file's hash a change to the list of gaps."""
-        target_file = _fit_target(tmp_path, "{%- macro agent_work() -%}x{%- endmacro -%}\nCarriers.\n")
+        target_file = _fit_target(tmp_path, f"{_NO_LAB}{{%- macro agent_work() -%}}x{{%- endmacro -%}}\nCarriers.\n")
         for path in ("templates/skills/shared/fit-carriers.md.j2", "templates/skills/shared/fit.md.j2"):
             _edit(target_file, f'"{path}" = "{file_sha256(REPO_ROOT / path)}"', f'"{path}" = "{WRONG_HASH}"')
         errors = declaration_errors(load_outside_target(target_file))

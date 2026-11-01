@@ -363,6 +363,7 @@ class TestCapabilityMap:
             assert heading not in fit, f"fit.md.j2 also holds {heading}"
         assert "**Beyond the runtime today**" in fit
         assert "**Beyond the runtime today**" not in carriers
+        assert "import also_read_when, agent_work with context" in fit, "fit.md.j2 no longer takes both phrases from the partial"
         assert fit.endswith('\n\n{% include "skills/shared/fit-carriers.md.j2" %}\n'), "the carriers are no longer included at the end of fit.md.j2"
 
     @pytest.mark.parametrize("target_name", TARGETS)
@@ -384,5 +385,6 @@ class TestCapabilityMap:
             "The code you write",
             "The answer",
         ]
+        assert '"reply to the customer"), and at the lab\'s first move. It says what a method can and cannot do' in body
         assert body.startswith("# What a method does, and what carries the rest\n")
         assert body.endswith("Which one?\n")

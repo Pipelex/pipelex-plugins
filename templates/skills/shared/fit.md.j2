@@ -18,13 +18,13 @@
 
    This file keeps what a method can and cannot do, the only list of it. What
    carries the rest, and how to answer, is `fit-carriers.md.j2`, so that an outside
-   target can replace those and keep this file: the import below brings the one
-   sentence of that partial that this file's table says, and the include at the
-   end brings its body. -#}
-{%- from "skills/shared/fit-carriers.md.j2" import agent_work with context -%}
+   target can replace those and keep this file: the import below brings the two
+   phrases of that partial that this file says in its opening and its table, and
+   the include at the end brings its body. -#}
+{%- from "skills/shared/fit-carriers.md.j2" import also_read_when, agent_work with context -%}
 # What a method does, and what carries the rest
 
-Read this when a request says where its input comes from, where the result goes, when it runs or what it does in the world ("every morning", "when an email arrives", "from our Drive", "post it to Slack", "update the CRM", "reply to the customer"), and at the lab's first move. It says what a method can and cannot do, how to split a request between the method and whatever carries it, which code you may write around a method, and how to answer.
+Read this when a request says where its input comes from, where the result goes, when it runs or what it does in the world ("every morning", "when an email arrives", "from our Drive", "post it to Slack", "update the CRM", "reply to the customer"){{ also_read_when() }}. It says what a method can and cannot do, how to split a request between the method and whatever carries it, which code you may write around a method, and how to answer.
 
 ## What a method is
 
