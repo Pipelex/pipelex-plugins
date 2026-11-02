@@ -602,8 +602,10 @@ description  = "Generate an image from a prompt"
 inputs       = { img_prompt = "Text" }
 output       = "Image"
 prompt       = "$img_prompt"
-# model       = "$gen-image"           # optional, e.g. "$gen-image" or "@default-premium"
-# aspect_ratio = "landscape_16_9"      # optional, model-dependent (below)
+# model         = "$gen-image"         # optional, e.g. "$gen-image" or "@default-premium"
+# aspect_ratio  = "landscape_16_9"     # optional, model-dependent (below)
+# size          = "2k"                 # optional: a tier, or an exact "WIDTHxHEIGHT" instead of aspect_ratio (below)
+# output_format = "jpeg"               # optional: "png", "jpeg" or "webp", model-dependent (below)
 ```
 
 **Required:** `prompt` (even if it's just a passthrough like `"$img_prompt"`). Declared `inputs` are injected into the `prompt` template.
@@ -617,9 +619,29 @@ prompt = "Apply this change to $ref: $instruction"
 
 Each referenced image is injected as an `[Image N]` token (reference image), bounded by the model's `max_prompt_images`.
 
-**Aspect ratio values** (enum names, not ratios): `square`, `landscape_4_3`, `landscape_3_2`, `landscape_16_9`, `landscape_21_9`, `portrait_3_4`, `portrait_2_3`, `portrait_9_16`, `portrait_9_21`.
+**Aspect ratio values** (enum names, not ratios): `square`, `landscape_4_3`, `landscape_3_2`, `landscape_16_9`, `landscape_21_9`, `portrait_3_4`, `portrait_2_3`, `portrait_9_16`, `portrait_9_21`, and the banners `landscape_4_1`, `landscape_8_1`, `portrait_1_4` and `portrait_1_8`.
 
-Aspect-ratio support is model-dependent, and only `square` works on every model. The newest models cover the full range: `gpt-image-2` supports all of them, `nano-banana-2` nearly all. The older `gpt-image-1` and `gpt-image-1.5` accept only `square`, `landscape_3_2` and `portrait_2_3`. For a specific shape such as `landscape_16_9` or `portrait_9_16`, choose a model that supports it rather than assuming the default does.
+Aspect-ratio support is model-dependent, and only `square` works on every model. `gpt-image-2` supports every value but the banners, and `nano-banana-2` every value but `portrait_9_21`; the banners need `nano-banana-2` or `nano-banana-2-lite`. The older `gpt-image-1`, `gpt-image-1-mini` and `gpt-image-1.5` accept only `square`, `landscape_3_2` and `portrait_2_3`. For a specific shape such as `landscape_16_9` or `portrait_9_16`, choose a model that supports it rather than assuming the default does.
+
+**`size`** is either a tier, `"0.5k"`, `"1k"`, `"2k"` or `"4k"`, a pixel class made at the pipe's `aspect_ratio`, or an exact `"WIDTHxHEIGHT"` in pixels. Left out, the picture is in the 1K class. **An exact size never sits beside `aspect_ratio` on the same pipe**: it implies its own ratio, and validation refuses the pair. **A shape the ratios above lack, such as a 4:5 feed picture or a 1.91:1 banner, takes an exact size**, never the nearest ratio, which would make it 3:4 or 16:9:
+
+```toml
+[pipe.make_feed_picture]
+type        = "PipeImgGen"
+description = "Make a 4:5 feed picture at 1088x1360"
+inputs      = { art_direction = "Text" }
+output      = "Image"
+prompt      = "$art_direction"
+size        = "1088x1360"
+```
+
+- **`gpt-image-2` takes any exact size within its caps**: both edges multiples of 16 and under 3840 pixels, the long edge at most three times the short one, and between 655,360 and 8,294,400 pixels in all, so `1200x624` makes the 1.91:1 banner. Of the tiers it takes `1k` and `2k`.
+- **The nano-banana models take an exact size only when it is a cell of their own grid**, such as `928x1152` for 4:5 on `nano-banana-2`, and refuse any other, naming the nearest cells. `nano-banana-2` and `nano-banana-pro` take the tiers `1k`, `2k` and `4k`; `nano-banana` and `nano-banana-2-lite` take `1k` alone.
+- **`gpt-image-1`, `gpt-image-1-mini` and `gpt-image-1.5` take only `1024x1024`, `1536x1024` and `1024x1536`**, and the tier `1k`. No model takes `0.5k` yet.
+
+A size the pipe's `model` cannot make is refused at validation; with `model` left out, the default model refuses it only when the step runs, before the picture is paid for. A larger picture costs more. **`size` is fixed per pipe**, so a method making pictures at several sizes has one `PipeImgGen` per size: a `PipeCondition` picks one from an input that names the format (`expression_template = "{{ brief.format }}"`, one outcome per format), or a `PipeParallel` makes them all.
+
+**`output_format`** is `png`, `jpeg` or `webp`, and only `gpt-image-1`, `gpt-image-1-mini` and `gpt-image-1.5` honour it. `gpt-image-2` ignores it without a word and returns PNG, and the nano-banana models return PNG and fail the run on any other value, so a method that needs lighter JPEG or WebP pictures names one of the older GPT models, with their three fixed sizes. There is no `quality` field: quality comes with the model reference, such as the preset `$gen-image-high-quality`.
 
 ### PipeDocGen — print a document file
 
