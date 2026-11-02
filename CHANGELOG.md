@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A picture asked at a channel's exact size comes out at that size**: the MTHDS reference taught `PipeImgGen` only through `aspect_ratio`, which has no 4:5 and no 1.91:1, so a method asked for a 4:5 feed picture or a 1.91:1 banner made it at 3:4 or 16:9. The reference now teaches `size`, a tier such as `2k` or an exact `WIDTHxHEIGHT` such as `1088x1360` that never sits beside `aspect_ratio`, which exact sizes each model takes (any size within `gpt-image-2`'s caps, only a cell of their grid on the nano-banana models, three fixed sizes on the older GPT models), and one pipe per size behind a `PipeCondition` for a method that needs several. It also teaches `output_format`, which only the older GPT models honour while `gpt-image-2` returns PNG whatever it says, and lists the banner aspect ratios that `nano-banana-2` and `nano-banana-2-lite` make.
+
 ## [0.20.0] - 2026-11-01
 
 ### Added
