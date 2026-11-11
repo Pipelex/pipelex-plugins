@@ -254,14 +254,28 @@ class TestPipelexInputsSkill:
         office = self.the_line(user_data, "**An Office file goes in as it is.**")
         assert "Pipelex's hosted platform reads a Word, Excel or PowerPoint file under a `Document` input" in office
         assert "leaves out the file's comments, hidden sheets and speaker notes" in office
+        assert "clips a cell's text where the next cell is filled" in office
         export = self.the_line(user_data, "**A runner with no document converter takes the PDF exported from it instead.**")
         assert "`input.file_type_unsupported`" in export
         assert '--outdir "$(mktemp -d)"' in export
         assert "never beside the method or the original" in export
         assert "in place of the original" in export
-        picture = self.the_line(user_data, "**A WebP, GIF or HEIC picture under a `Document` input goes in as a PNG.**")
+        picture = self.the_line(user_data, "**A HEIC, HEIF, WebP, GIF or SVG picture under a `Document` input goes in as a PNG.**")
         assert "never beside the method or the original" in picture
         assert "treat the PNG as the file selected for the input" in picture
+        assert "is known to take JPEG, PNG, BMP and TIFF pictures" in picture
+        assert "HEIF pictures" not in picture, "nobody has run a HEIF picture end to end, and a phone's HEIC one failed"
+        assert "a converter that rasterises it, ImageMagick or `rsvg-convert" in picture
+        images = self.the_line(user_data, "| image | `native.Image`")
+        assert "`.heic`, `.heif`" in images
+
+    def test_a_test_document_takes_the_originals_format(self) -> None:
+        """The factory makes a Word or Excel file when the user's originals are, so the test takes the route the
+        real files take; the hand-off to it says so rather than passing `pdf` for every `Document`."""
+        row = self.the_line(self.reference("synthetic.md"), "| `format` |")
+        assert "`docx` or `xlsx` when the user's originals are Word or Excel files" in row
+        assert "`pdf` for `native.Document`" not in row
+        assert "when the method asks for those" not in row
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_case_s_copies_are_made_only_when_the_calling_skill_asks(self, target_name: str) -> None:

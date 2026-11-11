@@ -335,7 +335,7 @@ class TestCapabilityMap:
             ),
             (
                 "A step that needs a PDF of an Office file reads one the platform converts, "
-                "which leaves out comments, hidden sheets and speaker notes.",
+                "which leaves out comments, hidden sheets and speaker notes and clips a cell's text where the next cell is filled.",
                 "It leaves out a Word document's comments, a workbook's hidden sheets and a presentation's speaker notes",
             ),
         ],

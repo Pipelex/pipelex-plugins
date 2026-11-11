@@ -29,7 +29,7 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 
 | Field | What to pass |
 |---|---|
-| `format` | `pdf` for `native.Document`, `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan`; `docx` / `xlsx` when the method asks for those |
+| `format` | For `native.Document`, `docx` or `xlsx` when the user's originals are Word or Excel files, so the test takes the route the real files take, and `pdf` otherwise; `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan` |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
 | `target` | `<tmp>/<input_variable>.<ext>`, `<tmp>` being a temporary directory made once for the preparation with `mktemp -d`; a list input's items go in a directory named after it, one index each (`<tmp>/<input_variable>/1.<ext>`), so an item never takes another input's name. For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>` |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |

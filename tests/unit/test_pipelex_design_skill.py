@@ -131,6 +131,10 @@ class TestPipelexDesignSkill:
         assert "**A conversion keeps the printed pages, and drops what does not print.**" in text
         assert "**A runner the user hosts converts only when its `[runtime.document_conversion]` names a converter**" in text
         assert "a WebP, a GIF or a phone's HEIC picture passes run setup and then fails the run at this step" in text
+        assert "the extraction is known to take a JPEG, PNG, BMP or TIFF picture" in text
+        assert "TIFF or HEIF picture" not in text, "HEIF is not verified end to end, and a phone's HEIC picture failed"
+        assert "clips a cell's text where the next cell is filled" in text
+        assert "| `page_views` | PDFs only" not in text
         assert "fails the run at this step with an extraction error" not in text
         assert "Any document (PDF, Word" not in text
         assert "a Word or PowerPoint file, the run fails when it reaches the render" not in text

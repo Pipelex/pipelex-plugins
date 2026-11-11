@@ -17,7 +17,7 @@ The newest come first. While nothing fits and `next_cursor` is not null, ask for
 
 - **One file is plainly the one the user named**: take it, and say which in one line, with its name, format and date.
 - **Several could be, or the user named none**: show them, each with its name, format, date and where it came from, and ask which; never pick one on a guess, since a run on the wrong file spends credit for nothing.
-- **The match is in a format the input cannot read**, such as a Word, Excel or PowerPoint file under an `Image` input, which takes a picture, or a WebP, GIF or HEIC picture under a `Document` input, which extraction refuses: the file cannot fill the input as it is. Never pass its address: say so, and ask the user for the file in a format the input reads. An Office file under a `Document` input is passed by its address like any other, since the hosted platform reads it.
+- **The match is in a format the input cannot read**, such as a Word, Excel or PowerPoint file under an `Image` input, which takes a picture, or a HEIC, HEIF, WebP, GIF or SVG picture under a `Document` input, which the extraction is not known to read: the file cannot fill the input as it is. Never pass its address: say so, and ask the user for the file in a format the input reads. An Office file under a `Document` input is passed by its address like any other, since the hosted platform reads it.
 - **None fits**: say that the team's files hold no match, and ask for the file as the skill would have.
 
 ## Pass its address

@@ -12,7 +12,7 @@ Each row names the pipe that does it, whose section of the MTHDS reference is th
 
 | In the builder's terms | Pipe | What to say with it |
 |---|---|---|
-| Read a document or an image | `PipeExtract` | It reads a PDF, an image or a web page, and on the hosted platform a Word, Excel or PowerPoint file too. A step that needs a PDF of an Office file reads one the platform converts, which leaves out comments, hidden sheets and speaker notes. |
+| Read a document or an image | `PipeExtract` | It reads a PDF, an image or a web page, and on the hosted platform a Word, Excel or PowerPoint file too. A step that needs a PDF of an Office file reads one the platform converts, which leaves out comments, hidden sheets and speaker notes and clips a cell's text where the next cell is filled. |
 | Read a web page | `PipeExtract` | A web page is a `Document` holding the page's URL, read with the `@default-extract-web-page` model. |
 | Understand, decide, extract fields, write | `PipeLLM` | It reads text and images and produces text or structured fields that the method defines. |
 | Search the web | `PipeSearch` | It returns an answer with its sources: a title, a URL and a snippet for each. |
