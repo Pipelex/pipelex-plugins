@@ -276,12 +276,23 @@ class TestPipelexInputsSkill:
         assert "`.heic`, `.heif`" in images
 
     def test_a_test_document_takes_the_originals_format(self) -> None:
-        """The factory makes a Word, Excel or PowerPoint file when the user's originals are, so the test takes the route the
-        real files take; the hand-off to it says so rather than passing `pdf` for every `Document`."""
-        row = self.the_line(self.reference("synthetic.md"), "| `format` |")
-        assert "`docx`, `xlsx` or `pptx` when the user's originals are Word, Excel or PowerPoint files" in row
+        """The factory makes a `.docx`, `.xlsx` or `.pptx` file when the user's originals are one, so the test takes the
+        route the real files take; the hand-off to it says so rather than passing `pdf` for every `Document`. A legacy or
+        OpenDocument original is read as the PDF the platform converts it to, so its fixture is a `pdf`, unless `soffice`
+        can turn a modern counterpart into the original's format, which takes the conversion route too."""
+        text = self.reference("synthetic.md")
+        row = self.the_line(text, "| `format` |")
+        assert "`docx`, `xlsx` or `pptx` when the user's originals are `.docx`, `.xlsx` or `.pptx` files" in row
+        assert "`pdf` when they are legacy or OpenDocument files (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`)" in row
+        assert "the test exercises the reader but not the conversion's losses" in row
+        assert "originals are Word, Excel or PowerPoint files" not in row, "a legacy original would get a modern fixture"
         assert "`pdf` for `native.Document`" not in row
         assert "when the method asks for those" not in row
+        conversion = self.the_line(text, "**A legacy or OpenDocument original can take its own route too.**")
+        assert "Outside a case's copies, where `soffice` is on PATH" in conversion
+        assert 'soffice --headless --convert-to odt --outdir "$(mktemp -d)" <file>' in conversion
+        assert "never rename a file to change its format" in conversion
+        assert "Without `soffice`, ask for the `pdf`." in conversion
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_case_s_copies_are_made_only_when_the_calling_skill_asks(self, target_name: str) -> None:
