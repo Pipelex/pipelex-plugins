@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex-synthetic-inputs` makes PowerPoint decks**: a `pptx` format, rendered with `python-pptx` (MIT), gives slides with titles, body text, a table and speaker notes when the brief needs them, so a method whose users send decks is tested on a deck.
+
+### Changed
+
+- **The skills send a Word, Excel or PowerPoint file as it is**: Pipelex's hosted platform now reads Office files, so `pipelex-inputs` uploads one like any other file instead of exporting it to PDF with LibreOffice first, and `pipelex-inputs` has `pipelex-synthetic-inputs` make a `.docx`, `.xlsx` or `.pptx` test file when your originals are one, and a PDF when they are legacy or OpenDocument files (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`), since the platform reads those as the PDF it converts them to; where LibreOffice is installed, `pipelex-inputs` may instead turn a generated Word, Excel or PowerPoint file into the original's format, so the test takes the conversion route too. The MTHDS reference now says that the hosted extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, losing the text inside its pictures and an Excel sheet's table structure, and that a step needing a PDF, one asking for page views or a `PipeLLM` whose model reads PDFs, reads a PDF the platform converts, which leaves out comments, hidden sheets and speaker notes, shows a tracked change's two versions side by side and clips a cell's text where the next cell is filled, so a method picks the route that keeps what it needs. The PDF export stays for a runner you host without a document converter, which refuses the file with `input.file_type_unsupported`.
+
+### Fixed
+
+- **A HEIC, HEIF, WebP, GIF or SVG picture under a `Document` input goes in as a PNG**: the skills said extraction reads any image, but the hosted extraction is known to take only JPEG, PNG, BMP and TIFF pictures, and refuses a WebP, a GIF or a phone's HEIC picture once the run has started, so `pipelex-inputs` now converts such a picture to PNG in a temporary directory, or asks you for one, and the MTHDS reference names the pictures extraction is known to take. The skills also no longer say that an Office file fails a run at its first step.
+
 ## [0.20.1] - 2026-11-02
 
 ### Fixed

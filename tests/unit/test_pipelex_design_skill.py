@@ -120,11 +120,22 @@ class TestPipelexDesignSkill:
         scaffold = self.reference("re-entry.md").split("## 3. ", 1)[1].split("\n## ", 1)[0]
         assert "only after reading the stepwise reference the skill points at for this branch" in scaffold
 
-    def test_the_authoring_reference_says_extraction_reads_no_office_format(self) -> None:
-        """A Word file passes validation and preparation and then fails the run at the extraction; the proof lab
-        (L-260923-9d0b53) designed a method over Word transcripts because the reference said `Document` covers Word."""
-        text = self.LANGUAGE_REFERENCE_TEMPLATE.read_text(encoding="utf-8")
-        assert "**It reads a PDF, an image or a web page, and nothing else.**" in text
+    def test_the_authoring_reference_says_which_route_an_office_file_takes(self) -> None:
+        """The hosted plane reads Office files: its extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, and a step
+        that needs a PDF reads the platform's conversion, which drops what does not print. The reference names both
+        routes and their losses, so a design picks the one that keeps what the method needs, and keeps the PDF export
+        for a runner without a converter. It no longer says an Office file fails the run at its first step."""
+        text = " ".join(self.LANGUAGE_REFERENCE_TEMPLATE.read_text(encoding="utf-8").split())
+        assert "**It reads a PDF, an image, a web page and, on Pipelex's hosted platform, a Word, Excel or PowerPoint file.**" in text
+        assert "loses the text inside pictures embedded in the file and the table structure of an Excel sheet" in text
+        assert "**A conversion keeps the printed pages, and drops what does not print.**" in text
+        assert "**A runner the user hosts converts only when its `[runtime.document_conversion]` names a converter**" in text
+        assert "a WebP, a GIF or a phone's HEIC picture passes run setup and then fails the run at this step" in text
+        assert "the extraction is known to take a JPEG, PNG, BMP or TIFF picture" in text
+        assert "TIFF or HEIF picture" not in text, "HEIF is not verified end to end, and a phone's HEIC picture failed"
+        assert "clips a cell's text where the next cell is filled" in text
+        assert "| `page_views` | PDFs only" not in text
+        assert "fails the run at this step with an extraction error" not in text
         assert "Any document (PDF, Word" not in text
         assert "a Word or PowerPoint file, the run fails when it reaches the render" not in text
 
