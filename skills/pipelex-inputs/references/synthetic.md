@@ -25,11 +25,11 @@ A list input (`Type[]` or `Type[N]`) arrives wrapped in a list: generate several
 
 ## A file input
 
-When an input needs an actual file — `native.Image`, `native.Document`, a Word or Excel file — the skill does not make it. The `pipelex-synthetic-inputs` skill renders PDFs, PNGs and Office files from code and installs the Python packages it needs on its own; a photograph it generates through the workshop, which spends a little credit. Hand it one request per file:
+When an input needs an actual file — `native.Image`, `native.Document`, a Word, Excel or PowerPoint file — the skill does not make it. The `pipelex-synthetic-inputs` skill renders PDFs, PNGs and Office files from code and installs the Python packages it needs on its own; a photograph it generates through the workshop, which spends a little credit. Hand it one request per file:
 
 | Field | What to pass |
 |---|---|
-| `format` | For `native.Document`, `docx` or `xlsx` when the user's originals are Word or Excel files, so the test takes the route the real files take, and `pdf` otherwise; `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan` |
+| `format` | For `native.Document`, `docx`, `xlsx` or `pptx` when the user's originals are Word, Excel or PowerPoint files, so the test takes the route the real files take, and `pdf` otherwise; `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan` |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
 | `target` | `<tmp>/<input_variable>.<ext>`, `<tmp>` being a temporary directory made once for the preparation with `mktemp -d`; a list input's items go in a directory named after it, one index each (`<tmp>/<input_variable>/1.<ext>`), so an item never takes another input's name. For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>` |
 | `constraints` | whatever the input's description pins: page count, pixel size, language |

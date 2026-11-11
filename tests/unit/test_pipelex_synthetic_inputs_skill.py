@@ -135,11 +135,14 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "read the plan back out of each photograph" in text
 
     def test_a_document_is_made_in_the_originals_office_format(self) -> None:
-        """The hosted plane reads Word and Excel files under a `Document` input, extracting the original and converting
+        """The hosted plane reads Word, Excel and PowerPoint files under a `Document` input, extracting the original and converting
         it to PDF where a step needs one, so a test file in the originals' format exercises the route the user's own
         files take, where a PDF the user would export skipped it."""
-        rule = self.the_line(self.render("prod"), "A `Document` whose originals are Word or Excel files")
-        assert "is a `docx` or `xlsx` like them, since Pipelex's hosted platform reads both" in rule
+        body = self.render("prod")
+        rule = self.the_line(body, "A `Document` whose originals are Word, Excel or PowerPoint files")
+        assert "is a `docx`, `xlsx` or `pptx` like them, since Pipelex's hosted platform reads all three" in rule
+        assert "`docx` → `python-docx`; `xlsx` → `openpyxl`; `pptx` → `python-pptx`." in body
+        assert "`python-pptx` (MIT)" in body
         assert "a `pdf` when the caller asks for one" in rule
 
     @pytest.mark.parametrize("target_name", TARGETS)

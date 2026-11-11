@@ -58,6 +58,7 @@ TEMPLATE_PLACEHOLDER = "<name>"
 EXPECTED_RECIPES = {
     ("office.md", "Word documents (DOCX)"),
     ("office.md", "Spreadsheets (XLSX)"),
+    ("office.md", "Presentations (PPTX)"),
     ("pdf.md", "Basic PDF (canvas)"),
     ("pdf.md", "Multi-page PDF (Platypus)"),
     ("pdf.md", "Table report (Platypus)"),
@@ -75,12 +76,13 @@ MAGIC_BY_SUFFIX = {
     ".png": b"\x89PNG",
     ".docx": b"PK",
     ".xlsx": b"PK",
+    ".pptx": b"PK",
 }
 
 # `PK` is two bytes any zip satisfies, including one holding no document at all.
 # The Office formats get the same depth of check as the others: name the part
 # that makes the package a document.
-REQUIRED_ZIP_MEMBER = {".docx": "word/document.xml", ".xlsx": "xl/workbook.xml"}
+REQUIRED_ZIP_MEMBER = {".docx": "word/document.xml", ".xlsx": "xl/workbook.xml", ".pptx": "ppt/presentation.xml"}
 
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
 HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
@@ -293,7 +295,7 @@ class TestRecipes:
         assert sets_line is not None, "Step 2 no longer states its package sets by format"
 
         by_format = {fmt: set(packages.split()) for fmt, packages in PACKAGE_SET_ENTRY.findall(sets_line.group(1))}
-        assert set(by_format) == {"pdf", "png", "docx", "xlsx"}, f"the package-set mapping no longer covers every format: {sorted(by_format)}"
+        assert set(by_format) == {"pdf", "png", "docx", "xlsx", "pptx"}, f"the package-set mapping no longer covers every format: {sorted(by_format)}"
 
         documented = {package for packages in by_format.values() for package in packages}
         used = {package for recipe in RECIPES for package in recipe.packages}

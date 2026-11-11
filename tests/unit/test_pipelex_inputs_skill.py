@@ -276,10 +276,10 @@ class TestPipelexInputsSkill:
         assert "`.heic`, `.heif`" in images
 
     def test_a_test_document_takes_the_originals_format(self) -> None:
-        """The factory makes a Word or Excel file when the user's originals are, so the test takes the route the
+        """The factory makes a Word, Excel or PowerPoint file when the user's originals are, so the test takes the route the
         real files take; the hand-off to it says so rather than passing `pdf` for every `Document`."""
         row = self.the_line(self.reference("synthetic.md"), "| `format` |")
-        assert "`docx` or `xlsx` when the user's originals are Word or Excel files" in row
+        assert "`docx`, `xlsx` or `pptx` when the user's originals are Word, Excel or PowerPoint files" in row
         assert "`pdf` for `native.Document`" not in row
         assert "when the method asks for those" not in row
 

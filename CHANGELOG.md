@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`pipelex-synthetic-inputs` makes PowerPoint decks**: a `pptx` format, rendered with `python-pptx` (MIT), gives slides with titles, body text, a table and speaker notes when the brief needs them, so a method whose users send decks is tested on a deck.
+
 ### Changed
 
-- **The skills send a Word, Excel or PowerPoint file as it is**: Pipelex's hosted platform now reads Office files, so `pipelex-inputs` uploads one like any other file instead of exporting it to PDF with LibreOffice first, and `pipelex-inputs` has `pipelex-synthetic-inputs` make a Word or Excel test file when your originals are. The MTHDS reference now says that the hosted extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, losing the text inside its pictures and an Excel sheet's table structure, and that a step needing a PDF, one asking for page views or a `PipeLLM` whose model reads PDFs, reads a PDF the platform converts, which leaves out comments, hidden sheets and speaker notes, shows a tracked change's two versions side by side and clips a cell's text where the next cell is filled, so a method picks the route that keeps what it needs. The PDF export stays for a runner you host without a document converter, which refuses the file with `input.file_type_unsupported`.
+- **The skills send a Word, Excel or PowerPoint file as it is**: Pipelex's hosted platform now reads Office files, so `pipelex-inputs` uploads one like any other file instead of exporting it to PDF with LibreOffice first, and `pipelex-inputs` has `pipelex-synthetic-inputs` make a Word, Excel or PowerPoint test file when your originals are. The MTHDS reference now says that the hosted extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, losing the text inside its pictures and an Excel sheet's table structure, and that a step needing a PDF, one asking for page views or a `PipeLLM` whose model reads PDFs, reads a PDF the platform converts, which leaves out comments, hidden sheets and speaker notes, shows a tracked change's two versions side by side and clips a cell's text where the next cell is filled, so a method picks the route that keeps what it needs. The PDF export stays for a runner you host without a document converter, which refuses the file with `input.file_type_unsupported`.
 
 ### Fixed
 
