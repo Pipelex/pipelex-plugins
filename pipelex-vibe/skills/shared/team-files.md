@@ -7,7 +7,7 @@ Read this when a file input of the method, an `Image` or a `Document`, alone or 
 Call `mthds_list_files`: it reads no file's content and spends no credit. Narrow it with what you know:
 
 - `query`: a word or two of the file's name, from the user's words or the input's (`invoice`), at most 200 characters; leave it out when there is nothing to search by.
-- `format`: `image` for an `Image` input and `pdf` for a `Document` one, or the extension the user named.
+- `format`: a list of lowercase extensions, every picture being `"image"`. For an `Image` input, `["image"]`. For a `Document` one, the document formats it takes, `["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt", "odt", "ods", "odp"]`, with `"image"` added when a picture is a fit for the input, such as a scan or a photo of a page. When the user named an extension, that one alone.
 - `kind`: only when the user said what made the file, `uploaded` for a member's upload, `generated` for a run's output, `test` for a test file made for a method.
 - `method_id`: a saved method's bare id, never `mt_…@draft` or `mt_…@<n>`, for that method's files, its test files and its runs' outputs.
 
