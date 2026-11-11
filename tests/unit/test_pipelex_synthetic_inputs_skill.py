@@ -134,11 +134,13 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "**A room seen from two places keeps its materials and loses its walls.**" in text
         assert "read the plan back out of each photograph" in text
 
-    def test_a_document_a_method_extracts_is_made_as_a_pdf(self) -> None:
-        """Extraction on the hosted plane reads no Office format, and the proof lab (L-260923-9d0b53) saw a Word
-        transcript made for a method that extracts it fail the run at its first step."""
-        rule = self.the_line(self.render("prod"), "A `Document` a method extracts is a `pdf`")
-        assert "even when the user's originals are Word or Excel files" in rule
+    def test_a_document_is_made_in_the_originals_office_format(self) -> None:
+        """The hosted plane reads Word and Excel files under a `Document` input, extracting the original and converting
+        it to PDF where a step needs one, so a test file in the originals' format exercises the route the user's own
+        files take, where a PDF the user would export skipped it."""
+        rule = self.the_line(self.render("prod"), "A `Document` whose originals are Word or Excel files")
+        assert "is a `docx` or `xlsx` like them, since Pipelex's hosted platform reads both" in rule
+        assert "a `pdf` when the caller asks for one" in rule
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_way_out_without_a_file_hands_back_no_path(self, target_name: str) -> None:

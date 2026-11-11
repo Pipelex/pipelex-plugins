@@ -198,7 +198,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "**Offer the run, never start it**",
         "never call a run tool here",
         "no calling skill asked to stop at run-ready",
-        "**An Office file's PDF export, made at matching, is the one exception**",
+        "**A copy converted at matching, as user-data.md says, is the one exception**",
         "**every input the template asked for is filled**",
         "Never fabricate a value or abandon `inputs.json`",
     ),

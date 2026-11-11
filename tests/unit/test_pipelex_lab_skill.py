@@ -326,19 +326,23 @@ class TestCapabilityMap:
             name = pipe.strip("`")
             assert f"\n### {name} — " in reference, f"fit.md's {name} row names a pipe the MTHDS reference does not document"
 
-    OFFICE_LIMIT = (
-        "Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them."
-    )
-
     @pytest.mark.parametrize(
         ("claim", "anchor"),
         [
-            ("It reads a PDF, an image or a web page, and nothing else.", "`PipeExtract` reads a PDF, an image or a web page, and nothing else"),
-            (f"A {OFFICE_LIMIT}", f"a {OFFICE_LIMIT}"),
+            (
+                "It reads a PDF, an image or a web page, and on the hosted platform a Word, Excel or PowerPoint file too.",
+                "It reads a PDF, an image, a web page and, on Pipelex's hosted platform, a Word, Excel or PowerPoint file.",
+            ),
+            (
+                "A step that needs a PDF of an Office file reads one the platform converts, "
+                "which leaves out comments, hidden sheets and speaker notes.",
+                "It leaves out a Word document's comments, a workbook's hidden sheets and a presentation's speaker notes",
+            ),
         ],
     )
     def test_the_extraction_limit_is_the_references_own(self, claim: str, anchor: str) -> None:
-        """The limit that failed a proof-lab run, said in the words the shared reference uses."""
+        """What extraction reads, and what the platform's conversion of an Office file drops, said where the shared
+        reference says it, so the capability map cannot claim more than the reference teaches."""
         reference = " ".join(self.MTHDS_REFERENCE.read_text(encoding="utf-8").split())
         assert anchor in reference, f"the MTHDS reference no longer says {anchor!r}"
         assert any(claim in row[2] for row in self.rows()), f"fit.md no longer says {claim!r}"

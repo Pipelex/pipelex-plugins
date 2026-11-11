@@ -150,8 +150,8 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 | `Text` | A string. |
 | `Markdown` | A text written in Markdown, which refines `Text` (`text`, the source). Declare an LLM's output `Markdown` when the text is to be read formatted, in a PDF or an HTML page: a `Text` prints its `#` and `**` as they are. A `Markdown` value goes wherever a `Text` does, never the reverse. |
 | `Image` | A binary image (JPEG, PNG, ...). |
-| `Document` | A document file or a web page URL, and the file a `PipeDocGen` prints. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them. See its section before designing over Office files. |
-| `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF). |
+| `Document` | A document file or a web page URL, and the file a `PipeDocGen` prints. A Word, Excel or PowerPoint file is a `Document` too: on Pipelex's hosted platform, `PipeExtract` reads a `.docx`, `.xlsx` or `.pptx` as it is, and a step that needs a PDF reads one the platform converts, which leaves some of the file out. See `PipeExtract`'s section before designing over Office files. |
+| `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF, or on an Office file the hosted platform converts). |
 | `Html` | HTML content. |
 | `TextAndImages` | Mixed text + images. |
 | `Number` | A numeric value. |
@@ -537,7 +537,17 @@ When the target field expects a content object (a concept-typed field), the obje
 
 ### PipeExtract — extract pages from a Document or Image
 
-**It reads a PDF, an image or a web page, and nothing else.** A Word, Excel or PowerPoint file passes validation and preparation, then fails the run at this step with an extraction error naming the formats it accepts. When the user's files are Office documents, say so at the contract and design for the PDF they export from them (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed): the input stays a `Document`, its description says PDF, and the test inputs are PDFs too.
+**It reads a PDF, an image, a web page and, on Pipelex's hosted platform, a Word, Excel or PowerPoint file.** There, the default extraction model, Azure Document Intelligence, takes a JPEG, PNG, BMP, TIFF or HEIF picture: a WebP, a GIF or a phone's HEIC picture passes run setup and then fails the run at this step, so such a picture goes in converted to PNG or JPEG.
+
+**An Office file is read as it is, or as its PDF.** On the hosted platform, the extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, and loses the text inside pictures embedded in the file and the table structure of an Excel sheet. A step reads a PDF the platform converts from the file instead when it sets `page_views = true`, since page views are drawn from a PDF and the extraction then reads that same PDF, and when the file is a legacy (`.doc`, `.xls`, `.ppt`) or OpenDocument (`.odt`, `.ods`, `.odp`) file, which the extraction does not read. A `PipeLLM` whose prompt names the file reads that PDF too, when its model reads PDFs. The run keeps the original as its input and value; only the model reads the PDF.
+
+**A conversion keeps the printed pages, and drops what does not print.** It leaves out a Word document's comments, a workbook's hidden sheets and a presentation's speaker notes, shows a tracked change's deleted and inserted text side by side as if both were current, and cuts a sheet or a chart wider than a page across several pages. Everything else reaches the page, pictures included. So choose the route at the contract, and say it there when the user's files are Office documents:
+
+- **The text of a document, and the tables of a Word or PowerPoint file**: extract it as it is, with no page views.
+- **Pages to show or to send to a vision model, the text inside a file's pictures, or a sheet's table structure**: set `page_views = true`, which reads the PDF, and say what the conversion drops.
+- **What a conversion drops** (comments, hidden sheets, speaker notes, which side of a tracked change is current): no route is known to read it. Extracting the original is the only one that skips the conversion, and whether it reads those parts is not established, so tell the user, and check the extracted pages on a test file before the method relies on them.
+
+The input stays a `Document`, its description names the formats the user's files come in, and the test inputs can be the Office files themselves. **A runner the user hosts converts only when its `[runtime.document_conversion]` names a converter**, Gotenberg or `soffice`. Without one, which is its default, it refuses an Office file that a step could read only as a PDF with `input.file_type_unsupported`, before the run starts or, for a step only a condition reaches, at that step; the method then takes the PDF exported from the file (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed), and its test inputs are PDFs.
 
 ```toml
 [pipe.extract_document]
@@ -546,7 +556,7 @@ description = "Extract content from a document"
 inputs      = { document = "Document" }
 output      = "Page[]"
 # model               = "@default-text-from-pdf"  # optional
-# page_views          = true                      # optional, PDFs only: fills each Page's page_view
+# page_views          = true                      # optional, PDFs and Office files: fills each Page's page_view
 # page_views_dpi      = 150                       # optional, with page_views
 # max_page_images     = 0                         # optional: 0 keeps no embedded images
 # page_image_captions = true                      # optional, caption-capable models only
@@ -563,7 +573,7 @@ output      = "Page[]"
 | Field | What it does |
 |-------|--------------|
 | `model` | Which extraction model to use, e.g. `"@default-text-from-pdf"` or `"@default-extract-web-page"`. |
-| `page_views` | PDFs only: renders every page as an image and puts it in that `Page`'s `page_view`. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, the run fails when it reaches the render, after the extraction has been paid for. |
+| `page_views` | PDFs only, an Office file's being its PDF on the hosted platform (above): renders every page as an image and puts it in that `Page`'s `page_view`. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, the run fails when it reaches the render, after the extraction has been paid for. |
 | `page_views_dpi` | Resolution of those renders; omitted, the runtime's `default_page_views_dpi` applies (72 unless configured otherwise). Only has an effect alongside `page_views = true`. |
 | `max_page_images` | How many of the images embedded in the pages the extraction keeps: `0` keeps none, and a positive `N` caps them — per page on some models, across the whole document on others. Omitted, the model preset's own limit applies; the default models have none, so every image is kept. |
 | `page_image_captions` | Requires a model that captions the images it pulls out: on any other, the run fails with a capability error. It does not switch captioning on — a caption-capable model returns its captions whether or not this is set — so it only guards a method that depends on captions against the wrong model. |
@@ -572,7 +582,7 @@ output      = "Page[]"
 
 **With an `Image` input**, `page_views` and `page_image_captions` cannot be turned on, and `page_views_dpi` and `max_page_images` cannot be set at all: they describe a document's pages, and validation rejects them on an image.
 
-**A web page is read only with `model = "@default-extract-web-page"`.** Its input is still a `Document`, the page's URL in the `url` field, but the default extraction model reads PDFs and images: given a web page, it fails the run at this step with `Could not identify file type of given bytes`, after validation has passed. A URL to a PDF is a PDF, which the default reads.
+**A web page is read only with `model = "@default-extract-web-page"`.** Its input is still a `Document`, the page's URL in the `url` field, but the default extraction model reads files, not web pages: given a web page, it fails the run at this step with `Could not identify file type of given bytes`, after validation has passed. A URL to a PDF is a PDF, which the default reads.
 
 ### PipeSearch — search the web
 
