@@ -590,6 +590,10 @@ output      = "Page[]"
 **Given a spreadsheet `Document`, it reads one table into a list of records, one per data row, and calls no model.** The file is an Excel workbook (`.xlsx`) or a CSV file, judged from its bytes, then its media type, then its name; any other format, a legacy `.xls` or an `.ods` included, is refused with `input.file_type_unsupported`.
 
 ```toml
+[concept.ExpenseWorkbook]
+description = "An expense workbook holding an Expenses Table"
+refines     = "Document"
+
 [concept.ExpenseRow]
 description = "One row of an expense workbook"
 
@@ -761,6 +765,13 @@ A dry run composes the document for real against mock inputs, which checks the t
 **`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches.
 
 ```toml
+[concept.ExpenseCompletion]
+description = "The category found for one expense, keyed by its invoice number"
+
+[concept.ExpenseCompletion.structure]
+invoice_number = { type = "text", description = "The invoice number, copied from the row", required = true }
+category       = { type = "text", description = "The expense category found" }
+
 [pipe.append_expenses]
 type           = "PipeDocGen"
 description    = "Add the extracted expenses to the caller's expense workbook"
@@ -781,7 +792,7 @@ table_fill     = "update"
 match_on       = ["invoice_number"]
 ```
 
-`ExpenseWorkbook` refines `Document`. Under `update`:
+`ExpenseWorkbook` and `ExpenseRow` are the concepts the `PipeStructure` example declares. Under `update`:
 
 - **A record finds its row by exactly one of two ways.** `match_on` names the fields whose columns are the Table's key; `match_row = "row"` names the field holding the row's position among the Table's data rows, an integer or number field filled by the `row_field` of the `PipeStructure` that read the Table (section 6, `PipeStructure`). **The key or the position travels unchanged, never produced by a model**: a `PipeBatch` over the rows keeps the order, and the record is assembled by a `PipeCompose` construct taking `row = { from = "expense.row" }` beside what the model found. At least one list input must carry the matching fields, or the method is refused when it loads.
 - **A null leaves its cell as it was**: it means the method produced nothing for that cell, the opposite of `replace` and `append`, where a null empties the cell.
@@ -808,7 +819,7 @@ match_on       = ["invoice_number"]
 
 **The catalog stores no template file yet**: `mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template file does not load by its id, while its directory still validates and runs as `method_dir`. A `template_input` step names no template file: its template is a run input, so nothing travels with the bundle for it.
 
-**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, a problem item located at the step's pipe (`location.pipe`) whose `params` carry `template_file`, the file as the step names it, and `template_location`, where in the file, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
+**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, a problem item located at the step's pipe (`location.pipe`) whose `params` carry `template`, the file as the step names it, and `finding`, what the check found and, when it says, where in the file, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict. **A `template_input` step's warning is the exception**: its `template` names the input, such as `the input 'workbook'`, and its `finding` says the template is checked when a run supplies it. Every valid verdict of such a step carries it, so no skill fixes it, asks about it or reports it as a finding; at most, say that the caller's file is checked when the run starts.
 
 ### PipeFunc — call a Python function of the method's folder
 
