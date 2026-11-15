@@ -18,7 +18,7 @@ Collect every file the user has provided as a sample input: explicit paths, fold
 | `.txt` | plain text | `native.Text`, the file's content read in |
 | `.md` | Markdown text | `native.Markdown` or `native.Text`, whichever the input declares, the file's content read in |
 | `.json` | JSON data | `native.JSON` or a custom structured concept |
-| `.csv` | CSV data | `native.Text` read as text, or `native.JSON` parsed into objects |
+| `.csv` | CSV data | `native.Text` read as text, `native.JSON` parsed into objects, or, for a `Document` input such as a spreadsheet a `PipeStructure` reads, `native.Document` as it is |
 | `.html`, `.htm` | HTML | `native.Html` |
 | `http://…`, `https://…` | web page URL | `native.Document` |
 

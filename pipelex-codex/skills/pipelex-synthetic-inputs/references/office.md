@@ -46,8 +46,8 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 **If an `xlsx` skill is available:**
 
 ```
-Use the /xlsx skill to create a spreadsheet with the following data:
-[Describe columns, rows, and sample data]
+Use the /xlsx skill to create a spreadsheet with the following data, formatted as an Excel Table:
+[Describe columns, rows, and sample data, and the Table's name when the method names one]
 Save to: <target>
 ```
 
@@ -59,6 +59,7 @@ import os
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.worksheet.table import Table
 
 OUT = "<target_dir>/test_spreadsheet.xlsx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
@@ -72,13 +73,16 @@ ws.title = "Data"
 ws.append(["Column1", "Column2"])
 ws.append(["Value1", "Value2"])
 # Add more rows as needed: ws.append([...]); a second sheet: wb.create_sheet("Summary")
+# The rows as an Excel Table, which a method reading them with PipeStructure or filling a Table needs;
+# name it as the method's `table` does.
+ws.add_table(Table(displayName="DataTable", ref=ws.dimensions))
 wb.save(PART)
 os.replace(PART, OUT)
 print("wrote", OUT)
 PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "from openpyxl import load_workbook; wb = load_workbook('<target>'); ws = wb.active; print(ws.title, ws.dimensions)"`.
+Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "from openpyxl import load_workbook; wb = load_workbook('<target>'); ws = wb.active; print(ws.title, ws.dimensions, list(ws.tables))"`.
 
 
 ## Presentations (PPTX)
