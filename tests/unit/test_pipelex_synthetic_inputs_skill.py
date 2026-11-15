@@ -134,11 +134,20 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "**A room seen from two places keeps its materials and loses its walls.**" in text
         assert "read the plan back out of each photograph" in text
 
-    def test_a_document_a_method_extracts_is_made_as_a_pdf(self) -> None:
-        """Extraction on the hosted plane reads no Office format, and the proof lab (L-260923-9d0b53) saw a Word
-        transcript made for a method that extracts it fail the run at its first step."""
-        rule = self.the_line(self.render("prod"), "A `Document` a method extracts is a `pdf`")
-        assert "even when the user's originals are Word or Excel files" in rule
+    def test_a_document_is_made_in_the_originals_office_format(self) -> None:
+        """The hosted plane reads a `.docx`, `.xlsx` or `.pptx` under a `Document` input as it is, so a test file in that
+        format exercises the route the user's own files take, where a PDF the user would export skipped it. A legacy or
+        OpenDocument file is read as the PDF the platform converts it to, since the extractors and models that read Office
+        files read only the modern formats, so its test file is a `pdf`, which exercises the reader but not the
+        conversion's losses."""
+        body = self.render("prod")
+        rule = self.the_line(body, "A `Document` whose originals are `.docx`, `.xlsx` or `.pptx` files")
+        assert "is one like them, or a `pdf` when the caller asks." in rule
+        assert "A legacy or OpenDocument original (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`) gets a `pdf`" in rule
+        assert "the test exercises the reader, not the conversion's losses." in rule
+        assert "Word, Excel or PowerPoint files is a `docx`" not in rule, "a legacy original would get a modern fixture"
+        assert "`docx` → `python-docx`; `xlsx` → `openpyxl`; `pptx` → `python-pptx`." in body
+        assert "`python-pptx` (MIT)" in body
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_every_way_out_without_a_file_hands_back_no_path(self, target_name: str) -> None:

@@ -26,7 +26,7 @@ A path never goes into an input name: an input is a plain name holding one whole
 | `Document` | DocumentContent | `url`, `public_url`, `filename`, `mime_type`, `title`, `snippet` |
 | `Html` | HtmlContent | `inner_html`, `css_class` |
 | `TextAndImages` | TextAndImagesContent | `text` (TextContent), `images` (list of ImageContent), `raw_html` (str) |
-| `Page` | PageContent | `text_and_images` (TextAndImagesContent), `page_view` (ImageContent, only with `page_views = true` on a PDF) |
+| `Page` | PageContent | `text_and_images` (TextAndImagesContent), `page_view` (ImageContent, only with `page_views = true` on a PDF, or on an Office file the hosted platform converts to PDF) |
 | `JSON` | JSONContent | `json_obj` |
 | `SearchResult` | SearchResultContent | `answer`, `sources` (list of DocumentContent) |
 | `Anything` | *(any content)* | depends on actual content |
@@ -164,7 +164,7 @@ A position on an ordered scale of described levels.
 | `title` | `str \| None` | no | Title of the document or source |
 | `snippet` | `str \| None` | no | Text snippet or excerpt from the document |
 
-**Access**: `$document.filename`, `$document.url` in prompts. A PipeLLM whose prompt names the document (`@document` or `$document`) sends it to its model, which must read the document's format; for a model that does not, extract it first with PipeExtract, which gives `Page[]`. A document the run is given is checked before the run starts, when it is certain to reach that step. A document made during the run, such as the file a PipeDocGen prints, or one that reaches the step only through a condition or a step that may be skipped, is refused only when that step runs, after the steps before it may have spent credit, so make sure, when writing the method, that the step's model reads that format. For web page URLs, use PipeExtract with the `@default-extract-web-page` model.
+**Access**: `$document.filename`, `$document.url` in prompts. A PipeLLM whose prompt names the document (`@document` or `$document`) sends it to its model, which must read the document's format; for a model that does not, extract it first with PipeExtract, which gives `Page[]`. On Pipelex's hosted platform, a Word, Excel or PowerPoint file reaches a model that reads PDFs as a PDF the platform converts from it, which leaves out its comments, hidden sheets and speaker notes and clips a cell's text where the next cell is filled, as the MTHDS reference's `PipeExtract` section says. A document the run is given is checked before the run starts, when it is certain to reach that step. A document made during the run, such as the file a PipeDocGen prints, or one that reaches the step only through a condition or a step that may be skipped, is refused only when that step runs, after the steps before it may have spent credit, so make sure, when writing the method, that the step's model reads that format. For web page URLs, use PipeExtract with the `@default-extract-web-page` model.
 
 **Produced by PipeDocGen**, whose output is the file it printed: a PDF, an Excel workbook, a Word document or a PowerPoint deck, its `filename` carrying the suffix.
 
@@ -202,7 +202,7 @@ Represents a single page extracted from a document. Produced by PipeExtract when
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `text_and_images` | `TextAndImagesContent` | yes | The text and images extracted from the page |
-| `page_view` | `ImageContent \| None` | no | An image of the whole page — set only when the `PipeExtract` that produced the page has `page_views = true`, which works on PDFs only |
+| `page_view` | `ImageContent \| None` | no | An image of the whole page — set only when the `PipeExtract` that produced the page has `page_views = true`, which works on a PDF, or on an Office file the hosted platform converts to PDF; a runner with no converter configured refuses an Office file |
 
 **Access**: When `@page` is used in a PipeLLM prompt, the text content is auto-rendered and images are sent as visual inputs. `$page.text_and_images.text.text` drills to the raw text.
 
@@ -311,7 +311,7 @@ ListContent supports iteration (`for item in list_content`), indexing (`list_con
 
 ### PipeExtract output chain
 
-PipeExtract produces `Page[]` — a list of pages. Each page contains `text_and_images` (text + images from OCR/extraction) and, when the `PipeExtract` sets `page_views = true` on a PDF, a `page_view` (an image of the whole page). To use extracted content in an LLM prompt:
+PipeExtract produces `Page[]` — a list of pages. Each page contains `text_and_images` (text + images from OCR/extraction) and, when the `PipeExtract` sets `page_views = true` on a PDF, or on an Office file the hosted platform converts to PDF, a `page_view` (an image of the whole page). To use extracted content in an LLM prompt:
 
 ```toml
 # Extract pages from a document

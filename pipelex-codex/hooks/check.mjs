@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.59.0 (0c06698) + @pipelex/tools-wasm 0.6.1 (npm)
+// Provenance: @pipelex/sdk 0.67.1 (d804c0b) + @pipelex/tools-wasm 0.6.1 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -14001,8 +14001,153 @@ function isLimitExceeded(err) {
 // src/client.ts
 init_protocol();
 
+// src/method-layouts.ts
+var LAYOUT_INPUT_MEMBERS = {
+  tree_digest: "required",
+  pipe_ref: "required",
+  catalog: "required",
+  prompt_hash: "required",
+  jsonl: "required",
+  sample_json: "optional"
+};
+var PROVENANCE_INPUT_MEMBERS = {
+  producer: "required",
+  model: "required",
+  seed: "optional",
+  style: "optional",
+  repair_rounds: "optional"
+};
+var LAYOUT_STRING_MEMBERS = [
+  "tree_digest",
+  "pipe_ref",
+  "catalog",
+  "prompt_hash",
+  "jsonl",
+  "stored_at"
+];
+var PROVENANCE_STRING_MEMBERS = ["producer", "model"];
+function methodLayoutFault(value) {
+  if (!isPlainObject(value)) return "that is not an object";
+  for (const member of LAYOUT_STRING_MEMBERS) {
+    if (typeof value[member] !== "string") return `whose \`${member}\` is not a string`;
+  }
+  const provenance = value.provenance;
+  if (!isPlainObject(provenance)) return "whose `provenance` is not an object";
+  for (const member of PROVENANCE_STRING_MEMBERS) {
+    if (typeof provenance[member] !== "string") {
+      return `whose \`provenance.${member}\` is not a string`;
+    }
+  }
+  return null;
+}
+function readMethodLayout(value) {
+  if (methodLayoutFault(value) !== null) return null;
+  const layout = value;
+  const { seed, style, repair_rounds: rounds } = layout.provenance;
+  return {
+    ...layout,
+    sample_json: typeof layout.sample_json === "string" ? layout.sample_json : null,
+    provenance: {
+      ...layout.provenance,
+      seed: typeof seed === "string" ? seed : null,
+      style: typeof style === "string" ? style : null,
+      repair_rounds: Number.isSafeInteger(rounds) && rounds >= 0 ? rounds : 0
+    }
+  };
+}
+function readMethodLayouts(value) {
+  if (!Array.isArray(value)) return [];
+  const layouts = [];
+  for (const entry of value) {
+    const layout = readMethodLayout(entry);
+    if (layout !== null) layouts.push(layout);
+  }
+  return layouts;
+}
+
+// src/method-showcases.ts
+var SHOWCASE_SUMMARY_STRING_MEMBERS = [
+  "showcase_id",
+  "name",
+  "pipe_ref",
+  "tree_digest",
+  "frozen_at"
+];
+var SHOWCASE_DOCUMENT_STATED_MEMBERS = [
+  "main_stuff",
+  "input_form",
+  "output_form",
+  "pipe_io_contracts"
+];
+var SHOWCASE_FILE_STRING_MEMBERS = ["address", "file_name", "media_type", "url"];
+function methodShowcaseSummaryFault(value) {
+  if (!isPlainObject(value)) return "that is not an object";
+  for (const member of SHOWCASE_SUMMARY_STRING_MEMBERS) {
+    if (typeof value[member] !== "string") return `whose \`${member}\` is not a string`;
+  }
+  return null;
+}
+function readMethodShowcaseSummaries(value) {
+  if (!Array.isArray(value)) return [];
+  const summaries = [];
+  for (const entry of value) {
+    if (methodShowcaseSummaryFault(entry) === null) {
+      summaries.push(entry);
+    }
+  }
+  return summaries;
+}
+function showcaseFileFault(file) {
+  if (!isPlainObject(file)) return "that is not an object";
+  for (const member of SHOWCASE_FILE_STRING_MEMBERS) {
+    if (typeof file[member] !== "string") return `whose \`${member}\` is not a string`;
+  }
+  const size = file.size_bytes;
+  if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0) {
+    return "whose `size_bytes` is not a non-negative integer";
+  }
+  return null;
+}
+function methodShowcaseDetailFault(value) {
+  const summaryFault = methodShowcaseSummaryFault(value);
+  if (summaryFault !== null) return summaryFault;
+  const detail = value;
+  const frozen = detail.document;
+  const files = detail.files;
+  if (!isPlainObject(frozen)) return "whose `document` is not an object";
+  if (!isPlainObject(frozen.inputs)) return "whose `document.inputs` is not an object";
+  for (const member of SHOWCASE_DOCUMENT_STATED_MEMBERS) {
+    if (frozen[member] === void 0) return `whose \`document.${member}\` is left out`;
+  }
+  if (!Array.isArray(files)) return "whose `files` is not an array";
+  for (let index = 0; index < files.length; index += 1) {
+    const fault2 = showcaseFileFault(files[index]);
+    if (fault2 !== null) return `whose \`files\` holds an entry ${fault2}, at [${index}]`;
+  }
+  return null;
+}
+function methodShowcaseFreezeFault(answer) {
+  switch (answer.outcome) {
+    case "frozen":
+    case "unchanged": {
+      const fault2 = methodShowcaseSummaryFault(answer.showcase);
+      if (fault2 === null) return null;
+      return `a \`${answer.outcome}\` freeze result whose \`showcase\` is one ${fault2}`;
+    }
+    case "refused":
+      for (const member of ["reason", "message"]) {
+        if (typeof answer[member] !== "string") {
+          return `a \`refused\` freeze result whose \`${member}\` is not a string`;
+        }
+      }
+      return null;
+    default:
+      return "a freeze result whose `outcome` is not `frozen`, `unchanged` or `refused`";
+  }
+}
+
 // src/version.ts
-var SDK_VERSION = "0.59.0";
+var SDK_VERSION = "0.67.1";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -16030,6 +16175,22 @@ function checkRunListQuery(call, query) {
     "not_an_object"
   );
 }
+var SHOWCASE_ID_ARGUMENT = {
+  name: "showcase_id",
+  what: "a showcase id, the showcase's non-empty `showcase_id`"
+};
+var SHOWCASE_VERSION_ARGUMENT = {
+  name: "version",
+  what: "a version number, the published version whose showcases to read, a positive integer"
+};
+var SHOWCASE_RUN_ID_ARGUMENT = {
+  name: "run_id",
+  what: "a run id, the non-empty `pipeline_run_id` of the completed run to freeze"
+};
+var SHOWCASE_NAME_ARGUMENT = {
+  name: "name",
+  what: "a name for the showcase, a non-empty string"
+};
 var COPY_DESTINATION_ARGUMENT = {
   name: "destination_org_id",
   what: "a destination_org_id, the canonical id of the organization to copy into, a non-empty string"
@@ -16041,6 +16202,26 @@ var COPY_NAME_ARGUMENT = {
 var COPY_DRAFT_TOKEN_ARGUMENT = {
   name: "expected_draft_updated_at",
   what: "an expected_draft_updated_at, the draft token the caller last read, the method's `updated_at`, a string, or none"
+};
+var LAYOUT_VERSION_ARGUMENT = {
+  name: "version",
+  what: "a version number, the published version the layout was designed for, a positive integer"
+};
+var LAYOUT_LIST_VERSION_ARGUMENT = {
+  name: "version",
+  what: "a version number, the published version whose layouts to read, a positive integer"
+};
+var LAYOUTS_OFF_CATALOGS_ARGUMENT = {
+  name: "catalogs",
+  what: "the ids of the catalogs to switch off as an array, the whole list, empty for none"
+};
+var LAYOUT_ARGUMENT = {
+  name: "layout",
+  what: "the layout to store as an object, a MethodLayoutInput"
+};
+var LAYOUT_PROVENANCE_ARGUMENT = {
+  name: "provenance",
+  what: "the layout's provenance as an object naming at least its producer and its model"
 };
 function argumentRefusal(call, argument, got, reason, cause) {
   const message = `${call}() takes ${argument.what}; got ${got}.`;
@@ -16067,6 +16248,7 @@ function requireNameAndInputs(name, inputs, call, needs) {
 }
 function describeNumberArgument(value) {
   if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) return "an array";
   return value === null ? "null" : typeof value;
 }
 function idPathSegment(value, call, what) {
@@ -16099,6 +16281,17 @@ function methodPath(methodId, call) {
 function methodExamplePath(methodId, exampleId, call) {
   const path2 = methodPath(methodId, call);
   return `${path2}/examples/${idPathSegment(exampleId, call, EXAMPLE_ID_ARGUMENT)}`;
+}
+function methodVersionShowcasesPath(methodId, version, call) {
+  if (!Number.isSafeInteger(version) || version < 1) {
+    throw argumentRefusal(
+      call,
+      SHOWCASE_VERSION_ARGUMENT,
+      describeNumberArgument(version),
+      "not_a_positive_integer"
+    );
+  }
+  return `${methodPath(methodId, call)}/versions/${version}/showcases`;
 }
 var isString3 = (value) => typeof value === "string";
 var FILE_ARCHIVE_STATES = ["queued", "building", "ready", "failed"];
@@ -16133,6 +16326,10 @@ var METHOD_EXAMPLE_FIELDS = {
   inputs: ["an object", isPlainObject],
   input_revision: ["an integer", (value) => Number.isSafeInteger(value)],
   latest_run_id: ["a string or null", (value) => value === null || isString3(value)],
+  showcase_id: [
+    "a string or null",
+    (value) => value === void 0 || value === null || isString3(value)
+  ],
   created_by_user_id: ["a string", isString3],
   created_at: ["a string", isString3],
   updated_at: ["a string", isString3],
@@ -16217,8 +16414,9 @@ var PipelexApiClient = class {
    * `url` is a fully resolved absolute URL. `mayStartRun` marks a request that may create a run,
    * whose errors then say whether it may have (see `RunCreation`).
    * `idempotencyKey`, already checked by `idempotencyKeyOf`, is sent as the
-   * `Idempotency-Key` header; only `start`, `copyMethod`, `rotateWebhookSecret` and
-   * `replayRunWebhookDelivery` pass one.
+   * `Idempotency-Key` header; only `start`, `copyMethod`, `storeMethodLayout`,
+   * `setMethodLayoutsOff`, `freezeMethodShowcase`, `withdrawMethodShowcase`, `rotateWebhookSecret`
+   * and `replayRunWebhookDelivery` pass one.
    */
   async requestRaw(method, url, options = {}) {
     const hasBody = options.body !== void 0;
@@ -16328,7 +16526,7 @@ var PipelexApiClient = class {
   }
   /**
    * A methods-catalog route answering one stored method (`createMethod`, `writeDraft`,
-   * `renameMethod`), read as `readObjectAnswer` reads it.
+   * `renameMethod`, `setMethodLayoutsOff`), read as `readObjectAnswer` reads it.
    */
   async requestMethodData(method, endpoint, body, options = {}) {
     const res = await this.requestProductAnswer(method, endpoint, body, options);
@@ -16894,7 +17092,10 @@ var PipelexApiClient = class {
    * `options.views` is the sibling opt-in for *structured* views where `render`
    * carries *rendered text*. The two lists are independent, each resolving its own
    * tokens against its own supported set, and each supported token adds a same-named
-   * top-level field to the valid arm — `input_form` and `output_form`. Unlike
+   * top-level field to the valid arm — `input_form` and `output_form`, and on a hosted
+   * validate by `method_id`, `layouts`, the layouts stored for the resolved tree
+   * (`PipelexValidationReport.layouts`, absent when there are none), each entry read as
+   * `storeMethodLayout`'s answer is and one that does not read as a layout left out. Unlike
    * `render`, this client sends `views` ONLY when the caller asks: the point of an
    * opt-in view is that the default response stays byte-identical, and the
    * highest-frequency consumers (hook pipelines, CI gates, agent loops) never pay for
@@ -16954,8 +17155,8 @@ var PipelexApiClient = class {
     if (res.status < 200 || res.status >= 300) {
       this.throwApiResponseError("POST", "validate", res);
     }
-    return withVerdictItems(
-      this.readObjectAnswer("POST", "validate", res)
+    return withReadLayouts(
+      withVerdictItems(this.readObjectAnswer("POST", "validate", res))
     );
   }
   // ── Tools extensions (Pipelex API — `/v1/lint`, `/v1/format`) ─────────
@@ -17611,16 +17812,19 @@ var PipelexApiClient = class {
    * Rows are `MethodSummary`: no `mthds`, no `python`, no `updated_at`. Reach
    * for `getMethod(id)` when you need a method's source.
    *
-   * `q` is applied server-side over the whole catalog, not over the page, and so is
+   * `q` is applied server-side over the whole catalog, not over the page, and so are
    * `published` (`true` for the methods with a published version, `false` for those never
-   * published). Each row carries the method's publish state (`latest_version`,
-   * `latest_published`, `draft_digest`). Both filters run after the index read, so a page can
-   * come back empty and still carry a `nextCursor`: keep following it until it is `null`.
+   * published) and `createdBy` (`"me"` for the caller's own methods, or a member's user id, sent
+   * as `created_by`); the three combine. Each row carries the method's publish state
+   * (`latest_version`, `latest_published`, `draft_digest`) and who created it
+   * (`created_by_user_id`). The filters run after the index read, so a page can come back empty
+   * and still carry a `nextCursor`: keep following it until it is `null`.
    */
   async listMethods(query = {}) {
     const search = productQuery({
       q: query.q,
       published: query.published,
+      created_by: query.createdBy,
       limit: query.limit,
       cursor: query.cursor
     });
@@ -17645,22 +17849,142 @@ var PipelexApiClient = class {
    * remove. If you truly want an array, `Array.fromAsync` makes that your
    * explicit choice.
    *
-   * It keeps going **through an empty page that carries a cursor**: under `q` or `published`
-   * such a page means "nothing matched in the slice just read", not "done". It stops on a
-   * `null` cursor or on a cursor the server failed to advance, and throws
+   * Takes the query `listMethods` takes, the cursor aside, and sends it with every page.
+   *
+   * It keeps going **through an empty page that carries a cursor**: under `q`, `published` or
+   * `createdBy` such a page means "nothing matched in the slice just read", not "done". It stops
+   * on a `null` cursor or on a cursor the server failed to advance, and throws
    * `PagingNotTerminatingError` past a page ceiling no real catalog reaches.
    */
   async *iterateMethods(query = {}) {
     yield* followCursor("listMethods", (cursor) => this.listMethods({ ...query, cursor }));
   }
   /**
-   * Read one method with its draft's files — `GET /v1/methods/{id}`: its identity, its draft
+   * One page of the template catalog — `GET /v1/method-templates`: the public methods of the
+   * organization the deployment names as its templates organization, the same for every caller.
+   *
+   * The templates the ordering lists lead, in its order, and every other template follows by name.
+   * `ordering` names the ordering to serve, such as `default` or an arm of a test; an absent,
+   * unknown or malformed name serves `default`, and the page's `ordering` names the one served,
+   * `null` when there is none. `category` keeps one category's templates, by slug, in the same
+   * order; an unknown slug keeps none. Whatever the filter, the page's `categories` names, with its
+   * labels, every category at least one template shows, in the catalog's order, so no tab drawn
+   * from it is ever empty; `listMethodCategories` reads the whole list.
+   *
+   * Each `MethodTemplate` carries the method's id and name, its latest published version's number,
+   * description and categories, its organization's display name and each thumbnail with its size
+   * and a link to its bytes valid for about fifteen minutes. A template reads, runs and copies by
+   * its `method_id`, as another organization's public method does (`getMethod`, `copyMethod`).
+   *
+   * Pass the page's `nextCursor` back as `cursor` with the same `ordering` and `category`, which the
+   * cursor does not hold; `null` is the last page. `iterateMethodTemplates` follows it for you.
+   *
+   * Throws `ApiResponseError`: `403` `pipelex.org.required` without an active organization, `422`
+   * `request.invalid` for a `limit` outside 1 to 200 or a cursor of another listing, `422`
+   * `request.malformed` for a cursor that does not decode, `500` `runtime.misconfigured` when the
+   * templates organization the deployment names has no record or a link cannot be signed, and
+   * `503` `runtime.unavailable`, safe to retry. A page whose `items` or `categories` is not an
+   * array, whose `next_cursor` or `ordering` is neither a string nor `null`, a template lacking a
+   * member a card is drawn from (a string `method_id`, `name` and `organization_name`, a
+   * `description` that is a string or `null`, a positive integer `latest_version`, an array of
+   * string `categories`, and `thumbnails` each with a string `path`, `media_type`, `sha256`, `url`
+   * and `expires_at` and a positive integer `width` and `height`), and a category without a string
+   * `slug` and `label` or whose `labels` is not an object of strings are an answer the SDK cannot
+   * read, thrown as an `ApiResponseError` too, its links redacted.
+   */
+  async listMethodTemplates(query = {}) {
+    const search = productQuery({
+      ordering: query.ordering,
+      category: query.category,
+      limit: query.limit,
+      cursor: query.cursor
+    });
+    const endpoint = `method-templates${search}`;
+    const res = withLinks(await this.requestProductAnswer("GET", endpoint, void 0));
+    const page = this.readObjectAnswer("GET", endpoint, res);
+    const { items, next_cursor: nextCursor, ordering, categories } = page;
+    let fault2 = null;
+    if (!Array.isArray(items)) fault2 = "`items` is not an array";
+    else if (nextCursor !== null && typeof nextCursor !== "string") {
+      fault2 = "`next_cursor` is neither a string nor null";
+    } else if (ordering !== null && typeof ordering !== "string") {
+      fault2 = "`ordering` is neither a string nor null";
+    } else if (!Array.isArray(categories)) fault2 = "`categories` is not an array";
+    else fault2 = methodTemplatesFault(items) ?? methodCategoriesFault(categories);
+    if (fault2 !== null) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a page of templates whose ${fault2}`
+      );
+    }
+    return {
+      items,
+      nextCursor,
+      ordering,
+      categories
+    };
+  }
+  /**
+   * Every template of the catalog, in the order served — follows `listMethodTemplates`'s cursor
+   * for you, with the same `ordering` and `category` on every page. It stops on a `null` cursor or
+   * on a cursor the server failed to advance, and throws `PagingNotTerminatingError` past a page
+   * ceiling no real catalog reaches. The ordering served and the categories are on each page, so
+   * read one page with `listMethodTemplates` when you need them.
+   */
+  async *iterateMethodTemplates(query = {}) {
+    yield* followCursor(
+      "listMethodTemplates",
+      (cursor) => this.listMethodTemplates({ ...query, cursor })
+    );
+  }
+  /**
+   * The catalog's whole list of categories — `GET /v1/method-categories`: every category an admin
+   * of the platform put on it, in the catalog's order, whether or not a template shows it, the same
+   * for every caller. Each `MethodCategory` carries its `slug`, the one a manifest declares, its
+   * English `label`, and its `labels` by language tag, which may lack a language the platform
+   * added after the category was stored; show `labels[locale] ?? label`.
+   *
+   * A template shows under the categories its manifest declares that are on this list, so this is
+   * the list a method's categories are picked from. `listMethodTemplates` names, on every page, only
+   * the categories some template shows, for the tabs a client draws.
+   *
+   * Throws `ApiResponseError`: `403` `pipelex.org.required` without an active organization, and
+   * `503` `runtime.unavailable`, safe to retry. An answer whose `categories` is not an array, or
+   * holds a category without a string `slug` and `label` or whose `labels` is not an object of
+   * strings, is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async listMethodCategories() {
+    const endpoint = "method-categories";
+    const res = await this.requestProductAnswer("GET", endpoint, void 0);
+    const list = this.readObjectAnswer("GET", endpoint, res);
+    const { categories } = list;
+    const fault2 = Array.isArray(categories) ? methodCategoriesFault(categories) : "`categories` is not an array";
+    if (fault2 !== null) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a list of categories whose ${fault2}`
+      );
+    }
+    return list;
+  }
+  /**
+   * Read one method with its files — `GET /v1/methods/{id}`. One of the caller's organization's
+   * methods answers a `MethodDetail`: its identity, its draft
    * (`files`, `input_data`) with the draft's token (`updated_at`) and digest (`draft_digest`),
    * and its latest published version's summary (`latest_version`, `latest_published`), whatever
    * the publish state. A method never published reads with both `null`, never as an error.
    * `files` lists the draft's tree in tree path order, each file with its SHA-256, its size and a
    * link to its bytes valid for about fifteen minutes, and is empty for an empty draft;
    * `writeMethodTree` brings the tree to disk.
+   *
+   * **Another organization's public method reads too, in a narrower shape**, a
+   * `PublicMethodDetail`: its latest published version, that version's description, categories
+   * and files, and nothing of its draft or of the owner's people, so no `updated_at` to write or
+   * publish with. Narrow the answer with `"updated_at" in method` before reading the draft.
    *
    * Takes a bare catalog id: the method routes address the method itself, never a version of
    * it. A caller holding `mt_…@3` strips the suffix with `parseMethodSelector` and reads that
@@ -17669,16 +17993,36 @@ var PipelexApiClient = class {
    * and for an id that is empty, `.` or `..`, which the URL would resolve into another route's
    * path.
    *
-   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown or foreign-org
-   * method, `409` `pipelex.catalog.being_deleted` while its erasure runs, and a `500`
-   * `runtime.unexpected` for a method whose draft names a tree the platform holds no record of. An
-   * answer whose `files` is not a listing is an answer the SDK cannot read, thrown as an
-   * `ApiResponseError` too.
+   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown method, for
+   * another organization's internal one, and for a public one made internal again or being
+   * erased; `409` `pipelex.catalog.being_deleted` while the erasure of the caller's own method
+   * runs; and a `500` `runtime.unexpected` for a method whose tree the platform holds no record
+   * of. An answer whose `files` is not a listing is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` too, its links redacted, and so is one that lacks `updated_at` while it
+   * carries a member only the owner's read has (`draft_digest`, `created_by_user_id`,
+   * `input_data`, `pipe_output`, `copied_from`, `deletion_state`), which would otherwise pass for
+   * another organization's public method, and a public read without an integer `latest_version`
+   * and a `latest_published` object.
    */
   async getMethod(methodId) {
     const endpoint = methodPath(methodId, "getMethod");
-    const res = await this.requestProductAnswer("GET", endpoint, void 0);
-    return this.readSavedTree("GET", endpoint, withLinks(res), "a stored method");
+    const res = withLinks(await this.requestProductAnswer("GET", endpoint, void 0));
+    const method = this.readSavedTree(
+      "GET",
+      endpoint,
+      res,
+      "a stored method"
+    );
+    const fault2 = methodReadFault(method);
+    if (fault2 !== null) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a stored method ${fault2}`
+      );
+    }
+    return method;
   }
   /**
    * Create a method — `POST /v1/methods`. The new method holds its tree as its draft and has no
@@ -18098,10 +18442,16 @@ var PipelexApiClient = class {
    * `422` for an empty name or one holding a lone surrogate, `413` `request.too_large` for a name
    * so long it would leave the method too large to publish, and a `503` that wrote nothing, safe
    * to retry, when draft writes kept landing under the rename.
+   *
+   * `expected_name` makes the rename conditional on the name the caller read: a method no longer
+   * named so is a `409` `pipelex.catalog.update_conflict` whose `location.field` is
+   * `expected_name`, and nothing is written. A client applying a name nobody typed, such as a
+   * proposed one, uses it so that a name a person set meanwhile is never overwritten.
    */
   async renameMethod(methodId, input) {
     return this.requestMethodData("PATCH", methodPath(methodId, "renameMethod"), {
-      name: input.name
+      name: input.name,
+      ...input.expected_name === void 0 ? {} : { expected_name: input.expected_name }
     });
   }
   /**
@@ -18114,9 +18464,12 @@ var PipelexApiClient = class {
    *
    * The answer is a `MethodPublishResult` discriminated on `outcome` — branch on it:
    * `published` with the new `version`; `unchanged` with the existing latest `version`;
-   * `refused` with a `reason` (`invalid`, or `not_runnable` for a draft that validates with
-   * pending signatures), a `message` and the runner's `validation` verdict, whose problem items
-   * are read member by member as `validate` reads them. Every arm carries the `method`. A publish
+   * `refused` with a `reason`, a `message` and the runner's `validation` verdict, whose problem
+   * items are read member by member as `validate` reads them. The reason is `invalid`, or
+   * `not_runnable` for a draft that validates with pending signatures, and for a public method
+   * also `thumbnail_missing`, `thumbnail_invalid`, `storage_reference` or `showcase_missing` (see
+   * `MethodPublishRefusalReason`); a reason this SDK does not know is passed through as its raw
+   * string, still a verdict, so show its `message`. Every arm carries the `method`. A publish
    * moves no token.
    *
    * Takes a bare catalog id, as `getMethod` does. Throws `RequestArgumentError` when
@@ -18131,11 +18484,14 @@ var PipelexApiClient = class {
    * cannot be reached, answers unusably or does not finish within the platform's deadline is a
    * `502` or a `503` with nothing written, so a retry is safe; a runner that refuses the request
    * itself is relayed under its own status. A retry of a publish that landed while its answer was
-   * lost, as on a client timeout, answers `unchanged` with the version it wrote.
+   * lost, as on a client timeout, answers `unchanged` with the version it wrote. A method made
+   * public while its publish ran is a `503` with nothing written, safe to retry, which a retry
+   * judges as a public method's publish.
    *
    * An answer whose `outcome` is not one of the outcomes above, that carries no `method` object,
-   * or a refusal whose `validation` is not a verdict object with a boolean `is_valid`, is an answer
-   * the SDK cannot read, thrown as an `ApiResponseError` too.
+   * or a refusal whose `reason` or `message` is not a string or whose `validation` is not a verdict
+   * object with a boolean `is_valid`, is an answer the SDK cannot read, thrown as an
+   * `ApiResponseError` too.
    */
   async publishMethod(methodId, input) {
     const token = input?.expected_draft_updated_at;
@@ -18159,12 +18515,18 @@ var PipelexApiClient = class {
       return { ...answer, outcome, method };
     }
     const validation = answer.validation;
-    if (!isPlainObject(validation) || typeof validation.is_valid !== "boolean") {
+    let fault2 = null;
+    if (typeof answer.reason !== "string") fault2 = "`reason` is not a string";
+    else if (typeof answer.message !== "string") fault2 = "`message` is not a string";
+    else if (!isPlainObject(validation) || typeof validation.is_valid !== "boolean") {
+      fault2 = "`validation` is not an object";
+    }
+    if (fault2 !== null) {
       throw this.unreadableAnswer(
         "POST",
         `/${API_PREFIX2}/${endpoint}`,
         res,
-        "a publish result whose `validation` is not an object"
+        `a publish result whose ${fault2}`
       );
     }
     return {
@@ -18180,11 +18542,13 @@ var PipelexApiClient = class {
    *
    * Pass the page's `nextCursor` back as `cursor` to continue; `null` is the last page. A page
    * may be short while `nextCursor` is set, because the platform reads versions whole. A method
-   * never published answers an empty page.
+   * never published answers an empty page. Another organization's public method lists its
+   * versions too, each without its `published_by`.
    *
    * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404`
-   * `pipelex.catalog.not_found` for an unknown method, `409` `pipelex.catalog.being_deleted`, and
-   * `422` `request.invalid` for a cursor the listing did not issue for this method or a `limit`
+   * `pipelex.catalog.not_found` for an unknown method and for another organization's internal
+   * one, `409` `pipelex.catalog.being_deleted` while the erasure of the caller's own method runs,
+   * and `422` `request.invalid` for a cursor the listing did not issue for this method or a `limit`
    * outside 1 to 100. A page whose `items` is not an array or whose `next_cursor` is neither a
    * string nor `null` is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
    */
@@ -18196,12 +18560,15 @@ var PipelexApiClient = class {
   /**
    * One published version of a method, with its files — `GET /v1/methods/{id}/versions/{n}`.
    * `files` lists the version's tree as `getMethod` lists the draft's, each file with a link to
-   * its bytes valid for about fifteen minutes, which `writeMethodTree` writes to disk.
+   * its bytes valid for about fifteen minutes, which `writeMethodTree` writes to disk. Another
+   * organization's public method reads its versions too, without their `published_by`, the files
+   * linked in the organization that holds it.
    *
    * Takes a bare catalog id, as `getMethod` does, and the version number. Throws
    * `RequestArgumentError` for a `version` that is not a positive integer, before any request.
    * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for a version the method never
-   * published and for an unknown method, `409` `pipelex.catalog.being_deleted`, and `500`
+   * published, for an unknown method and for another organization's internal one, `409`
+   * `pipelex.catalog.being_deleted` while the erasure of the caller's own method runs, and `500`
    * `runtime.unexpected` for a version stored before methods were trees and never rewritten as
    * one, which names no tree to serve.
    */
@@ -18224,6 +18591,359 @@ var PipelexApiClient = class {
     );
   }
   /**
+   * Store a layout designed for one pipe of a published version of a method —
+   * `POST /v1/methods/{id}/versions/{n}/layouts` — and answer it as stored, with the `stored_at` the
+   * platform stamped.
+   *
+   * A layout is a data file a producer designed over the version's input-form descriptor, in the
+   * vocabulary of a catalog of components. The platform stores it beside the method, keyed by the
+   * content it was designed for, and hands it back through `listMethodLayouts` and on every validate
+   * of the method by `method_id` that names `layouts` among its `views` and resolves the same tree
+   * (`PipelexValidationReport.layouts`). It never produces, parses or judges one.
+   *
+   * `layout.tree_digest` must be the digest of the tree `version` holds, its
+   * `MethodVersionSummary.tree_digest`: a producer designs over the descriptor of the version it was
+   * handed. **A write of the same identity replaces the layout**, the identity being `tree_digest`,
+   * `pipe_ref`, `catalog` and `prompt_hash`, and is answered the same `200` whether it stored a new
+   * layout or replaced one. `options.idempotencyKey` is sent as the `Idempotency-Key` header, so a
+   * write whose answer was lost is sent again under the same key and answered as the first was; sent
+   * again without one, it runs again, with a new `stored_at` and the bound applied again
+   * (`MethodLayoutWriteOptions`). A content keeps at most 16
+   * layouts, every pipe, catalog and prompt hash together; past the bound a write removes first what
+   * newer prompts of the same pipe and catalog superseded (see `docs/method-layouts.md`).
+   * `layout.sample_json` keeps a written sample with the layout, never a run's output.
+   *
+   * The write changes the method, so it takes an `admin` or a `member` of the method's
+   * organization. Takes a bare catalog id, as `getMethod` does, and the version number. Sends the
+   * members of `MethodLayoutInput` and nothing else, the route's body being closed at both levels,
+   * and leaves out `sample_json` and each optional provenance member that is `null` or omitted, for
+   * the platform's default. Throws `RequestArgumentError` before any request for a `version` that is not a positive
+   * integer and for a `layout` or a `provenance` that is not an object; every other member is sent
+   * as given. Throws `ApiResponseError` when the platform refuses the write, which stores nothing:
+   * `422` `request.invalid` for a member breaking its shape or bound, naming it in `params.field`
+   * and `location.field` (`provenance.<member>` for one of the provenance's), and, naming
+   * `tree_digest`, for a digest that is not the tree the version holds; `403` `auth.forbidden`
+   * naming the `member` requirement for a `runner` or a caller with no recognised role; `404`
+   * `pipelex.catalog.not_found` for an unknown method or another organization's, its
+   * `params.resource` `method`, and for a version the method never published, its
+   * `params.resource` `version`; `409` `pipelex.catalog.being_deleted` while the method's erasure is
+   * pending, under way or stopped; and `500` `runtime.unexpected` for a version stored before
+   * methods were trees, which names no tree. Under an idempotency key, `409`
+   * `request.idempotency_conflict` for the key sent with a different body and `409`
+   * `request.idempotency_key_in_use` while its earlier request is still being handled; a key that is
+   * not 1 to 255 visible ASCII characters is a `RequestArgumentError` before any request. An answer
+   * that does not read as a layout (`methodLayoutFault`) is an answer the SDK cannot read, thrown as
+   * an `ApiResponseError` too.
+   */
+  async storeMethodLayout(methodId, version, layout, options = {}) {
+    const call = "storeMethodLayout";
+    if (!Number.isSafeInteger(version) || version < 1) {
+      throw argumentRefusal(
+        call,
+        LAYOUT_VERSION_ARGUMENT,
+        describeNumberArgument(version),
+        "not_a_positive_integer"
+      );
+    }
+    const endpoint = `${methodPath(methodId, call)}/versions/${version}/layouts`;
+    const body = methodLayoutBody(layout, call);
+    const idempotencyKey = idempotencyKeyOf(options, "store the layout");
+    const res = await this.requestProductAnswer("POST", endpoint, body, { idempotencyKey });
+    const answer = this.readObjectAnswer("POST", endpoint, res);
+    const stored = readMethodLayout(answer);
+    if (stored === null) {
+      throw this.unreadableAnswer(
+        "POST",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        `a layout ${methodLayoutFault(answer) ?? "that is not one"}`
+      );
+    }
+    return stored;
+  }
+  /**
+   * The layouts stored for the content of a published version of a method —
+   * `GET /v1/methods/{id}/versions/{n}/layouts` — newest first, at most 16, `items` empty when none
+   * is stored. It touches only the platform's database and calls no runner, so it costs a host far
+   * less than the `layouts` view of `validate`, which dry-runs every pipe of the method.
+   *
+   * It answers what is stored whatever `layouts_off` says: the switch is the host's to honour.
+   * Another organization's public method reads too, with the layouts its builders stored, and a
+   * `runner` reads what it is shown. Takes a bare catalog id, as `getMethod` does, and the version
+   * number. `options.signal` cancels the read. Throws `RequestArgumentError` for a `version` that is
+   * not a positive integer, before any request.
+   *
+   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown method or another
+   * organization's internal one, its `params.resource` `method`, and for a version the method never
+   * published, its `params.resource` `version`; `409` `pipelex.catalog.being_deleted` while the
+   * erasure of the caller's own method is pending, under way or stopped; `500` `runtime.unexpected`
+   * for a version stored before methods were trees, which names no tree. An answer whose `items` is
+   * not an array is an answer the SDK cannot read, thrown as an `ApiResponseError` too; an entry
+   * that does not read as a layout is left out (`readMethodLayouts`), so one layout it cannot read
+   * never costs the caller the others.
+   */
+  async listMethodLayouts(methodId, version, options = {}) {
+    const call = "listMethodLayouts";
+    if (!Number.isSafeInteger(version) || version < 1) {
+      throw argumentRefusal(
+        call,
+        LAYOUT_LIST_VERSION_ARGUMENT,
+        describeNumberArgument(version),
+        "not_a_positive_integer"
+      );
+    }
+    const endpoint = `${methodPath(methodId, call)}/versions/${version}/layouts`;
+    return this.requestMethodLayoutList(endpoint, options);
+  }
+  /**
+   * The layouts stored for the content of a method's draft — `GET /v1/methods/{id}/draft/layouts` —
+   * newest first, `items` empty for an empty draft or a draft none was designed for. A layout is
+   * keyed by its content, so a draft holding a published tree finds that tree's layouts here, and a
+   * builder sees the designs of what it is editing.
+   *
+   * It reads for the organization that holds the method alone, since a draft is its holder's. Takes
+   * a bare catalog id, as `getMethod` does. `options.signal` cancels the read. Throws
+   * `ApiResponseError`: `404` `pipelex.catalog.not_found` for a method the organization does not
+   * hold, another organization's public one included, and `409` `pipelex.catalog.being_deleted`
+   * while its erasure is pending, under way or stopped. An answer whose `items` is not an array is
+   * an answer the SDK cannot read, thrown as an `ApiResponseError` too; an entry that does not read
+   * as a layout is left out (`readMethodLayouts`).
+   */
+  async listMethodDraftLayouts(methodId, options = {}) {
+    const endpoint = `${methodPath(methodId, "listMethodDraftLayouts")}/draft/layouts`;
+    return this.requestMethodLayoutList(endpoint, options);
+  }
+  /** The `{items}` of a route answering layouts, each entry read as `readMethodLayouts` reads it. */
+  async requestMethodLayoutList(endpoint, options) {
+    const res = await this.requestProductAnswer("GET", endpoint, void 0, {
+      signal: options.signal
+    });
+    const answer = this.readObjectAnswer("GET", endpoint, res);
+    if (!Array.isArray(answer.items)) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a list of layouts whose `items` is not an array"
+      );
+    }
+    return { ...answer, items: readMethodLayouts(answer.items) };
+  }
+  /**
+   * Freeze a completed run of a method into a showcase — `POST /v1/methods/{id}/showcases` — and
+   * answer what the freeze did.
+   *
+   * A showcase is real output, frozen: the run's inputs, its main output, the forms and contracts
+   * that describe them, and a private copy of every stored file they name. It is keyed by the
+   * digest of the run's tree, so a builder freezes a run of the draft before publishing it, and
+   * another organization reads it only through a published version holding that tree. The run must
+   * be this method's, completed and with stored results, and its tree must be the draft's or the
+   * latest published version's.
+   *
+   * The answer is a `MethodShowcaseFreezeResult`, a `200` discriminated on `outcome` — branch on it:
+   * `frozen` with the new `showcase`; `unchanged` with the one that stands, when this run is already
+   * a showcase, whatever has happened to its tree since, the name in the request being ignored; or
+   * `refused` with a `reason` and a `message`, nothing written (`MethodShowcaseRefusalReason`, read
+   * open, so a later reason arrives as its raw string).
+   *
+   * The write changes the method, so it takes an `admin` or a `member` of the method's organization.
+   * Takes a bare catalog id, as `getMethod` does. Sends `run_id` and `name` and nothing else, the
+   * body being closed. `options.idempotencyKey` is sent as the `Idempotency-Key` header
+   * (`MethodShowcaseWriteOptions`). Throws `RequestArgumentError` before any request for a `run_id`
+   * or a `name` that is not a non-empty string, and for a malformed idempotency key. Throws
+   * `ApiResponseError` when no verdict was produced: `403` `auth.forbidden` for a `runner`; `404`
+   * `pipelex.catalog.not_found` for a method the organization does not hold; `409`
+   * `pipelex.catalog.being_deleted` while its erasure is pending, under way or stopped; `422`
+   * `request.invalid` for a body that does not validate; and `503` `runtime.unavailable`, with
+   * `retry` `yes`, past the freeze's deadline. An answer that is none of the verdict's arms is an
+   * answer the SDK cannot read, thrown as an `ApiResponseError` too.
+   */
+  async freezeMethodShowcase(methodId, input, options = {}) {
+    const call = "freezeMethodShowcase";
+    const endpoint = `${methodPath(methodId, call)}/showcases`;
+    const { run_id: runId, name } = input ?? {};
+    const body = {
+      run_id: requireNonEmptyId(runId, call, SHOWCASE_RUN_ID_ARGUMENT),
+      name: requireNonEmptyId(name, call, SHOWCASE_NAME_ARGUMENT)
+    };
+    const idempotencyKey = idempotencyKeyOf(options, "freeze the showcase");
+    const res = await this.requestProductAnswer("POST", endpoint, body, { idempotencyKey });
+    const answer = this.readObjectAnswer("POST", endpoint, res);
+    const fault2 = methodShowcaseFreezeFault(answer);
+    if (fault2 !== null) {
+      throw this.unreadableAnswer("POST", `/${API_PREFIX2}/${endpoint}`, res, fault2);
+    }
+    return answer;
+  }
+  /**
+   * Withdraw a showcase — `DELETE /v1/methods/{id}/showcases/{showcase_id}`. The platform answers
+   * `204`, the row going first, so every read closes at once, and then its stored document and
+   * files. It runs no check, even on a public method's last showcase, because taking down something
+   * published by mistake is never refused; the method then stays public and its next publish needs
+   * a showcase. What another organization already copied stays theirs.
+   *
+   * `options.idempotencyKey` is sent as the `Idempotency-Key` header, so a withdrawal whose answer
+   * was lost is sent again under the same key and answered as the first was
+   * (`MethodShowcaseWriteOptions`). Throws `RequestArgumentError` before any request for a showcase
+   * id that is empty, `.` or `..`, or holds a lone surrogate, and for a malformed idempotency key.
+   * Throws `ApiResponseError`: `404` `pipelex.catalog.not_found`, its `params.resource` `example`,
+   * when there is no such showcase, one already withdrawn included; `403` `auth.forbidden` for a
+   * `runner`; and `422` `request.invalid` for an id that is not one a showcase can have.
+   */
+  async withdrawMethodShowcase(methodId, showcaseId, options = {}) {
+    const call = "withdrawMethodShowcase";
+    const endpoint = `${methodPath(methodId, call)}/showcases/${idPathSegment(showcaseId, call, SHOWCASE_ID_ARGUMENT)}`;
+    const idempotencyKey = idempotencyKeyOf(options, "withdraw the showcase");
+    await this.requestProduct("DELETE", endpoint, void 0, { idempotencyKey });
+  }
+  /**
+   * Every showcase of a method the caller's organization holds, across every tree, each naming its
+   * digest, oldest first — `GET /v1/methods/{id}/showcases`.
+   *
+   * It reads for the holding organization's members alone: another organization reads a `404`,
+   * public method or not, and reads a public method's showcases through
+   * `listMethodVersionShowcases`. Takes a bare catalog id, as `getMethod` does. `options.signal`
+   * cancels the read. Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for a method the
+   * organization does not hold and `409` `pipelex.catalog.being_deleted` while its erasure is
+   * pending, under way or stopped. An answer whose `items` is not an array is an answer the SDK
+   * cannot read, thrown as an `ApiResponseError` too; an entry that does not read as a summary is
+   * left out (`readMethodShowcaseSummaries`).
+   */
+  async listMethodShowcases(methodId, options = {}) {
+    const endpoint = `${methodPath(methodId, "listMethodShowcases")}/showcases`;
+    return this.requestMethodShowcaseList(endpoint, options);
+  }
+  /**
+   * One showcase of a method the caller's organization holds, in full, with a short-lived link to
+   * each of its files — `GET /v1/methods/{id}/showcases/{showcase_id}`. Read with `parseExactJson`,
+   * so an integer past `Number.MAX_SAFE_INTEGER` in its document is a `bigint`.
+   *
+   * It reads for the holding organization's members alone. Takes a bare catalog id, as `getMethod`
+   * does, and refuses a showcase id as `withdrawMethodShowcase` does, before any request. Throws
+   * `ApiResponseError`: `404` `pipelex.catalog.not_found` for a method the organization does not
+   * hold and for a showcase it does not have, the latter's `params.resource` being `example`, and
+   * `409` `pipelex.catalog.being_deleted` while its erasure is pending, under way or stopped. An
+   * answer that does not read as a detail (`methodShowcaseDetailFault`) is an answer the SDK cannot
+   * read, thrown as an `ApiResponseError` too, its signed links redacted.
+   */
+  async getMethodShowcase(methodId, showcaseId, options = {}) {
+    const call = "getMethodShowcase";
+    const endpoint = `${methodPath(methodId, call)}/showcases/${idPathSegment(showcaseId, call, SHOWCASE_ID_ARGUMENT)}`;
+    return this.requestMethodShowcaseDetail(endpoint, options);
+  }
+  /**
+   * The showcases of the tree a published version holds, oldest first —
+   * `GET /v1/methods/{id}/versions/{n}/showcases` — for every reader of that version, another
+   * organization's on a public method included. `items` is empty when none is frozen. A showcase of
+   * a tree no published version holds is never read through this route.
+   *
+   * Takes a bare catalog id, as `getMethod` does, and the version number. `options.signal` cancels
+   * the read. Throws `RequestArgumentError` for a `version` that is not a positive integer, before
+   * any request. Throws `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown method
+   * or another organization's internal one, its `params.resource` `method`, and for a version the
+   * method never published, its `params.resource` `version`; and `409`
+   * `pipelex.catalog.being_deleted` while the erasure of the caller's own method is pending, under
+   * way or stopped. An answer whose `items` is not an array is an answer the SDK cannot read, thrown
+   * as an `ApiResponseError` too; an entry that does not read as a summary is left out.
+   */
+  async listMethodVersionShowcases(methodId, version, options = {}) {
+    const endpoint = methodVersionShowcasesPath(methodId, version, "listMethodVersionShowcases");
+    return this.requestMethodShowcaseList(endpoint, options);
+  }
+  /**
+   * One showcase of the tree a published version holds, in full, with a short-lived link to each of
+   * its files — `GET /v1/methods/{id}/versions/{n}/showcases/{showcase_id}`. Read with
+   * `parseExactJson`, so an integer past `Number.MAX_SAFE_INTEGER` in its document is a `bigint`. A
+   * showcase of another tree reads as not found.
+   *
+   * The refusals are `listMethodVersionShowcases`'s, and a showcase that tree does not hold is a
+   * `404` `pipelex.catalog.not_found` whose `params.resource` is `example`. The showcase id is
+   * refused as `withdrawMethodShowcase` refuses it. An answer that does not read as a detail is an
+   * answer the SDK cannot read, thrown as an `ApiResponseError` too, its signed links redacted.
+   */
+  async getMethodVersionShowcase(methodId, version, showcaseId, options = {}) {
+    const call = "getMethodVersionShowcase";
+    const list = methodVersionShowcasesPath(methodId, version, call);
+    const endpoint = `${list}/${idPathSegment(showcaseId, call, SHOWCASE_ID_ARGUMENT)}`;
+    return this.requestMethodShowcaseDetail(endpoint, options);
+  }
+  /** The `{items}` of a route answering showcase summaries, each read as `readMethodShowcaseSummaries` reads it. */
+  async requestMethodShowcaseList(endpoint, options) {
+    const res = await this.requestProductAnswer("GET", endpoint, void 0, {
+      signal: options.signal
+    });
+    const answer = this.readObjectAnswer("GET", endpoint, res);
+    if (!Array.isArray(answer.items)) {
+      throw this.unreadableAnswer(
+        "GET",
+        `/${API_PREFIX2}/${endpoint}`,
+        res,
+        "a list of showcases whose `items` is not an array"
+      );
+    }
+    return { ...answer, items: readMethodShowcaseSummaries(answer.items) };
+  }
+  /** A route answering one showcase in full, its answer read exactly and any error's links redacted. */
+  async requestMethodShowcaseDetail(endpoint, options) {
+    const res = withLinks(
+      await this.requestProductAnswer("GET", endpoint, void 0, { signal: options.signal })
+    );
+    const answer = this.readObjectAnswer(
+      "GET",
+      endpoint,
+      res,
+      {},
+      parseExactJson
+    );
+    const fault2 = methodShowcaseDetailFault(answer);
+    if (fault2 !== null) {
+      throw this.unreadableAnswer("GET", `/${API_PREFIX2}/${endpoint}`, res, `a showcase ${fault2}`);
+    }
+    return answer;
+  }
+  /**
+   * Set which catalogs of a method have their layouts switched off —
+   * `PUT /v1/methods/{id}/layouts-off` — and return the method, its `layouts_off` the list as held.
+   *
+   * `catalogs` is the whole list and replaces the one held, each catalog id once, at most 8, empty
+   * when every design is on: to change one, read `layouts_off` and write the new list. The switch
+   * acts at once, with no publish, and holds across every publish. A layout switched off is kept,
+   * and `listMethodLayouts` still answers it; a host draws the plain page instead. Like a rename, it
+   * never moves the draft token, so the `updated_at` a caller holds stays valid.
+   *
+   * The last write to land is the one held. `options.idempotencyKey` is sent as the
+   * `Idempotency-Key` header, so a write whose answer was lost is sent again under the same key and
+   * answered as the first was (`MethodLayoutsOffOptions`).
+   *
+   * The write changes the method, so it takes an `admin` or a `member` of the method's
+   * organization. Takes a bare catalog id, as `getMethod` does. Throws `RequestArgumentError` before
+   * any request for `catalogs` that is not an array; its entries are sent as given. Throws
+   * `ApiResponseError`: `404` `pipelex.catalog.not_found` for an unknown method or another
+   * organization's, a public one included; `403` `auth.forbidden` naming the `member` requirement
+   * for a `runner` or a caller with no recognised role; `409` `pipelex.catalog.being_deleted` while
+   * the method's erasure is pending, under way or stopped; `413` `request.too_large` for a list that
+   * would leave the method too large to publish, which a list that does not grow never is; and
+   * `422` `request.invalid` for more than 8 catalogs, a catalog named twice or one that is not a
+   * slug. Under an idempotency key, `409` `request.idempotency_conflict` for the key sent with a
+   * different list and `409` `request.idempotency_key_in_use` while its earlier request is still
+   * being handled; a key that is not 1 to 255 visible ASCII characters is a `RequestArgumentError`
+   * before any request.
+   */
+  async setMethodLayoutsOff(methodId, catalogs, options = {}) {
+    const call = "setMethodLayoutsOff";
+    const endpoint = `${methodPath(methodId, call)}/layouts-off`;
+    if (!Array.isArray(catalogs)) {
+      throw argumentRefusal(
+        call,
+        LAYOUTS_OFF_CATALOGS_ARGUMENT,
+        describeNumberArgument(catalogs),
+        "not_a_list"
+      );
+    }
+    const idempotencyKey = idempotencyKeyOf(options, "set the layouts off");
+    return this.requestMethodData("PUT", endpoint, { catalogs }, { idempotencyKey });
+  }
+  /**
    * Copy a method into an organization the caller may change methods in —
    * `POST /v1/methods/{id}/copy`: the method's own organization for a duplicate, another team, or
    * the caller's personal workspace.
@@ -18235,10 +18955,17 @@ var PipelexApiClient = class {
    * original stays as it was. The copy takes the draft, never the latest published version; with
    * `expected_draft_updated_at`, it takes exactly the draft the caller last saw.
    *
+   * **Another organization's public method copies too**, a template of the catalog among them,
+   * from its latest published version rather than its draft: that version's tree, description and
+   * categories, and the method's examples, never the owner's form inputs, with `copied_from`
+   * naming the `version`. Leave `expected_draft_updated_at` out then: sent with such a method, it
+   * is refused with a `422` `request.invalid` naming it.
+   *
    * The answer is a `MethodCopyResult` discriminated on `outcome` — branch on it: `copied` with
-   * the copy as `method`, `examples_copied` and `stored_files_copied`; `refused` with the
+   * the copy as `method`, `examples_copied`, `stored_files_copied` and the counts reserved for
+   * showcases, `showcases_copied` and `layouts_copied`; `refused` with the
    * `reason` `bundle_names_other_storage`, a `message` and every `references` entry (`{ path, uri
-   * }`) a `.mthds` file of the draft holds that the destination cannot read and, in a duplicate,
+   * }`) a `.mthds` file of the tree holds that the destination cannot read and, in a duplicate,
    * that names a file under the original's run files, which erasing the original would remove,
    * nothing written.
    *
@@ -18257,7 +18984,8 @@ var PipelexApiClient = class {
    * that is not from a web session, or for a role that may not change methods, in the method's
    * organization or in the destination; `404` `pipelex.org.not_found` for a destination the
    * caller does not belong to, still being set up or unknown, alike; `404`
-   * `pipelex.catalog.not_found` for an unknown method; `409` `pipelex.catalog.being_deleted`;
+   * `pipelex.catalog.not_found` for an unknown method and for another organization's internal
+   * one; `409` `pipelex.catalog.being_deleted` while the erasure of the caller's own method runs;
    * `409` `pipelex.catalog.update_conflict` for a draft that moved since
    * `expected_draft_updated_at`; a `409` whose `domain` is `runtime` and `retry` `no`, for a
    * draft whose tree the method's organization holds no record of or no longer holds every file
@@ -18337,30 +19065,6 @@ var PipelexApiClient = class {
       throw this.unreadableAnswer("POST", `/${API_PREFIX2}/${endpoint}`, res, fault2);
     }
     return answer;
-  }
-  /**
-   * One page of the copies made of a method, in the order of the copies' ids, which says nothing
-   * of when each was made — `GET /v1/methods/{id}/copies`.
-   *
-   * Each row is the `MethodCopyMarker` the original keeps of a copy: the copy's id, the
-   * destination's id, the member who made it and when. The destination is named by its id alone,
-   * never its name, so a surface shows a destination's name only from the reader's own
-   * memberships, and a copy in an organization the reader does not belong to stays a bare id. A
-   * marker stays when its copy is erased, and the copy then reads as not found. Pass the page's
-   * `nextCursor` back as `cursor` to continue; `null` is the last page. A method never copied,
-   * and a copy itself, answer an empty page. The listing is open to every member of the method's
-   * organization, a runner included, as every read of a method is.
-   *
-   * Takes a bare catalog id, as `getMethod` does. Throws `ApiResponseError`: `404`
-   * `pipelex.catalog.not_found` for an unknown method, `409` `pipelex.catalog.being_deleted`, and
-   * `422` `request.invalid` for a cursor the listing did not issue for this method or a `limit`
-   * outside 1 to 100. A page whose `items` is not an array or whose `next_cursor` is neither a
-   * string nor `null` is an answer the SDK cannot read, thrown as an `ApiResponseError` too.
-   */
-  async listMethodCopies(methodId, query = {}) {
-    const search = productQuery({ limit: query.limit, cursor: query.cursor });
-    const endpoint = `${methodPath(methodId, "listMethodCopies")}/copies`;
-    return this.requestPage(`${endpoint}${search}`);
   }
   /**
    * Erase a method and everything it produced — `DELETE /v1/methods/{id}`.
@@ -18686,34 +19390,44 @@ var PipelexApiClient = class {
   }
   /**
    * The branding of the caller's active organization — `GET /v1/branding`: its name, its light
-   * and dark colour sets and its two logos. Any role reads it, `runner` included, by web session
-   * or API key, so an app scaffolded from the method-app template reads its organization's
-   * branding with its own key. A personal workspace, or a team that set nothing, answers every
-   * colour and logo `null`. A logo's `uri` is a `pipelex-storage://` reference, which
-   * `resolveStorageUrl` turns into a short-lived link to its bytes.
+   * and dark colour sets, its two logos, its app style and typeface, and whether it holds the
+   * white-label entitlement. Any role reads it, `runner` included, by web session or API key, so
+   * an app scaffolded from the method-app template reads its organization's branding with its own
+   * key. A personal workspace, or a team that set nothing, answers every colour and logo `null`
+   * and no style or typeface. A logo's `uri` is a `pipelex-storage://` reference, which
+   * `resolveStorageUrl` turns into a short-lived link to its bytes. An answer without `style`,
+   * `typeface` or `white_label`, as a platform that predates them sends, reads as `null`, `null`
+   * and `false`.
    *
-   * Throws `ApiResponseError`: `400` when the caller has no active organization, `404` when its
-   * row is missing, and an answer that is not a JSON object, an empty one included.
+   * Throws `ApiResponseError`: `403` `pipelex.org.required` when the caller has no active
+   * organization, `404` when its row is missing, and an answer that is not a JSON object, an
+   * empty one included.
    */
   async getBranding() {
-    return this.requestProductObject("GET", "branding");
+    const answer = await this.requestProductObject("GET", "branding");
+    return withCheckedBrandingChoices(answer);
   }
   /**
-   * Set or clear an organization's branding — `PATCH /v1/organizations/{org_id}/branding`, an
-   * admin's write to the active organization. Every key of `input` is optional: a value sets it,
-   * `null` clears it, and a key left out keeps its value (`OrganizationBrandingUpdate`), so `{}`
-   * writes nothing. A new logo is the `pipelex-storage://` URI of a file the organization uploaded
-   * on its own, which the platform reads and measures, then copies under `branding/`: the answer's
-   * `uri` is that copy, and sending it back unchanged keeps the logo. The logo a write replaces or
-   * clears is erased. Answers the branding as the write left it.
+   * Set or clear an organization's branding — `PATCH /v1/organizations/{org_id}/branding`, a
+   * write to the active organization by the `admin` or the `member` role, never a `runner`. Every
+   * key of `input` is optional: a value sets it, `null` clears it, and a key left out keeps its
+   * value (`OrganizationBrandingUpdate`), so `{}` writes nothing. A new logo is the
+   * `pipelex-storage://` URI of a file the organization uploaded on its own, which the platform
+   * reads and measures, then copies under `branding/`: the answer's `uri` is that copy, and sending
+   * it back unchanged keeps the logo. The logo a write replaces or clears is erased. A style or a
+   * typeface is an id of the shape `^[a-z0-9-]{1,32}$`, stored whether or not it names one that
+   * exists. Answers the branding as the write left it, read as `getBranding` reads it.
    *
    * Throws `RequestArgumentError` for an organization id that is empty, `.` or `..`, before any
    * request. Throws `ApiResponseError`, refusing every change of the request when it refuses one:
    * `403` `pipelex.org.mismatch` when `orgId` is not the active organization, `403`
-   * `auth.forbidden` for a caller who is not its admin, `404` `pipelex.org.not_found` for a missing
-   * organization, `409` `pipelex.org.not_manageable` for a personal workspace, which has no
-   * branding, and `422` `request.invalid` for a colour that is not `#rrggbb` or a key the body does
-   * not know. A logo's refusal names its slot in its problem's `errors`, each item's
+   * `auth.forbidden` for a runner or a caller with no recognised role, `404`
+   * `pipelex.org.not_found` for a missing organization, `409` `pipelex.org.not_manageable` for a
+   * personal workspace, which has no branding, and `422` `request.invalid` for a colour that is
+   * not `#rrggbb`, a style or a typeface of another shape, or a key the body does not know, which
+   * names the field in `location.field`: the problem's own when it refuses one field alone, each
+   * item's of its `errors` when it refuses several. `white_label` is such a key, since only
+   * Pipelex staff grant it. A logo's refusal names its slot in its problem's `errors`, each item's
    * `location.field` being `square_logo` or `wide_logo` and its `detail` the sentence to show under
    * that slot: `422` `pipelex.storage.uri_invalid` for a URI that is not a storage URI, `403`
    * `pipelex.org.mismatch` for another organization's file, and `422` `request.invalid` with an
@@ -18723,7 +19437,12 @@ var PipelexApiClient = class {
    */
   async updateOrganizationBranding(orgId, input) {
     const segment = idPathSegment(orgId, "updateOrganizationBranding", ORG_ID_ARGUMENT);
-    return this.requestProductObject("PATCH", `organizations/${segment}/branding`, input);
+    const answer = await this.requestProductObject(
+      "PATCH",
+      `organizations/${segment}/branding`,
+      input
+    );
+    return withCheckedBrandingChoices(answer);
   }
   /**
    * The organization's webhook signing secret — `GET /v1/organizations/{org_id}/webhook-secret`:
@@ -20025,6 +20744,89 @@ function savedFilesFault(files) {
   }
   return null;
 }
+var OWNER_ONLY_METHOD_MEMBERS = [
+  "draft_digest",
+  "created_by_user_id",
+  "input_data",
+  "pipe_output",
+  "copied_from",
+  "deletion_state"
+];
+function methodReadFault(method) {
+  if ("updated_at" in method) return null;
+  const ownerMember = OWNER_ONLY_METHOD_MEMBERS.find((member) => member in method);
+  if (ownerMember !== void 0) {
+    return `without \`updated_at\` that carries the owner's \`${ownerMember}\``;
+  }
+  if (!isPositiveInteger(method.latest_version)) {
+    return "read as another organization's public method whose `latest_version` is not a positive integer";
+  }
+  if (!isPlainObject(method.latest_published)) {
+    return "read as another organization's public method whose `latest_published` is not an object";
+  }
+  return null;
+}
+function isPositiveInteger(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
+function isStringArray2(value) {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+function methodTemplatesFault(items) {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (!isPlainObject(item))
+      return `\`items\` holds an entry that is not an object, at [${index}]`;
+    for (const member of ["method_id", "name", "organization_name"]) {
+      if (typeof item[member] !== "string") {
+        return `\`items\` holds a template whose \`${member}\` is not a string, at [${index}]`;
+      }
+    }
+    if (item.description !== null && item.description !== void 0 && typeof item.description !== "string") {
+      return `\`items\` holds a template whose \`description\` is neither a string nor null, at [${index}]`;
+    }
+    if (!isPositiveInteger(item.latest_version)) {
+      return `\`items\` holds a template whose \`latest_version\` is not a positive integer, at [${index}]`;
+    }
+    if (!isStringArray2(item.categories)) {
+      return `\`items\` holds a template whose \`categories\` is not an array of strings, at [${index}]`;
+    }
+    const thumbnails = item.thumbnails;
+    if (!Array.isArray(thumbnails)) {
+      return `\`items\` holds a template whose \`thumbnails\` is not an array, at [${index}]`;
+    }
+    for (let position = 0; position < thumbnails.length; position += 1) {
+      const thumbnail = thumbnails[position];
+      const where = `at [${index}].thumbnails[${position}]`;
+      if (!isPlainObject(thumbnail))
+        return `\`items\` holds a thumbnail that is not an object, ${where}`;
+      for (const member of ["path", "media_type", "sha256", "url", "expires_at"]) {
+        if (typeof thumbnail[member] !== "string") {
+          return `\`items\` holds a thumbnail whose \`${member}\` is not a string, ${where}`;
+        }
+      }
+      for (const member of ["width", "height"]) {
+        if (!isPositiveInteger(thumbnail[member])) {
+          return `\`items\` holds a thumbnail whose \`${member}\` is not a positive integer, ${where}`;
+        }
+      }
+    }
+  }
+  return null;
+}
+function methodCategoriesFault(categories) {
+  for (let index = 0; index < categories.length; index += 1) {
+    const category = categories[index];
+    if (!isPlainObject(category) || typeof category.slug !== "string" || typeof category.label !== "string") {
+      return `\`categories\` holds an entry without a string \`slug\` and \`label\`, at [${index}]`;
+    }
+    const labels = category.labels;
+    if (!isPlainObject(labels) || !Object.values(labels).every((label) => typeof label === "string")) {
+      return `\`categories\` holds an entry whose \`labels\` is not an object of strings, at [${index}]`;
+    }
+  }
+  return null;
+}
 function extractNetworkErrorCode(err) {
   if (err instanceof DOMException && err.name === "TimeoutError") {
     return "ABORT_TIMEOUT";
@@ -20085,6 +20887,41 @@ function withVerdictItems(answer) {
   else if (Object.hasOwn(answer, "warnings")) read.warnings = readProblemItems(answer.warnings);
   return read;
 }
+function withReadLayouts(answer) {
+  if (!isPlainObject(answer) || answer.is_valid !== true || !Object.hasOwn(answer, "layouts")) {
+    return answer;
+  }
+  const read = { ...answer };
+  const layouts = readMethodLayouts(answer.layouts);
+  if (layouts.length === 0) delete read.layouts;
+  else read.layouts = layouts;
+  return read;
+}
+function sentMembers(members, source) {
+  const sent = {};
+  for (const [member, presence] of Object.entries(members)) {
+    const value = source[member];
+    if (presence === "required" || value != null) sent[member] = value;
+  }
+  return sent;
+}
+function methodLayoutBody(layout, call) {
+  if (!isPlainObject(layout)) {
+    throw argumentRefusal(call, LAYOUT_ARGUMENT, describeNumberArgument(layout), "not_an_object");
+  }
+  const provenance = layout.provenance;
+  if (!isPlainObject(provenance)) {
+    throw argumentRefusal(
+      call,
+      LAYOUT_PROVENANCE_ARGUMENT,
+      describeNumberArgument(provenance),
+      "not_an_object"
+    );
+  }
+  const body = sentMembers(LAYOUT_INPUT_MEMBERS, layout);
+  body.provenance = sentMembers(PROVENANCE_INPUT_MEMBERS, provenance);
+  return body;
+}
 function withCheckedProblem(record) {
   if (!isPlainObject(record) || !Object.hasOwn(record, "error")) return record;
   return { ...record, error: isProblem(record.error) ? record.error : null };
@@ -20096,6 +20933,14 @@ function withCheckedUse(use) {
     ...use,
     created_by: typeof use.created_by === "string" ? use.created_by : null,
     method_version: Number.isInteger(version) || version === "draft" ? version : null
+  };
+}
+function withCheckedBrandingChoices(answer) {
+  return {
+    ...answer,
+    style: typeof answer.style === "string" ? answer.style : null,
+    typeface: typeof answer.typeface === "string" ? answer.typeface : null,
+    white_label: answer.white_label === true
   };
 }
 function withCheckedDegradation(run) {

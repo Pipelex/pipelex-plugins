@@ -150,8 +150,8 @@ Use bare or qualified (`native.Text`) — bare wins on resolution. Never redecla
 | `Text` | A string. |
 | `Markdown` | A text written in Markdown, which refines `Text` (`text`, the source). Declare an LLM's output `Markdown` when the text is to be read formatted, in a PDF or an HTML page: a `Text` prints its `#` and `**` as they are. A `Markdown` value goes wherever a `Text` does, never the reverse. |
 | `Image` | A binary image (JPEG, PNG, ...). |
-| `Document` | A document file or a web page URL, and the file a `PipeDocGen` prints. `PipeExtract` reads a PDF, an image or a web page, and nothing else: a Word, Excel or PowerPoint file fails the run at the extraction, so a method over Office documents takes the PDF exported from them. See its section before designing over Office files. |
-| `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF). |
+| `Document` | A document file or a web page URL, and the file a `PipeDocGen` prints. A Word, Excel or PowerPoint file is a `Document` too: on Pipelex's hosted platform, `PipeExtract` reads a `.docx`, `.xlsx` or `.pptx` as it is, and a step that needs a PDF reads one the platform converts, which leaves some of the file out. See `PipeExtract`'s section before designing over Office files. |
+| `Page` | A single extracted page (`text_and_images`, `page_view` — the latter only when the `PipeExtract` that produced it set `page_views = true` on a PDF, or on an Office file the hosted platform converts). |
 | `Html` | HTML content. |
 | `TextAndImages` | Mixed text + images. |
 | `Number` | A numeric value. |
@@ -537,7 +537,18 @@ When the target field expects a content object (a concept-typed field), the obje
 
 ### PipeExtract — extract pages from a Document or Image
 
-**It reads a PDF, an image or a web page, and nothing else.** A Word, Excel or PowerPoint file passes validation and preparation, then fails the run at this step with an extraction error naming the formats it accepts. When the user's files are Office documents, say so at the contract and design for the PDF they export from them (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed): the input stays a `Document`, its description says PDF, and the test inputs are PDFs too.
+**It reads a PDF, an image, a web page and, on Pipelex's hosted platform, a Word, Excel or PowerPoint file.** There, under a `Document` input, the extraction is known to take a JPEG, PNG, BMP or TIFF picture. A HEIC or HEIF, WebP, GIF or SVG picture goes in as a PNG converted into a fresh temporary directory: a WebP, a GIF or a phone's HEIC picture passes run setup and then fails the run at this step, and none of the others has been shown to work.
+
+**An Office file is read as it is, or as its PDF.** On the hosted platform, the extraction reads a `.docx`, `.xlsx` or `.pptx` as it is, and loses the text inside pictures embedded in the file and the table structure of an Excel sheet. A step reads a PDF the platform converts from the file instead when it sets `page_views = true`, since page views are drawn from a PDF and the extraction then reads that same PDF, and when the file is a legacy (`.doc`, `.xls`, `.ppt`) or OpenDocument (`.odt`, `.ods`, `.odp`) file, which the extraction does not read. A `PipeLLM` whose prompt names the file reads that PDF too, when its model reads PDFs. The run keeps the original as its input and value; only the model reads the PDF.
+
+**A conversion keeps the printed pages, and drops what does not print.** It leaves out a Word document's comments, a workbook's hidden sheets and a presentation's speaker notes, shows a tracked change's deleted and inserted text side by side as if both were current, cuts a sheet or a chart wider than a page across several pages, and clips a cell's text where the next cell is filled, keeping only the part that shows ("The rate in this Excel file" reads "The rate in"). Everything else reaches the page, pictures included. So choose the route at the contract, and say it there when the user's files are Office documents:
+
+- **The text of a document, and the tables of a Word or PowerPoint file**: extract it as it is, with no page views.
+- **Pages to show or to send to a vision model, the text inside a file's pictures, or a sheet's table structure**: set `page_views = true`, which reads the PDF, and say what the conversion drops.
+- **The rows of an Excel Table or a CSV file, as records**: no extraction, but a `PipeStructure` reading the file (below), with no model.
+- **What a conversion drops** (comments, hidden sheets, speaker notes, which side of a tracked change is current): no route is known to read it. Extracting the original is the only one that skips the conversion, and whether it reads those parts is not established, so tell the user, and check the extracted pages on a test file before the method relies on them.
+
+The input stays a `Document`, its description names the formats the user's files come in, and the test inputs can be the Office files themselves. **A runner the user hosts converts only when its `[runtime.document_conversion]` names a converter**, Gotenberg or `soffice`. Without one, which is its default, it refuses an Office file that a step could read only as a PDF with `input.file_type_unsupported`, before the run starts or, for a step only a condition reaches, at that step; the method then takes the PDF exported from the file (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed), and its test inputs are PDFs.
 
 ```toml
 [pipe.extract_document]
@@ -546,7 +557,7 @@ description = "Extract content from a document"
 inputs      = { document = "Document" }
 output      = "Page[]"
 # model               = "@default-text-from-pdf"  # optional
-# page_views          = true                      # optional, PDFs only: fills each Page's page_view
+# page_views          = true                      # optional, PDFs and Office files: fills each Page's page_view
 # page_views_dpi      = 150                       # optional, with page_views
 # max_page_images     = 0                         # optional: 0 keeps no embedded images
 # page_image_captions = true                      # optional, caption-capable models only
@@ -563,7 +574,7 @@ output      = "Page[]"
 | Field | What it does |
 |-------|--------------|
 | `model` | Which extraction model to use, e.g. `"@default-text-from-pdf"` or `"@default-extract-web-page"`. |
-| `page_views` | PDFs only: renders every page as an image and puts it in that `Page`'s `page_view`. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, the run fails when it reaches the render, after the extraction has been paid for. |
+| `page_views` | Renders every page of a PDF, or of an Office file the hosted platform converts to PDF (above), as an image and puts it in that `Page`'s `page_view`; a runner with no converter configured refuses an Office file. **Off by default, and `page_view` stays unset without it** — a method that shows a page, or sends one to a vision model, must set `page_views = true`. On a web page, the run fails when it reaches the render, after the extraction has been paid for. |
 | `page_views_dpi` | Resolution of those renders; omitted, the runtime's `default_page_views_dpi` applies (72 unless configured otherwise). Only has an effect alongside `page_views = true`. |
 | `max_page_images` | How many of the images embedded in the pages the extraction keeps: `0` keeps none, and a positive `N` caps them — per page on some models, across the whole document on others. Omitted, the model preset's own limit applies; the default models have none, so every image is kept. |
 | `page_image_captions` | Requires a model that captions the images it pulls out: on any other, the run fails with a capability error. It does not switch captioning on — a caption-capable model returns its captions whether or not this is set — so it only guards a method that depends on captions against the wrong model. |
@@ -572,7 +583,43 @@ output      = "Page[]"
 
 **With an `Image` input**, `page_views` and `page_image_captions` cannot be turned on, and `page_views_dpi` and `max_page_images` cannot be set at all: they describe a document's pages, and validation rejects them on an image.
 
-**A web page is read only with `model = "@default-extract-web-page"`.** Its input is still a `Document`, the page's URL in the `url` field, but the default extraction model reads PDFs and images: given a web page, it fails the run at this step with `Could not identify file type of given bytes`, after validation has passed. A URL to a PDF is a PDF, which the default reads.
+**A web page is read only with `model = "@default-extract-web-page"`.** Its input is still a `Document`, the page's URL in the `url` field, but the default extraction model reads files, not web pages: given a web page, it fails the run at this step with `Could not identify file type of given bytes`, after validation has passed. A URL to a PDF is a PDF, which the default reads.
+
+### PipeStructure — read a spreadsheet into records
+
+**Given a spreadsheet `Document`, it reads one table into a list of records, one per data row, and calls no model.** The file is an Excel workbook (`.xlsx`) or a CSV file, judged from its bytes, then its media type, then its name; any other format, a legacy `.xls` or an `.ods` included, is refused with `input.file_type_unsupported`.
+
+```toml
+[concept.ExpenseWorkbook]
+description = "An expense workbook holding an Expenses Table"
+refines     = "Document"
+
+[concept.ExpenseRow]
+description = "One row of an expense workbook"
+
+[concept.ExpenseRow.structure]
+row            = { type = "integer", description = "The row's position in the Table", required = true }
+invoice_number = { type = "text", description = "The invoice number", required = true }
+amount         = { type = "number", description = "The amount" }
+category       = { type = "text", description = "The expense category, empty when not yet filled" }
+
+[pipe.read_expenses]
+type        = "PipeStructure"
+description = "Read the rows of the expense workbook"
+inputs      = { workbook = "ExpenseWorkbook" }
+output      = "ExpenseRow[]"
+table       = "Expenses"
+row_field   = "row"
+```
+
+- **One input, single, whose concept is `Document` or refines it**, never a concept holding a `Document` in a field.
+- **The output is a variable list of a flat structured concept**: `Foo[]`, never `Foo` or `Foo[N]`, whose fields are each `text`, `integer`, `number`, `boolean`, `date` or `datetime`, or carry `choices`: no `concept` or `list` field. The table decides how many records come out.
+- **`model` is refused on this path.** It reads; it never infers.
+- `table` names the Excel Table to read (Insert > Table in Excel), compared ignoring case; omit it when the workbook holds exactly one Table. A sheet's cells outside a Table are not read, and a CSV file, which has no Tables, takes no `table`.
+- `row_field` names an `integer` or `number` field that receives each row's position among the data rows, counted from 1, which `table_fill = "update"`'s `match_row` finds the row by (section 6, `PipeDocGen`). No column may match it.
+- **Columns are matched to fields ignoring case, spaces, dots and underscores**, so a `Unit price` column fills `unit_price`. A column matching no field is ignored; a required field matching no column, or a column matching two fields, is refused. An empty cell takes the field's default, or nothing, and a value that does not convert fails the step, naming the row and the field.
+
+**A `PipeStructure` over a `Text` input, which asks a model to structure it, is outside the authoring subset**: a bundle you read may carry one, but write a `PipeLLM` with a structured output concept instead.
 
 ### PipeSearch — search the web
 
@@ -675,11 +722,14 @@ filename    = "inspection-report"
 | Field | What it does |
 |-------|--------------|
 | `template` | An inline HTML template, for `pdf` only (below). |
-| `template_file` | A template file beside the bundle, its path relative to the `.mthds` file that names it and inside the bundle's directory: an `.html` file for `pdf`, and the `.xlsx`, `.docx` or `.pptx` file itself for the other formats. Never together with `template`. `pptx` requires one. |
-| `filename` | The file's name without its suffix, a Jinja expression over the inputs such as `"invoice-{{ invoice.invoice_number }}"`. Omitted, it is the pipe's code. |
+| `template_file` | A template file beside the bundle, its path relative to the `.mthds` file that names it and inside the bundle's directory: an `.html` file for `pdf`, and the `.xlsx`, `.docx` or `.pptx` file itself for the other formats. Never together with `template` or `template_input`. `pptx` requires one, or a `template_input`. |
+| `template_input` | The input whose file is the office template, for `xlsx`, `docx` or `pptx`: the run supplies the file to fill (below). Never together with `template` or `template_file`. |
+| `table_fill` | How a list input's records fill a Table of an office template: `replace`, the default, `append` or `update`, the last two for `xlsx` only (below). |
+| `match_on`, `match_row`, `cells` | Under `table_fill = "update"` alone: how a record finds its row, and which cells it may write (below). |
+| `filename` | The file's name without its suffix, a Jinja expression over the inputs such as `"invoice-{{ invoice.invoice_number }}"`. Omitted, it is the pipe's code, or with a `template_input` the name of the input's file. |
 | `model` | The document engine that prints the file. Omit it: the deck's default engine for the format, with or without a template, prints it. A reference the user asks for is checked with `doc_gen`, as "Model references" says. |
 
-**Without a template, the step lays its inputs out itself**, for `pdf`, `xlsx` and `docx`; `pptx` has no layout of its own and always takes a `template_file`. A single input is the document itself, and several inputs each get a section, in the order `inputs` declares them. In a PDF, a structure's scalar fields make a grid of labels and values, a list of a declared structure whose fields are all flat makes a table, and a nested structure makes a section; a `Text` prints as plain paragraphs and a `Markdown` formatted, with its headings, lists, tables and links; an `Image` prints as a picture with its caption, an `Html` as its text with the tags removed, and a `YesNo`, `Choice` or `Rating` as its verdict alone. **So the report an LLM writes for a document is declared `Markdown`**, as in the example: declared `Text`, it prints its `#` and `**` as they are.
+**Without a template, the step lays its inputs out itself**, for `pdf`, `xlsx` and `docx`; `pptx` has no layout of its own and always takes a `template_file` or a `template_input`. A single input is the document itself, and several inputs each get a section, in the order `inputs` declares them. In a PDF, a structure's scalar fields make a grid of labels and values, a list of a declared structure whose fields are all flat makes a table, and a nested structure makes a section; a `Text` prints as plain paragraphs and a `Markdown` formatted, with its headings, lists, tables and links; an `Image` prints as a picture with its caption, an `Html` as its text with the tags removed, and a `YesNo`, `Choice` or `Rating` as its verdict alone. **So the report an LLM writes for a document is declared `Markdown`**, as in the example: declared `Text`, it prints its `#` and `**` as they are.
 
 **A `pdf` template is HTML**, inline in `template` or in an `.html` `template_file`, rendered as a `PipeCompose` template of the `html` category is: `$var` and `@var`, the `format` and `tag` filters, autoescaping. A fragment is wrapped in a print stylesheet with a running header and page numbers; a whole HTML document prints as written, with its own CSS page setup.
 
@@ -708,6 +758,49 @@ template    = """
 
 A dry run composes the document for real against mock inputs, which checks the template and the file name, prints nothing and outputs a mock `Document`.
 
+#### A file the run supplies, and filling its Table
+
+**`template_input` fills the caller's own file**: the method takes a workbook, a Word document or a deck as an input and returns a filled copy of it. The input is declared single and required, as `Document` or a concept refining it; it is the template, not data, so the step's other inputs fill it. **The output is a new file**, named after the input's file unless `filename` says otherwise; the caller's file is never changed in place. The file must be of the step's `format`, judged from its bytes, or the run is refused with `input.file_type_unsupported`. Validation cannot see a file the run has not supplied yet, so a valid verdict carries a `pipelex.docgen.template_warning` saying the template is checked when a run supplies it: that is expected, not a finding to fix. When the run starts, a template the engine finds unfit refuses it as `pipelex.docgen.template_input_unfit`.
+
+**`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches. **A list input of records, a list of a structured concept, fills the Table named after it**, the two names compared ignoring case, spaces, dots and underscores, so the list input `expenses` fills the Table `Expenses` while one named `expense_rows` fills nothing; a list of single values, such as `Text[]`, fills no Table. Under `append` or `update`, a list input of records matching no Table of the workbook is refused: in a method's own `template_file`, at validation and the dry run, as `pipelex.docgen.template_invalid`; in a workbook supplied through `template_input`, when the run starts, as `pipelex.docgen.template_input_unfit`.
+
+```toml
+[concept.ExpenseCompletion]
+description = "The category found for one expense, keyed by its invoice number"
+
+[concept.ExpenseCompletion.structure]
+invoice_number = { type = "text", description = "The invoice number, copied from the row", required = true }
+category       = { type = "text", description = "The expense category found" }
+
+[pipe.append_expenses]
+type           = "PipeDocGen"
+description    = "Add the extracted expenses to the caller's expense workbook"
+inputs         = { workbook = "ExpenseWorkbook", expenses = "ExpenseRow[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "append"
+
+[pipe.complete_expenses]
+type           = "PipeDocGen"
+description    = "Write the categories found into the caller's expense workbook"
+inputs         = { workbook = "ExpenseWorkbook", expenses = "ExpenseCompletion[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "update"
+match_on       = ["invoice_number"]
+```
+
+`ExpenseWorkbook` and `ExpenseRow` are the concepts the `PipeStructure` example declares. Under `update`:
+
+- **A record finds its row by exactly one of two ways.** `match_on` names the fields whose columns are the Table's key; `match_row = "row"` names the field holding the row's position among the Table's data rows, an integer or number field filled by the `row_field` of the `PipeStructure` that read the Table (section 6, `PipeStructure`). **The key or the position travels unchanged, never produced by a model**: a `PipeBatch` over the rows keeps the order, and the record is assembled by a `PipeCompose` construct taking `row = { from = "expense.row" }` beside what the model found. At least one list input must carry the matching fields, or the method is refused when it loads.
+- **A null leaves its cell as it was**: it means the method produced nothing for that cell, the opposite of `replace` and `append`, where a null empties the cell.
+- **`cells`** is `fill_empty`, the default, which writes only empty cells and fails the step on a non-empty cell holding a different value, or `overwrite`, for corrections. A formula cell and a calculated column are never written.
+- **All or nothing**: a key twice in the Table, a record matching no row and two records matching one row fail the step before anything is written.
+
+`match_on`, `match_row` and `cells` are refused under any other fill. **An `append` or `update` needs an engine that declares it**: one that does not is refused when the method loads, `model.capability_unsupported`, which `mthds_validate` reports; tell the user rather than changing the fill in silence.
+
 #### Template files
 
 **A template file travels with the bundle**, as its `.mthds` files do: a runner that receives the bundle without it refuses the step when the method loads. **The workshop finds it**: given the bundle directory as `method_dir`, it reads the folder's `.mthds` files, looks each step's `template_file` up among the folder's files from the directory of the `.mthds` file naming it, sends what it finds beside them, keyed by that `template_file`, and lists every file it sent in `files_sent`. A template the folder does not hold, or holds only where its rule leaves it out, is not sent, and the runner reports it as not supplied; one reached through a nested repository, or held only in another letter case, is refused at `method_dir`, naming the cause.
@@ -724,9 +817,9 @@ A dry run composes the document for real against mock inputs, which checks the t
 
 **A workshop older than template files refuses one** as *Path is not a .mthds file*: the same refresh cures it. Never rewrite the step to do without its template to get past it.
 
-**The catalog stores no template file yet**: `mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template file does not load by its id, while its directory still validates and runs as `method_dir`.
+**The catalog stores no template file yet**: `mthds_save_method` takes `.mthds` and `.py` files alone, so a saved method whose step names a template file does not load by its id, while its directory still validates and runs as `method_dir`. A `template_input` step names no template file: its template is a run input, so nothing travels with the bundle for it.
 
-**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, a problem item located at the step's pipe (`location.pipe`) whose `params` carry `template_file`, the file as the step names it, and `template_location`, where in the file, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict.
+**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`** is the template check's finding in the file a step names, a problem item located at the step's pipe (`location.pipe`) whose `params` carry `template`, the file as the step names it, and `finding`, what the check found and, when it says, where in the file, such as a field that matches no input of the step. It never changes `is_valid`, but the printed file may show it. A skill that writes the method fixes it in the template it wrote, or in the step, and validates again; a template the user supplied is theirs, so name the finding and ask before changing it. A skill that only reads or runs the method reports it with the verdict. **A `template_input` step's warning is the exception**: its `template` names the input, such as `the input 'workbook'`, and its `finding` says the template is checked when a run supplies it. Every valid verdict of such a step carries it, so no skill fixes it, asks about it or reports it as a finding; at most, say that the caller's file is checked when the run starts.
 
 ### PipeFunc — call a Python function of the method's folder
 
@@ -790,7 +883,7 @@ signature_for = "PipeLLM"   # optional hint: the intended implementation type
 - `signature_for` records the *intended* next-level type. It is a **hint, not a binding contract** — the implementation may override it. It may **not** be `"PipeSignature"`. Omit it if unsure.
 
 **`signature_for` → operator or controller** (the next-level decision when you expand a signature):
-- **Operator (leaf)** — a single step: `PipeLLM`, `PipeExtract`, `PipeSearch`, `PipeImgGen`, `PipeDocGen`, `PipeCompose`, `PipeFunc`. Replace the signature with the concrete operator; that branch is done.
+- **Operator (leaf)** — a single step: `PipeLLM`, `PipeExtract`, `PipeStructure` (a spreadsheet's rows), `PipeSearch`, `PipeImgGen`, `PipeDocGen`, `PipeCompose`, `PipeFunc`. Replace the signature with the concrete operator; that branch is done.
 - **Controller (composite)** — multiple steps, iteration, branching, or parallelism: `PipeSequence`, `PipeBatch`, `PipeParallel`, `PipeCondition`. Replace the signature with the controller, wire its sub-pipes, and forward-declare each not-yet-built sub-pipe as its own `PipeSignature`.
 
 **Header ↔ definition contract.** A concrete pipe satisfies a signature of the same code when their `inputs`/`output` match **by concept identity** — bare↔qualified (`Brief` ≡ `thisdomain.Brief`) and native (`Text` ≡ `native.Text`) spellings are equivalent, multiplicity compared structurally. Spelling need not be byte-identical, but both sides must declare `inputs`/`output` explicitly. A definition whose contract differs from its header is a hard error.
@@ -853,11 +946,15 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 - ❌ A `category` field on a `PipeCompose` — it belongs in the `template` table.
 - ❌ Wrapping a construct literal in `{ value = ... }` — assign it directly.
 - ❌ Writing a `dict` field — outside the authoring subset.
-- ❌ Writing a `PipeStructure` — outside the authoring subset; use `PipeLLM` with a structured output concept instead.
+- ❌ Writing a `PipeStructure` over a `Text` — outside the authoring subset; use `PipeLLM` with a structured output concept instead. Over a spreadsheet `Document` it is the model-free reader.
+- ❌ A spreadsheet `PipeStructure` with a `model`, or an output other than a variable list `Foo[]` of a flat structured concept.
 - ❌ Declaring a concept named `Markdown`, `Choice`, `Rating` or any other native — refused as `native_concept_redeclaration`.
 - ❌ An LLM report bound for a `PipeDocGen` declared `Text` — it prints its Markdown marks as they are; declare it `Markdown`.
 - ❌ An inline `template` on an `xlsx`, `docx` or `pptx`, or `template` and `template_file` together — the inline template is HTML, for a `pdf` only.
-- ❌ A `pptx` without `template_file` — it has no layout of its own.
+- ❌ A `pptx` without `template_file` or `template_input` — it has no layout of its own.
+- ❌ A `template_input` that is optional, a list, or not a `Document` — the template is one supplied file.
+- ❌ `table_fill = "append"` or `"update"` on a `docx` or `pptx` — they fill an `xlsx` Table only.
+- ❌ An `update` record whose `match_on` key or `match_row` position a model wrote — carry it from the rows read, unchanged.
 - ❌ A `PipeDocGen` output with `[]` or `[N]`, or of a concept that does not refine `Document` — the step prints one file.
 - ❌ `default_value` on `concept`- or `list`-typed fields — not allowed.
 - ❌ Referencing a variable in a prompt without declaring it in `inputs` — validation will fail.

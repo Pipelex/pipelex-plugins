@@ -28,7 +28,7 @@ Design a `.mthds` method **contract-first**, directly or stepwise (step 3). A st
 
 **When the request also says where its input comes from, where the result goes, when it runs or what it acts on, read [fit.md](../shared/fit.md) before fixing the contract, and design only the method's part.**
 
-Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**. For what it does not cover, such as `PipeStructure`, write the closest in-scope equivalent and call out the deviation.
+Read [writing-mthds.md](../shared/writing-mthds.md) **before writing**. For what it does not cover, such as a `dict` field, write the closest in-scope equivalent and call out the deviation.
 
 Fix the **input concept(s)**, the **output concept** and the **description**, and specify every boundary concept fully now. Shape each concept from all its known consumers: it must be structured if any consumer field-reads it (`$x.field`, a construct `from = "x.field"`), and can stay simple otherwise. Declare each concept exactly once, complete, owned by the root boundary or by the controller that introduces it.
 

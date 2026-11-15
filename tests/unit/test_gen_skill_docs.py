@@ -2437,7 +2437,7 @@ class TestSyntheticInputsSkill:
         body = self.synthetic
         assert "**No AI for what code can render.**" in body
         assert "**Permissive packages only.**" in body
-        for package in ("reportlab", "Pillow", "matplotlib", "numpy", "python-docx", "openpyxl"):
+        for package in ("reportlab", "Pillow", "matplotlib", "numpy", "python-docx", "openpyxl", "python-pptx"):
             assert package in body, f"missing allowlisted package: {package}"
         assert "no PyMuPDF (AGPL)" in body
         assert "Nothing installed into the project, nothing installed onto the machine without asking" in body
