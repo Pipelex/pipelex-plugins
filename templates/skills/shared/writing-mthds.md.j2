@@ -772,7 +772,7 @@ A dry run composes the document for real against mock inputs, which checks the t
 
 **`template_input` fills the caller's own file**: the method takes a workbook, a Word document or a deck as an input and returns a filled copy of it. The input is declared single and required, as `Document` or a concept refining it; it is the template, not data, so the step's other inputs fill it. **The output is a new file**, named after the input's file unless `filename` says otherwise; the caller's file is never changed in place. The file must be of the step's `format`, judged from its bytes, or the run is refused with `input.file_type_unsupported`. Validation cannot see a file the run has not supplied yet, so a valid verdict carries a `pipelex.docgen.template_warning` saying the template is checked when a run supplies it: that is expected, not a finding to fix. When the run starts, a template the engine finds unfit refuses it as `pipelex.docgen.template_input_unfit`.
 
-**`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches.
+**`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches. **A list input of records, a list of a structured concept, fills the Table named after it**, the two names compared ignoring case, spaces, dots and underscores, so the list input `expenses` fills the Table `Expenses` while one named `expense_rows` fills nothing; a list of single values, such as `Text[]`, fills no Table. Under `append` or `update`, a list input of records matching no Table of the workbook is refused: in a method's own `template_file`, at validation and the dry run, as `pipelex.docgen.template_invalid`; in a workbook supplied through `template_input`, when the run starts, as `pipelex.docgen.template_input_unfit`.
 
 ```toml
 [concept.ExpenseCompletion]
@@ -785,7 +785,7 @@ category       = { type = "text", description = "The expense category found" }
 [pipe.append_expenses]
 type           = "PipeDocGen"
 description    = "Add the extracted expenses to the caller's expense workbook"
-inputs         = { workbook = "ExpenseWorkbook", expense_rows = "ExpenseRow[]" }
+inputs         = { workbook = "ExpenseWorkbook", expenses = "ExpenseRow[]" }
 output         = "ExpenseWorkbook"
 format         = "xlsx"
 template_input = "workbook"
@@ -794,7 +794,7 @@ table_fill     = "append"
 [pipe.complete_expenses]
 type           = "PipeDocGen"
 description    = "Write the categories found into the caller's expense workbook"
-inputs         = { workbook = "ExpenseWorkbook", completions = "ExpenseCompletion[]" }
+inputs         = { workbook = "ExpenseWorkbook", expenses = "ExpenseCompletion[]" }
 output         = "ExpenseWorkbook"
 format         = "xlsx"
 template_input = "workbook"
