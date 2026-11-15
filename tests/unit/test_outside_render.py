@@ -594,7 +594,12 @@ class TestOutsideRender:
         repository = output / where
         subprocess.run(["git", "init", "--quiet", str(repository)], check=True)
         subprocess.run(["git", "-C", str(repository), "add", "-A"], check=True)
-        subprocess.run(["git", "-C", str(repository), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "publish"], check=True)
+        # No automatic gc: git estimates its loose objects from one fan-out directory, so a rendering whose blobs
+        # happen to crowd it starts a detached gc that writes into .git after the snapshot below.
+        no_auto_gc = ["-c", "gc.auto=0", "-c", "maintenance.auto=false"]
+        subprocess.run(
+            ["git", "-C", str(repository), *no_auto_gc, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "publish"], check=True
+        )
         before = _snapshot(output)
         capsys.readouterr()
         assert build(target) == 1

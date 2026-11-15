@@ -4,6 +4,7 @@
 
 ### Added
 
+- **The MTHDS reference teaches editing an Office file the run supplies**: a `PipeDocGen` step's `template_input` fills a copy of a workbook, document or deck the method is given, never changing the original, and `table_fill` chooses whether a list's records replace a Table's rows, are appended after them or, with `match_on` or `match_row` and `cells`, update the rows they match, `append` and `update` being for `xlsx` alone; and a new `PipeStructure` section teaches reading an Excel Table or a CSV file into a variable list of flat records with no model, with `table` and `row_field`, whose row position an update finds the row by. The reference names the rules `pipelex` enforces when the method loads, says that a key or a row position must travel from the rows read rather than through a model, and says that the warning a valid verdict carries for a `template_input` is expected, so no skill fixes or reports it as a finding; `pipelex-design` and `pipelex-explain` no longer treat every `PipeStructure` as outside the authoring subset, the fit reference lists reading a spreadsheet's rows and filling a supplied file, `pipelex-inputs` takes a CSV file as it is under a `Document` input and never hands such a step a PDF, converting a legacy or OpenDocument file to the step's format instead, and `pipelex-synthetic-inputs` formats a test workbook's rows as an Excel Table, which such a method needs.
 - **`pipelex-synthetic-inputs` makes PowerPoint decks**: a `pptx` format, rendered with `python-pptx` (MIT), gives slides with titles, body text, a table and speaker notes when the brief needs them, so a method whose users send decks is tested on a deck.
 
 ### Changed
@@ -12,6 +13,7 @@
 
 ### Fixed
 
+- **A template check's warning is read by the parameters it carries**: the MTHDS reference said a `pipelex.docgen.template_warning` carries `template_file` and `template_location` in its `params`, but `pipelex` sends `template`, the file as the step names it, and `finding`, what the check found and where.
 - **A HEIC, HEIF, WebP, GIF or SVG picture under a `Document` input goes in as a PNG**: the skills said extraction reads any image, but the hosted extraction is known to take only JPEG, PNG, BMP and TIFF pictures, and refuses a WebP, a GIF or a phone's HEIC picture once the run has started, so `pipelex-inputs` now converts such a picture to PNG in a temporary directory, or asks you for one, and the MTHDS reference names the pictures extraction is known to take. The skills also no longer say that an Office file fails a run at its first step.
 
 ## [0.20.1] - 2026-11-02

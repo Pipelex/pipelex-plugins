@@ -237,7 +237,11 @@ class TestLanguageReference:
         assert "**The catalog stores no template file yet**" in docgen
         assert "does not load by its id, while its directory still validates and runs as `method_dir`" in docgen
         assert "**A `pipelex.docgen.template_warning` in a valid verdict's `warnings`**" in docgen
-        assert "located at the step's pipe (`location.pipe`) whose `params` carry `template_file`" in docgen
+        # pipelex's registry names the parameters `template` and `finding` (pipelex-error-registry.json).
+        assert "located at the step's pipe (`location.pipe`) whose `params` carry `template`, the file as the step names it, and `finding`" in docgen
+        # The section validate-warnings links to carves out the warning every `template_input` step's verdict carries.
+        assert "**A `template_input` step's warning is the exception**" in docgen
+        assert "no skill fixes it, asks about it or reports it as a finding" in docgen
         assert "It never changes `is_valid`, but the printed file may show it." in docgen
         assert "a template the user supplied is theirs, so name the finding and ask before changing it" in docgen
 
