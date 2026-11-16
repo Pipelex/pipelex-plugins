@@ -34,21 +34,31 @@ ARGUMENT_PLACEHOLDER_PATTERN = re.compile(r"\$(?:ARGUMENTS|\d+)")
 # Skill frontmatter keys only Claude Code reads, which no other in-repo target may carry.
 CLAUDE_ONLY_SKILL_KEYS = ("allowed-tools",)
 
-# The native Mistral Vibe plugin, as Vibe 2.26.1's resolver reads it (`vibe/core/plugins/_native.py`):
-# the Agent Plugins 1.0 manifest at the plugin root, its fields and an `ai.mistral.vibe` extension's.
-# Two files of the build are no part of the plugin as Vibe reads it: the hook and the MCP fragment are
-# the entries the user appends to their own hooks file and configuration. A plugin's own hooks file,
-# `ai.mistral.vibe/hooks.toml`, is refused, since Vibe 2.26.1 lists the hooks it declares and runs none.
+# The native Mistral Vibe plugin, as Vibe 3.1.2's resolver reads it (`vibe/core/plugins/_native.py`):
+# the Agent Plugins 1.0 manifest at the plugin root, its fields and its `ai.mistral.vibe` extension's,
+# and the plugin's own hooks file, `ai.mistral.vibe/hooks.toml`, which Vibe 3.0.4 and later run, but
+# only when the manifest declares that extension (`_load_runtime_hooks`). The MCP fragment is no part
+# of the plugin as Vibe reads it: it is the entry the user appends to their configuration, since a
+# plugin's stdio server starts in the plugin's directory. The entry the user appended to their hooks
+# file before the hook moved into the plugin, `hooks/vibe-hooks.toml`, is refused.
 VIBE_MANIFEST_PATH = "plugin.json"
 VIBE_MANIFEST_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
 VIBE_MANIFEST_KEYS = frozenset({"$schema", "name", "version", "description", "author", "homepage", "repository", "license", "keywords", "extensions"})
 VIBE_AUTHOR_KEYS = frozenset({"name", "email", "url"})
 VIBE_PLUGIN_NAME_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?")
 VIBE_EXTENSION = "ai.mistral.vibe"
-VIBE_EXTENSION_KEYS = frozenset({"schemaVersion", "toolNamespace", "toolOverrides"})
+VIBE_EXTENSION_KEYS = frozenset({"schemaVersion", "displayName", "starterPrompt", "toolNamespace", "toolOverrides", "volumes", "defaultEnabled"})
 VIBE_PLUGIN_HOOKS_PATH = "ai.mistral.vibe/hooks.toml"
-VIBE_HOOKS_PATH = "hooks/vibe-hooks.toml"
+# Vibe refuses a plugin hooks file larger than this (`_MAX_PLUGIN_HOOKS_BYTES`).
+VIBE_PLUGIN_HOOKS_MAX_BYTES = 65536
+VIBE_LEGACY_HOOKS_PATH = "hooks/vibe-hooks.toml"
+VIBE_HOOK_NAME = "check-mthds"
 VIBE_HOOK_MATCH = "re:^(edit|write_file)$"
+# The plugin hook's command (docs/decisions.md, "The Vibe hook ships in the plugin"): Vibe runs it with
+# `/bin/sh -c` and sets PLUGIN_ROOT in its environment, so the root is the shell's expansion, quoted;
+# `bash` is named because the session's copy of the plugin is rebuilt without mode bits; and
+# `--plugin-hook` is what lets the wrapper tell this hook from an entry an earlier install appended.
+VIBE_HOOK_COMMAND = 'bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook'
 VIBE_MCP_FRAGMENT_PATH = "mcp/vibe-mcp.toml"
 
 # The compaction ceiling (box C of the size diet's design, L-260923-a9bdfe). After a compaction Claude
@@ -979,11 +989,13 @@ def check_no_claude_artifacts(base_dir: Path) -> list[str]:
 def _vibe_manifest_errors(target_name: str, manifest_path: Path, plugin_name: str) -> list[str]:
     """Check the Vibe build's `plugin.json` against the fields Mistral Vibe's resolver accepts.
 
-    Vibe parses an Agent Plugins 1.0 manifest strictly: an unknown key, a `$schema` other than the
-    1.0.0 one, or an `ai.mistral.vibe` extension without `schemaVersion = 1` makes it refuse the
-    whole plugin, skills included (`vibe/core/plugins/_native.py`, `_PluginManifest`). The fields
-    are mirrored here so that the build fails before a user's Vibe does. The build declares no
-    extension, needing none of the components it enables, but one added later is held to them.
+    Vibe validates an Agent Plugins 1.0 manifest against the fields it defines
+    (`vibe/core/plugins/_native.py`, `_PluginManifest`): a `$schema` other than the 1.0.0 one or a
+    malformed field refuses the plugin, and an unknown key is reported as an issue. The
+    `ai.mistral.vibe` extension must be present at `schemaVersion = 1`, since Vibe reads the plugin's
+    hooks file only behind it and drops an extension that fails to validate, hooks included. An
+    unknown extension key is reported too. The fields are mirrored here so that the build fails
+    before a user's Vibe reports anything.
     """
     rel = VIBE_MANIFEST_PATH
     manifest = _read_json_object(manifest_path)
@@ -992,7 +1004,7 @@ def _vibe_manifest_errors(target_name: str, manifest_path: Path, plugin_name: st
     errors: list[str] = []
     unknown = sorted(set(manifest) - VIBE_MANIFEST_KEYS)
     if unknown:
-        errors.append(f"[{target_name}] {rel} carries {', '.join(unknown)}, which Vibe's manifest refuses")
+        errors.append(f"[{target_name}] {rel} carries {', '.join(unknown)}, which Vibe's manifest does not define")
     if manifest.get("$schema") != VIBE_MANIFEST_SCHEMA:
         errors.append(f"[{target_name}] {rel} must declare $schema {VIBE_MANIFEST_SCHEMA}")
     name: object = manifest.get("name")
@@ -1007,36 +1019,36 @@ def _vibe_manifest_errors(target_name: str, manifest_path: Path, plugin_name: st
         else:
             unknown_author = sorted(set(cast(dict[str, object], author)) - VIBE_AUTHOR_KEYS)
             if unknown_author:
-                errors.append(f"[{target_name}] {rel} author carries {', '.join(unknown_author)}, which Vibe's manifest refuses")
+                errors.append(f"[{target_name}] {rel} author carries {', '.join(unknown_author)}, which Vibe's manifest does not define")
     extensions: object = manifest.get("extensions")
     extension: object = cast(dict[str, object], extensions).get(VIBE_EXTENSION) if isinstance(extensions, dict) else None
-    if extension is not None and not isinstance(extension, dict):
+    if extension is None:
+        errors.append(f"[{target_name}] {rel} declares no {VIBE_EXTENSION} extension, without which Vibe never reads {VIBE_PLUGIN_HOOKS_PATH}")
+    elif not isinstance(extension, dict):
         errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension must be an object")
-    elif isinstance(extension, dict):
+    else:
         fields = cast(dict[str, object], extension)
         if fields.get("schemaVersion") != 1:
             errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension must set schemaVersion = 1")
         unknown_extension = sorted(set(fields) - VIBE_EXTENSION_KEYS)
         if unknown_extension:
-            errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension carries {', '.join(unknown_extension)}, which Vibe refuses")
+            errors.append(f"[{target_name}] {rel} {VIBE_EXTENSION} extension carries {', '.join(unknown_extension)}, which Vibe does not define")
     return errors
 
 
-def _vibe_hook_command(plugin_name: str) -> str:
-    """The command of the Vibe hook entry: the wrapper, found through the link the install makes."""
-    return f'"${{VIBE_HOME:-$HOME/.vibe}}/plugins/{plugin_name}/hooks/check-mthds-vibe.sh"'
+def _vibe_plugin_hooks_errors(target_name: str, hooks_path: Path) -> list[str]:
+    """Check that the plugin's hooks file declares the one `check-mthds` post_tool hook, with its exact command.
 
-
-def _vibe_hooks_errors(target_name: str, hooks_path: Path, plugin_name: str) -> list[str]:
-    """Check that the Vibe hook entry declares the one post_tool hook, naming the wrapper through the plugin's link.
-
-    The user appends the entry to their own hooks file, which Vibe runs through the shell with its
-    own environment, so the command reaches the wrapper through `$VIBE_HOME/plugins/<plugin>`, the
-    link the install makes, quoted so that a home directory holding a space stays one word.
+    Vibe parses the file strictly, renames the hook `<plugin>:check-mthds`, and runs its command with
+    `/bin/sh -c` from the session's copy of the plugin, PLUGIN_ROOT set to that copy
+    (`vibe/core/plugins/_native.py`, `_load_runtime_hooks`). The hook must not be strict, so that a
+    failure of the hook itself, such as a missing interpreter, lets the edit stand.
     """
-    rel = VIBE_HOOKS_PATH
+    rel = VIBE_PLUGIN_HOOKS_PATH
     if not hooks_path.is_file():
         return [f"[{target_name}] {rel} missing"]
+    if hooks_path.stat().st_size > VIBE_PLUGIN_HOOKS_MAX_BYTES:
+        return [f"[{target_name}] {rel} is larger than the {VIBE_PLUGIN_HOOKS_MAX_BYTES} bytes Vibe reads from a plugin hooks file"]
     try:
         data = tomllib.loads(hooks_path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:
@@ -1046,13 +1058,19 @@ def _vibe_hooks_errors(target_name: str, hooks_path: Path, plugin_name: str) -> 
         return [f"[{target_name}] {rel} must declare exactly one [[hooks]] table"]
     hook = cast(dict[str, object], cast(list[object], hooks)[0])
     errors: list[str] = []
+    if hook.get("name") != VIBE_HOOK_NAME:
+        errors.append(f'[{target_name}] {rel} must name its hook "{VIBE_HOOK_NAME}"')
     if hook.get("type") != "post_tool":
         errors.append(f'[{target_name}] {rel} must use type = "post_tool"')
     if hook.get("match") != VIBE_HOOK_MATCH:
         errors.append(f"[{target_name}] {rel} must match {VIBE_HOOK_MATCH}")
-    expected_command = _vibe_hook_command(plugin_name)
-    if hook.get("command") != expected_command:
-        errors.append(f"[{target_name}] {rel} command must be {expected_command}")
+    if hook.get("strict") is not False:
+        errors.append(f"[{target_name}] {rel} must set strict = false, so that a failure of the hook itself lets the edit stand")
+    timeout: object = hook.get("timeout")
+    if isinstance(timeout, bool) or not isinstance(timeout, int | float) or timeout <= 0:
+        errors.append(f"[{target_name}] {rel} must set a positive timeout")
+    if hook.get("command") != VIBE_HOOK_COMMAND:
+        errors.append(f"[{target_name}] {rel} command must be {VIBE_HOOK_COMMAND}")
     return errors
 
 
@@ -1093,12 +1111,13 @@ def _vibe_mcp_fragment_errors(target_name: str, fragment: Path) -> list[str]:
 def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
     """Check that each Mistral Vibe target is the native plugin Vibe's resolver loads.
 
-    The build is an Agent Plugins 1.0 plugin: `plugin.json` at its root, the skills, and the
-    executable hook wrapper, with no other harness's manifest, no `mcp.json` and no hooks file of
-    the plugin's own: a second manifest makes Vibe refuse the plugin as ambiguous, an `mcp.json`
-    would start a workshop in the plugin's directory, outside the project, and Vibe 2.26.1 runs no
-    hook a plugin declares. The hook and the workshop ship as `hooks/vibe-hooks.toml` and
-    `mcp/vibe-mcp.toml` instead, the entries the user appends (docs/decisions.md).
+    The build is an Agent Plugins 1.0 plugin: `plugin.json` at its root with the `ai.mistral.vibe`
+    extension, the skills, the plugin's hooks file `ai.mistral.vibe/hooks.toml` and the hook
+    wrapper, with no other harness's manifest, no `mcp.json` and no `hooks/vibe-hooks.toml`: a second
+    manifest makes Vibe refuse the plugin as ambiguous, an `mcp.json` would start a workshop in the
+    plugin's directory, outside the project, and the entry the user once appended to their hooks file
+    would run the check a second time beside the plugin's hook. The workshop ships as
+    `mcp/vibe-mcp.toml`, the entry the user appends (docs/decisions.md).
     """
     errors: list[str] = []
     configs = load_target_configs(base_dir)
@@ -1119,15 +1138,19 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
         if (output_dir / "mcp.json").exists():
             errors.append(f"[{target_name}] mcp.json found in Vibe output {source}; it would start the workshop outside the project")
 
-        if (output_dir / VIBE_PLUGIN_HOOKS_PATH).exists():
+        if (output_dir / VIBE_LEGACY_HOOKS_PATH).exists():
             errors.append(
-                f"[{target_name}] {VIBE_PLUGIN_HOOKS_PATH} found in Vibe output {source}; Vibe 2.26.1 runs no hook a plugin declares, "
-                f"so the hook ships as {VIBE_HOOKS_PATH}"
+                f"[{target_name}] {VIBE_LEGACY_HOOKS_PATH} found in Vibe output {source}; the hook ships in the plugin as "
+                f"{VIBE_PLUGIN_HOOKS_PATH}, and an entry appended to the user's hooks file would check each edit twice"
             )
         plugin_name = str(plugin_section.get("name", target_name))
         errors.extend(_vibe_manifest_errors(target_name, output_dir / VIBE_MANIFEST_PATH, plugin_name))
-        errors.extend(_vibe_hooks_errors(target_name, output_dir / VIBE_HOOKS_PATH, plugin_name))
+        errors.extend(_vibe_plugin_hooks_errors(target_name, output_dir / VIBE_PLUGIN_HOOKS_PATH))
 
+        # The plugin's hook runs the wrapper through `bash`, so the session's copy needs no executable
+        # bit. The clone keeps it all the same: an entry an earlier install appended to the user's hooks
+        # file runs the wrapper directly through the link, and must reach its silent exit rather than
+        # fail with a permission error Vibe reports on every edit.
         hook_script = output_dir / "hooks" / "check-mthds-vibe.sh"
         if not hook_script.is_file():
             errors.append(f"[{target_name}] hooks/check-mthds-vibe.sh missing")

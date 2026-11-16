@@ -344,7 +344,7 @@ class TestNoClaudeArtifacts:
 
 
 class TestVibeTargetArtifacts:
-    """The Vibe build is the native plugin Vibe's resolver loads, its manifest and wrapper, with the hook entry and the fragment the user appends."""
+    """The Vibe build is the native plugin Vibe's resolver loads, its manifest, hooks file and wrapper, with the fragment the user appends."""
 
     REPO_ROOT = Path(__file__).parents[2]
     VALID_MANIFEST: ClassVar[dict[str, object]] = {
@@ -352,9 +352,13 @@ class TestVibeTargetArtifacts:
         "name": "pipelex",
         "version": "0.1.0",
         "author": {"name": "Pipelex staff", "email": "oss@pipelex.com"},
+        "extensions": {"ai.mistral.vibe": {"schemaVersion": 1}},
     }
-    HOOK_COMMAND = '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
-    VALID_HOOKS = f'[[hooks]]\nname = "check-mthds"\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\ncommand = \'{HOOK_COMMAND}\'\n'
+    HOOK_COMMAND = 'bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook'
+    VALID_HOOKS = (
+        '[[hooks]]\nname = "check-mthds"\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\n'
+        f"command = '{HOOK_COMMAND}'\ntimeout = 15.0\nstrict = false\n"
+    )
 
     VALID_MCP_FRAGMENT = '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = ["npx"]\nargs = ["-y", "@pipelex/mcp@latest"]\n'
 
@@ -368,7 +372,8 @@ class TestVibeTargetArtifacts:
         output = tmp_path / "pipelex-vibe"
         (output / "hooks").mkdir(parents=True)
         (output / "plugin.json").write_text(json.dumps(self.VALID_MANIFEST))
-        (output / "hooks" / "vibe-hooks.toml").write_text(self.VALID_HOOKS)
+        (output / "ai.mistral.vibe").mkdir()
+        (output / "ai.mistral.vibe" / "hooks.toml").write_text(self.VALID_HOOKS)
         hook_script = output / "hooks" / "check-mthds-vibe.sh"
         hook_script.write_text("#!/usr/bin/env bash\nexit 0\n")
         hook_script.chmod(0o755)
@@ -411,7 +416,7 @@ class TestVibeTargetArtifacts:
     @pytest.mark.parametrize(
         ("field", "value", "expected"),
         [
-            ("userConfig", {}, "plugin.json carries userConfig, which Vibe's manifest refuses"),
+            ("userConfig", {}, "plugin.json carries userConfig, which Vibe's manifest does not define"),
             ("$schema", "https://example.com/plugin.schema.json", "plugin.json must declare $schema"),
             ("name", "Pipelex", "plugin.json name 'Pipelex' is not a name Vibe accepts"),
             ("name", "pipe--lex", "plugin.json name 'pipe--lex' is not a name Vibe accepts"),
@@ -419,7 +424,9 @@ class TestVibeTargetArtifacts:
             ("author", {"name": "Pipelex", "twitter": "@pipelex"}, "plugin.json author carries twitter"),
             ("extensions", {"ai.mistral.vibe": "on"}, "extension must be an object"),
             ("extensions", {"ai.mistral.vibe": {"schemaVersion": 2}}, "extension must set schemaVersion = 1"),
-            ("extensions", {"ai.mistral.vibe": {"schemaVersion": 1, "hooks": "x"}}, "extension carries hooks, which Vibe refuses"),
+            ("extensions", {"ai.mistral.vibe": {"schemaVersion": 1, "hooks": "x"}}, "extension carries hooks, which Vibe does not define"),
+            ("extensions", {}, "declares no ai.mistral.vibe extension, without which Vibe never reads ai.mistral.vibe/hooks.toml"),
+            ("extensions", None, "declares no ai.mistral.vibe extension"),
         ],
     )
     def test_the_manifest_holds_to_vibe_fields(self, tmp_path: Path, field: str, value: object, expected: str) -> None:
@@ -429,10 +436,11 @@ class TestVibeTargetArtifacts:
         assert len(errors) == 1, errors
         assert expected in errors[0]
 
-    def test_the_manifest_may_declare_the_vibe_extension(self, tmp_path: Path) -> None:
-        """The build declares no extension, but one held to Vibe's fields passes."""
+    def test_the_extension_may_carry_the_other_fields_vibe_defines(self, tmp_path: Path) -> None:
+        """Vibe 3.1.2 defines more extension fields than the build uses; one of them is no error."""
         output = self._vibe_target(tmp_path)
-        (output / "plugin.json").write_text(json.dumps({**self.VALID_MANIFEST, "extensions": {"ai.mistral.vibe": {"schemaVersion": 1}}}))
+        extension = {"schemaVersion": 1, "displayName": "Pipelex", "defaultEnabled": True}
+        (output / "plugin.json").write_text(json.dumps({**self.VALID_MANIFEST, "extensions": {"ai.mistral.vibe": extension}}))
         assert check_vibe_target_artifacts(tmp_path) == []
 
     def test_a_missing_manifest_fails(self, tmp_path: Path) -> None:
@@ -442,37 +450,48 @@ class TestVibeTargetArtifacts:
     @pytest.mark.parametrize(
         ("old", "new", "expected"),
         [
+            ('name = "check-mthds"', 'name = "mthds"', 'must name its hook "check-mthds"'),
             ('type = "post_tool"', 'type = "pre_tool"', 'must use type = "post_tool"'),
             ("re:^(edit|write_file)$", "re:^write_file$", "must match re:^(edit|write_file)$"),
-            (HOOK_COMMAND, '"${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh', "command must be"),
-            (HOOK_COMMAND, "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh", "command must be"),
-            (HOOK_COMMAND, HOOK_COMMAND.replace("/pipelex/", "/other/"), "command must be"),
+            ("strict = false", "strict = true", "must set strict = false"),
+            ("strict = false\n", "", "must set strict = false"),
+            ("timeout = 15.0", "timeout = 0", "must set a positive timeout"),
+            ("timeout = 15.0\n", "", "must set a positive timeout"),
+            (HOOK_COMMAND, '"${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook', "command must be"),
+            (HOOK_COMMAND, 'bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh', "command must be"),
+            (HOOK_COMMAND, "bash ${PLUGIN_ROOT}/hooks/check-mthds-vibe.sh --plugin-hook", "command must be"),
+            (HOOK_COMMAND, '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"', "command must be"),
             ("[[hooks]]", "[[hooks]\n", "not valid TOML"),
         ],
     )
-    def test_the_hook_entry_declares_the_one_hook(self, tmp_path: Path, old: str, new: str, expected: str) -> None:
-        hooks = self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml"
+    def test_the_plugin_hooks_file_declares_the_one_hook(self, tmp_path: Path, old: str, new: str, expected: str) -> None:
+        hooks = self._vibe_target(tmp_path) / "ai.mistral.vibe" / "hooks.toml"
         hooks.write_text(self.VALID_HOOKS.replace(old, new))
         errors = check_vibe_target_artifacts(tmp_path)
         assert len(errors) == 1, errors
         assert expected in errors[0]
 
-    def test_the_hook_entry_declares_exactly_one_hook(self, tmp_path: Path) -> None:
-        (self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml").write_text(self.VALID_HOOKS * 2)
-        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/vibe-hooks.toml must declare exactly one [[hooks]] table"]
+    def test_the_plugin_hooks_file_declares_exactly_one_hook(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "ai.mistral.vibe" / "hooks.toml").write_text(self.VALID_HOOKS * 2)
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] ai.mistral.vibe/hooks.toml must declare exactly one [[hooks]] table"]
 
-    def test_a_missing_hook_entry_fails(self, tmp_path: Path) -> None:
-        (self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml").unlink()
-        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/vibe-hooks.toml missing"]
-
-    def test_rejects_a_plugin_hooks_file(self, tmp_path: Path) -> None:
-        """Vibe 2.26.1 lists the hooks a plugin declares and runs none, so a plugin hooks file would never check an edit."""
-        output = self._vibe_target(tmp_path)
-        (output / "ai.mistral.vibe").mkdir()
-        (output / "ai.mistral.vibe" / "hooks.toml").write_text(self.VALID_HOOKS)
+    def test_a_plugin_hooks_file_past_vibes_size_limit_fails(self, tmp_path: Path) -> None:
+        hooks = self._vibe_target(tmp_path) / "ai.mistral.vibe" / "hooks.toml"
+        hooks.write_text(self.VALID_HOOKS + "#" * 65536 + "\n")
         assert check_vibe_target_artifacts(tmp_path) == [
-            "[mistral-vibe] ai.mistral.vibe/hooks.toml found in Vibe output pipelex-vibe/; Vibe 2.26.1 runs no hook a plugin declares, "
-            "so the hook ships as hooks/vibe-hooks.toml"
+            "[mistral-vibe] ai.mistral.vibe/hooks.toml is larger than the 65536 bytes Vibe reads from a plugin hooks file"
+        ]
+
+    def test_a_missing_plugin_hooks_file_fails(self, tmp_path: Path) -> None:
+        (self._vibe_target(tmp_path) / "ai.mistral.vibe" / "hooks.toml").unlink()
+        assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] ai.mistral.vibe/hooks.toml missing"]
+
+    def test_rejects_the_hook_entry_the_user_appended(self, tmp_path: Path) -> None:
+        """Vibe runs a user's hooks file beside the plugin's, under another name, so shipping the old entry checks each edit twice."""
+        (self._vibe_target(tmp_path) / "hooks" / "vibe-hooks.toml").write_text(self.VALID_HOOKS)
+        assert check_vibe_target_artifacts(tmp_path) == [
+            "[mistral-vibe] hooks/vibe-hooks.toml found in Vibe output pipelex-vibe/; the hook ships in the plugin as "
+            "ai.mistral.vibe/hooks.toml, and an entry appended to the user's hooks file would check each edit twice"
         ]
 
     def test_non_executable_script(self, tmp_path: Path) -> None:

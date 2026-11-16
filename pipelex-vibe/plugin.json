@@ -13,7 +13,12 @@
     "mthds",
     "ai-methods"
   ],
+  "extensions": {
+    "ai.mistral.vibe": {
+      "schemaVersion": 1
+    }
+  },
   "name": "pipelex",
   "description": "Build and run AI methods from Mistral Vibe with Pipelex: skills that write them in MTHDS, and a hook that checks every edit.",
-  "version": "0.21.0"
+  "version": "0.22.0"
 }

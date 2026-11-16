@@ -18,9 +18,9 @@ TARGETS = ("prod", "codex", "mistral-vibe")
 # The placeholders a harness replaces with the plugin root. Codex honours the Claude spelling too.
 ROOT_PLACEHOLDERS = ("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
 SPACED_ROOT_NAME = "plug in"
-# Vibe's hook entry reaches the wrapper through the link the install makes in Vibe's home, not through a root it is handed.
-VIBE_HOME_EXPANSION = "${VIBE_HOME:-$HOME/.vibe}"
-VIBE_PLUGIN_NAME = "pipelex"
+# The directory Vibe reads a native plugin's own hooks file from, beside `hooks/`, which holds the scripts.
+VIBE_HOOKS_DIR = "ai.mistral.vibe"
+VIBE_PLUGIN_HOOK_FLAG = "--plugin-hook"
 STUB_MARKER = "hook started"
 HOOK_TIMEOUT_SECONDS = 60
 # What reaches the validate stage, and so the network: removed so that only the offline stages run.
@@ -44,7 +44,7 @@ def _render_hooks(target_name: str, plugin_root: Path) -> dict[Path, str]:
     """A target's hook files rendered from the real templates, written under `plugin_root` as the target ships them."""
     config = load_target_config(REPO_ROOT / "targets", target_name)
     rendered = render_templates(REPO_ROOT / "templates", plugin_root, config.template_vars, include_skills=[], target_name=config.name)
-    hooks = {path: content for path, content in rendered.items() if path.parent == plugin_root / "hooks"}
+    hooks = {path: content for path, content in rendered.items() if path.parent in (plugin_root / "hooks", plugin_root / VIBE_HOOKS_DIR)}
     for path, content in hooks.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -54,7 +54,7 @@ def _render_hooks(target_name: str, plugin_root: Path) -> dict[Path, str]:
 
 
 def _shell_commands(hooks: dict[Path, str]) -> list[str]:
-    """Every hook command a shell runs: Claude's and Codex's shell-form entries, and each Vibe entry."""
+    """Every hook command a shell runs: Claude's and Codex's shell-form entries, and each hook of the Vibe plugin's hooks file."""
     commands: list[str] = []
     for path, content in hooks.items():
         if path.suffix == ".json":
@@ -62,7 +62,7 @@ def _shell_commands(hooks: dict[Path, str]) -> list[str]:
             for groups in events.values():
                 for group in groups:
                     commands.extend(hook["command"] for hook in group["hooks"] if hook.get("type") == "command" and "args" not in hook)
-        elif path.name == "vibe-hooks.toml":
+        elif path.parent.name == VIBE_HOOKS_DIR and path.name == "hooks.toml":
             commands.extend(hook["command"] for hook in tomllib.loads(content)["hooks"])
     return commands
 
@@ -90,31 +90,33 @@ def _run_in_shell(command: str, *, plugin_root: Path, cwd: Path, overrides: dict
     )
 
 
-def _linked_vibe_home(vibe_home: Path, plugin_root: Path) -> Path:
-    """A Vibe home whose plugins directory links to `plugin_root`, as the install page has the user make it."""
-    plugins = vibe_home / "plugins"
-    plugins.mkdir(parents=True)
-    (plugins / VIBE_PLUGIN_NAME).symlink_to(plugin_root, target_is_directory=True)
-    return vibe_home
-
-
-def _vibe_runs(command: str, *, plugin_root: Path, tmp_path: Path) -> dict[str, tuple[str, dict[str, str | None]]]:
-    """The Vibe entry run as Vibe's shell runs it: with VIBE_HOME set, and without it from a home holding a space."""
-    vibe_home = _linked_vibe_home(tmp_path / "vibe home", plugin_root)
-    home = tmp_path / "my home"
-    _linked_vibe_home(home / ".vibe", plugin_root)
-    return {
-        "VIBE_HOME set to a directory holding a space": (command, {"VIBE_HOME": str(vibe_home)}),
-        "VIBE_HOME unset, HOME holding a space": (command, {"VIBE_HOME": None, "HOME": str(home)}),
-    }
-
-
-def _stub_every_script(hooks: dict[Path, str]) -> None:
-    """Replace each wrapper by a script that says it started, so a run proves the command reached it."""
+def _stub_every_script(hooks: dict[Path, str], *, mode: int = 0o755) -> None:
+    """Replace each wrapper by a script that says it started, and with what arguments, so a run proves the command reached it."""
     for path in hooks:
         if path.suffix == ".sh":
-            path.write_text(f'#!/bin/sh\necho "{STUB_MARKER}"\n', encoding="utf-8")
-            path.chmod(0o755)
+            path.write_text(f'#!/bin/sh\necho "{STUB_MARKER}" "$@"\n', encoding="utf-8")
+            path.chmod(mode)
+
+
+def _vibe_post_tool_payload(project: Path, relative_path: str, content: str) -> str:
+    """A `post_tool` payload for a `write_file` call, with the fields Vibe 3.1.2's unified harness sends (`_post_tool_payload`)."""
+    return json.dumps(
+        {
+            "session_id": "session-1",
+            "transcript_path": "",
+            "cwd": str(project),
+            "parent_session_id": None,
+            "hook_event_name": "post_tool",
+            "tool_name": "file_system.write_file",
+            "tool_call_id": "call-1",
+            "tool_input": {"file_path": relative_path, "content": content},
+            "tool_status": "success",
+            "tool_output": {"path": str(project / relative_path), "bytes_written": len(content), "file_existed": False},
+            "tool_output_text": "",
+            "tool_error": None,
+            "duration_ms": 0,
+        }
+    )
 
 
 class CodexHookRun:
@@ -207,21 +209,39 @@ class TestHookCommands:
         _stub_every_script(hooks)
 
         for command in commands:
-            runs: dict[str, tuple[str, dict[str, str | None]]]
-            if target_name == "mistral-vibe":
-                assert VIBE_HOME_EXPANSION in command, f"{target_name}: {command!r} does not reach its script through Vibe's home"
-                runs = _vibe_runs(command, plugin_root=plugin_root, tmp_path=tmp_path)
-            else:
-                assert any(placeholder in command for placeholder in ROOT_PLACEHOLDERS), (
-                    f"{target_name}: {command!r} names its script by no plugin-root placeholder"
-                )
-                runs = {"the shell expanding the root": (command, {}), "the root substituted into the text": (_substituted(command, plugin_root), {})}
-            for how, (runnable, overrides) in runs.items():
-                result = _run_in_shell(runnable, plugin_root=plugin_root, cwd=project, overrides=overrides)
-                assert result.returncode == 0 and result.stdout.strip() == STUB_MARKER, (
+            assert any(placeholder in command for placeholder in ROOT_PLACEHOLDERS), (
+                f"{target_name}: {command!r} names its script by no plugin-root placeholder"
+            )
+            runs: dict[str, str] = {"the shell expanding the root": command}
+            # Vibe never substitutes a hook command's text: only Codex does, and Claude Code's shell expands the variable.
+            if target_name != "mistral-vibe":
+                runs["the root substituted into the text"] = _substituted(command, plugin_root)
+            for how, runnable in runs.items():
+                result = _run_in_shell(runnable, plugin_root=plugin_root, cwd=project)
+                assert result.returncode == 0 and result.stdout.split()[:2] == STUB_MARKER.split(), (
                     f"{target_name}: {command!r}, run through sh -c with {how}, did not start its script under a root holding a space "
                     f"(exit {result.returncode}, stderr {result.stderr.strip()!r}): wrap the root in double quotes"
                 )
+
+    def test_the_vibe_command_starts_a_wrapper_that_lost_its_executable_bit(self, tmp_path: Path) -> None:
+        """Vibe runs a plugin hook from the session's copy of the plugin, rebuilt without mode bits, with that copy as the
+        working directory and PLUGIN_ROOT set to it. The command names `bash`, so the wrapper starts all the same, under a
+        root holding a space, and receives the argument that tells it the plugin's hook called it."""
+        plugin_root = tmp_path / SPACED_ROOT_NAME
+        hooks = _render_hooks("mistral-vibe", plugin_root)
+        [command] = _shell_commands(hooks)
+        _stub_every_script(hooks, mode=0o644)
+        wrapper = plugin_root / "hooks" / "check-mthds-vibe.sh"
+        assert not os.access(wrapper, os.X_OK)
+
+        result = _run_in_shell(command, plugin_root=plugin_root, cwd=plugin_root, overrides={"CLAUDE_PLUGIN_ROOT": None})
+        assert result.returncode == 0, f"exit {result.returncode}, stderr {result.stderr.strip()!r}"
+        assert result.stdout.strip() == f"{STUB_MARKER} {VIBE_PLUGIN_HOOK_FLAG}"
+
+        # The same wrapper run directly, as a command that relied on the executable bit would, is refused by the shell.
+        direct = _run_in_shell('"${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh', plugin_root=plugin_root, cwd=plugin_root)
+        assert direct.returncode == 126
+        assert STUB_MARKER not in direct.stdout
 
     def test_an_unquoted_root_fails_the_same_run(self, tmp_path: Path) -> None:
         """The run above tells a quoted command from an unquoted one: the form the hooks had exits 127."""
@@ -343,3 +363,56 @@ class TestHookCommands:
         verdict = json.loads(stdout)
         assert verdict["decision"] == "block"
         assert str(target) in verdict["reason"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="the Vibe wrapper is a bash script")
+class TestVibeWrapper:
+    """The rendered Vibe wrapper, with the vendored `check.mjs`, on a `post_tool` payload naming a method with a lint error."""
+
+    @pytest.fixture
+    def plugin_root(self, tmp_path: Path) -> Path:
+        root = tmp_path / SPACED_ROOT_NAME
+        _render_hooks("mistral-vibe", root)
+        shutil.copy(REPO_ROOT / "templates" / "hooks" / "assets" / "check.mjs", root / "hooks" / "check.mjs")
+        return root
+
+    @pytest.fixture
+    def project(self, tmp_path: Path) -> Path:
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / "broken.mthds").write_text(BROKEN_METHOD, encoding="utf-8")
+        return project
+
+    def _run(self, plugin_root: Path, project: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        environment = {key: value for key, value in os.environ.items() if not key.startswith(CREDENTIAL_PREFIXES)}
+        environment["PLUGIN_ROOT"] = str(plugin_root)
+        return subprocess.run(
+            ["bash", str(plugin_root / "hooks" / "check-mthds-vibe.sh"), *arguments],
+            input=_vibe_post_tool_payload(project, "broken.mthds", BROKEN_METHOD),
+            capture_output=True,
+            text=True,
+            cwd=plugin_root,
+            env=environment,
+            timeout=HOOK_TIMEOUT_SECONDS,
+            check=False,
+        )
+
+    def test_without_the_plugin_hook_argument_the_wrapper_exits_silently(self, plugin_root: Path, project: Path, node: str) -> None:
+        """An entry an earlier install appended to the user's hooks file calls the wrapper with no argument. Vibe runs it beside
+        the plugin's hook, so the wrapper exits 0 with no output rather than check the edit a second time, even a broken one."""
+        assert node
+        result = self._run(plugin_root, project)
+        assert result.returncode == 0
+        assert result.stdout == ""
+        assert result.stderr == ""
+        assert (project / "broken.mthds").read_text(encoding="utf-8") == BROKEN_METHOD
+
+    def test_with_the_plugin_hook_argument_the_wrapper_denies_the_lint_error(self, plugin_root: Path, project: Path, node: str) -> None:
+        """The control for the test above: the same payload, from the plugin's hook, is denied with the lint diagnostics."""
+        assert node
+        result = self._run(plugin_root, project, VIBE_PLUGIN_HOOK_FLAG)
+        assert result.returncode == 0, result.stderr
+        verdict = json.loads(result.stdout)
+        assert verdict["decision"] == "deny"
+        assert "MTHDS lint errors" in verdict["reason"]
+        assert str(project / "broken.mthds") in verdict["reason"]

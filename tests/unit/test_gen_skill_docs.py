@@ -54,7 +54,7 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 # Minimal hook templates for every platform. render_templates declares hooks
 # per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
-# Vibe: vibe-hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml
+# Vibe: ai.mistral.vibe/hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml
 # launcher fragment), so any test tree that reaches skill/hook rendering must
 # provide them or render fails with "hook template not found".
 HOOK_TEMPLATE_BODIES = {
@@ -63,9 +63,9 @@ HOOK_TEMPLATE_BODIES = {
     "hooks/launch-pipelex-mcp.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/vibe-hooks.toml.j2": (
-        '[[hooks]]\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\n'
-        "command = '\"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh\"'\n"
+    "ai.mistral.vibe/hooks.toml.j2": (
+        '[[hooks]]\nname = "check-mthds"\ntype = "post_tool"\nmatch = "re:^(edit|write_file)$"\n'
+        "command = 'bash \"${PLUGIN_ROOT}\"/hooks/check-mthds-vibe.sh --plugin-hook'\n"
     ),
     "hooks/check-mthds-vibe.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "mcp/vibe-mcp.toml.j2": '[[mcp_servers]]\nname = "pipelex"\ntransport = "stdio"\ncommand = ["npx"]\n',
@@ -895,8 +895,8 @@ class TestPluginManifests:
             "description": "",
             "version": "1.0.0",
         }
-        assert tree / "pipelex-vibe" / "hooks" / "vibe-hooks.toml" in result.files
-        assert not any("ai.mistral.vibe" in path.parts for path in result.files)
+        assert tree / "pipelex-vibe" / "ai.mistral.vibe" / "hooks.toml" in result.files
+        assert not any(path.name == "vibe-hooks.toml" for path in result.files)
         assert any(path.name == "writing-mthds.md" for path in result.files)
 
     def test_build_claude_target_writes_claude_plugin_dir(self, tmp_path: Path) -> None:
@@ -2160,19 +2160,27 @@ class TestVibeMcpFragment:
         assert body.index("delete the `mcp_servers = []` line") < body.index("cat <this file>"), "the deletions come before the append"
         assert "merges with a trusted project's .vibe/config.toml" in body
 
-    def test_the_hook_entry_appends_to_a_hooks_file_and_names_no_path_of_the_user(self) -> None:
-        """Vibe 2.26.1 runs no hook a plugin declares, so the hook is an entry the user appends to their own hooks file,
-        beside the hooks already there, and it reaches the wrapper through the link the install made in Vibe's home."""
-        body = self._render("mistral-vibe")[self.REPO_ROOT / "hooks" / "vibe-hooks.toml"]
-        assert body.startswith("\n")
-        existing = '[[hooks]]\nname = "lint"\ntype = "post_agent"\ncommand = "eslint --quiet ."'
-        hooks = tomllib.loads(existing + body)["hooks"]
-        assert [hook["name"] for hook in hooks] == ["lint", "check-mthds"]
-        assert hooks[1]["command"] == '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
-        assert 'cat <this file> >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"' in body
-        assert "First delete any `check-mthds` hook already there" in body
-        assert "delete it from any trusted\n# project's .vibe/hooks.toml" in body, "an old project-level entry overrides the user's"
-        assert body.index("First delete any `check-mthds` hook") < body.index("cat <this file>"), "the deletions come before the append"
+    def test_the_hook_ships_in_the_plugin_hooks_file(self) -> None:
+        """Vibe 3.0.4 and later run a native plugin's `ai.mistral.vibe/hooks.toml`, so the hook is the plugin's own: one
+        `post_tool` hook, not strict, whose command names its interpreter and the plugin root the shell expands."""
+        rendered = self._render("mistral-vibe")
+        assert self.REPO_ROOT / "hooks" / "vibe-hooks.toml" not in rendered
+        body = rendered[self.REPO_ROOT / "ai.mistral.vibe" / "hooks.toml"]
+        hooks = tomllib.loads(body)["hooks"]
+        assert len(hooks) == 1
+        hook = hooks[0]
+        assert hook["name"] == "check-mthds"
+        assert hook["type"] == "post_tool"
+        assert hook["match"] == "re:^(edit|write_file)$"
+        assert hook["strict"] is False
+        assert hook["timeout"] == 15.0
+        assert hook["command"] == 'bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook'
+        assert "pipelex:check-mthds" in body, "the comment names the hook as Vibe lists it"
+
+    def test_the_vibe_manifest_base_declares_the_extension_the_hooks_file_needs(self) -> None:
+        """Vibe reads a plugin's hooks file only when its manifest declares the `ai.mistral.vibe` extension."""
+        base = json.loads((self.REPO_ROOT / ".vibe-plugin" / "plugin-base.json").read_text(encoding="utf-8"))
+        assert base["extensions"] == {"ai.mistral.vibe": {"schemaVersion": 1}}
 
     @pytest.mark.parametrize("target_name", ["prod", "codex"])
     def test_plugin_targets_do_not_ship_the_fragment(self, target_name: str) -> None:
@@ -3001,7 +3009,7 @@ class TestHookRendering:
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == set(Platform)
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["ai.mistral.vibe/hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.AGENT_SKILLS] == []
         assert MCP_TEMPLATES_BY_PLATFORM == {
             Platform.CLAUDE: [],
@@ -3043,10 +3051,10 @@ class TestHookRendering:
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
         results = render_templates(tree / "templates", tree, {**DEFAULT_VARS, "platform": "mistral-vibe"})
-        assert tree / "hooks" / "vibe-hooks.toml" in results
+        assert tree / "ai.mistral.vibe" / "hooks.toml" in results
         assert tree / "hooks" / "check-mthds-vibe.sh" in results
         assert tree / "mcp" / "vibe-mcp.toml" in results
-        assert not any("ai.mistral.vibe" in path.parts for path in results)
+        assert not any(path.name == "vibe-hooks.toml" for path in results)
 
     def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
         generate(template_tree, "prod")

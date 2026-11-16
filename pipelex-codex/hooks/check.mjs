@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.67.1 (d804c0b) + @pipelex/tools-wasm 0.6.1 (npm)
+// Provenance: @pipelex/sdk 0.69.0 (4b25116) + @pipelex/tools-wasm 0.6.1 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -6227,8 +6227,8 @@ var init_client = __esm({
           if (fault2 !== null) {
             const sha256 = isObject(entry) && typeof entry.sha256 === "string" ? entry.sha256 : "";
             const wellFormed = SHA256_HEX.test(sha256) ? sha256 : void 0;
-            const named = wellFormed === void 0 ? "" : ` (blob ${wellFormed})`;
-            throw new MalformedBlobsAnswerError(`POST /v1/blobs/missing answered a malformed entry at missing[${index}]${named}: ${fault2}.`, res.status, index, wellFormed);
+            const named2 = wellFormed === void 0 ? "" : ` (blob ${wellFormed})`;
+            throw new MalformedBlobsAnswerError(`POST /v1/blobs/missing answered a malformed entry at missing[${index}]${named2}: ${fault2}.`, res.status, index, wellFormed);
           }
         });
         return parsed;
@@ -9005,10 +9005,10 @@ function resolveFileReference(input) {
   const { holder, reference, context, isMember } = input;
   if (!isFileReference(reference, context))
     return { kind: "not_a_reference" };
-  const named = referencePath(reference, context);
-  if ("code" in named)
-    return { kind: "refused", code: named.code, reference };
-  const segments = lexicalJoin(holder, named.path);
+  const named2 = referencePath(reference, context);
+  if ("code" in named2)
+    return { kind: "refused", code: named2.code, reference };
+  const segments = lexicalJoin(holder, named2.path);
   if (segments === null)
     return { kind: "refused", code: "reference_leaves_tree", reference };
   const namesRoot = segments.length === 0 || segments.length === 1 && segments[0] === "";
@@ -9949,8 +9949,8 @@ async function readFileEntryMapValue(document, blobStore = EMPTY_BLOB_STORE) {
     const names = refusals.get(code);
     if (names === void 0)
       continue;
-    const named = NAMES_ALL.has(code) ? [...names].sort(compareUtf8) : names.slice(0, 1);
-    throw new MethodTreeError(code, mapRefusalMessage(code, named), { names: named });
+    const named2 = NAMES_ALL.has(code) ? [...names].sort(compareUtf8) : names.slice(0, 1);
+    throw new MethodTreeError(code, mapRefusalMessage(code, named2), { names: named2 });
   }
   const files = [...contents.entries()].map(([path2, bytes]) => ({ path: path2, size: bytes.length, sha256: sha256Hex(bytes), bytes })).sort((left, right) => compareUtf8(left.path, right.path));
   return { files, digest: treeDigest(files) };
@@ -12049,9 +12049,9 @@ function comparedLines(addedLines) {
   return addedLines.map((line) => line.trimEnd()).filter((line) => line !== "");
 }
 function uncheckedShellPatchNote(paths) {
-  const named = paths.map(pathSpan);
-  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
-  const context = named.length === 1 ? `The .mthds hook did not check ${list}: it could not confirm which file this shell command patched. Name the file by its absolute path, or edit it with the apply_patch tool, and the hook will check it.` : `The .mthds hook did not check ${list}: it could not confirm which files this shell command patched. Name the files by their absolute paths, or edit them with the apply_patch tool, and the hook will check them.`;
+  const named2 = paths.map(pathSpan);
+  const list = named2.length === 1 ? named2[0] : `${named2.slice(0, -1).join(", ")} and ${named2.at(-1)}`;
+  const context = named2.length === 1 ? `The .mthds hook did not check ${list}: it could not confirm which file this shell command patched. Name the file by its absolute path, or edit it with the apply_patch tool, and the hook will check it.` : `The .mthds hook did not check ${list}: it could not confirm which files this shell command patched. Name the files by their absolute paths, or edit them with the apply_patch tool, and the hook will check them.`;
   return { kind: "context", context: truncate(context) };
 }
 function extractVibeMthdsFilePath(stdinJson) {
@@ -12694,10 +12694,29 @@ var ArtifactFetchError = class extends ArtifactOperationError {
     this.status = status;
   }
 };
+var StoredTextLoadError = class extends ArtifactOperationError {
+  uri;
+  path;
+  reason;
+  status;
+  wireResults;
+  constructor(message, details, options) {
+    super(message, {
+      cause: options?.cause,
+      problem: options?.problem ?? artifactFetchProblem(details.reason, details.uri, details.status)
+    });
+    this.name = "StoredTextLoadError";
+    this.uri = details.uri;
+    this.path = details.path;
+    this.reason = details.reason;
+    this.status = details.status;
+    this.wireResults = details.wireResults;
+  }
+};
 function artifactFetchProblem(reason, uri, status) {
   switch (reason) {
-    case "invalid_storage_uri":
-    case "forbidden":
+    case "pipelex.storage.uri_invalid":
+    case "pipelex.org.mismatch":
     case "not_found":
       return buildProblem("input.reference_not_found", { input: uri });
     case "unsupported_url":
@@ -12944,6 +12963,28 @@ function isTimerDelay(value) {
   return Number.isFinite(value) && value > 0 && value <= MAX_TIMER_DELAY_MS;
 }
 
+// src/signals.ts
+function eitherSignal(first, second) {
+  if (second === void 0 || first.aborted) return { signal: first, dispose: () => void 0 };
+  if (second.aborted) return { signal: second, dispose: () => void 0 };
+  const controller = new AbortController();
+  const dispose = () => {
+    first.removeEventListener("abort", onFirst);
+    second.removeEventListener("abort", onSecond);
+  };
+  const onFirst = () => {
+    dispose();
+    controller.abort(first.reason);
+  };
+  const onSecond = () => {
+    dispose();
+    controller.abort(second.reason);
+  };
+  first.addEventListener("abort", onFirst, { once: true });
+  second.addEventListener("abort", onSecond, { once: true });
+  return { signal: controller.signal, dispose };
+}
+
 // src/runs.ts
 var RUN_STATUSES = [
   "PENDING",
@@ -13121,53 +13162,90 @@ function assertWaitOptions(options = {}) {
   }
   assertArtifactSelection(options.artifacts);
 }
-async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress) {
+async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress, loadCompleted) {
   assertWaitOptions(options);
   const intervalMs = options.intervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
   const startedAt = Date.now();
-  let attempt = 0;
-  const { onProgress } = options;
-  let readsProgress = onProgress !== void 0 && fetchProgress !== void 0;
-  let delivered;
-  for (; ; ) {
-    throwIfAborted(options.signal);
-    const elapsedMs = Date.now() - startedAt;
-    if (elapsedMs >= timeoutMs) {
-      throw new RunTimeoutError(
-        `Run ${runId} did not reach a terminal state within ${timeoutMs}ms.`,
-        runId,
-        timeoutMs
-      );
-    }
-    const state = await fetchOnce(
-      runId,
-      options.artifacts === void 0 ? { signal: options.signal } : { signal: options.signal, artifacts: options.artifacts }
-    );
-    if (state.state === "completed") {
-      return state.result;
-    }
-    if (state.state === "failed") {
-      throw new RunFailedError(state.message, runId, state.status, { problem: state.problem });
-    }
-    if (readsProgress && onProgress !== void 0 && fetchProgress !== void 0) {
-      let progress;
+  const deadline = new AbortController();
+  const timer = isTimerDelay(timeoutMs) ? setTimeout(() => {
+    deadline.abort(new DOMException(`The wait for run ${runId} timed out.`, "TimeoutError"));
+  }, timeoutMs) : void 0;
+  const linked = eitherSignal(deadline.signal, options.signal);
+  const { signal } = linked;
+  const timedOut = () => deadline.signal.aborted && options.signal?.aborted !== true;
+  const notFinished = () => new RunTimeoutError(
+    `Run ${runId} did not reach a terminal state within ${timeoutMs}ms.`,
+    runId,
+    timeoutMs
+  );
+  try {
+    let attempt = 0;
+    const { onProgress } = options;
+    let readsProgress = onProgress !== void 0 && fetchProgress !== void 0;
+    let delivered;
+    for (; ; ) {
+      throwIfAborted(options.signal);
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= timeoutMs || deadline.signal.aborted) throw notFinished();
+      const loadStoredTexts2 = loadCompleted === void 0 ? options.loadStoredTexts : false;
+      let state;
       try {
-        progress = await fetchProgress(runId, { signal: options.signal });
+        state = await fetchOnce(runId, {
+          signal,
+          ...options.artifacts === void 0 ? {} : { artifacts: options.artifacts },
+          ...loadStoredTexts2 === void 0 ? {} : { loadStoredTexts: loadStoredTexts2 }
+        });
       } catch (error) {
-        throwIfAborted(options.signal);
-        if (error instanceof RunLifecycleUnavailableError) readsProgress = false;
+        if (timedOut()) throw notFinished();
+        throw error;
       }
-      if (progress !== void 0 && isFresherRunProgress(progress, delivered)) {
-        delivered = progress;
-        onProgress(progress);
+      if (state.state === "completed") {
+        if (loadCompleted === void 0) return state.result;
+        try {
+          return await loadCompleted(state.result, { signal });
+        } catch (error) {
+          if (timedOut()) {
+            throw new RunTimeoutError(
+              `Run ${runId} completed, but its stored texts did not load within ${timeoutMs}ms; read it again with getRunResult, or with loadStoredTexts: false for the wire shape.`,
+              runId,
+              timeoutMs
+            );
+          }
+          throw error;
+        }
+      }
+      if (state.state === "failed") {
+        throw new RunFailedError(state.message, runId, state.status, { problem: state.problem });
+      }
+      if (readsProgress && onProgress !== void 0 && fetchProgress !== void 0) {
+        let progress;
+        try {
+          progress = await fetchProgress(runId, { signal });
+        } catch (error) {
+          throwIfAborted(options.signal);
+          if (timedOut()) throw notFinished();
+          if (error instanceof RunLifecycleUnavailableError) readsProgress = false;
+        }
+        if (progress !== void 0 && isFresherRunProgress(progress, delivered)) {
+          delivered = progress;
+          onProgress(progress);
+        }
+      }
+      attempt += 1;
+      options.onPoll?.({ attempt, elapsedMs });
+      const retryMs = state.retry_after_seconds != null ? state.retry_after_seconds * 1e3 : 0;
+      const waitMs = Math.min(Math.max(intervalMs, retryMs), timeoutMs - elapsedMs);
+      try {
+        await sleep(waitMs, signal);
+      } catch (error) {
+        if (timedOut()) throw notFinished();
+        throw error;
       }
     }
-    attempt += 1;
-    options.onPoll?.({ attempt, elapsedMs });
-    const retryMs = state.retry_after_seconds != null ? state.retry_after_seconds * 1e3 : 0;
-    const waitMs = Math.min(Math.max(intervalMs, retryMs), timeoutMs - elapsedMs);
-    await sleep(waitMs, options.signal);
+  } finally {
+    clearTimeout(timer);
+    linked.dispose();
   }
 }
 function throwIfAborted(signal) {
@@ -13349,26 +13427,6 @@ function missingBlobsOf2(status, body) {
     return void 0;
   }
   return listed;
-}
-function eitherSignal(first, second) {
-  if (second === void 0 || first.aborted) return { signal: first, dispose: () => void 0 };
-  if (second.aborted) return { signal: second, dispose: () => void 0 };
-  const controller = new AbortController();
-  const dispose = () => {
-    first.removeEventListener("abort", onFirst);
-    second.removeEventListener("abort", onSecond);
-  };
-  const onFirst = () => {
-    dispose();
-    controller.abort(first.reason);
-  };
-  const onSecond = () => {
-    dispose();
-    controller.abort(second.reason);
-  };
-  first.addEventListener("abort", onFirst, { once: true });
-  second.addEventListener("abort", onSecond, { once: true });
-  return { signal: controller.signal, dispose };
 }
 async function contentsTreeSource(contents, call, sending) {
   const bytesByPath = /* @__PURE__ */ new Map();
@@ -14147,7 +14205,7 @@ function methodShowcaseFreezeFault(answer) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.67.1";
+var SDK_VERSION = "0.69.0";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -15064,6 +15122,243 @@ async function prepareInputs(client, request) {
 
 // src/artifacts.ts
 init_protocol();
+
+// src/stored-texts.ts
+var KIND_BY_CONCEPT = {
+  "native.Text": "text",
+  "native.Markdown": "text",
+  "native.Html": "html",
+  "native.JSON": "json"
+};
+var STORED_TEXT_VALUE_FIELD = {
+  text: "text",
+  html: "inner_html",
+  json: "json_obj"
+};
+var STORED_TEXT_REFERENCE_FIELDS = ["url", "size", "mime_type", "preview"];
+var MAIN_STUFF_ALIAS = "main_stuff";
+var LIST_ITEMS_FIELD = "items";
+var NATIVE_MEMBERS = {
+  "native.Page": { text_and_images: "native.TextAndImages", page_view: "native.Image" },
+  "native.TextAndImages": { text: "native.Text", images: ["native.Image"] }
+};
+var NATIVE_FILE_KINDS = {
+  "native.Image": "image",
+  "native.Document": "document"
+};
+function storedTextKindOf(conceptRef2, refines) {
+  for (const candidate of [conceptRef2, ...refines ?? []]) {
+    if (typeof candidate !== "string") continue;
+    const kind = KIND_BY_CONCEPT[candidate];
+    if (kind !== void 0) return kind;
+  }
+  return null;
+}
+var NATIVE_PREFIX2 = "native.";
+function storedTextKindOfNode(node) {
+  if (node === void 0 || node.kind === "list") return null;
+  const kind = storedTextKindOf(node.concept_ref, node.refines);
+  if (kind !== null) return kind;
+  if (node.concept_ref === void 0) return null;
+  const chain = [node.concept_ref, ...node.refines ?? []];
+  if (chain.some((concept) => concept.startsWith(NATIVE_PREFIX2))) return null;
+  return node.kind === "prose" || node.kind === "text" ? "text" : null;
+}
+function mainStuffNode(results) {
+  const memory = results.working_memory;
+  if (memory == null || typeof memory !== "object") return null;
+  const aliases = memory.aliases;
+  const aliased = typeof aliases === "object" && aliases !== null ? aliases[MAIN_STUFF_ALIAS] : void 0;
+  const name = typeof aliased === "string" ? aliased : MAIN_STUFF_ALIAS;
+  const stuff = memory.root?.[name];
+  const conceptRef2 = conceptRefOf(stuff?.concept);
+  if (conceptRef2 === null) return null;
+  return contentNode(conceptRef2, results.main_stuff, results);
+}
+function workingMemoryNode(results) {
+  const memory = results.working_memory;
+  if (memory == null || typeof memory !== "object") return null;
+  const root = memory.root;
+  if (typeof root !== "object" || root === null) return null;
+  const stuffFields = [];
+  for (const [name, stuff] of Object.entries(root)) {
+    if (typeof stuff !== "object" || stuff === null) continue;
+    const conceptRef2 = conceptRefOf(stuff.concept);
+    if (conceptRef2 === null) continue;
+    const content = contentNode(conceptRef2, stuff.content, results);
+    stuffFields.push(named(name, objectNode(null, [named("content", content)])));
+  }
+  return objectNode(null, [named("root", objectNode(null, stuffFields))]);
+}
+function childNode(node, parent, key) {
+  if (node === void 0) return void 0;
+  if (node.kind === "list") {
+    if (Array.isArray(parent)) return node.item;
+    return key === LIST_ITEMS_FIELD ? node : void 0;
+  }
+  if (node.kind === "object" && typeof key === "string" && !Array.isArray(parent)) {
+    return node.fields.find((field) => field.name === key);
+  }
+  return void 0;
+}
+function conceptRefOf(concept) {
+  if (typeof concept === "string") return concept;
+  if (typeof concept === "object" && concept !== null) {
+    const fields = concept;
+    const domain = fields["domain_code"] ?? fields["domain"];
+    const code = fields["code"];
+    if (typeof domain === "string" && typeof code === "string") return `${domain}.${code}`;
+  }
+  return null;
+}
+function contentNode(conceptRef2, content, source) {
+  const element = nodeForConcept(conceptRef2, source);
+  if (!isPluralEnvelope(content, element)) return element;
+  return {
+    kind: "list",
+    concept_ref: conceptRef2,
+    ...element.refines === void 0 ? {} : { refines: element.refines },
+    required: true,
+    item: element
+  };
+}
+function isPluralEnvelope(content, element) {
+  if (typeof content !== "object" || content === null || Array.isArray(content)) return false;
+  const keys = Object.keys(content);
+  if (keys.length !== 1 || keys[0] !== LIST_ITEMS_FIELD) return false;
+  if (!Array.isArray(content[LIST_ITEMS_FIELD])) return false;
+  return !(element.kind === "object" && element.fields.some((field) => field.name === LIST_ITEMS_FIELD));
+}
+function nodeForConcept(conceptRef2, source) {
+  for (const form of [source.output_form, source.input_form]) {
+    if (form == null || typeof form !== "object") continue;
+    for (const descriptor of Object.values(form)) {
+      const roots = descriptorRoots(descriptor);
+      for (const root of roots) {
+        const found = findConceptNode(root, conceptRef2);
+        if (found !== void 0) return found;
+      }
+    }
+  }
+  return nativeNode(conceptRef2);
+}
+function descriptorRoots(descriptor) {
+  if (typeof descriptor !== "object" || descriptor === null) return [];
+  const entry = descriptor;
+  const roots = [];
+  if (isNode(entry.field)) roots.push(entry.field);
+  if (Array.isArray(entry.fields)) roots.push(...entry.fields.filter(isNode));
+  return roots;
+}
+function isNode(value) {
+  return typeof value === "object" && value !== null && typeof value.kind === "string";
+}
+function findConceptNode(node, conceptRef2) {
+  if (node.kind !== "list" && node.concept_ref === conceptRef2) return node;
+  if (node.kind === "list" && isNode(node.item)) return findConceptNode(node.item, conceptRef2);
+  if (node.kind === "object" && Array.isArray(node.fields)) {
+    for (const field of node.fields) {
+      if (!isNode(field)) continue;
+      const found = findConceptNode(field, conceptRef2);
+      if (found !== void 0) return found;
+    }
+  }
+  return void 0;
+}
+function nativeNode(conceptRef2) {
+  const members = NATIVE_MEMBERS[conceptRef2];
+  if (members !== void 0) {
+    return objectNode(
+      conceptRef2,
+      Object.entries(members).map(
+        ([name, member]) => named(
+          name,
+          typeof member === "string" ? nativeNode(member) : {
+            kind: "list",
+            concept_ref: member[0],
+            required: true,
+            item: nativeNode(member[0])
+          }
+        )
+      )
+    );
+  }
+  const fileKind = NATIVE_FILE_KINDS[conceptRef2];
+  if (fileKind !== void 0) return { kind: fileKind, concept_ref: conceptRef2, required: true };
+  return { kind: "unknown", concept_ref: conceptRef2, required: true };
+}
+function objectNode(conceptRef2, fields) {
+  return {
+    kind: "object",
+    ...conceptRef2 === null ? {} : { concept_ref: conceptRef2 },
+    required: true,
+    fields
+  };
+}
+function named(name, node) {
+  return { ...node, name };
+}
+
+// src/exact-json.ts
+init_protocol();
+var INTEGER_TOKEN = /^-?\d+$/;
+var LONG_DIGIT_RUN = /\d{16}/;
+var JSON_WITH_RAW = JSON;
+var ExactJsonUnsupportedError = class extends ProblemError {
+  constructor(message) {
+    super(
+      buildProblem("client.tool_outdated", {
+        tool: "JavaScript runtime",
+        version: runtimeVersion()
+      })
+    );
+    this.name = "ExactJsonUnsupportedError";
+    this.message = message;
+  }
+};
+function runtimeVersion() {
+  const node = globalThis.process?.versions?.node;
+  return typeof node === "string" ? `Node.js ${node}` : "unknown";
+}
+function parseExactJson(text) {
+  return LONG_DIGIT_RUN.test(text) ? JSON.parse(text, readIntegerExactly) : JSON.parse(text);
+}
+function stringifyExactJson(value, space) {
+  const bigIntHasToJson = typeof BigInt.prototype.toJSON === "function";
+  return JSON.stringify(
+    value,
+    function writeBigIntExactly(key, item) {
+      if (typeof item === "bigint") return rawBigInt(item);
+      if (!bigIntHasToJson) return item;
+      const held = ownDataValue(this, key);
+      return typeof held === "bigint" ? rawBigInt(held) : item;
+    },
+    space
+  );
+}
+function readIntegerExactly(_key, value, context) {
+  if (typeof value !== "number" || Number.isSafeInteger(value)) return value;
+  const source = context?.source;
+  if (typeof source === "string") return INTEGER_TOKEN.test(source) ? BigInt(source) : value;
+  if (Number.isFinite(value) && !Number.isInteger(value)) return value;
+  throw new ExactJsonUnsupportedError(
+    `This runtime's JSON.parse gives a reviver no source text, so the number read as ${value} cannot be read exactly.`
+  );
+}
+function rawBigInt(value) {
+  if (typeof JSON_WITH_RAW.rawJSON !== "function") {
+    throw new TypeError(
+      `This runtime has no JSON.rawJSON, so the bigint ${value.toString()} cannot be written as its exact digits.`
+    );
+  }
+  return JSON_WITH_RAW.rawJSON(value.toString());
+}
+function ownDataValue(holder, key) {
+  if (typeof holder !== "object" || holder === null) return void 0;
+  return Object.getOwnPropertyDescriptor(holder, key)?.value;
+}
+
+// src/artifacts.ts
 var PIPELEX_STORAGE_SCHEME2 = "pipelex-storage://";
 var BULK_RESOLVE_MAX_URIS = 100;
 var DEFAULT_ARTIFACT_MAX_BYTES = 1024 * 1024 * 1024;
@@ -15088,27 +15383,47 @@ var EXTENSION_BY_CONTENT_TYPE = {
   "text/csv": ".csv",
   "application/json": ".json"
 };
+var TEXT_EXTENSION_BY_MIME_TYPE = {
+  "text/plain": ".txt",
+  "text/markdown": ".md",
+  "text/html": ".html",
+  "application/json": ".json"
+};
+var TEXT_EXTENSION_BY_KIND = {
+  text: ".txt",
+  html: ".html",
+  json: ".json"
+};
 var IDENTIFIER_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
-function walkReferences(value, withPaths = true) {
+function walkReferences(value, withPaths = true, described2, includeTexts = false) {
   const byUri = /* @__PURE__ */ new Map();
   const trail = [];
-  const visit = (node) => {
-    if (typeof node === "string") {
-      if (!isStorageReference(node)) return;
-      const known = byUri.get(node);
-      if (!withPaths) {
-        if (known === void 0) byUri.set(node, { uri: node, paths: [] });
-        return;
+  const record = (uri, path2, text) => {
+    const known = byUri.get(uri);
+    if (!withPaths) {
+      if (known === void 0) byUri.set(uri, { uri, paths: [], ...text ? { text } : {} });
+      return;
+    }
+    if (known === void 0) byUri.set(uri, { uri, paths: [path2], ...text ? { text } : {} });
+    else known.paths.push(path2);
+  };
+  const visit = (node, nodeDescriptor) => {
+    const kind = storedTextKindOfNode(nodeDescriptor);
+    if (kind !== null) {
+      const url = includeTexts ? storedTextReferenceUrl(node, kind) : null;
+      if (url !== null && isStorageReference(url)) {
+        record(url, [...trail, "url"], { kind, reference: node });
       }
-      const path2 = [...trail];
-      if (known === void 0) byUri.set(node, { uri: node, paths: [path2] });
-      else known.paths.push(path2);
+      return;
+    }
+    if (typeof node === "string") {
+      if (isStorageReference(node)) record(node, [...trail]);
       return;
     }
     if (Array.isArray(node)) {
       for (let index = 0; index < node.length; index += 1) {
         trail.push(index);
-        visit(node[index]);
+        visit(node[index], childNode(nodeDescriptor, node, index));
         trail.pop();
       }
       return;
@@ -15116,12 +15431,12 @@ function walkReferences(value, withPaths = true) {
     if (typeof node === "object" && node !== null) {
       for (const [key, entry] of Object.entries(node)) {
         trail.push(key);
-        visit(entry);
+        visit(entry, childNode(nodeDescriptor, node, key));
         trail.pop();
       }
     }
   };
-  visit(value);
+  visit(value, described2);
   return [...byUri.values()];
 }
 function renderLocation(located) {
@@ -15139,12 +15454,21 @@ function renderPath2(segments) {
 function isStorageReference(value) {
   return value.startsWith(PIPELEX_STORAGE_SCHEME2) && value.length > PIPELEX_STORAGE_SCHEME2.length;
 }
-function filenameFor(segments, uri, contentType, scope) {
-  const named = segments.at(-1) === "url" ? segments.slice(0, -1) : segments;
-  const words = named.map(
+function isLoadableStoredTextUrl(url) {
+  return isStorageReference(url) || url.startsWith("data:");
+}
+function storedTextReferenceUrl(value, kind) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const reference = value;
+  const url = reference["url"];
+  if (typeof url !== "string" || reference[STORED_TEXT_VALUE_FIELD[kind]] != null) return null;
+  return url;
+}
+function filenameFor(segments, extension, scope) {
+  const named2 = segments.at(-1) === "url" ? segments.slice(0, -1) : segments;
+  const words = named2.map(
     (segment) => typeof segment === "number" ? String(segment) : segment.replace(/[^A-Za-z0-9_]/gu, "_")
   ).filter((word) => word !== "");
-  const extension = extensionFor(uri, contentType);
   const stem = fitStem(words.length > 0 ? words : [scope], MAX_FILENAME_LENGTH - extension.length);
   return (WINDOWS_DEVICE_STEM.test(stem) ? `${stem}_` : stem) + extension;
 }
@@ -15163,6 +15487,10 @@ function extensionFor(uri, contentType) {
   if (fromKey !== "") return `.${fromKey}`;
   if (contentType == null) return "";
   return EXTENSION_BY_CONTENT_TYPE[contentType.split(";")[0].trim().toLowerCase()] ?? "";
+}
+function textExtensionFor(kind, mimeType) {
+  const named2 = mimeType == null ? void 0 : TEXT_EXTENSION_BY_MIME_TYPE[mimeType.split(";")[0].trim().toLowerCase()];
+  return named2 ?? TEXT_EXTENSION_BY_KIND[kind];
 }
 function storageKeyExtension(uri) {
   const key = uri.startsWith(PIPELEX_STORAGE_SCHEME2) ? uri.slice(PIPELEX_STORAGE_SCHEME2.length) : uri;
@@ -15496,6 +15824,260 @@ function formatMiB(bytes) {
   const mib = bytes / (1024 * 1024);
   return `${Number.isInteger(mib) ? mib : mib.toFixed(1)} MiB`;
 }
+var DEFAULT_STORED_TEXT_MAX_BYTES = 100 * 1024 * 1024;
+var DEFAULT_STORED_TEXT_CONCURRENCY = 8;
+async function loadStoredTexts(client, results, options = {}) {
+  if (results.main_stuff == null) return results;
+  const node = mainStuffNode(results);
+  if (node === null) return results;
+  const loaded = await loadStoredTextValues(
+    client,
+    results.main_stuff,
+    node,
+    options,
+    results.pipeline_run_id
+  );
+  return loaded === results.main_stuff ? results : { ...results, main_stuff: loaded };
+}
+var CONCEPT_ARTIFACTS = ["working_memory", "output_form", "input_form"];
+async function withConceptArtifacts(client, results, selection, signal) {
+  if (selection === void 0) return results;
+  const missing = CONCEPT_ARTIFACTS.filter((artifact) => !selection.includes(artifact));
+  if (missing.length === 0) return results;
+  const state = await client.getRunResult(results.pipeline_run_id, {
+    signal,
+    artifacts: missing,
+    loadStoredTexts: false
+  });
+  if (state.state !== "completed") return results;
+  const concepts = {};
+  for (const artifact of missing) {
+    concepts[artifact] = state.result[artifact];
+  }
+  return { ...results, ...concepts };
+}
+function mayHoldStoredTexts(value) {
+  if (Array.isArray(value)) return value.some(mayHoldStoredTexts);
+  if (typeof value !== "object" || value === null) return false;
+  const fields = value;
+  if (typeof fields["url"] === "string" && Object.values(STORED_TEXT_VALUE_FIELD).every((field) => fields[field] == null) && ("size" in fields || "preview" in fields)) {
+    return true;
+  }
+  return Object.values(fields).some(mayHoldStoredTexts);
+}
+function carriesConceptArtifacts(selection) {
+  return selection === void 0 || CONCEPT_ARTIFACTS.every((artifact) => selection.includes(artifact));
+}
+async function loadStoredTextValues(client, value, node, options, runId) {
+  const sites = findStoredTexts(value, node);
+  if (sites.length === 0) return value;
+  const concurrency = options.concurrency ?? DEFAULT_STORED_TEXT_CONCURRENCY;
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new ArtifactOperationError(
+      `"concurrency" must be a positive integer, got ${String(concurrency)}.`,
+      { problem: argumentInvalidProblem("concurrency", "not_positive") }
+    );
+  }
+  const bounds = fetchBounds({
+    maxBytes: options.maxBytes ?? DEFAULT_STORED_TEXT_MAX_BYTES,
+    timeoutMs: options.timeoutMs,
+    allowHttp: options.allowHttp,
+    signal: options.signal
+  });
+  const firstSite = /* @__PURE__ */ new Map();
+  for (const site of sites) if (!firstSite.has(site.url)) firstSite.set(site.url, site);
+  const urls = [...firstSite.keys()];
+  const references = urls.filter(isStorageReference);
+  const resolved = /* @__PURE__ */ new Map();
+  let items;
+  try {
+    items = await resolveArtifacts(client, references, { signal: options.signal });
+  } catch (err) {
+    if (options.signal?.aborted === true) throw options.signal.reason;
+    const site = firstSite.get(references[0]);
+    const path2 = renderPath2(site.segments);
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new StoredTextLoadError(
+      `The stored text at ${path2} could not be loaded: the platform's bulk resolve route failed: ${detail}`,
+      {
+        uri: site.url,
+        path: path2,
+        reason: "resolve_failed",
+        status: err instanceof ApiResponseError ? err.status : void 0
+      },
+      { cause: err, problem: err instanceof ProblemError ? err.problem : void 0 }
+    );
+  }
+  references.forEach((uri, index) => resolved.set(uri, items[index]));
+  const texts = /* @__PURE__ */ new Map();
+  const dispatcher = await dispatcherFor(bounds.timeoutMs);
+  try {
+    let next = 0;
+    const worker = async () => {
+      for (; ; ) {
+        const index = next;
+        next += 1;
+        if (index >= urls.length) return;
+        const url = urls[index];
+        const site = firstSite.get(url);
+        const bytes = await readStoredBytes(site, resolved.get(url), bounds, dispatcher);
+        texts.set(url, decodeStoredValue(site, bytes, runId));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, urls.length) }, worker));
+  } finally {
+    void dispatcher?.close().catch(() => void 0);
+  }
+  let loaded = structuredClone(value);
+  for (const site of sites) {
+    loaded = replaceAt(loaded, site.segments, loadedForm(site, texts.get(site.url)));
+  }
+  return loaded;
+}
+function findStoredTexts(value, node) {
+  const sites = [];
+  const trail = [];
+  const visit = (current, described2) => {
+    const kind = storedTextKindOfNode(described2);
+    if (kind !== null) {
+      const url = storedTextReferenceUrl(current, kind);
+      if (url === null) return;
+      if (!isLoadableStoredTextUrl(url)) {
+        const path2 = renderPath2(trail);
+        throw new StoredTextLoadError(
+          `The stored text at ${path2} could not be loaded: its url is neither a pipelex-storage:// reference nor a data: URL, so it is not fetched; read the result with loadStoredTexts: false to see it as written.`,
+          { uri: url, path: path2, reason: "unsupported_url" }
+        );
+      }
+      sites.push({
+        segments: [...trail],
+        kind,
+        url,
+        reference: current
+      });
+      return;
+    }
+    if (Array.isArray(current)) {
+      current.forEach((entry, index) => {
+        trail.push(index);
+        visit(entry, childNode(described2, current, index));
+        trail.pop();
+      });
+      return;
+    }
+    if (typeof current === "object" && current !== null) {
+      for (const [key, entry] of Object.entries(current)) {
+        trail.push(key);
+        visit(entry, childNode(described2, current, key));
+        trail.pop();
+      }
+    }
+  };
+  visit(value, node);
+  return sites;
+}
+async function readStoredBytes(site, resolved, bounds, dispatcher) {
+  const path2 = renderPath2(site.segments);
+  const fail = (reason, detail, extra) => {
+    throw new StoredTextLoadError(
+      `The stored text at ${path2} could not be loaded: ${detail}`,
+      { uri: site.url, path: path2, reason, status: extra?.status },
+      { cause: extra?.cause, problem: extra?.problem }
+    );
+  };
+  if (site.url.startsWith("data:")) {
+    const bytes = decodeDataUrl2(site.url);
+    if (bytes === null) return fail("unsupported_url", "its data URL does not decode.");
+    if (bytes.byteLength > bounds.maxBytes) {
+      return fail(
+        "too_large",
+        `it is ${formatMiB(bytes.byteLength)}, over the ${formatMiB(bounds.maxBytes)} cap.`,
+        {
+          problem: downloadLimitProblem(bounds.maxBytes)
+        }
+      );
+    }
+    return bytes;
+  }
+  if (resolved === void 0) {
+    return fail("unsupported_url", "its url was not resolved by the platform.");
+  }
+  if (resolved.error !== null) return fail(resolved.error.code, resolved.error.detail);
+  const link = resolved.url;
+  try {
+    const response = await fetchResolvedUrl(site.url, link, bounds, dispatcher, () => void 0);
+    return new Uint8Array(await response.arrayBuffer());
+  } catch (err) {
+    if (bounds.signal?.aborted === true) throw bounds.signal.reason;
+    if (err instanceof ArtifactFetchError) {
+      return fail(err.reason, err.message, {
+        cause: err,
+        problem: err.problem,
+        status: err.status
+      });
+    }
+    return fail("unknown", err instanceof Error ? err.message : String(err), { cause: err });
+  }
+}
+function decodeDataUrl2(url) {
+  const comma = url.indexOf(",");
+  if (comma < 0) return null;
+  const header2 = url.slice("data:".length, comma);
+  const payload = url.slice(comma + 1);
+  try {
+    if (/;base64$/i.test(header2)) {
+      const binary = atob(payload);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    }
+    return new TextEncoder().encode(decodeURIComponent(payload));
+  } catch {
+    return null;
+  }
+}
+function decodeStoredValue(site, bytes, runId) {
+  const path2 = renderPath2(site.segments);
+  const unreadable2 = (reason, detail, cause) => {
+    throw new StoredTextLoadError(
+      `The stored text at ${path2} could not be loaded: ${detail}`,
+      { uri: site.url, path: path2, reason },
+      { cause, problem: responseUnreadableProblem(200, runId) }
+    );
+  };
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch (err) {
+    return unreadable2("not_utf8", "its bytes are not UTF-8 text.", err);
+  }
+  if (site.kind !== "json") return text;
+  let parsed;
+  try {
+    parsed = parseExactJson(text);
+  } catch (err) {
+    return unreadable2("not_json_object", "its bytes are not JSON.", err);
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return unreadable2("not_json_object", "its JSON is not an object.");
+  }
+  return parsed;
+}
+function loadedForm(site, value) {
+  const loaded = { [STORED_TEXT_VALUE_FIELD[site.kind]]: value };
+  const dropped = STORED_TEXT_REFERENCE_FIELDS;
+  for (const [key, entry] of Object.entries(site.reference)) {
+    if (!dropped.includes(key)) loaded[key] = entry;
+  }
+  return loaded;
+}
+function replaceAt(root, segments, value) {
+  if (segments.length === 0) return value;
+  let parent = root;
+  for (const segment of segments.slice(0, -1)) {
+    parent = parent[segment];
+  }
+  parent[segments.at(-1)] = value;
+  return root;
+}
 async function writeFully(writer, chunk) {
   let offset = 0;
   while (offset < chunk.byteLength) {
@@ -15535,6 +16117,7 @@ var SKIPPED_TOTAL = "Skipped: the download's total byte limit was reached by an 
 function itemError(location, contentType, code, detail) {
   return {
     uri: location.uri,
+    kind: location.kind,
     found_at: location.found_at,
     path: null,
     content_type: contentType,
@@ -15550,7 +16133,11 @@ function isCredentialRefusal(err) {
   return err instanceof ApiResponseError && (err.status === 401 || err.status === 403);
 }
 async function readCompletedResults(client, runId, scope, signal) {
-  const state = await client.getRunResult(runId, { signal, artifacts: [scope] });
+  const state = await client.getRunResult(runId, {
+    signal,
+    artifacts: [scope],
+    loadStoredTexts: false
+  });
   if (state.state === "running") {
     throw new RunStillRunningError(
       `Run ${runId} is still running, so it has no artifacts to download yet` + (state.retry_after_seconds != null ? ` \u2014 retry in ${state.retry_after_seconds}s.` : "."),
@@ -15601,12 +16188,26 @@ async function downloadArtifacts(client, request) {
   if (walked == null) {
     throw new ScopeUnavailableError(scope, runId);
   }
-  const located = walkReferences(walked);
+  const source = !hasResults && mayHoldStoredTexts(walked) ? await withConceptArtifacts(client, results, [scope], request.signal) : results;
+  const node = scope === "main_stuff" ? mainStuffNode({ ...source, main_stuff: walked }) : workingMemoryNode(source);
+  const located = walkReferences(walked, true, node ?? void 0, true);
   if (located.length === 0) {
     return { scope, artifacts: [], saved_paths: [], all_saved: true };
   }
-  const locations = located.map(renderLocation);
+  const locations = located.map((reference) => ({
+    ...renderLocation(reference),
+    kind: reference.text === void 0 ? "file" : "text"
+  }));
   const uris = located.map((reference) => reference.uri);
+  const contentTypeOf = (index, resolvedType) => {
+    const stated = located[index].text?.reference["mime_type"];
+    return typeof stated === "string" ? stated : resolvedType;
+  };
+  const filenameOf = (index, contentType) => {
+    const reference = located[index];
+    const extension = reference.text === void 0 ? extensionFor(reference.uri, contentType) : textExtensionFor(reference.text.kind, contentType);
+    return filenameFor(reference.paths[0], extension, scope);
+  };
   const fs2 = host.fs;
   const path2 = host.path;
   const dir = path2.resolve(request.dir);
@@ -15680,7 +16281,7 @@ async function downloadArtifacts(client, request) {
     const share = () => Math.max(written, reserved);
     let target;
     try {
-      const filename = filenameFor(located[index].paths[0], uri, contentType, scope);
+      const filename = filenameOf(index, contentType);
       target = await openUniqueFile(fs2, path2, dir, filename);
     } catch (err) {
       committedBytes -= share();
@@ -15712,6 +16313,7 @@ async function downloadArtifacts(client, request) {
       committedBytes -= share();
       return {
         uri,
+        kind: location.kind,
         found_at: location.found_at,
         path: target.path,
         content_type: contentType,
@@ -15772,6 +16374,7 @@ async function downloadArtifacts(client, request) {
     savedBytes += written;
     return {
       uri,
+      kind: location.kind,
       found_at: location.found_at,
       path: target.path,
       content_type: contentType,
@@ -15789,7 +16392,7 @@ async function downloadArtifacts(client, request) {
       if (credentialFailure !== void 0 || aborted()) {
         outcomes[index] = itemError(
           location,
-          entry.content_type,
+          contentTypeOf(index, entry.content_type),
           "aborted",
           credentialFailure ? SKIPPED_CREDENTIAL : SKIPPED_ABORTED
         );
@@ -15798,7 +16401,7 @@ async function downloadArtifacts(client, request) {
       if (limitReached) {
         outcomes[index] = itemError(
           location,
-          entry.content_type,
+          contentTypeOf(index, entry.content_type),
           "total_limit_exceeded",
           SKIPPED_TOTAL
         );
@@ -15813,19 +16416,24 @@ async function downloadArtifacts(client, request) {
             credentialFailure = err;
             outcomes[index] = itemError(
               location,
-              entry.content_type,
+              contentTypeOf(index, entry.content_type),
               "aborted",
               SKIPPED_CREDENTIAL
             );
             continue;
           }
           if (aborted()) {
-            outcomes[index] = itemError(location, entry.content_type, "aborted", SKIPPED_ABORTED);
+            outcomes[index] = itemError(
+              location,
+              contentTypeOf(index, entry.content_type),
+              "aborted",
+              SKIPPED_ABORTED
+            );
             continue;
           }
           outcomes[index] = itemError(
             location,
-            entry.content_type,
+            contentTypeOf(index, entry.content_type),
             "resolve_failed",
             `The expired link could not be re-resolved: ${err instanceof Error ? err.message : String(err)}.`
           );
@@ -15833,10 +16441,15 @@ async function downloadArtifacts(client, request) {
         }
       }
       if (entry.error !== null) {
-        outcomes[index] = itemError(location, null, entry.error.code, entry.error.detail);
+        outcomes[index] = itemError(
+          location,
+          contentTypeOf(index, null),
+          entry.error.code,
+          entry.error.detail
+        );
         continue;
       }
-      outcomes[index] = await saveOne(index, entry.url, entry.content_type);
+      outcomes[index] = await saveOne(index, entry.url, contentTypeOf(index, entry.content_type));
     }
   };
   try {
@@ -15943,65 +16556,6 @@ function resultsFromExecute(response) {
     tokens_usages: response.pipe_output["tokens_usages"] ?? null,
     usage_assembly_error: response.pipe_output["usage_assembly_error"] ?? null
   };
-}
-
-// src/exact-json.ts
-init_protocol();
-var INTEGER_TOKEN = /^-?\d+$/;
-var LONG_DIGIT_RUN = /\d{16}/;
-var JSON_WITH_RAW = JSON;
-var ExactJsonUnsupportedError = class extends ProblemError {
-  constructor(message) {
-    super(
-      buildProblem("client.tool_outdated", {
-        tool: "JavaScript runtime",
-        version: runtimeVersion()
-      })
-    );
-    this.name = "ExactJsonUnsupportedError";
-    this.message = message;
-  }
-};
-function runtimeVersion() {
-  const node = globalThis.process?.versions?.node;
-  return typeof node === "string" ? `Node.js ${node}` : "unknown";
-}
-function parseExactJson(text) {
-  return LONG_DIGIT_RUN.test(text) ? JSON.parse(text, readIntegerExactly) : JSON.parse(text);
-}
-function stringifyExactJson(value, space) {
-  const bigIntHasToJson = typeof BigInt.prototype.toJSON === "function";
-  return JSON.stringify(
-    value,
-    function writeBigIntExactly(key, item) {
-      if (typeof item === "bigint") return rawBigInt(item);
-      if (!bigIntHasToJson) return item;
-      const held = ownDataValue(this, key);
-      return typeof held === "bigint" ? rawBigInt(held) : item;
-    },
-    space
-  );
-}
-function readIntegerExactly(_key, value, context) {
-  if (typeof value !== "number" || Number.isSafeInteger(value)) return value;
-  const source = context?.source;
-  if (typeof source === "string") return INTEGER_TOKEN.test(source) ? BigInt(source) : value;
-  if (Number.isFinite(value) && !Number.isInteger(value)) return value;
-  throw new ExactJsonUnsupportedError(
-    `This runtime's JSON.parse gives a reviver no source text, so the number read as ${value} cannot be read exactly.`
-  );
-}
-function rawBigInt(value) {
-  if (typeof JSON_WITH_RAW.rawJSON !== "function") {
-    throw new TypeError(
-      `This runtime has no JSON.rawJSON, so the bigint ${value.toString()} cannot be written as its exact digits.`
-    );
-  }
-  return JSON_WITH_RAW.rawJSON(value.toString());
-}
-function ownDataValue(holder, key) {
-  if (typeof holder !== "object" || holder === null) return void 0;
-  return Object.getOwnPropertyDescriptor(holder, key)?.value;
 }
 
 // src/client.ts
@@ -17656,20 +18210,48 @@ var PipelexApiClient = class {
         runId
       );
     }
-    return { state: "completed", pipeline_run_id: runId, result };
+    if (options.loadStoredTexts === false || !selectionIncludesMainStuff(options.artifacts)) {
+      return { state: "completed", pipeline_run_id: runId, result };
+    }
+    const loaded = await this.withStoredTextsLoaded(result, options.artifacts, options.signal);
+    return { state: "completed", pipeline_run_id: runId, result: loaded };
+  }
+  /**
+   * A completed result with the stored texts of its `main_stuff` loaded, as the result readers
+   * hand it back by default (`loadStoredTexts`); only `main_stuff` changes in the result handed
+   * back. A read that carried the concepts is walked by them at once, which costs no request when
+   * nothing is stored. A read whose `selection` left them out reads the working memory and the
+   * forms again by the run's id only when `main_stuff` holds a value shaped like a stored text's
+   * reference ({@link mayHoldStoredTexts}), so a narrowed read of images and documents stays one
+   * request.
+   */
+  async withStoredTextsLoaded(result, selection, signal) {
+    if (result.main_stuff == null) return result;
+    if (!carriesConceptArtifacts(selection) && !mayHoldStoredTexts(result.main_stuff)) {
+      return result;
+    }
+    const source = await withConceptArtifacts(this, result, selection, signal);
+    const loaded = await loadStoredTexts(this, { ...result, ...source }, {
+      signal
+    });
+    return loaded.main_stuff === result.main_stuff ? result : { ...result, main_stuff: loaded.main_stuff };
   }
   /**
    * Poll an already-started run (by id) until it reaches a terminal state. With `onProgress`,
    * each poll that finds the run still running also reads `getRunProgress` and hands the callback
    * every snapshot fresher than the last it delivered; a failed progress read never fails the wait
-   * (see `WaitForResultOptions.onProgress`).
+   * (see `WaitForResultOptions.onProgress`). `timeoutMs` bounds the whole wait, the load of the
+   * completed result's stored texts included: a run that completed but whose texts did not load
+   * in the time left throws `RunTimeoutError` saying so.
    */
   async waitForResult(runId, options) {
+    const selection = options?.artifacts;
     return pollUntilResult(
       (id, opts) => this.getRunResult(id, opts),
       runId,
       options,
-      (id, opts) => this.getRunProgress(id, opts)
+      (id, opts) => this.getRunProgress(id, opts),
+      options?.loadStoredTexts === false || !selectionIncludesMainStuff(selection) ? void 0 : (result, opts) => this.withStoredTextsLoaded(result, selection, opts.signal)
     );
   }
   /**
@@ -17766,14 +18348,14 @@ var PipelexApiClient = class {
         this.lifecycleAvailable = false;
         throwIfAborted(signal);
         onStarting?.();
-        return this.executeBlocking(options, signal, sending);
+        return this.executeBlocking(options, signal, sending, waitOptions.loadStoredTexts);
       }
       onStarted?.(ack);
       return this.waitForResult(ack.pipeline_run_id, waitOptions);
     }
     throwIfAborted(signal);
     onStarting?.();
-    return this.executeBlocking(options, signal, sending);
+    return this.executeBlocking(options, signal, sending, waitOptions.loadStoredTexts);
   }
   /**
    * A run's tree prepared once for `startAndWaitForResult`, under `call`'s refusals: the run's
@@ -19857,9 +20439,9 @@ var PipelexApiClient = class {
    * file got a verdict. A linked file carries its `url`, a presigned `GET` valid for fifteen
    * minutes, with its `expires_at`, the `name` the download saves under and its `media_type`, and
    * a `null` `error`. A file that got no link carries `error`, `{ code, detail }`, and `null` link
-   * members: `not_found` for an unknown file id, `conflict` for a file whose upload has not
-   * finished, `invalid_storage_uri` for a malformed address and `forbidden` for another
-   * organization's.
+   * members: the platform's registry codes, `request.invalid` naming `file_id` or `uri` for an
+   * unknown file or one whose upload has not finished, `pipelex.storage.uri_invalid` for a malformed
+   * address and `pipelex.org.mismatch` for another organization's.
    *
    * Each link is signed with a `Content-Disposition` naming the file, so a download saves under
    * the name a person sees rather than the bytes' hash. It opens in place (`inline`) for an image,
@@ -20418,7 +21000,7 @@ var PipelexApiClient = class {
    * so a runner that cannot resolve it says so (Rule 4) instead of the client
    * silently dropping it.
    */
-  async executeBlocking(options, signal, sending) {
+  async executeBlocking(options, signal, sending, loadStoredTexts2) {
     const response = await this.executeRun(
       {
         pipe_code: options.pipe_code ?? void 0,
@@ -20442,7 +21024,24 @@ var PipelexApiClient = class {
       signal,
       sending
     );
-    return resultsFromExecute(response);
+    const results = resultsFromExecute(response);
+    if (loadStoredTexts2 === false) return results;
+    try {
+      return await this.withStoredTextsLoaded(results, void 0, signal);
+    } catch (err) {
+      if (!(err instanceof StoredTextLoadError)) throw err;
+      throw new StoredTextLoadError(
+        err.message,
+        {
+          uri: err.uri,
+          path: err.path,
+          reason: err.reason,
+          status: err.status,
+          wireResults: results
+        },
+        { cause: err.cause, problem: err.problem }
+      );
+    }
   }
 };
 function isValidBaseUrl2(value) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0] - 2026-11-17
+
+### Changed
+
+- **The Mistral Vibe hook ships in the plugin, and Vibe 3.0.4 or later is required (Breaking)**: the `.mthds` check is now the plugin's own hook, `pipelex:check-mthds` in `pipelex-vibe/ai.mistral.vibe/hooks.toml`, which Vibe 3.0.4 and later run from each session's copy of the plugin, so the install no longer appends an entry to your hooks file and an older Vibe checks no edit at all. Delete the `check-mthds` entry an earlier install had you append to `~/.vibe/hooks.toml`, and to any trusted project's `.vibe/hooks.toml`; until you do it does nothing, since the script it calls now exits at once unless the plugin's hook calls it.
+- **The validation hook is rebuilt from `pipelex-sdk` 0.69.0**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `4b25116`, the commit its header names, now embedding `@pipelex/sdk` 0.69.0 and still `@pipelex/tools-wasm` 0.6.1. The SDK releases it crosses change how a run's results and stored texts are read and downloaded, calls the hook never makes, so its lint, format and validate verdicts and the request it sends are unchanged; its `User-Agent` now names `pipelex-sdk-js/0.69.0`.
+
 ## [0.21.0] - 2026-11-15
 
 ### Added

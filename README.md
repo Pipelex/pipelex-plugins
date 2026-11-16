@@ -110,7 +110,7 @@ The tools the skills call to validate a method, prepare its inputs, run it, gene
 
 ## Other agents
 
-The plugin also installs in **Mistral Vibe** 2.26.1 or later, as a native Vibe plugin: a clone of this repository linked into Vibe's plugins directory brings the skills, and the Pipelex tools and the hook are one entry each, appended to Vibe's configuration and hooks file, with no key and no path of yours in either. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
+The plugin also installs in **Mistral Vibe** 3.0.4 or later, as a native Vibe plugin: a clone of this repository linked into Vibe's plugins directory brings the skills and the hook, and the Pipelex tools are one entry appended to Vibe's configuration, with no key and no path of yours in it. [The Mistral Vibe procedure](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#mistral-vibe).
 
 **Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. The Pipelex tools find the login's key there; for the hook's validation, set the key in the plugin configuration dialog, which opens when you enable the plugin.
 

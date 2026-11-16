@@ -16,8 +16,22 @@
 # hook passes silently (exit 0, no deny); no PIPELEX_API_KEY / API unreachable
 # → check.mjs skips only the validate stage while the local lint/format
 # verdicts still apply. Nothing here shells out to plxt or mthds-agent.
+#
+# The plugin's ai.mistral.vibe/hooks.toml runs this script as
+# `bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook`, naming bash
+# because the session's copy of the plugin is rebuilt without mode bits.
 
 set -euo pipefail
+
+# Run only when the plugin's own hook calls this script. Earlier install
+# instructions had the user append a `check-mthds` entry to their hooks file,
+# which calls this same wrapper through the link in Vibe's plugins directory
+# with no argument. Vibe runs that entry and the plugin's hook both, since their
+# names differ, so without this guard every .mthds edit would be checked twice:
+# two validate calls and every refusal reported twice.
+if [[ "${1:-}" != "--plugin-hook" ]]; then
+  exit 0
+fi
 
 # --- Read stdin (post_tool JSON payload) once; re-fed to check.mjs below ---
 INPUT=$(cat)
