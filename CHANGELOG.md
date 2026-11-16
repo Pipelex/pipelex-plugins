@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The Mistral Vibe hook ships in the plugin, and Vibe 3.0.4 or later is required (Breaking)**: the `.mthds` check is now the plugin's own hook, `pipelex:check-mthds` in `pipelex-vibe/ai.mistral.vibe/hooks.toml`, which Vibe 3.0.4 and later run from each session's copy of the plugin, so the install no longer appends an entry to your hooks file and an older Vibe checks no edit at all. Delete the `check-mthds` entry an earlier install had you append to `~/.vibe/hooks.toml`, and to any trusted project's `.vibe/hooks.toml`; until you do it does nothing, since the script it calls now exits at once unless the plugin's hook calls it.
+
 ## [0.21.0] - 2026-11-15
 
 ### Added
