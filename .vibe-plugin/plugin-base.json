@@ -12,5 +12,10 @@
     "pipelex",
     "mthds",
     "ai-methods"
-  ]
+  ],
+  "extensions": {
+    "ai.mistral.vibe": {
+      "schemaVersion": 1
+    }
+  }
 }

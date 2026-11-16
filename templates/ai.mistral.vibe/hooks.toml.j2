@@ -1,0 +1,26 @@
+# The Pipelex plugin's .mthds check for {{ harness_name }}: the post_tool hook that
+# lints, formats and validates each .mthds file an edit or a write touches.
+#
+# {{ harness_name }} 3.0.4 and later run the hooks file a native plugin ships at
+# ai.mistral.vibe/hooks.toml, because plugin.json declares the ai.mistral.vibe
+# extension. The hook is renamed {{ plugin_name }}:check-mthds and runs from the
+# session's read-only copy of the plugin, with that copy as its working
+# directory and PLUGIN_ROOT and PLUGIN_DATA in its environment. Nothing is
+# appended to your own hooks file.
+#
+# The command is a shell line, so "${PLUGIN_ROOT}" is the shell's expansion,
+# quoted so that a plugin root holding a space stays one word. It names bash
+# because the session's copy is rebuilt without mode bits, so the wrapper may not
+# be executable there. --plugin-hook tells the wrapper that this hook called it:
+# without that argument the wrapper exits at once, which keeps the entry earlier
+# instructions had you append to ~/.vibe/hooks.toml from checking each edit a
+# second time.
+
+[[hooks]]
+name = "check-mthds"
+type = "post_tool"
+match = "re:^(edit|write_file)$"
+command = 'bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook'
+timeout = 15.0
+strict = false
+description = "Validate .mthds files after Vibe file edits."

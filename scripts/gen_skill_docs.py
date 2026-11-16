@@ -193,9 +193,11 @@ HOOK_TEMPLATES = [
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
-# - Mistral Vibe: hooks/vibe-hooks.toml, the [[hooks]] entry the user appends
-#   to their own hooks file, since Vibe 2.26.1 runs no hook a plugin declares,
-#   + the check-mthds-vibe.sh wrapper it names through the plugin's link.
+# - Mistral Vibe: ai.mistral.vibe/hooks.toml, the plugin's own hooks file,
+#   which Vibe 3.0.4 and later run from the session's copy of the plugin when
+#   the manifest declares the ai.mistral.vibe extension (its template mirrors
+#   that output path, as every template does), + the check-mthds-vibe.sh
+#   wrapper it runs through `bash "${PLUGIN_ROOT}"/...`.
 # Each wrapper is a thin fail-open guard around the shared check.mjs bundle,
 # invoked with the matching --platform flag.
 # - Agent Skills: nothing, since the platform has no hooks.
@@ -204,7 +206,7 @@ HOOK_TEMPLATES = [
 HOOK_TEMPLATES_BY_PLATFORM: dict[Platform, list[str]] = {
     Platform.CLAUDE: HOOK_TEMPLATES,
     Platform.CODEX: ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"],
-    Platform.MISTRAL_VIBE: ["hooks/vibe-hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
+    Platform.MISTRAL_VIBE: ["ai.mistral.vibe/hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"],
     Platform.AGENT_SKILLS: [],
 }
 
@@ -587,6 +589,7 @@ def render_templates(
         # Map template path to output path:
         # templates/skills/X/SKILL.md.j2 -> skills/X/SKILL.md
         # templates/hooks/X.sh.j2 -> hooks/X.sh
+        # templates/ai.mistral.vibe/hooks.toml.j2 -> ai.mistral.vibe/hooks.toml
         output_path = base_dir / template_name.removesuffix(".j2")
         results[output_path] = rendered
 

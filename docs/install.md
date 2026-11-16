@@ -93,7 +93,7 @@ An entry of your own replaces the plugin's whole, including the names it forward
 
 ## Mistral Vibe
 
-Mistral Vibe loads the plugin from a clone of this repository, linked into its plugins directory, since it has no marketplace to install from. Requires Mistral Vibe 2.26.1 or later, the release the plugin is built and checked against. The hook and the Pipelex tools need Node.js on your `PATH`.
+Mistral Vibe loads the plugin from a clone of this repository, linked into its plugins directory, since it has no marketplace to install from. Requires Mistral Vibe 3.0.4 or later, the first release that runs the hook a plugin ships; the plugin is checked against 3.1.2. Run `vibe --version` to see yours. The hook and the Pipelex tools need Node.js on your `PATH`, and the hook needs `bash`, which macOS and Linux provide.
 
 ```bash
 git clone https://github.com/Pipelex/pipelex-plugins.git ~/.local/share/pipelex-plugins
@@ -102,9 +102,11 @@ ln -s ~/.local/share/pipelex-plugins/pipelex-vibe "${VIBE_HOME:-$HOME/.vibe}/plu
 npx -y @pipelex/mcp@latest login
 ```
 
-That brings the skills, which Vibe names after the plugin (`/pipelex:pipelex-design`, `/pipelex:pipelex-run` and so on). `/plugins` lists what a session loads. Vibe reads its plugins when a session starts, so to take a new release, pull the clone, then start a new session or run `/reload-plugins` in an open one. The last line is the login, [above](#the-key).
+That brings the skills, which Vibe names after the plugin (`/pipelex:pipelex-design`, `/pipelex:pipelex-run` and so on), and [the hook](#the-hook). `/plugins` lists what a session loads. The last line is the login, [above](#the-key). Keep the link named `pipelex`, the plugin's own name.
 
-Two pieces the plugin cannot carry are entries in your own Vibe files, each shipped ready to append: the Pipelex tools and the hook. Keep the link named `pipelex`, since the hook's entry finds its script through it.
+**A pull reaches the next session, never the one running.** Each session runs from a read-only copy of the plugin that Vibe makes when the session starts, which lets a session outlive an upgrade. To take a new release, pull the clone, then start a new session or run `/reload-plugins` in an open one.
+
+One piece the plugin cannot carry is an entry in your own Vibe configuration, shipped ready to append: the Pipelex tools.
 
 ### The Pipelex tools
 
@@ -139,30 +141,17 @@ The skills that need the tools stop with this setup instruction when the tools a
 
 ### The hook
 
-Vibe 2.26.1 does not yet run the hooks a plugin declares, so the hook that lints, formats and validates each `.mthds` file Vibe edits is one entry in your hooks file, and the plugin ships that entry as `pipelex-vibe/hooks/vibe-hooks.toml`. First delete any `check-mthds` hook already in that file, such as the entry an earlier version of this page had you write, since Vibe skips a second hook of the same name and would keep running the old one; and delete it from any trusted project's `.vibe/hooks.toml` that page let you put it in, where it overrides the entry in yours. Then append the entry and start a new Vibe session:
+The hook that lints, formats and validates each `.mthds` file Vibe edits or writes ships in the plugin, as `pipelex-vibe/ai.mistral.vibe/hooks.toml`, so there is nothing to append. Vibe lists it as `pipelex:check-mthds` and runs it after every `edit` and `write_file` call, from the session's copy of the plugin. Its command is `bash "${PLUGIN_ROOT}"/hooks/check-mthds-vibe.sh --plugin-hook`: Vibe sets `PLUGIN_ROOT` to that copy, and the command names `bash` because Vibe rebuilds the copy without the files' executable bits.
 
-```bash
-cat ~/.local/share/pipelex-plugins/pipelex-vibe/hooks/vibe-hooks.toml >> "${VIBE_HOME:-$HOME/.vibe}/hooks.toml"
-```
+When the hook refuses an edit, the model reads the lint or validation errors in place of the tool's result and fixes the file. The hook runs with Vibe's own environment, so it validates a method against the API only with `PIPELEX_API_KEY` exported in the shell you start Vibe from. Without it, it still lints and formats every edit.
 
-The entry it adds:
-
-```toml
-[[hooks]]
-name = "check-mthds"
-type = "post_tool"
-match = "re:^(edit|write_file)$"
-command = '"${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/hooks/check-mthds-vibe.sh"'
-timeout = 15.0
-strict = false
-description = "Validate .mthds files after Vibe file edits."
-```
-
-Its command names no path of yours: Vibe runs a hook through the shell, which finds the script through the link you made, so a pull of the clone updates the hook with no edit here. The hook runs with Vibe's own environment, so it validates a method against the API only with `PIPELEX_API_KEY` exported in the shell you start Vibe from. Without it, it still lints and formats every edit.
+When the hook itself fails, because `bash` is missing or the hook runs past its 15-second timeout, the edit stands and Vibe shows a warning line naming `pipelex:check-mthds` with the hook's error, which the model never sees. Without Node.js on your `PATH` the hook passes every edit silently, as it does in every agent. On native Windows, Vibe runs a hook in Git Bash, or in PowerShell when Git Bash is absent; under PowerShell the command cannot find its script yet, so every edit passes unchecked.
 
 ### Leaving the setup of earlier releases
 
-Earlier releases had you make three hand edits instead. Remove the `skill_paths` entry naming `pipelex-vibe/skills`, which loads every skill a second time under its bare name; replace the `check-mthds` hook, which names the script by an absolute path, by the hook's entry above, and delete it from any trusted project's `.vibe/hooks.toml` you put it in, where it would override that entry; and replace the old `pipelex` server, with its `env` table, by the tools' entry above.
+Earlier releases had you append the hook to your own hooks file. Delete that `check-mthds` hook from `~/.vibe/hooks.toml`, or from `$VIBE_HOME/hooks.toml` when `VIBE_HOME` is set, and from any trusted project's `.vibe/hooks.toml` you put it in. Vibe runs the hooks in those files beside the plugin's, under another name, so the entry would check every edit a second time; since this release the script it calls exits at once when anything but the plugin's hook calls it, so the leftover entry is harmless, and deleting it is tidiness.
+
+Releases before that had you make three hand edits. Remove the `skill_paths` entry naming `pipelex-vibe/skills`, which loads every skill a second time under its bare name; delete the `check-mthds` hook that names the script by an absolute path, as above; and replace the old `pipelex` server, with its `env` table, by the tools' entry above.
 
 ## The Pipelex MCP, for chatbots
 
