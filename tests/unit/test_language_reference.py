@@ -281,6 +281,24 @@ class TestLanguageReference:
         assert "`sheet_range` under `replace`, the default, is refused when the method loads" in docgen
         assert "**`list` is required.**" in docgen
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_an_append_moves_the_totals_down_and_a_named_range_is_filled(self, target_name: str) -> None:
+        """The Excel engine appends under a totals line by moving it down and extending the formulas over the
+        column, so the reference never tells the user a total is in the way; it names what is refused instead, the
+        single sample row above a total among it. A list of records fills a named range as it fills a Table."""
+        docgen = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeDocGen — ")
+        assert "in the way" not in docgen
+        assert "**The totals line and its footer rows move down**" in docgen
+        assert "A formula covering a column's whole data, such as `=SUM(D4:D20)`, is extended to the new rows" in docgen
+        assert "when pre-filled rows lie below the totals line" in docgen
+        assert "when a totals line stands under a single sample row" in docgen
+        assert "add a second sample row, move the total out of the range's columns, or turn the range into a Table" in docgen
+        assert "**An update matches and writes the data rows**" in docgen
+        assert "or the named range of that name (Formulas > Define Name)" in docgen
+        assert "A null input leaves a named range of several cells exactly as written" in docgen
+        assert "reaching neither a Table nor a named range of the workbook is refused" in docgen
+        assert "matching no Table of the workbook" not in docgen
+
     def test_the_engine_is_checked_never_listed(self) -> None:
         """The workshop's lookup takes `doc_gen` in a check alone: the listing holds no document engines."""
         reference = rendered_shared("prod", "writing-mthds.md")
