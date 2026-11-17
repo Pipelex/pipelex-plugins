@@ -22,6 +22,7 @@ two tools' verdicts, and refused everywhere else.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -46,7 +47,16 @@ class TestSkillErrorFields:
         """Every file a target ships under `skills/`, references and scripts included, as a user installs it."""
         config = load_target_config(REPO_ROOT / "targets", target_name)
         skills_dir = resolve_output_dir(REPO_ROOT, config.source) / "skills"
-        shipped = sorted(path for path in skills_dir.rglob("*") if path.is_file())
+        # What git ignores never ships, so a Finder `.DS_Store` beside the output is no skill file of the target's.
+        ignored = subprocess.run(
+            ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--", str(skills_dir)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        ignored_paths = {REPO_ROOT / line for line in ignored}
+        shipped = sorted(path for path in skills_dir.rglob("*") if path.is_file() and path not in ignored_paths)
         assert shipped, f"{target_name}: no skill files found under {skills_dir}"
 
         named: list[str] = []

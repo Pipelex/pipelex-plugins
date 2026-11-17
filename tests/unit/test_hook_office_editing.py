@@ -140,3 +140,25 @@ class TestHookOfficeEditing:
             directory=tmp_path,
             environment=offline_environment,
         )
+
+
+@pytest.fixture(scope="module")
+def sheet_range_read_and_fill() -> str:
+    """The reference's two `sheet_range` examples: the `PipeStructure` reading a plain sheet, and the `PipeDocGen` appending to it."""
+    sheet_read = taught_example(holding=('type        = "PipeStructure"', 'sheet_range = { sheet = "Expenses", header_row = 3 }'))
+    sheet_fill = taught_example(holding=('type           = "PipeDocGen"', 'sheet_range    = { list = "expenses" }'))
+    return f"{sheet_read}\n{sheet_fill}"
+
+
+class TestHookSheetRange:
+    @pytest.mark.xfail(strict=True, reason="check.mjs predates tools-wasm with sheet_range")
+    def test_the_hook_passes_the_sheet_range_read_and_fill_silently(
+        self, spreadsheet_read: str, sheet_range_read_and_fill: str, node: str, offline_environment: dict[str, str], tmp_path: Path
+    ) -> None:
+        """`PipeStructure` and `PipeDocGen` with `sheet_range`, beside the Table read that declares their concepts."""
+        assert_the_hook_passes_silently(
+            node=node,
+            method_text=f"{METHOD_HEADER}\n{spreadsheet_read}\n{sheet_range_read_and_fill}",
+            directory=tmp_path,
+            environment=offline_environment,
+        )

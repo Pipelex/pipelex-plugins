@@ -21,6 +21,7 @@ packages into uv's cache.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -255,6 +256,44 @@ class TestRecipes:
             with zipfile.ZipFile(written) as package:
                 names = package.namelist()
             assert member in names, f"{recipe.output} is a zip with no {member} — not a document: {names}"
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_lays_rows_out_for_a_sheet_range(self, tmp_path: Path) -> None:
+        """The default run takes the Table path; a method using `sheet_range` takes the plain one, which a Table would
+        hide, since a sheet holding a Table is read as that Table. Run with `PLAIN = True` and the header on row 3."""
+        (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
+        script = recipe.script
+        for constant, plain in (
+            ("PLAIN = False", "PLAIN = True"),
+            ('SHEET, HEADER_ROW, TABLE = "Data", 1,', 'SHEET, HEADER_ROW, TABLE = "Feuil1", 3,'),
+        ):
+            assert script.count(constant) == 1, f"the spreadsheet recipe no longer sets `{constant}`, which this test substitutes"
+            script = script.replace(constant, plain)
+        result = _bash(script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
+        assert result.returncode == 0, f"the plain spreadsheet recipe failed\n{result.stderr}"
+
+        inspect = (
+            "import json, sys; from openpyxl import load_workbook; ws = load_workbook(sys.argv[1]).active; "
+            "print(json.dumps({'title': ws.title, 'tables': list(ws.tables), "
+            "'rows': [[cell.value for cell in row] for row in ws.iter_rows()]}))"
+        )
+        inspected = subprocess.run(
+            ["uv", "run", "--quiet", "--no-project", "--with", "openpyxl", "python", "-c", inspect, str(tmp_path / recipe.output)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert inspected.returncode == 0, inspected.stderr
+        workbook = json.loads(inspected.stdout)
+        rows = workbook["rows"]
+        assert workbook["title"] == "Feuil1"
+        assert workbook["tables"] == [], f"the plain path left a Table: {workbook['tables']}"
+        assert rows[0][0] not in (None, ""), "no title row above a header on row 3"
+        assert rows[1] == [None, None], "row 2 should stand empty between the title and the header"
+        assert rows[2] == ["Item", "Amount"], f"the header is not on row 3: {rows[2]}"
+        last_data_row = len(rows) - 1  # the sheet row of the last data row, the totals line being the last row
+        assert rows[-1] == ["Total", f"=SUM(B4:B{last_data_row})"], f"no totals line under the data: {rows[-1]}"
+        assert last_data_row - 3 >= 2, "a totals line needs two data rows above it"
 
     @NEEDS_UV
     @pytest.mark.parametrize("package_set", PACKAGE_SETS, ids=PACKAGE_SET_IDS)

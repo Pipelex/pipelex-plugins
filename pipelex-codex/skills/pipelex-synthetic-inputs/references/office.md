@@ -47,11 +47,11 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 
 ```
 Use the /xlsx skill to create a spreadsheet with the following data, laid out as described:
-[Describe columns, rows, and sample data. The layout follows the method. One using `sheet_range` anywhere, a PipeDocGen writing through it included: plain rows with no Excel Table, on a sheet named as its `sheet` (any name when it names none), the header on its `header_row` under a title, and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least. Any other: the rows formatted as an Excel Table, named as the method's `table` names one]
+[Describe columns, rows, and sample data. The layout follows the steps that take this workbook input. One a `sheet_range` reads or fills: plain rows with no Excel Table, on a sheet named as its `sheet` (any name when it names none), the header on its `header_row` under a title, and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least. One a `table` names, or a `PipeDocGen` fills by name: the rows formatted as an Excel Table, named as that `table` or list names it]
 Save to: <target>
 ```
 
-A sheet holding a Table is read and filled as that Table, so a Table in a `sheet_range` method's test workbook leaves the plain-range path untested.
+A sheet holding a Table is read and filled as that Table, so a Table in a workbook a `sheet_range` takes leaves the plain-range path untested. A method taking two workbooks may need one of each.
 
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
@@ -70,8 +70,8 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
-# The layout follows the method. One using `sheet_range` anywhere: PLAIN = True, SHEET its `sheet` and
-# HEADER_ROW its `header_row` (1 when it names none). Any other: an Excel Table named as its `table` names one.
+# The layout follows the steps that take this workbook. One a `sheet_range` reads or fills: PLAIN = True, SHEET its
+# `sheet` and HEADER_ROW its `header_row` (1 when it names none). Any other: a Table named as its `table` or list.
 PLAIN = False
 SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]

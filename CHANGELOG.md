@@ -4,7 +4,7 @@
 
 ### Added
 
-- **The MTHDS reference teaches workbooks with no Excel Table**: a `PipeStructure` step reads a named range through `table` and the rows typed on a plain sheet through `sheet_range`, and a `PipeDocGen` step fills a named range as it fills a Table, and appends to or updates a plain sheet's rows through `sheet_range = { list = "expenses" }`, its totals line moving down under an append. The reference says which sheets the rules refuse and how to fix them, and `pipelex-synthetic-inputs` writes the test workbook of a method using `sheet_range` as plain rows, since a sheet holding a Table is read as that Table.
+- **The MTHDS reference teaches workbooks with no Excel Table**: a `PipeStructure` step reads a named range through `table` and the rows typed on a plain sheet through `sheet_range`, and a `PipeDocGen` step fills a named range as it fills a Table, and appends to or updates a plain sheet's rows through `sheet_range = { list = "expenses" }`, its totals line moving down under an append. The reference says which sheets the rules refuse and how to fix them, and `pipelex-synthetic-inputs` writes a test workbook a `sheet_range` reads or fills as plain rows, since a sheet holding a Table is read as that Table.
 
 ## [0.22.2] - 2026-11-17
 
