@@ -2896,11 +2896,11 @@ class TestBundleHome:
         assert "a wheel ships only what is inside the package" in reference
         assert "**A name already taken**" in reference
 
-    def test_design_never_writes_over_another_bundle(self) -> None:
+    def test_design_never_writes_into_an_occupied_home(self) -> None:
         """Two domains that fold to one `<name>` resolve to one directory, and the home is announced without
         waiting for a reply, so the write itself has to refuse an occupied home."""
         body = self._template("pipelex-design")
-        assert "**Never write over another bundle**: a home holding a `.mthds` file or a `method.json` is a question." in body
+        assert "**Never write into an occupied home**: a home that exists and is not empty is a question." in body
 
     def test_nothing_a_skill_ships_still_defaults_to_pipelex_wip(self) -> None:
         """It survives only as a directory a user may already have, never as the

@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- **`pipelex-design` never writes a new bundle over another one**: when the resolved home already holds a `.mthds` file or a `method.json`, as when two methods' domains fold to the same directory name, the skill asks for another name or path instead of overwriting the other method's `main.mthds`.
+- **A new method never lands in an occupied directory**: when the directory `pipelex-design` resolves for a new bundle, or the one `pipelex-integrate` would copy an outside bundle into, already exists and is not empty, as when two methods' domains fold to the same name, the skill asks for another name or path instead of overwriting the other method's `main.mthds` or mixing files into a directory of yours.
 
 ## [0.22.0] - 2026-11-17
 

@@ -17,7 +17,7 @@ List each `methods/` found, reading names only, never a file's content:
 - **Several positive ones**: one that holds methods wins over an empty one. Two of the same grade are a question: name both and ask which.
 - **A packaged Python project, or one owning a codegen harness, whose positive `methods/` is outside the import package**: ask, naming both it and `<package>/methods/`, and say why the skill's default is the package: a wheel ships only what is inside the package, and the call site loads the method from beside itself.
 - **No positive one**: take the skill's default home. When that home falls inside a `methods/` that is a bundle or holds something else, write nothing there: say what that directory holds, and ask the user for a path.
-- **A name already taken**: a `<name>/` in the chosen `methods/` that holds a `.mthds` file or a `method.json` is another method's. Never write into it; ask for another name. The one exception is a pull into a directory whose `pipelex-method.json` links it to the method being pulled: that directory is this method's, and the pull goes there, as the skill's own steps say.
+- **A name already taken**: a `<name>/` in the chosen `methods/` that exists and is not empty belongs to something else, another method or files of the user's. Never write or copy into it; ask for another name. The one exception is a pull into a directory whose `pipelex-method.json` links it to the method being pulled: that directory is this method's, and the pull goes there, as the skill's own steps say.
 
 ## Name it like its neighbours
 

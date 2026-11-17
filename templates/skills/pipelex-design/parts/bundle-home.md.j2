@@ -1,11 +1,11 @@
 {#- pipelex-design's step 2, where a new bundle lives: the order
    of the candidate homes, the pointer to an existing `methods/`, the casing of
-   `<name>`, the refusal to write over another bundle, and the method-app question.
+   `<name>`, the refusal to write into an occupied home, and the method-app question.
 
    A per-skill partial: its own file so an outside target can replace this
    paragraph alone, declared and pinned, and keep the rest of the skill
    (docs/build-targets.md, "Per-skill partials"). Strips its own trailing
    newline (the closing comment below), so the including template supplies the
    line break. -#}
-**A path the user named** wins; otherwise, in order: `<package>/methods/<name>/` in a packaged Python project or one owning a codegen harness; `<project root>/methods/<name>/` in any other project, the project being {% include "skills/shared/project-root.md.j2" %}; otherwise `./methods/<name>/`. {% include "skills/shared/methods-dir-pointer.md.j2" %} `<name>` is the `domain`, `summarize-pdf` in TypeScript, `summarize_pdf` in Python and with no project, a dot becoming that separator. **Never write over another bundle**: a home holding a `.mthds` file or a `method.json` is a question. **On a method app, ask first**: its `make add-method` writes the whole slice. A bundle that already lives elsewhere stays there.
+**A path the user named** wins; otherwise, in order: `<package>/methods/<name>/` in a packaged Python project or one owning a codegen harness; `<project root>/methods/<name>/` in any other project, the project being {% include "skills/shared/project-root.md.j2" %}; otherwise `./methods/<name>/`. {% include "skills/shared/methods-dir-pointer.md.j2" %} `<name>` is the `domain`, `summarize-pdf` in TypeScript, `summarize_pdf` in Python and with no project, a dot becoming that separator. **Never write into an occupied home**: a home that exists and is not empty is a question. **On a method app, ask first**: its `make add-method` writes the whole slice. A bundle that already lives elsewhere stays there.
 {#- -#}

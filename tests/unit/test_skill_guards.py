@@ -55,7 +55,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "write the closest in-scope equivalent and call out the deviation",
         "**On a method app, ask first**",
         "A bundle that already lives elsewhere stays there.",
-        "**Never write over another bundle**: a home holding a `.mthds` file or a `method.json` is a question.",
+        "**Never write into an occupied home**: a home that exists and is not empty is a question.",
         "read [methods-dir.md](../shared/methods-dir.md) before choosing.**",
         "**Never publish here: a publish is `/pipelex-catalog`'s, on the user's request.**",
         "**no `name`, no `expected_updated_at`, no `python`, no `link_dir`**",
