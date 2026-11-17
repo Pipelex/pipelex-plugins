@@ -3,8 +3,9 @@
 The reference the skills read, `templates/skills/shared/writing-mthds.md.j2`, teaches a `PipeStructure` that reads
 an Excel Table into records with `table` and `row_field`, and a `PipeDocGen` that fills the caller's own workbook
 with `template_input`, appending under `table_fill = "append"` or updating the rows it matches under
-`table_fill = "update"`, with `match_on` or `match_row` and `cells`. The MTHDS JSON Schema frozen into a
-`@pipelex/tools-wasm` before 0.6.2 refuses every one of those fields, so a session following the skills had its write
+`table_fill = "update"`, with `match_on` or `match_row` and `cells`, and both reading and filling the rows typed on a
+plain sheet with `sheet_range`. The MTHDS JSON Schema frozen into a `@pipelex/tools-wasm` before 0.6.2 refuses every one
+of the Table fields, and one before 0.6.3 refuses `sheet_range`, so a session following the skills had its write
 blocked by the plugin's own hook. These tests take the reference's examples as they are written, so a re-vendor onto
 an engine that refuses them, or a reference that changes them into a form the engine refuses, fails here.
 They run `templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a Claude `PostToolUse`
@@ -151,7 +152,6 @@ def sheet_range_read_and_fill() -> str:
 
 
 class TestHookSheetRange:
-    @pytest.mark.xfail(strict=True, reason="check.mjs predates tools-wasm with sheet_range")
     def test_the_hook_passes_the_sheet_range_read_and_fill_silently(
         self, spreadsheet_read: str, sheet_range_read_and_fill: str, node: str, offline_environment: dict[str, str], tmp_path: Path
     ) -> None:
