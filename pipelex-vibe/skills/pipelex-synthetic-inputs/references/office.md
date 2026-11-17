@@ -47,7 +47,7 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 
 ```
 Use the /xlsx skill to create a spreadsheet with the following data, laid out as described:
-[Describe columns, rows, and sample data. The layout is the request's `constraints` layout. `layout: plain`: plain rows with no Excel Table, on a sheet named as its `sheet`, or, for `sheet: none`, in a workbook holding that one worksheet; the header on its `header_row` under a title, or, for `header_row: none`, on the first filled row with nothing above it; and, for `totals: yes`, a totals line such as `=SUM(...)` under two data rows at least, every cell of it within the header's columns. `layout: table`: the rows formatted as an Excel Table of its `name`. With no layout given: a Table]
+[Describe columns, rows, and sample data. The layout is the request's `constraints` layout. `layout: plain`: plain rows with no Excel Table, on a sheet named as its `sheet`, or, for `sheet: none`, in a workbook holding that one worksheet; the header on its `header_row` under a title, or, for `header_row: none`, on the first filled row with nothing above it; and, for `totals: yes`, a totals line such as `=SUM(...)` under two data rows at least, every cell of it within the header's columns. `layout: table`: the rows formatted as an Excel Table of its `name`. `layout: named`: the rows with no Table, and a defined name (Formulas > Define Name) of its `name` over the header and the data rows, nothing under them. With no layout given: a Table]
 Save to: <target>
 ```
 
@@ -62,6 +62,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.table import Table
 
 OUT = "<target_dir>/test_spreadsheet.xlsx"
@@ -70,11 +71,12 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
-# The request's `constraints` layout sets these. `layout: plain`: PLAIN = True, SHEET its `sheet` (any name for
-# `none`: the workbook holds that one sheet), HEADER_ROW its `header_row` (1 for `none`, nothing above the header),
-# TOTALS_COLUMN a numeric column's header for `totals: yes`, else None. `layout: table` or none: TABLE its `name`.
-PLAIN = False
-SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
+# The request's `constraints` layout sets these. LAYOUT is its `layout`: "table" (also when none is given), "plain"
+# or "named". plain: SHEET its `sheet` (any name for `none`: the workbook holds that one sheet), HEADER_ROW its
+# `header_row` (1 for `none`, nothing above the header), TOTALS_COLUMN a numeric column's header for `totals: yes`,
+# else None. table and named: NAME its `name`; a named range covers the header and the data rows, nothing under them.
+LAYOUT = "table"
+SHEET, HEADER_ROW, NAME = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]
 ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]
 TOTALS_COLUMN = "Amount"  # plain rows only: the header of the column a totals line sums, or None for no totals line
@@ -88,8 +90,11 @@ for offset, values in enumerate([HEADER, *ROWS]):
     for column, value in enumerate(values, start=1):
         ws.cell(row=HEADER_ROW + offset, column=column, value=value)
 last = HEADER_ROW + len(ROWS)
-if not PLAIN:
-    ws.add_table(Table(displayName=TABLE, ref=f"A{HEADER_ROW}:{get_column_letter(len(HEADER))}{last}"))
+last_col = get_column_letter(len(HEADER))
+if LAYOUT == "table":
+    ws.add_table(Table(displayName=NAME, ref=f"A{HEADER_ROW}:{last_col}{last}"))
+elif LAYOUT == "named":
+    wb.defined_names[NAME] = DefinedName(NAME, attr_text=f"'{SHEET}'!$A${HEADER_ROW}:${last_col}${last}")
 elif TOTALS_COLUMN is not None and len(ROWS) >= 2:  # a total over one data row reads as a data row
     # openpyxl stores no value for the formula, but the range rules tell a totals line by its formula text.
     total = HEADER.index(TOTALS_COLUMN) + 1
