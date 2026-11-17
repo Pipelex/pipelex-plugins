@@ -113,6 +113,7 @@ def skill_tree(tmp_path: Path) -> Path:
         "framing.md.j2",
         "team-files.md.j2",
         "file-roles.md.j2",
+        "methods-dir.md.j2",
     ]:
         (template_shared / name).write_text("# placeholder\n")
 
@@ -1047,6 +1048,7 @@ class TestSharedFilesExist:
                 "framing.md.j2",
                 "team-files.md.j2",
                 "file-roles.md.j2",
+                "methods-dir.md.j2",
             ]
         )
 
