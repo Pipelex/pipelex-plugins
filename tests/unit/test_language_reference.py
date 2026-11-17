@@ -277,7 +277,10 @@ class TestLanguageReference:
         docgen = section(reference, "### PipeDocGen — ")
         assert "| `sheet_range` |" in docgen
         assert "#### Filling a range on a plain sheet" in docgen
-        assert 'sheet_range    = { list = "expenses", sheet = "Sheet1" }' in docgen
+        assert 'sheet_range    = { list = "expenses" }' in docgen
+        assert 'sheet = "Sheet1"' not in docgen, f"{target_name}: the example hard-codes a sheet name users' sheets rarely share"
+        assert "a null keeping a calculated column's formula in the row" in docgen
+        assert "the opposite of the other fills, where a null empties what the template holds" in docgen
         assert "`sheet_range` under `replace`, the default, is refused when the method loads" in docgen
         assert "**`list` is required.**" in docgen
 

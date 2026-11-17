@@ -46,10 +46,12 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 **If an `xlsx` skill is available:**
 
 ```
-Use the /xlsx skill to create a spreadsheet with the following data, formatted as an Excel Table:
-[Describe columns, rows, and sample data, and the Table's name when the method names one; for a method reading a `sheet_range`, ask for plain rows on a sheet of the name it gives, under its `header_row`, with no Table]
+Use the /xlsx skill to create a spreadsheet with the following data, laid out as described:
+[Describe columns, rows, and sample data. The layout follows the method. One using `sheet_range` anywhere, a PipeDocGen writing through it included: plain rows with no Excel Table, on a sheet named as its `sheet` (any name when it names none), the header on its `header_row` under a title, and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least. Any other: the rows formatted as an Excel Table, named as the method's `table` names one]
 Save to: <target>
 ```
+
+A sheet holding a Table is read and filled as that Table, so a Table in a `sheet_range` method's test workbook leaves the plain-range path untested.
 
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
@@ -59,6 +61,7 @@ import os
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table
 
 OUT = "<target_dir>/test_spreadsheet.xlsx"
@@ -67,16 +70,29 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
+# The layout follows the method. One using `sheet_range` anywhere: PLAIN = True, SHEET its `sheet` and
+# HEADER_ROW its `header_row` (1 when it names none). Any other: an Excel Table named as its `table` names one.
+PLAIN = False
+SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
+HEADER = ["Item", "Amount"]
+ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]
+TOTALS = True  # plain rows only: a totals line under the data, which an append moves down
+
 wb = Workbook()
 ws = wb.active
-ws.title = "Data"
-ws.append(["Column1", "Column2"])
-ws.append(["Value1", "Value2"])
-# Add more rows as needed: ws.append([...]); a second sheet: wb.create_sheet("Summary")
-# The rows as an Excel Table, which a method reading them with PipeStructure or filling a Table needs;
-# name it as the method's `table` does. For a method reading a `sheet_range`, leave this line out, since a
-# sheet holding a Table is read as that Table, and title the sheet as its `sheet` does.
-ws.add_table(Table(displayName="DataTable", ref=ws.dimensions))
+ws.title = SHEET
+if HEADER_ROW > 1:
+    ws.cell(row=1, column=1, value="Expenses")  # a title above the header, which `header_row` skips
+for offset, values in enumerate([HEADER, *ROWS]):
+    for column, value in enumerate(values, start=1):
+        ws.cell(row=HEADER_ROW + offset, column=column, value=value)
+last = HEADER_ROW + len(ROWS)
+if not PLAIN:
+    ws.add_table(Table(displayName=TABLE, ref=f"A{HEADER_ROW}:{get_column_letter(len(HEADER))}{last}"))
+elif TOTALS and len(ROWS) >= 2:  # a total over one data row reads as a data row
+    ws.cell(row=last + 1, column=1, value="Total")
+    ws.cell(row=last + 1, column=2, value=f"=SUM(B{HEADER_ROW + 1}:B{last})")
+# A second sheet: wb.create_sheet("Summary")
 wb.save(PART)
 os.replace(PART, OUT)
 print("wrote", OUT)
