@@ -1,0 +1,12 @@
+{#- The pointer a skill places where it decides which `methods/<name>/` a method
+   directory goes into: design's bundle home, the catalog's pull landing and
+   integrate's copy of an outside bundle. It sends the model to the rendered
+   shared reference `methods-dir.md`, which grades an existing `methods/` and
+   decides between it and the skill's default, so the three skills reach the
+   same directory.
+
+   Its own include so the three say it in the same words. Strips its own
+   trailing newline (the closing comment below), so the including template
+   supplies what follows. -#}
+**When a `methods/` exists in or above the working directory, or in a Python package, read [methods-dir.md]({{ shared_dir }}/methods-dir.md) before choosing.**
+{#- -#}
