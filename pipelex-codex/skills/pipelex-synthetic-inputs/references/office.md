@@ -47,7 +47,7 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 
 ```
 Use the /xlsx skill to create a spreadsheet with the following data, laid out as described:
-[Describe columns, rows, and sample data. The layout follows the steps that take this workbook input. One a `sheet_range` reads or fills: plain rows with no Excel Table, on a sheet named as its `sheet` (any name when it names none), the header on its `header_row` under a title, and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least. One a `table` names, or a `PipeDocGen` fills by name: the rows formatted as an Excel Table, named as that `table` or list names it]
+[Describe columns, rows, and sample data. The layout follows the steps that take this workbook input. One a `sheet_range` reads or fills: plain rows with no Excel Table, on a sheet named as its `sheet`, or, when it names none, in a workbook holding that one worksheet; the header on its `header_row` under a title, or, when it names none, on the first filled row with nothing above it; and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least, every cell of it within the header's columns. One a `table` names, or a `PipeDocGen` fills by name: the rows formatted as an Excel Table, named as that `table` or list names it]
 Save to: <target>
 ```
 
@@ -71,30 +71,33 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # The layout follows the steps that take this workbook. One a `sheet_range` reads or fills: PLAIN = True, SHEET its
-# `sheet` and HEADER_ROW its `header_row` (1 when it names none). Any other: a Table named as its `table` or list.
+# `sheet` (the workbook holds that one sheet, as one naming no `sheet` needs) and HEADER_ROW its `header_row`, or 1
+# when it names none, which leaves nothing above the header. Any other: a Table named as its `table` or list.
 PLAIN = False
 SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]
 ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]
-TOTALS = True  # plain rows only: a totals line under the data, which an append moves down
-AMOUNT_COLUMN = HEADER.index("Amount") + 1  # the column the totals line sums, found by its header
+TOTALS_COLUMN = "Amount"  # plain rows only: the header of the column a totals line sums, or None for no totals line
 
 wb = Workbook()
 ws = wb.active
 ws.title = SHEET
 if HEADER_ROW > 1:
-    ws.cell(row=1, column=1, value="Expenses")  # a title above the header, which `header_row` skips
+    ws.cell(row=1, column=1, value="Expenses")  # a title above the header, only with an explicit `header_row`
 for offset, values in enumerate([HEADER, *ROWS]):
     for column, value in enumerate(values, start=1):
         ws.cell(row=HEADER_ROW + offset, column=column, value=value)
 last = HEADER_ROW + len(ROWS)
 if not PLAIN:
     ws.add_table(Table(displayName=TABLE, ref=f"A{HEADER_ROW}:{get_column_letter(len(HEADER))}{last}"))
-elif TOTALS and len(ROWS) >= 2:  # a total over one data row reads as a data row
-    amount = get_column_letter(AMOUNT_COLUMN)
-    ws.cell(row=last + 1, column=1 if AMOUNT_COLUMN > 1 else 2, value="Total")
-    ws.cell(row=last + 1, column=AMOUNT_COLUMN, value=f"=SUM({amount}{HEADER_ROW + 1}:{amount}{last})")
-# A second sheet: wb.create_sheet("Summary")
+elif TOTALS_COLUMN is not None and len(ROWS) >= 2:  # a total over one data row reads as a data row
+    # openpyxl stores no value for the formula, but the range rules tell a totals line by its formula text.
+    total = HEADER.index(TOTALS_COLUMN) + 1
+    letter = get_column_letter(total)
+    ws.cell(row=last + 1, column=total, value=f"=SUM({letter}{HEADER_ROW + 1}:{letter}{last})")
+    if len(HEADER) > 1:  # the label goes in another of the header's columns, never past them
+        ws.cell(row=last + 1, column=1 if total > 1 else 2, value="Total")
+# A second sheet, never for a `sheet_range` naming no `sheet`: wb.create_sheet("Summary")
 wb.save(PART)
 os.replace(PART, OUT)
 print("wrote", OUT)

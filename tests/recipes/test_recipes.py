@@ -257,30 +257,20 @@ class TestRecipes:
                 names = package.namelist()
             assert member in names, f"{recipe.output} is a zip with no {member} — not a document: {names}"
 
-    @NEEDS_UV
-    def test_spreadsheet_recipe_plain_path_lays_rows_out_for_a_sheet_range(self, tmp_path: Path) -> None:
-        """The default run takes the Table path; a method using `sheet_range` takes the plain one, which a Table would
-        hide, since a sheet holding a Table is read as that Table. Run with `PLAIN = True` and the header on row 3."""
+    @classmethod
+    def _run_plain_spreadsheet_recipe(cls, *, substitutions: tuple[tuple[str, str], ...], tmp_path: Path) -> dict[str, list[object]]:
+        """Run the spreadsheet recipe on its plain path with `substitutions`, and read the workbook back: its sheet
+        names, the Tables of its active sheet and that sheet's rows."""
         (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
         script = recipe.script
-        # The amount moves to the third column, so the totals line must follow `HEADER` rather than sit on column B.
-        for constant, plain in (
-            ("PLAIN = False", "PLAIN = True"),
-            ('SHEET, HEADER_ROW, TABLE = "Data", 1,', 'SHEET, HEADER_ROW, TABLE = "Feuil1", 3,'),
-            ('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Category", "Amount"]'),
-            (
-                'ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]',
-                'ROWS = [["Paper", "Office", 12.5], ["Toner", "Office", 48.0], ["Pens", "Office", 6.2]]',
-            ),
-        ):
+        for constant, plain in (("PLAIN = False", "PLAIN = True"), *substitutions):
             assert script.count(constant) == 1, f"the spreadsheet recipe no longer sets `{constant}`, which this test substitutes"
             script = script.replace(constant, plain)
         result = _bash(script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
         assert result.returncode == 0, f"the plain spreadsheet recipe failed\n{result.stderr}"
-
         inspect = (
-            "import json, sys; from openpyxl import load_workbook; ws = load_workbook(sys.argv[1]).active; "
-            "print(json.dumps({'title': ws.title, 'tables': list(ws.tables), "
+            "import json, sys; from openpyxl import load_workbook; wb = load_workbook(sys.argv[1]); ws = wb.active; "
+            "print(json.dumps({'sheets': wb.sheetnames, 'tables': list(ws.tables), "
             "'rows': [[cell.value for cell in row] for row in ws.iter_rows()]}))"
         )
         inspected = subprocess.run(
@@ -290,16 +280,60 @@ class TestRecipes:
             check=False,
         )
         assert inspected.returncode == 0, inspected.stderr
-        workbook = json.loads(inspected.stdout)
+        workbook: dict[str, list[object]] = json.loads(inspected.stdout)
+        return workbook
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_lays_rows_out_for_a_sheet_range(self, tmp_path: Path) -> None:
+        """The default run takes the Table path; a method using `sheet_range` takes the plain one, which a Table would
+        hide, since a sheet holding a Table is read as that Table. Run with `PLAIN = True` and the header on row 3,
+        the amount moved to the third column, so the totals line must follow `HEADER` rather than sit on column B."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(
+                ('SHEET, HEADER_ROW, TABLE = "Data", 1,', 'SHEET, HEADER_ROW, TABLE = "Feuil1", 3,'),
+                ('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Category", "Amount"]'),
+                (
+                    'ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]',
+                    'ROWS = [["Paper", "Office", 12.5], ["Toner", "Office", 48.0], ["Pens", "Office", 6.2]]',
+                ),
+            ),
+            tmp_path=tmp_path,
+        )
         rows = workbook["rows"]
-        assert workbook["title"] == "Feuil1"
+        assert workbook["sheets"] == ["Feuil1"], f"a step naming its sheet reads it among: {workbook['sheets']}"
         assert workbook["tables"] == [], f"the plain path left a Table: {workbook['tables']}"
-        assert rows[0][0] not in (None, ""), "no title row above a header on row 3"
+        assert rows[0] == ["Expenses", None, None], "no title row above a header on row 3"
         assert rows[1] == [None, None, None], "row 2 should stand empty between the title and the header"
         assert rows[2] == ["Item", "Category", "Amount"], f"the header is not on row 3: {rows[2]}"
         last_data_row = len(rows) - 1  # the sheet row of the last data row, the totals line being the last row
         assert rows[-1] == ["Total", None, f"=SUM(C4:C{last_data_row})"], f"no totals line under the amount column: {rows[-1]}"
         assert last_data_row - 3 >= 2, "a totals line needs two data rows above it"
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_without_header_row_or_label_column(self, tmp_path: Path) -> None:
+        """A `sheet_range` naming no `header_row` reads the first filled row as the header, so nothing stands above
+        it, and one naming no `sheet` needs a workbook of one worksheet. With the amount as the header's only column,
+        the totals line holds the formula alone: a label in the column beside it would be a column with no header."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(
+                ('HEADER = ["Item", "Amount"]', 'HEADER = ["Amount"]'),
+                ('ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]', "ROWS = [[12.5], [48.0], [6.2]]"),
+            ),
+            tmp_path=tmp_path,
+        )
+        assert len(workbook["sheets"]) == 1, f"a step naming no sheet needs one worksheet: {workbook['sheets']}"
+        assert workbook["tables"] == []
+        assert workbook["rows"] == [["Amount"], [12.5], [48], [6.2], ["=SUM(A2:A4)"]], workbook["rows"]
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_table_path_needs_no_amount_column(self, tmp_path: Path) -> None:
+        """The totals column is looked up on the plain path alone, so a Table's header need not hold `Amount`."""
+        (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
+        constant = 'HEADER = ["Item", "Amount"]'
+        assert recipe.script.count(constant) == 1
+        script = recipe.script.replace(constant, 'HEADER = ["Item", "Price"]')
+        result = _bash(script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
+        assert result.returncode == 0, f"the Table recipe failed without an Amount column\n{result.stderr}"
 
     @NEEDS_UV
     @pytest.mark.parametrize("package_set", PACKAGE_SETS, ids=PACKAGE_SET_IDS)
