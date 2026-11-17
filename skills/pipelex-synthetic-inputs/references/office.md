@@ -47,7 +47,7 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 
 ```
 Use the /xlsx skill to create a spreadsheet with the following data, laid out as described:
-[Describe columns, rows, and sample data. The layout follows the steps that take this workbook input. One a `sheet_range` reads or fills: plain rows with no Excel Table, on a sheet named as its `sheet`, or, when it names none, in a workbook holding that one worksheet; the header on its `header_row` under a title, or, when it names none, on the first filled row with nothing above it; and, to exercise an append, a totals line such as `=SUM(...)` under two data rows at least, every cell of it within the header's columns. One a `table` names, or a `PipeDocGen` fills by name: the rows formatted as an Excel Table, named as that `table` or list names it]
+[Describe columns, rows, and sample data. The layout is the request's `constraints` layout. `layout: plain`: plain rows with no Excel Table, on a sheet named as its `sheet`, or, for `sheet: none`, in a workbook holding that one worksheet; the header on its `header_row` under a title, or, for `header_row: none`, on the first filled row with nothing above it; and, for `totals: yes`, a totals line such as `=SUM(...)` under two data rows at least, every cell of it within the header's columns. `layout: table`: the rows formatted as an Excel Table of its `name`. With no layout given: a Table]
 Save to: <target>
 ```
 
@@ -70,9 +70,9 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
-# The layout follows the steps that take this workbook. One a `sheet_range` reads or fills: PLAIN = True, SHEET its
-# `sheet` (the workbook holds that one sheet, as one naming no `sheet` needs) and HEADER_ROW its `header_row`, or 1
-# when it names none, which leaves nothing above the header. Any other: a Table named as its `table` or list.
+# The request's `constraints` layout sets these. `layout: plain`: PLAIN = True, SHEET its `sheet` (any name for
+# `none`: the workbook holds that one sheet), HEADER_ROW its `header_row` (1 for `none`, nothing above the header),
+# TOTALS_COLUMN a numeric column's header for `totals: yes`, else None. `layout: table` or none: TABLE its `name`.
 PLAIN = False
 SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]
