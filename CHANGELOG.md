@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.1] - 2026-11-17
+
+### Fixed
+
+- **The validation hook passes the Office-editing forms the skills teach**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `6e995c0`, the commit its header names, still embedding `@pipelex/sdk` 0.69.0 and now `@pipelex/tools-wasm` 0.6.2, whose MTHDS schema takes `PipeStructure`'s `table` and `row_field` and `PipeDocGen`'s `template_input`, `table_fill`, `match_on`, `match_row` and `cells`. The bundle on 0.6.1 refused those fields offline as unexpected properties, so a method that reads a spreadsheet's rows or fills the caller's workbook, written as the MTHDS reference teaches, had its write blocked by the plugin's own hook; its format output, the request its validate stage sends and its `User-Agent` are unchanged.
+
 ## [0.22.0] - 2026-11-17
 
 ### Changed
