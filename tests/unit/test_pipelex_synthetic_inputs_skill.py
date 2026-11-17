@@ -169,6 +169,25 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "never uploads anything" in self.render(target_name)
 
     @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_workbook_s_layout_is_handed_over_and_mapped_onto_the_recipe(self, target_name: str) -> None:
+        """A sheet holding an Excel Table is read and filled as that Table, so a workbook a `sheet_range` takes must be
+        plain rows or its test proves nothing about the user's sheet. Only `/pipelex-inputs` sees the steps that take
+        the workbook, so it passes the layout in `constraints`, the factory's request names it, and the recipe's
+        constants map from it."""
+        body = self.render(target_name)
+        assert "and an `xlsx`'s layout" in self.the_line(body, "- `constraints`:")
+        synthetic = (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "synthetic.md").read_text(encoding="utf-8")
+        assert "**A workbook's layout follows the steps that take it**" in synthetic
+        assert "`layout: plain, sheet: Feuil1, header_row: 3, totals: yes`" in synthetic
+        assert "`layout: table, name: Expenses`" in synthetic
+        assert "pass **`layout: named, name: Expenses`** when the user's workbook" in synthetic
+        assert "when you cannot tell, ask, or pass `table` and say so" in synthetic
+        office = self.reference("office.md")
+        assert "The layout is the request's `constraints` layout." in office
+        assert "# The request's `constraints` layout sets these. LAYOUT is its `layout`" in office
+        assert "`layout: named`: the rows with no Table, and a defined name" in office
+
+    @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_default_target_is_a_temporary_directory_never_beside_a_method(self, target_name: str) -> None:
         """`L-260924-208499`: the factory once wrote into an `inputs/` beside the bundle, which it marked with a
         `.gitignore` of `*`; but every surface sends a method's folder whole, and a `uv_build` wheel ships it whatever

@@ -253,6 +253,69 @@ class TestLanguageReference:
         assert "so `mthds_validate` reports it before any run spends credit" in docgen
         assert "Tell the user, and offer the PDF laid out from the inputs rather than changing the format in silence." in docgen
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_plain_sheet_is_read_and_filled_through_sheet_range(self, target_name: str) -> None:
+        """Most workbooks hold no Excel Table, so the reference teaches `sheet_range` on both operators, the named
+        range `table` reaches, and the rules a plain range is refused by. A `PipeDocGen` list fills a sheet the
+        method names, because a user's sheet is as often `Sheet1` as `Expenses`, and `replace` is refused on one."""
+        reference = rendered_shared(target_name, "writing-mthds.md")
+        structure = section(reference, "### PipeStructure — ")
+        assert "a named range (Formulas > Define Name)" in structure
+        assert "#### A range on a plain sheet" in structure
+        assert 'sheet_range = { sheet = "Expenses", header_row = 3 }' in structure
+        for rule in (
+            "**The header**",
+            "**Nothing below, nothing beside.**",
+            "**A totals line is not a record.**",
+            "**Footer rows**",
+            "**Pre-filled rows**",
+            "**Merges.**",
+        ):
+            assert rule in structure, f"{target_name}: the sheet range rules lack {rule}"
+        assert "a lone aggregate of that column's data rows" in structure and "over two rows at least" in structure
+        assert "a cumulative column such as `=SUM($D$4:D4)` filled down, are columns of the records" in structure
+        docgen = section(reference, "### PipeDocGen — ")
+        assert "| `sheet_range` |" in docgen
+        assert "#### Filling a range on a plain sheet" in docgen
+        assert 'sheet_range    = { list = "expenses" }' in docgen
+        assert 'sheet = "Sheet1"' not in docgen, f"{target_name}: the example hard-codes a sheet name users' sheets rarely share"
+        assert "a null or empty list emptying it" in docgen and "a null or empty list appending nothing" in docgen
+        assert "a record's null field leaving its new cell empty, save a calculated column's formula, which it keeps" in docgen
+        assert "unlike `replace` and `append`, whose nulls the `table_fill` paragraph above describes" in docgen
+        assert "empties what the template holds" not in docgen, f"{target_name}: a null under `append` empties nothing"
+        assert "A Table's own totals row (Table Design > Total Row) is refused under `replace` and `append`" in docgen
+        assert "is an error of the template check" in docgen
+        assert "`sheet_range` under `replace`, the default, is refused when the method loads" in docgen
+        assert "**`list` is required.**" in docgen
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_an_append_moves_the_totals_down_and_a_named_range_is_filled(self, target_name: str) -> None:
+        """The Excel engine appends under a totals line by moving it down and extending the formulas over the
+        column, so the reference never tells the user a total is in the way; it names what is refused instead, the
+        single sample row above a total among it. A list of records fills a named range as it fills a Table."""
+        docgen = section(rendered_shared(target_name, "writing-mthds.md"), "### PipeDocGen — ")
+        assert "in the way" not in docgen
+        assert "**The totals line and its footer rows move down**" in docgen
+        assert "A formula covering a column's whole data, such as `=SUM(D4:D20)`, is extended to the new rows" in docgen
+        assert "when pre-filled rows lie below the totals line" in docgen
+        assert "**A total under a single sample row is refused.**" in docgen
+        assert "unless that formula is the cell above's filled down" in docgen and "`=COUNTA(B$1:B2)`" in docgen
+        assert "when a merge reaches onto the totals rows from other rows" in docgen
+        assert "only as a warning saying how many appended records reach it" in docgen
+        assert "the template check flagging such a field only under `update`" in docgen
+        assert "`=SUM(C4)` and `=SUM(B4:D4)`, which name that one record, are kept and warned about" in docgen
+        assert "add a second sample row, move the total out of the range's columns, or turn the range into a Table" in docgen
+        assert "**An update matches and writes the data rows**" in docgen
+        assert "or the named range of that name (below)" in docgen
+        assert "**A named range** (Formulas > Define Name)" in docgen and "**is filled as a Table is**" in docgen
+        assert (
+            "**A null leaves a named range of several cells exactly as written**, whether the null matches it or a null structure holds it" in docgen
+        )
+        assert "a replace that shrinks it rewrites none" in docgen
+        assert "A workbook name holding a constant or a formula, such as `={0.1,0.2}`" in docgen
+        assert "reaching neither a Table nor a named range of the workbook is refused" in docgen
+        assert "matching no Table of the workbook" not in docgen
+
     def test_the_engine_is_checked_never_listed(self) -> None:
         """The workshop's lookup takes `doc_gen` in a check alone: the listing holds no document engines."""
         reference = rendered_shared("prod", "writing-mthds.md")

@@ -21,6 +21,7 @@ packages into uv's cache.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -255,6 +256,113 @@ class TestRecipes:
             with zipfile.ZipFile(written) as package:
                 names = package.namelist()
             assert member in names, f"{recipe.output} is a zip with no {member} — not a document: {names}"
+
+    @classmethod
+    def _run_plain_spreadsheet_recipe(
+        cls, *, substitutions: tuple[tuple[str, str], ...], tmp_path: Path, layout: str = "plain"
+    ) -> dict[str, list[object]]:
+        """Run the spreadsheet recipe on its `layout` path, plain or named, with `substitutions`, and read the
+        workbook back: its sheet names, its defined names, the Tables of its active sheet and that sheet's rows."""
+        (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
+        script = recipe.script
+        for constant, plain in (('LAYOUT = "table"', f'LAYOUT = "{layout}"'), *substitutions):
+            assert script.count(constant) == 1, f"the spreadsheet recipe no longer sets `{constant}`, which this test substitutes"
+            script = script.replace(constant, plain)
+        result = _bash(script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
+        assert result.returncode == 0, f"the plain spreadsheet recipe failed\n{result.stderr}"
+        inspect = (
+            "import json, sys; from openpyxl import load_workbook; wb = load_workbook(sys.argv[1]); ws = wb.active; "
+            "print(json.dumps({'sheets': wb.sheetnames, 'tables': list(ws.tables), "
+            "'names': [[name, defined.attr_text] for name, defined in wb.defined_names.items()], "
+            "'rows': [[cell.value for cell in row] for row in ws.iter_rows()]}))"
+        )
+        inspected = subprocess.run(
+            ["uv", "run", "--quiet", "--no-project", "--with", "openpyxl", "python", "-c", inspect, str(tmp_path / recipe.output)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert inspected.returncode == 0, inspected.stderr
+        workbook: dict[str, list[object]] = json.loads(inspected.stdout)
+        return workbook
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_lays_rows_out_for_a_sheet_range(self, tmp_path: Path) -> None:
+        """The default run takes the Table path; a method using `sheet_range` takes the plain one, which a Table would
+        hide, since a sheet holding a Table is read as that Table. Run with `LAYOUT = "plain"` and the header on row 3,
+        the amount moved to the third column, so the totals line must follow `HEADER` rather than sit on column B."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(
+                ('SHEET, HEADER_ROW, NAME = "Data", 1,', 'SHEET, HEADER_ROW, NAME = "Feuil1", 3,'),
+                ('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Category", "Amount"]'),
+                ("TOTALS_COLUMN = None", 'TOTALS_COLUMN = "Amount"'),
+                (
+                    'ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]',
+                    'ROWS = [["Paper", "Office", 12.5], ["Toner", "Office", 48.0], ["Pens", "Office", 6.2]]',
+                ),
+            ),
+            tmp_path=tmp_path,
+        )
+        rows = workbook["rows"]
+        assert workbook["sheets"] == ["Feuil1"], f"a step naming its sheet reads it among: {workbook['sheets']}"
+        assert workbook["tables"] == [], f"the plain path left a Table: {workbook['tables']}"
+        assert rows[0] == ["Expenses", None, None], "no title row above a header on row 3"
+        assert rows[1] == [None, None, None], "row 2 should stand empty between the title and the header"
+        assert rows[2] == ["Item", "Category", "Amount"], f"the header is not on row 3: {rows[2]}"
+        last_data_row = len(rows) - 1  # the sheet row of the last data row, the totals line being the last row
+        assert rows[-1] == ["Total", None, f"=SUM(C4:C{last_data_row})"], f"no totals line under the amount column: {rows[-1]}"
+        assert last_data_row - 3 >= 2, "a totals line needs two data rows above it"
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_without_header_row_or_label_column(self, tmp_path: Path) -> None:
+        """A `sheet_range` naming no `header_row` reads the first filled row as the header, so nothing stands above
+        it, and one naming no `sheet` needs a workbook of one worksheet. With the amount as the header's only column,
+        the totals line holds the formula alone: a label in the column beside it would be a column with no header."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(
+                ('HEADER = ["Item", "Amount"]', 'HEADER = ["Amount"]'),
+                ("TOTALS_COLUMN = None", 'TOTALS_COLUMN = "Amount"'),
+                ('ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]', "ROWS = [[12.5], [48.0], [6.2]]"),
+            ),
+            tmp_path=tmp_path,
+        )
+        assert len(workbook["sheets"]) == 1, f"a step naming no sheet needs one worksheet: {workbook['sheets']}"
+        assert workbook["tables"] == []
+        assert workbook["rows"] == [["Amount"], [12.5], [48], [6.2], ["=SUM(A2:A4)"]], workbook["rows"]
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_writes_no_totals_line_unless_asked(self, tmp_path: Path) -> None:
+        """Only `totals: yes` sets `TOTALS_COLUMN`, so a plain request without it ends on its data rows, and a header
+        holding no `Amount` column is never looked up."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Price"]'),),
+            tmp_path=tmp_path,
+        )
+        assert workbook["rows"] == [["Item", "Price"], ["Paper", 12.5], ["Toner", 48], ["Pens", 6.2]], workbook["rows"]
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_named_path_defines_a_name_over_header_and_data(self, tmp_path: Path) -> None:
+        """A `table` or a list filled by name reaches a named range too, and a Table in its place would test the
+        Table path while the user's named range went untested: the named path writes plain rows and a defined name
+        over the header and the data rows, which the engine reads as one rectangle whose first row is the header."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(('SHEET, HEADER_ROW, NAME = "Data", 1, "DataTable"', 'SHEET, HEADER_ROW, NAME = "Data", 1, "Expenses"'),),
+            tmp_path=tmp_path,
+            layout="named",
+        )
+        assert workbook["tables"] == [], f"the named path left a Table: {workbook['tables']}"
+        assert workbook["names"] == [["Expenses", "'Data'!$A$1:$B$4"]], workbook["names"]
+        assert workbook["rows"] == [["Item", "Amount"], ["Paper", 12.5], ["Toner", 48], ["Pens", 6.2]], "nothing lies under a named range"
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_table_path_needs_no_amount_column(self, tmp_path: Path) -> None:
+        """The totals column is looked up on the plain path alone, so a Table's header need not hold `Amount`."""
+        (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
+        constant = 'HEADER = ["Item", "Amount"]'
+        assert recipe.script.count(constant) == 1
+        script = recipe.script.replace(constant, 'HEADER = ["Item", "Price"]')
+        result = _bash(script.replace(OUTPUT_DIR_PLACEHOLDER, str(tmp_path)), cwd=tmp_path)
+        assert result.returncode == 0, f"the Table recipe failed without an Amount column\n{result.stderr}"
 
     @NEEDS_UV
     @pytest.mark.parametrize("package_set", PACKAGE_SETS, ids=PACKAGE_SET_IDS)
