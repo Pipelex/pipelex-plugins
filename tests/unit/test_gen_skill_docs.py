@@ -137,6 +137,7 @@ def template_tree(tmp_path: Path) -> Path:
     (shared / "framing.md.j2").write_text("Framing.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "file-roles.md.j2").write_text("File roles.\n")
+    (shared / "methods-dir.md.j2").write_text("Methods dir.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -169,6 +170,7 @@ def _create_codex_tree(tmp_path: Path) -> Path:
     (shared / "framing.md.j2").write_text("Framing.\n")
     (shared / "team-files.md.j2").write_text("Team files.\n")
     (shared / "file-roles.md.j2").write_text("File roles.\n")
+    (shared / "methods-dir.md.j2").write_text("Methods dir.\n")
     (shared / "frontmatter.md.j2").write_text(FRONTMATTER_BODY)
     _create_hook_templates(templates_dir)
 
@@ -1063,6 +1065,8 @@ class TestSharedSkillIncludes:
         "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
         "read [the catalog-id reference]({{ shared_dir }}/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
+        "read [methods-dir.md]({{ shared_dir }}/methods-dir.md) before choosing": "skills/shared/methods-dir-pointer.md.j2",
+        "the strongest sign: at least one of its subdirectories holds a `.mthds` file": "skills/shared/methods-dir.md.j2",
         "stands for the directory holding this `SKILL.md`": "skills/shared/skill-dir.md.j2",
         "relative to that file's directory, say so, and check again": "skills/shared/git-ignore.md.j2",
         "so one still not ignored is not written until the user says so": "skills/shared/git-ignore.md.j2",
@@ -2863,6 +2867,40 @@ class TestBundleHome:
     def test_the_name_follows_the_project_language_casing(self) -> None:
         body = self._template("pipelex-design")
         assert "`summarize-pdf` in TypeScript, `summarize_pdf` in Python" in body
+
+    def test_an_existing_methods_directory_is_read_before_the_computed_home(self) -> None:
+        """A `methods/` the user made says where they keep methods better than any project marker.
+
+        Design's bundle home, the catalog's pull landing and integrate's copy of an outside bundle all
+        choose a `methods/<name>/`, so all three point at the one reference that grades an existing
+        `methods/`, through the one pointer include, and reach the same directory."""
+        pointer = '{% include "skills/shared/methods-dir-pointer.md.j2" %}'
+        bundle_home = (self.SKILLS / "pipelex-design" / "parts" / "bundle-home.md.j2").read_text(encoding="utf-8")
+        assert bundle_home.count(pointer) == 1
+        for skill in ("pipelex-catalog", "pipelex-integrate"):
+            assert (self.SKILLS / skill / "SKILL.md.j2").read_text(encoding="utf-8").count(pointer) == 1, skill
+        assert "skills/shared/methods-dir.md.j2" in SHARED_TEMPLATES
+
+    def test_the_methods_reference_grades_by_what_the_directory_holds(self) -> None:
+        """Holding methods is the strongest sign, empty a weaker one; a bundle or anything else is never a home.
+
+        A `methods/` holding `.mthds` files directly is one method, and a method nested in it would be sent
+        with it by the folder form, so it is refused like a code module named `methods`."""
+        reference = (self.SKILLS / "shared" / "methods-dir.md.j2").read_text(encoding="utf-8")
+        for grade in ("**It holds methods**, the strongest sign", "**It is empty**", "**It is a bundle**", "**It holds something else**"):
+            assert grade in reference, grade
+        assert "Never place a method inside it." in reference
+        assert "never the home of a method" in reference
+        # A disagreement is the user's to settle, never the agent's to pick.
+        assert "Two of the same grade are a question" in reference
+        assert "a wheel ships only what is inside the package" in reference
+        assert "**A name already taken**" in reference
+
+    def test_design_never_writes_into_an_occupied_home(self) -> None:
+        """Two domains that fold to one `<name>` resolve to one directory, and the home is announced without
+        waiting for a reply, so the write itself has to refuse an occupied home."""
+        body = self._template("pipelex-design")
+        assert "**Never write into an occupied home**: a home that exists and is not empty is a question." in body
 
     def test_nothing_a_skill_ships_still_defaults_to_pipelex_wip(self) -> None:
         """It survives only as a directory a user may already have, never as the

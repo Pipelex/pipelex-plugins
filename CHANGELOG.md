@@ -6,6 +6,22 @@
 
 - **The MTHDS reference teaches reading and filling a workbook with no Excel Table**: `PipeStructure` reads a named range through `table`, and the rows typed on a plain sheet through `sheet_range`, with its optional `sheet` and `header_row`, and a `PipeDocGen` step appends to or updates such rows under `sheet_range = { list = "expenses", sheet = "Sheet1" }`, naming the list that fills them, refused under `replace`. The reference states the shapes a plain range is refused for, naming the cell to fix (a merged or second header block, data or a note below the rows, a value in the column beside them, a merge across their edge, a filter that disagrees), and what is left out of the records: a totals line holding a lone aggregate of its column over two rows at least, never a cumulative column, the labelled footer rows under it and the pre-filled formulas of rows to come; the fit reference lists both, and `pipelex-synthetic-inputs` writes such a method's test workbook as plain rows, since a sheet holding a Table is read as that Table.
 
+## [0.22.2] - 2026-11-17
+
+### Changed
+
+- **An existing `methods/` directory decides where a new method goes**: `pipelex-design` placing a new bundle, `pipelex-catalog` landing a pull and `pipelex-integrate` copying an outside bundle into a project now look for a `methods/` directory in or above the working directory within the project, or in a Python package, before taking the home the project markers point to. One that already holds method directories is the strongest sign and the new method goes beside them, spelled with their separator; an empty one comes next; one that is itself a bundle, or holds code or other files, is never used, and the skill says why. Two equally good candidates, or a `methods/` outside a packaged Python project's import package, are put to you as a question rather than chosen silently.
+
+### Fixed
+
+- **A new method never lands in an occupied directory**: when the directory `pipelex-design` resolves for a new bundle, or the one `pipelex-integrate` would copy an outside bundle into, already exists and is not empty, as when two methods' domains fold to the same name, the skill asks for another name or path instead of overwriting the other method's `main.mthds` or mixing files into a directory of yours.
+
+## [0.22.1] - 2026-11-17
+
+### Fixed
+
+- **The validation hook passes the Office-editing forms the skills teach**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `6e995c0`, the commit its header names, still embedding `@pipelex/sdk` 0.69.0 and now `@pipelex/tools-wasm` 0.6.2, whose MTHDS schema takes `PipeStructure`'s `table` and `row_field` and `PipeDocGen`'s `template_input`, `table_fill`, `match_on`, `match_row` and `cells`. The bundle on 0.6.1 refused those fields offline as unexpected properties, so a method that reads a spreadsheet's rows or fills the caller's workbook, written as the MTHDS reference teaches, had its write blocked by the plugin's own hook; its format output, the request its validate stage sends and its `User-Agent` are unchanged.
+
 ## [0.22.0] - 2026-11-17
 
 ### Changed

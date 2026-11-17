@@ -173,6 +173,7 @@ SHARED_TEMPLATES = [
     "skills/shared/framing.md.j2",
     "skills/shared/team-files.md.j2",
     "skills/shared/file-roles.md.j2",
+    "skills/shared/methods-dir.md.j2",
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
