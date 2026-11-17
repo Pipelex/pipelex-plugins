@@ -79,7 +79,7 @@ LAYOUT = "table"
 SHEET, HEADER_ROW, NAME = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]
 ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]
-TOTALS_COLUMN = "Amount"  # plain rows only: the header of the column a totals line sums, or None for no totals line
+TOTALS_COLUMN = None  # plain rows only: the header of the column a totals line sums, such as "Amount"
 
 wb = Workbook()
 ws = wb.active

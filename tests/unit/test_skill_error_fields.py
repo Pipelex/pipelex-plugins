@@ -48,13 +48,18 @@ class TestSkillErrorFields:
         config = load_target_config(REPO_ROOT / "targets", target_name)
         skills_dir = resolve_output_dir(REPO_ROOT, config.source) / "skills"
         # What git ignores never ships, so a Finder `.DS_Store` beside the output is no skill file of the target's.
-        ignored = subprocess.run(
-            ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--", str(skills_dir)],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.splitlines()
+        # Where git is absent or the tree is no checkout, such as an sdist, nothing is filtered.
+        ignored: list[str]
+        try:
+            ignored = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--", str(skills_dir)],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.splitlines()
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            ignored = []
         ignored_paths = {REPO_ROOT / line for line in ignored}
         shipped = sorted(path for path in skills_dir.rglob("*") if path.is_file() and path not in ignored_paths)
         assert shipped, f"{target_name}: no skill files found under {skills_dir}"

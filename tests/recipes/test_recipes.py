@@ -295,6 +295,7 @@ class TestRecipes:
             substitutions=(
                 ('SHEET, HEADER_ROW, NAME = "Data", 1,', 'SHEET, HEADER_ROW, NAME = "Feuil1", 3,'),
                 ('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Category", "Amount"]'),
+                ("TOTALS_COLUMN = None", 'TOTALS_COLUMN = "Amount"'),
                 (
                     'ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]',
                     'ROWS = [["Paper", "Office", 12.5], ["Toner", "Office", 48.0], ["Pens", "Office", 6.2]]',
@@ -320,6 +321,7 @@ class TestRecipes:
         workbook = self._run_plain_spreadsheet_recipe(
             substitutions=(
                 ('HEADER = ["Item", "Amount"]', 'HEADER = ["Amount"]'),
+                ("TOTALS_COLUMN = None", 'TOTALS_COLUMN = "Amount"'),
                 ('ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]', "ROWS = [[12.5], [48.0], [6.2]]"),
             ),
             tmp_path=tmp_path,
@@ -327,6 +329,16 @@ class TestRecipes:
         assert len(workbook["sheets"]) == 1, f"a step naming no sheet needs one worksheet: {workbook['sheets']}"
         assert workbook["tables"] == []
         assert workbook["rows"] == [["Amount"], [12.5], [48], [6.2], ["=SUM(A2:A4)"]], workbook["rows"]
+
+    @NEEDS_UV
+    def test_spreadsheet_recipe_plain_path_writes_no_totals_line_unless_asked(self, tmp_path: Path) -> None:
+        """Only `totals: yes` sets `TOTALS_COLUMN`, so a plain request without it ends on its data rows, and a header
+        holding no `Amount` column is never looked up."""
+        workbook = self._run_plain_spreadsheet_recipe(
+            substitutions=(('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Price"]'),),
+            tmp_path=tmp_path,
+        )
+        assert workbook["rows"] == [["Item", "Price"], ["Paper", 12.5], ["Toner", 48], ["Pens", 6.2]], workbook["rows"]
 
     @NEEDS_UV
     def test_spreadsheet_recipe_named_path_defines_a_name_over_header_and_data(self, tmp_path: Path) -> None:
