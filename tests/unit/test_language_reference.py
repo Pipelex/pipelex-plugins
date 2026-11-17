@@ -253,6 +253,34 @@ class TestLanguageReference:
         assert "so `mthds_validate` reports it before any run spends credit" in docgen
         assert "Tell the user, and offer the PDF laid out from the inputs rather than changing the format in silence." in docgen
 
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_plain_sheet_is_read_and_filled_through_sheet_range(self, target_name: str) -> None:
+        """Most workbooks hold no Excel Table, so the reference teaches `sheet_range` on both operators, the named
+        range `table` reaches, and the rules a plain range is refused by. A `PipeDocGen` list fills a sheet the
+        method names, because a user's sheet is as often `Sheet1` as `Expenses`, and `replace` is refused on one."""
+        reference = rendered_shared(target_name, "writing-mthds.md")
+        structure = section(reference, "### PipeStructure — ")
+        assert "a named range (Formulas > Define Name)" in structure
+        assert "#### A range on a plain sheet" in structure
+        assert 'sheet_range = { sheet = "Expenses", header_row = 3 }' in structure
+        for rule in (
+            "**The header**",
+            "**Nothing below, nothing beside.**",
+            "**A totals line is not a record.**",
+            "**Footer rows**",
+            "**Pre-filled rows**",
+            "**Merges.**",
+        ):
+            assert rule in structure, f"{target_name}: the sheet range rules lack {rule}"
+        assert "a lone aggregate of that column's data rows" in structure and "over two rows at least" in structure
+        assert "a cumulative column such as `=SUM($D$4:D4)` filled down, are columns of the records" in structure
+        docgen = section(reference, "### PipeDocGen — ")
+        assert "| `sheet_range` |" in docgen
+        assert "#### Filling a range on a plain sheet" in docgen
+        assert 'sheet_range    = { list = "expenses", sheet = "Sheet1" }' in docgen
+        assert "`sheet_range` under `replace`, the default, is refused when the method loads" in docgen
+        assert "**`list` is required.**" in docgen
+
     def test_the_engine_is_checked_never_listed(self) -> None:
         """The workshop's lookup takes `doc_gen` in a check alone: the listing holds no document engines."""
         reference = rendered_shared("prod", "writing-mthds.md")

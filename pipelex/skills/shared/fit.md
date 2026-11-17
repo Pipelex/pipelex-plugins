@@ -13,12 +13,12 @@ Each row names the pipe that does it, whose section of the MTHDS reference is th
 | In the builder's terms | Pipe | What to say with it |
 |---|---|---|
 | Read a document or an image | `PipeExtract` | It reads a PDF, an image or a web page, and on the hosted platform a Word, Excel or PowerPoint file too. A step that needs a PDF of an Office file reads one the platform converts, which leaves out comments, hidden sheets and speaker notes and clips a cell's text where the next cell is filled. |
-| Read a spreadsheet's rows | `PipeStructure` | It reads one Excel Table or a CSV file into a list of records, one per row, with no model. |
+| Read a spreadsheet's rows | `PipeStructure` | It reads one Excel Table, a named range, the rows typed on a plain sheet or a CSV file into a list of records, one per row, with no model. A plain sheet it cannot read with certainty, such as one with a note under the rows, is refused, naming the cell to fix. |
 | Read a web page | `PipeExtract` | A web page is a `Document` holding the page's URL, read with the `@default-extract-web-page` model. |
 | Understand, decide, extract fields, write | `PipeLLM` | It reads text and images and produces text or structured fields that the method defines. |
 | Search the web | `PipeSearch` | It returns an answer with its sources: a title, a URL and a snippet for each. |
 | Generate images | `PipeImgGen` | It makes images from a prompt. These are the dearest runs. |
-| Produce a PDF, Excel, Word or PowerPoint file | `PipeDocGen` | It prints what earlier steps produced as one file, with no model, and can fill a copy of a workbook, document or deck the run supplies, adding rows to an Excel Table or filling its rows' empty cells. A PDF laid out from those results needs only the built-in engine; a PDF from a template and an Office file need an engine the runner may lack, which validation reports before any run. |
+| Produce a PDF, Excel, Word or PowerPoint file | `PipeDocGen` | It prints what earlier steps produced as one file, with no model, and can fill a copy of a workbook, document or deck the run supplies, adding rows to an Excel Table or to the rows typed on a plain sheet, or filling those rows' empty cells. A PDF laid out from those results needs only the built-in engine; a PDF from a template and an Office file need an engine the runner may lack, which validation reports before any run. |
 | Run over a list | `PipeBatch` | It applies one step to every item of a list, such as every receipt or every clause. |
 | Route a case by a condition | `PipeCondition` | It sends each case down the branch its condition selects. |
 | Do several things at once | `PipeParallel` | It runs independent steps side by side. |

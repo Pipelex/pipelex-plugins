@@ -545,7 +545,7 @@ When the target field expects a content object (a concept-typed field), the obje
 
 - **The text of a document, and the tables of a Word or PowerPoint file**: extract it as it is, with no page views.
 - **Pages to show or to send to a vision model, the text inside a file's pictures, or a sheet's table structure**: set `page_views = true`, which reads the PDF, and say what the conversion drops.
-- **The rows of an Excel Table or a CSV file, as records**: no extraction, but a `PipeStructure` reading the file (below), with no model.
+- **The rows of a spreadsheet, as records**, from an Excel Table, a named range, a plain sheet or a CSV file: no extraction, but a `PipeStructure` reading the file (below), with no model.
 - **What a conversion drops** (comments, hidden sheets, speaker notes, which side of a tracked change is current): no route is known to read it. Extracting the original is the only one that skips the conversion, and whether it reads those parts is not established, so tell the user, and check the extracted pages on a test file before the method relies on them.
 
 The input stays a `Document`, its description names the formats the user's files come in, and the test inputs can be the Office files themselves. **A runner the user hosts converts only when its `[runtime.document_conversion]` names a converter**, Gotenberg or `soffice`. Without one, which is its default, it refuses an Office file that a step could read only as a PDF with `input.file_type_unsupported`, before the run starts or, for a step only a condition reaches, at that step; the method then takes the PDF exported from the file (Word's *Save as PDF*, or `soffice --headless --convert-to pdf` where LibreOffice is installed), and its test inputs are PDFs.
@@ -615,11 +615,42 @@ row_field   = "row"
 - **One input, single, whose concept is `Document` or refines it**, never a concept holding a `Document` in a field.
 - **The output is a variable list of a flat structured concept**: `Foo[]`, never `Foo` or `Foo[N]`, whose fields are each `text`, `integer`, `number`, `boolean`, `date` or `datetime`, or carry `choices`: no `concept` or `list` field. The table decides how many records come out.
 - **`model` is refused on this path.** It reads; it never infers.
-- `table` names the Excel Table to read (Insert > Table in Excel), compared ignoring case; omit it when the workbook holds exactly one Table. A sheet's cells outside a Table are not read, and a CSV file, which has no Tables, takes no `table`.
+- **Which rows, in a workbook.** `table` names an Excel Table (Insert > Table) or, when the workbook holds no Table of that name, a named range (Formulas > Define Name): one rectangle of cells whose first row is the header and every row under it a data row. Both are compared ignoring case. `sheet_range` reads the rows typed on a plain sheet (below). With neither, the step reads the workbook's only Table, and refuses a workbook holding several or none. `table` and `sheet_range` exclude each other, and a CSV file, which is one table, takes neither: the run is refused when it reads one.
 - `row_field` names an `integer` or `number` field that receives each row's position among the data rows, counted from 1, which `table_fill = "update"`'s `match_row` finds the row by (section 6, `PipeDocGen`). No column may match it.
 - **Columns are matched to fields ignoring case, spaces, dots and underscores**, so a `Unit price` column fills `unit_price`. A column matching no field is ignored; a required field matching no column, or a column matching two fields, is refused. An empty cell takes the field's default, or nothing, and a value that does not convert fails the step, naming the row and the field.
 
 **A `PipeStructure` over a `Text` input, which asks a model to structure it, is outside the authoring subset**: a bundle you read may carry one, but write a `PipeLLM` with a structured output concept instead.
+
+#### A range on a plain sheet
+
+**Most workbooks people keep have no Excel Table**: a title, a header row, the rows and sometimes a total, typed straight onto a sheet. `sheet_range` reads them:
+
+```toml
+[pipe.read_expense_sheet]
+type        = "PipeStructure"
+description = "Read the expense rows under the sheet's title"
+inputs      = { workbook = "ExpenseWorkbook" }
+output      = "ExpenseRow[]"
+sheet_range = { sheet = "Expenses", header_row = 3 }
+row_field   = "row"
+```
+
+- `sheet` names the worksheet, compared ignoring case. Omit it when the workbook holds one worksheet, as when the users' sheets are named differently; a workbook holding several is then refused.
+- `header_row` is the sheet row of the header, counted from 1. Omit it when the header is the sheet's first row holding a value, and name it when a title stands above the header, which would otherwise be read as the header. `sheet_range = {}` reads the only sheet from its first filled row.
+- **A sheet holding one Excel Table is read as that Table**, and `header_row`, when given, must be its header row; a sheet holding several Tables is refused. A user who turns the range into a Table keeps the method working.
+
+**A plain range declares nowhere where it ends, so it is found by strict rules**, and a sheet the rules cannot settle refuses the run, naming the sheet and the cell (`Expenses!A9`), never a cell's value. These are the shapes an author meets:
+
+- **The header** holds its column headers side by side, from its first filled cell to the first empty one. A merged header cell, a second block of headers further along the row, and a header formula the workbook stores no value of are refused.
+- **The data rows** run down to the first row holding no data in the columns. A formula holds data when the value the workbook stored for it is not empty. Hidden rows and columns are read like any other.
+- **Nothing below, nothing beside.** Data in the columns below the range, such as a further block after a blank row or an "Approved by" note, is refused even past a blank row, so a sheet whose rows are split by intentional blank rows cannot be read: move a note out of the range's columns. A value in the column just left or right of the headers, on any row of the range, is a column with no header, refused too; values past an empty column are another part of the sheet and are left alone.
+- **A totals line is not a record.** It is the first row holding, in one of the columns, a lone aggregate of that column's data rows, from the first data row through the row just above, over two rows at least: `=SUM(D4:D20)` or `=SUBTOTAL(109,D4:D20)`, or `AVERAGE`, `MIN`, `MAX`, `COUNT`, `COUNTA`, `PRODUCT` or `AGGREGATE` over the same range. A formula doing more, such as `=SUM(D4:D20)*1` or `SUMIF`, and a cumulative column such as `=SUM($D$4:D4)` filled down, are columns of the records, and a total typed as a value is a data row, which the concept's field types usually refuse. The totals line ends the data and is not counted in the positions, so a subtotal in the middle of the rows stops them there and the rows after it are refused: move it below the records.
+- **Footer rows** directly after the totals line, each holding a text label beside formulas that build on the total, such as a `VAT` line `=D21*0.2` and a `Grand total` `=D21+D22`, are not read either. A row there with a typed number, or with no label, is data below the totals line, refused.
+- **Pre-filled rows**, formulas filled down ahead of the rows to come that store an empty text, such as `=IF(A5="","",B5*C5)` down to row 500, are neither read nor refused, and a total may stand under them. A workbook saved by a program that calculates nothing stores no values: such rows are skipped with a warning, and a header holding such a formula is refused, both cured by opening the workbook in Excel or LibreOffice and saving it.
+- **Merges.** Beyond the header, a merged range crossing the left or right edge of the columns is refused; one merged down inside the data, such as a category spanning two rows, reads as its first cell on every row it covers.
+- **The sheet's filter**, when it has one, must start on the header row and cover exactly the columns.
+
+Fixing the cell a refusal names, or turning the range into an Excel Table, makes the sheet readable: tell the user which, rather than loosening the method. The MTHDS specification's "Finding a Sheet Range" holds the complete rules. Test such a method on a workbook whose rows are plain cells, since a sheet holding a Table is read as that Table.
 
 ### PipeSearch — search the web
 
@@ -725,6 +756,7 @@ filename    = "inspection-report"
 | `template_file` | A template file beside the bundle, its path relative to the `.mthds` file that names it and inside the bundle's directory: an `.html` file for `pdf`, and the `.xlsx`, `.docx` or `.pptx` file itself for the other formats. Never together with `template` or `template_input`. `pptx` requires one, or a `template_input`. |
 | `template_input` | The input whose file is the office template, for `xlsx`, `docx` or `pptx`: the run supplies the file to fill (below). Never together with `template` or `template_file`. |
 | `table_fill` | How a list input's records fill a Table of an office template: `replace`, the default, `append` or `update`, the last two for `xlsx` only (below). |
+| `sheet_range` | Under `append` or `update`, the range on a plain sheet a list fills instead of a Table, `{ list = "expenses", sheet = "Sheet1" }` (below). |
 | `match_on`, `match_row`, `cells` | Under `table_fill = "update"` alone: how a record finds its row, and which cells it may write (below). |
 | `filename` | The file's name without its suffix, a Jinja expression over the inputs such as `"invoice-{{ invoice.invoice_number }}"`. Omitted, it is the pipe's code, or with a `template_input` the name of the input's file. |
 | `model` | The document engine that prints the file. Omit it: the deck's default engine for the format, with or without a template, prints it. A reference the user asks for is checked with `doc_gen`, as "Model references" says. |
@@ -762,7 +794,7 @@ A dry run composes the document for real against mock inputs, which checks the t
 
 **`template_input` fills the caller's own file**: the method takes a workbook, a Word document or a deck as an input and returns a filled copy of it. The input is declared single and required, as `Document` or a concept refining it; it is the template, not data, so the step's other inputs fill it. **The output is a new file**, named after the input's file unless `filename` says otherwise; the caller's file is never changed in place. The file must be of the step's `format`, judged from its bytes, or the run is refused with `input.file_type_unsupported`. Validation cannot see a file the run has not supplied yet, so a valid verdict carries a `pipelex.docgen.template_warning` saying the template is checked when a run supplies it: that is expected, not a finding to fix. When the run starts, a template the engine finds unfit refuses it as `pipelex.docgen.template_input_unfit`.
 
-**`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches. **A list input of records, a list of a structured concept, fills the Table named after it**, the two names compared ignoring case, spaces, dots and underscores, so the list input `expenses` fills the Table `Expenses` while one named `expense_rows` fills nothing; a list of single values, such as `Text[]`, fills no Table. Under `append` or `update`, a list input of records matching no Table of the workbook is refused: in a method's own `template_file`, at validation and the dry run, as `pipelex.docgen.template_invalid`; in a workbook supplied through `template_input`, when the run starts, as `pipelex.docgen.template_input_unfit`.
+**`table_fill` says what a list input's records do to a Table of an office template**, `template_file` or `template_input`: `replace`, the default, writes them over the Table's rows; `append`, for `xlsx` only, adds them after the rows the Table already holds; `update`, for `xlsx` only, writes each record into the one row it matches. **A list input of records, a list of a structured concept, fills the Table named after it**, the two names compared ignoring case, spaces, dots and underscores, so the list input `expenses` fills the Table `Expenses` while one named `expense_rows` fills nothing; a list of single values, such as `Text[]`, fills no Table. Under `append` or `update`, a list input of records matching no Table of the workbook is refused: in a method's own `template_file`, at validation and the dry run, as `pipelex.docgen.template_invalid`; in a workbook supplied through `template_input`, when the run starts, as `pipelex.docgen.template_input_unfit`. Rows typed on a plain sheet, with no Table, are filled through `sheet_range` instead (below).
 
 ```toml
 [concept.ExpenseCompletion]
@@ -800,6 +832,28 @@ match_on       = ["invoice_number"]
 - **All or nothing**: a key twice in the Table, a record matching no row and two records matching one row fail the step before anything is written.
 
 `match_on`, `match_row` and `cells` are refused under any other fill. **An `append` or `update` needs an engine that declares it**: one that does not is refused when the method loads, `model.capability_unsupported`, which `mthds_validate` reports; tell the user rather than changing the fill in silence.
+
+#### Filling a range on a plain sheet
+
+**A list fills a sheet the method names, not one named after it.** A user's sheet is as often `Sheet1` or `Feuil1` as `Expenses`, and the method cannot rename it, so with `sheet_range` the step says which list fills which range:
+
+```toml
+[pipe.append_expenses_to_sheet]
+type           = "PipeDocGen"
+description    = "Add the extracted expenses under the rows typed on the caller's sheet"
+inputs         = { workbook = "ExpenseWorkbook", expenses = "ExpenseRow[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "append"
+sheet_range    = { list = "expenses", sheet = "Sheet1" }
+```
+
+- **`list` is required.** It names the list of records that fills the range, by its path in the step's data, its input first, so a list a structured input holds is `report.lines`; that list fills the range and no Table. `sheet` and `header_row` are `PipeStructure`'s, and the same rules find the range, so a method that reads the rows and then updates them by `match_row` gives both steps the same `sheet` and `header_row`, and the positions the read gave are the rows the update writes.
+- **Only `append` and `update`.** `sheet_range` under `replace`, the default, is refused when the method loads: on a range found by rules, a wrong boundary would clear the user's rows rather than fail. It also needs `format = "xlsx"` and a `template_input` or a `template_file`; a template the method owns can hold a Table instead.
+- **An append writes after the last data row**, into pre-filled rows first. A totals line directly under the data is in the way and refuses the append, while one under pre-filled rows lets it write into them: tell the user to move the total above the header or onto another sheet, or to turn the range into a Table.
+- **A range the rules cannot settle refuses the run when it starts**, as `pipelex.docgen.template_input_unfit`, naming the sheet and the cell, by the rules of `PipeStructure`'s "A range on a plain sheet" above. A sheet holding one Excel Table is filled as that Table.
+- **The engine must declare `sheet_range`**: one that does not is refused when the method loads, `model.capability_unsupported`.
 
 #### Template files
 
@@ -948,12 +1002,15 @@ When the bundle stays in one domain (the common case), use bare names everywhere
 - ❌ Writing a `dict` field — outside the authoring subset.
 - ❌ Writing a `PipeStructure` over a `Text` — outside the authoring subset; use `PipeLLM` with a structured output concept instead. Over a spreadsheet `Document` it is the model-free reader.
 - ❌ A spreadsheet `PipeStructure` with a `model`, or an output other than a variable list `Foo[]` of a flat structured concept.
+- ❌ `table` and `sheet_range` on one step, or either for a CSV file — one region, and a CSV file is one table.
+- ❌ A `sheet_range` with no `header_row` on a sheet whose title stands above the header — the title is read as the header.
 - ❌ Declaring a concept named `Markdown`, `Choice`, `Rating` or any other native — refused as `native_concept_redeclaration`.
 - ❌ An LLM report bound for a `PipeDocGen` declared `Text` — it prints its Markdown marks as they are; declare it `Markdown`.
 - ❌ An inline `template` on an `xlsx`, `docx` or `pptx`, or `template` and `template_file` together — the inline template is HTML, for a `pdf` only.
 - ❌ A `pptx` without `template_file` or `template_input` — it has no layout of its own.
 - ❌ A `template_input` that is optional, a list, or not a `Document` — the template is one supplied file.
 - ❌ `table_fill = "append"` or `"update"` on a `docx` or `pptx` — they fill an `xlsx` Table only.
+- ❌ A `PipeDocGen` `sheet_range` under `replace`, the default, or without `list` — it fills a range under `append` or `update`, from the list it names.
 - ❌ An `update` record whose `match_on` key or `match_row` position a model wrote — carry it from the rows read, unchanged.
 - ❌ A `PipeDocGen` output with `[]` or `[N]`, or of a concept that does not refine `Document` — the step prints one file.
 - ❌ `default_value` on `concept`- or `list`-typed fields — not allowed.

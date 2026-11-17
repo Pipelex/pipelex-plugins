@@ -47,7 +47,7 @@ Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "
 
 ```
 Use the /xlsx skill to create a spreadsheet with the following data, formatted as an Excel Table:
-[Describe columns, rows, and sample data, and the Table's name when the method names one]
+[Describe columns, rows, and sample data, and the Table's name when the method names one; for a method reading a `sheet_range`, ask for plain rows on a sheet of the name it gives, under its `header_row`, with no Table]
 Save to: <target>
 ```
 
@@ -74,7 +74,8 @@ ws.append(["Column1", "Column2"])
 ws.append(["Value1", "Value2"])
 # Add more rows as needed: ws.append([...]); a second sheet: wb.create_sheet("Summary")
 # The rows as an Excel Table, which a method reading them with PipeStructure or filling a Table needs;
-# name it as the method's `table` does.
+# name it as the method's `table` does. For a method reading a `sheet_range`, leave this line out, since a
+# sheet holding a Table is read as that Table, and title the sheet as its `sheet` does.
 ws.add_table(Table(displayName="DataTable", ref=ws.dimensions))
 wb.save(PART)
 os.replace(PART, OUT)

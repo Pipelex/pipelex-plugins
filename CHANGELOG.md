@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The MTHDS reference teaches reading and filling a workbook with no Excel Table**: `PipeStructure` reads a named range through `table`, and the rows typed on a plain sheet through `sheet_range`, with its optional `sheet` and `header_row`, and a `PipeDocGen` step appends to or updates such rows under `sheet_range = { list = "expenses", sheet = "Sheet1" }`, naming the list that fills them, refused under `replace`. The reference states the shapes a plain range is refused for, naming the cell to fix (a merged or second header block, data or a note below the rows, a value in the column beside them, a merge across their edge, a filter that disagrees), and what is left out of the records: a totals line holding a lone aggregate of its column over two rows at least, never a cumulative column, the labelled footer rows under it and the pre-filled formulas of rows to come; the fit reference lists both, and `pipelex-synthetic-inputs` writes such a method's test workbook as plain rows, since a sheet holding a Table is read as that Table.
+
 ## [0.22.0] - 2026-11-17
 
 ### Changed
