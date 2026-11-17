@@ -5,8 +5,6 @@ description: Wire an MTHDS method into a Python or TypeScript codebase with gene
 
 # Integrate an MTHDS method into a codebase
 
-Leave a project calling a method through one typed module, over generated types and an offline drift gate.
-
 **Not** a runner or a design skill: it writes no tests, routes or UI, edits no business code, and **writes no client for another service before reading [fit.md](../shared/fit.md)**.
 
 ## Requirements
@@ -33,7 +31,7 @@ Automatic unless the user asks to be walked through it; pause only for a genuine
 
 Pass exactly one selector to every tool call:
 
-- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. **Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir` or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop. A bundle outside the project is copied in first, where the language reference places it, and the user told. **A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**
+- **Local files**: record and hash what step 2's `files_sent` lists. Pass the bundle directory as `method_dir`: the workshop sends its `.mthds` files and the templates their steps name, listed in `files_sent`. It refuses one outside **its own** working directory; relaunching the harness from a directory holding the bundle cures that. **Nothing else sends the call site's tree: a bundle out of its reach, or a workshop whose tools lack `method_dir` or answer it *Provide MTHDS files*, is a stop**; ask for that relaunch or a current workshop. **When a `methods/` exists in or above the working directory, or in a Python package, read [methods-dir.md](../shared/methods-dir.md) before choosing.** A bundle outside the project is then copied in where the language reference places it, never into a non-empty directory, and the user told. **A `METHODS.toml` in a parent of it, up to the one holding `.git`, is a stop.**
 - **`method_ref: "github.com/<owner>/<repo>[/<selector>][@<tag>]"`**: **an address with no tag is accepted and floats** on the default branch: say so in one line, recommend the tag, and proceed.
 - **`method_id: "mt_…"`**: **recommend pinning `mt_…@<n>`**, a published version, which never changes. A bare id follows each publish and `mt_…@draft` each save, so committed types can go stale: say so, and proceed with one only on the user's say-so.
 
@@ -103,7 +101,7 @@ With the project's package manager, at least: `zod`, `@pipelex/sdk` 0.48.0 (`ts-
 
 ### 9. The call site
 
-One module per method from the language reference's template, in the project's service layer, sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads (its docstring sends callers with files to `prepareInputs`). **Exactly one shared helper**, the client factory, serves every method.
+One module per method from the language reference's template, in the project's service layer, sending **the whole `bundle_dir` as the method's tree** at call time, or running the recorded selector. **A list output (`variable`, `fixed`) arrives as `{"items": […]}`, never a bare array: narrow its `items`, as the template shows**. The module never reads credentials and never uploads. **Exactly one shared helper**, the client factory, serves every method.
 
 ### 10. The offline gate
 

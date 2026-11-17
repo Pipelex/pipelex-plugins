@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.2] - 2026-11-17
+
+### Changed
+
+- **An existing `methods/` directory decides where a new method goes**: `pipelex-design` placing a new bundle, `pipelex-catalog` landing a pull and `pipelex-integrate` copying an outside bundle into a project now look for a `methods/` directory in or above the working directory within the project, or in a Python package, before taking the home the project markers point to. One that already holds method directories is the strongest sign and the new method goes beside them, spelled with their separator; an empty one comes next; one that is itself a bundle, or holds code or other files, is never used, and the skill says why. Two equally good candidates, or a `methods/` outside a packaged Python project's import package, are put to you as a question rather than chosen silently.
+
+### Fixed
+
+- **A new method never lands in an occupied directory**: when the directory `pipelex-design` resolves for a new bundle, or the one `pipelex-integrate` would copy an outside bundle into, already exists and is not empty, as when two methods' domains fold to the same name, the skill asks for another name or path instead of overwriting the other method's `main.mthds` or mixing files into a directory of yours.
+
 ## [0.22.1] - 2026-11-17
 
 ### Fixed
