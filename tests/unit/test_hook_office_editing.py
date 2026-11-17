@@ -3,8 +3,9 @@
 The reference the skills read, `templates/skills/shared/writing-mthds.md.j2`, teaches a `PipeStructure` that reads
 an Excel Table into records with `table` and `row_field`, and a `PipeDocGen` that fills the caller's own workbook
 with `template_input`, appending under `table_fill = "append"` or updating the rows it matches under
-`table_fill = "update"`, with `match_on` or `match_row` and `cells`. The MTHDS JSON Schema frozen into a
-`@pipelex/tools-wasm` before 0.6.2 refuses every one of those fields, so a session following the skills had its write
+`table_fill = "update"`, with `match_on` or `match_row` and `cells`, and both reading and filling the rows typed on a
+plain sheet with `sheet_range`. The MTHDS JSON Schema frozen into a `@pipelex/tools-wasm` before 0.6.2 refuses every one
+of the Table fields, and one before 0.6.3 refuses `sheet_range`, so a session following the skills had its write
 blocked by the plugin's own hook. These tests take the reference's examples as they are written, so a re-vendor onto
 an engine that refuses them, or a reference that changes them into a form the engine refuses, fails here.
 They run `templates/hooks/assets/check.mjs`, the copy every target carries byte for byte, as a Claude `PostToolUse`
@@ -107,6 +108,14 @@ def assert_the_hook_passes_silently(*, node: str, method_text: str, directory: P
     )
 
 
+@pytest.fixture(scope="module")
+def sheet_range_read_and_fill() -> str:
+    """The reference's two `sheet_range` examples: the `PipeStructure` reading a plain sheet, and the `PipeDocGen` appending to it."""
+    sheet_read = taught_example(holding=('type        = "PipeStructure"', 'sheet_range = { sheet = "Expenses", header_row = 3 }'))
+    sheet_fill = taught_example(holding=('type           = "PipeDocGen"', 'sheet_range    = { list = "expenses" }'))
+    return f"{sheet_read}\n{sheet_fill}"
+
+
 class TestHookOfficeEditing:
     def test_the_hook_passes_the_spreadsheet_read_silently(
         self, spreadsheet_read: str, node: str, offline_environment: dict[str, str], tmp_path: Path
@@ -137,6 +146,17 @@ class TestHookOfficeEditing:
         assert_the_hook_passes_silently(
             node=node,
             method_text=f"{METHOD_HEADER}\n{spreadsheet_read}\n{UPDATE_BY_ROW_POSITION}",
+            directory=tmp_path,
+            environment=offline_environment,
+        )
+
+    def test_the_hook_passes_the_sheet_range_read_and_fill_silently(
+        self, spreadsheet_read: str, sheet_range_read_and_fill: str, node: str, offline_environment: dict[str, str], tmp_path: Path
+    ) -> None:
+        """`PipeStructure` and `PipeDocGen` with `sheet_range`, beside the Table read that declares their concepts."""
+        assert_the_hook_passes_silently(
+            node=node,
+            method_text=f"{METHOD_HEADER}\n{spreadsheet_read}\n{sheet_range_read_and_fill}",
             directory=tmp_path,
             environment=offline_environment,
         )

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.23.0] - 2026-11-17
+
+### Added
+
+- **The MTHDS reference teaches workbooks with no Excel Table**: a `PipeStructure` step reads a named range through `table` and the rows typed on a plain sheet through `sheet_range`, and a `PipeDocGen` step fills a named range as it fills a Table, and appends to or updates a plain sheet's rows through `sheet_range = { list = "expenses" }`, its totals line moving down under an append. The reference says which sheets the rules refuse and how to fix them, and `pipelex-synthetic-inputs` writes a test workbook a `sheet_range` reads or fills as plain rows, since a sheet holding a Table is read as that Table.
+
+### Fixed
+
+- **The validation hook passes `sheet_range`**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `2297118`, the commit its header names, still embedding `@pipelex/sdk` 0.69.0 and now `@pipelex/tools-wasm` 0.6.3, whose MTHDS schema takes the `sheet_range` of `PipeStructure` and `PipeDocGen`. The bundle on 0.6.2 refused it offline as an unexpected property, so a method reading or filling the rows typed on a plain sheet, written as the MTHDS reference teaches, had its write blocked by the plugin's own hook; its format output, the request its validate stage sends and its `User-Agent` are unchanged.
+
 ## [0.22.2] - 2026-11-17
 
 ### Changed

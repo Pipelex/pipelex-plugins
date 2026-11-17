@@ -30,12 +30,12 @@ A Python this skill can reach: `uv` on `PATH`, or `python3` with `venv` and `pip
 
 ### Step 1: Settle the request
 
-A request carries four fields: explicit when `/pipelex-inputs` calls, otherwise inferred from the conversation, confirming only what is genuinely ambiguous.
+A request carries four fields: explicit when `/pipelex-inputs` calls, otherwise inferred from the conversation, confirming only what is ambiguous.
 
 - `format`: `pdf`, `png` with its category, `photograph`, `docx`, `xlsx` or `pptx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, or `photograph` when the method reads the image as a photo of a real-world scene (damage to inspect, a room, a product) rather than of a document, a chart or a screen; and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`). A `Document` whose originals are `.docx`, `.xlsx` or `.pptx` files is one like them, or a `pdf` when the caller asks. A legacy or OpenDocument original (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`) gets a `pdf`, the form Pipelex reads it in: the test exercises the reader, not the conversion's losses.
 - `brief`: one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it. Derive it from the method's purpose and the input's description, or ask for it — one question, then proceed.
 - `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in a fresh temporary directory made once with `mktemp -d`, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. A target the caller or the user names is honoured.
-- `constraints`: page count, pixel size, language, anything the input's description pins; otherwise the recipe's defaults.
+- `constraints`: page count, pixel size, language, anything the input's description pins, and an `xlsx`'s layout; otherwise the recipe's defaults.
 
 A `photograph` follows [photograph.md](references/photograph.md) from here: read it before drafting, since it replaces steps 2, 4 and 5 for that file. Mode follows the caller: a request from `/pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
 
