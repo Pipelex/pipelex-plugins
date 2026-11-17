@@ -8,7 +8,7 @@ List each `methods/` found, reading names only, never a file's content:
 
 - **It holds methods**, the strongest sign: at least one of its subdirectories holds a `.mthds` file or a `method.json`. The user keeps methods here, and the new one goes beside them. Other files beside them, a README or an `__init__.py`, change nothing.
 - **It is empty**, or holds only a README and dotfiles such as `.gitkeep`: most likely made for methods. A positive sign, weaker than the first.
-- **It is a bundle**: it holds `.mthds` files directly. It is one method whose directory is named `methods`, not a home for several, and a method nested inside it would be sent with it whenever it is validated, saved or run by its folder. Never place a method inside it.
+- **It is a bundle**: it holds `.mthds` files directly, whatever its subdirectories hold; this grade wins over the first. It is one method whose directory is named `methods`, not a home for several, and a method nested inside it would be sent with it whenever it is validated, saved or run by its folder. Never place a method inside it.
 - **It holds something else**: source code, assets, subdirectories with no `.mthds` file and no `method.json`. It is some other kind of "methods", such as a code module, and never the home of a method.
 
 ## Choose
