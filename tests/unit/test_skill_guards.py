@@ -168,6 +168,7 @@ GUARDS: dict[str, tuple[str, ...]] = {
         "never guess the output concept",
         "never add its hash to `sources` by hand",
         "read [methods-dir.md](../shared/methods-dir.md) before choosing.**",
+        "never into a non-empty directory",
     ),
     "pipelex-inputs": (
         "never hand-derive the template from the `.mthds` source",
