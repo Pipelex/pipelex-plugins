@@ -263,9 +263,15 @@ class TestRecipes:
         hide, since a sheet holding a Table is read as that Table. Run with `PLAIN = True` and the header on row 3."""
         (recipe,) = [recipe for recipe in RECIPES if recipe.heading == "Spreadsheets (XLSX)"]
         script = recipe.script
+        # The amount moves to the third column, so the totals line must follow `HEADER` rather than sit on column B.
         for constant, plain in (
             ("PLAIN = False", "PLAIN = True"),
             ('SHEET, HEADER_ROW, TABLE = "Data", 1,', 'SHEET, HEADER_ROW, TABLE = "Feuil1", 3,'),
+            ('HEADER = ["Item", "Amount"]', 'HEADER = ["Item", "Category", "Amount"]'),
+            (
+                'ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]',
+                'ROWS = [["Paper", "Office", 12.5], ["Toner", "Office", 48.0], ["Pens", "Office", 6.2]]',
+            ),
         ):
             assert script.count(constant) == 1, f"the spreadsheet recipe no longer sets `{constant}`, which this test substitutes"
             script = script.replace(constant, plain)
@@ -289,10 +295,10 @@ class TestRecipes:
         assert workbook["title"] == "Feuil1"
         assert workbook["tables"] == [], f"the plain path left a Table: {workbook['tables']}"
         assert rows[0][0] not in (None, ""), "no title row above a header on row 3"
-        assert rows[1] == [None, None], "row 2 should stand empty between the title and the header"
-        assert rows[2] == ["Item", "Amount"], f"the header is not on row 3: {rows[2]}"
+        assert rows[1] == [None, None, None], "row 2 should stand empty between the title and the header"
+        assert rows[2] == ["Item", "Category", "Amount"], f"the header is not on row 3: {rows[2]}"
         last_data_row = len(rows) - 1  # the sheet row of the last data row, the totals line being the last row
-        assert rows[-1] == ["Total", f"=SUM(B4:B{last_data_row})"], f"no totals line under the data: {rows[-1]}"
+        assert rows[-1] == ["Total", None, f"=SUM(C4:C{last_data_row})"], f"no totals line under the amount column: {rows[-1]}"
         assert last_data_row - 3 >= 2, "a totals line needs two data rows above it"
 
     @NEEDS_UV

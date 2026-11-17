@@ -827,7 +827,7 @@ match_on       = ["invoice_number"]
 `ExpenseWorkbook` and `ExpenseRow` are the concepts the `PipeStructure` example declares. Under `update`:
 
 - **A record finds its row by exactly one of two ways.** `match_on` names the fields whose columns are the Table's key; `match_row = "row"` names the field holding the row's position among the Table's data rows, an integer or number field filled by the `row_field` of the `PipeStructure` that read the Table (section 6, `PipeStructure`). **The key or the position travels unchanged, never produced by a model**: a `PipeBatch` over the rows keeps the order, and the record is assembled by a `PipeCompose` construct taking `row = { from = "expense.row" }` beside what the model found. At least one list input must carry the matching fields, or the method is refused when it loads.
-- **A null leaves its cell as it was**: it means the method produced nothing for that cell, the opposite of the other fills, where a null empties what the template holds.
+- **A null leaves its cell as it was**: it means the method produced nothing for that cell, the opposite of the other fills, where a null empties what the template holds, except a calculated column's formula, which an append keeps.
 - **`cells`** is `fill_empty`, the default, which writes only empty cells and fails the step on a non-empty cell holding a different value, or `overwrite`, for corrections. A formula cell and a calculated column are never written.
 - **All or nothing**: a key twice in the Table, a record matching no row and two records matching one row fail the step before anything is written.
 

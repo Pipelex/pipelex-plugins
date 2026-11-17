@@ -280,7 +280,7 @@ class TestLanguageReference:
         assert 'sheet_range    = { list = "expenses" }' in docgen
         assert 'sheet = "Sheet1"' not in docgen, f"{target_name}: the example hard-codes a sheet name users' sheets rarely share"
         assert "a null keeping a calculated column's formula in the row" in docgen
-        assert "the opposite of the other fills, where a null empties what the template holds" in docgen
+        assert "where a null empties what the template holds, except a calculated column's formula, which an append keeps" in docgen
         assert "`sheet_range` under `replace`, the default, is refused when the method loads" in docgen
         assert "**`list` is required.**" in docgen
 

@@ -77,6 +77,7 @@ SHEET, HEADER_ROW, TABLE = "Data", 1, "DataTable"
 HEADER = ["Item", "Amount"]
 ROWS = [["Paper", 12.5], ["Toner", 48.0], ["Pens", 6.2]]
 TOTALS = True  # plain rows only: a totals line under the data, which an append moves down
+AMOUNT_COLUMN = HEADER.index("Amount") + 1  # the column the totals line sums, found by its header
 
 wb = Workbook()
 ws = wb.active
@@ -90,8 +91,9 @@ last = HEADER_ROW + len(ROWS)
 if not PLAIN:
     ws.add_table(Table(displayName=TABLE, ref=f"A{HEADER_ROW}:{get_column_letter(len(HEADER))}{last}"))
 elif TOTALS and len(ROWS) >= 2:  # a total over one data row reads as a data row
-    ws.cell(row=last + 1, column=1, value="Total")
-    ws.cell(row=last + 1, column=2, value=f"=SUM(B{HEADER_ROW + 1}:B{last})")
+    amount = get_column_letter(AMOUNT_COLUMN)
+    ws.cell(row=last + 1, column=1 if AMOUNT_COLUMN > 1 else 2, value="Total")
+    ws.cell(row=last + 1, column=AMOUNT_COLUMN, value=f"=SUM({amount}{HEADER_ROW + 1}:{amount}{last})")
 # A second sheet: wb.create_sheet("Summary")
 wb.save(PART)
 os.replace(PART, OUT)
