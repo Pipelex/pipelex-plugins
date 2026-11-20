@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The hook's corpus sweep runs on the corpus of pipelex 0.111.0**: the vendored MTHDS Test Corpus copy is re-synced, so its structured-output entry declares its list of stops as `item_type = "concept"` with `item_concept_ref = "Stop"`, the form the standard now writes, and the hook's sweep holds the vendored `check.mjs` to that form rather than to the older `item_type = "Stop"`.
+
 ## [0.23.0] - 2026-11-17
 
 ### Added
