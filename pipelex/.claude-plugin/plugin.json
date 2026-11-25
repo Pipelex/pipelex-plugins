@@ -12,7 +12,7 @@
     "api_key": {
       "type": "string",
       "title": "Pipelex API key",
-      "description": "API key for the hosted Pipelex API, which validates bundles and runs methods. Get one at https://app.pipelex.com. Leave empty to use the key saved by `npx -y @pipelex/mcp@latest login`, or PIPELEX_API_KEY from your shell.",
+      "description": "API key for the hosted Pipelex API, which validates bundles and runs methods. Get one at https://app.pipelex.com. Leave empty to use the key saved by `npx -y @pipelex/mcp@latest login`, or PIPELEX_API_KEY from your shell; the validation hook validates only with a key given here or in your shell, and otherwise lints and formats.",
       "sensitive": true
     }
   },
