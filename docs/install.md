@@ -50,7 +50,7 @@ claude plugin marketplace add Pipelex/pipelex-plugins
 claude plugin install pipelex@pipelex-plugins
 ```
 
-**The key.** Run the login, [above](#the-key), in a terminal. When you enable the plugin, Claude Code also opens the plugin configuration dialog, which asks for an API key and stores it in your OS keychain: leave the field empty to use the login's key, or fill it to give the plugin a key of its own, which then wins over the login's and reaches the hook too, so the hook validates as well as lints. The dialog's optional base URL field is for a deployment other than the hosted API, which it defaults to.
+**The key.** Run the login, [above](#the-key), in a terminal. When you enable the plugin, Claude Code also opens the plugin configuration dialog, which asks for an API key and stores it in your OS keychain: leave the field empty to use the login's key, or fill it to give the plugin a key of its own, which then wins over the login's and reaches the hook too, so the hook validates as well as lints. The dialog asks for nothing else: the plugin uses the hosted API, `https://api.pipelex.com`.
 
 Your session environment is the last place the plugin looks before the login's file:
 
@@ -58,9 +58,11 @@ Your session environment is the last place the plugin looks before the login's f
 export PIPELEX_API_KEY=plx_sk_...
 ```
 
-`PIPELEX_BASE_URL` sets the base URL the same way and defaults to `https://api.pipelex.com`. A value set in the dialog wins over the environment, and an empty field leaves the environment in charge.
+A key set in the dialog wins over the environment, and an empty field leaves the environment in charge.
 
-**Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the tools find the login's key, and the hook validates only with a key in the plugin configuration dialog. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
+**Another deployment.** The plugin never asks for the API's address. To reach a deployment other than the hosted API, export `PIPELEX_BASE_URL` the same way; the tools and the hook both read it. Where no shell environment reaches the plugin, run the login with it set, `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which signs in to that deployment's app, since the login takes its app from `PIPELEX_APP_URL` alone, and saves the API's address beside the key in `~/.pipelex/.env`; with a key created in that deployment's app, `PIPELEX_BASE_URL=<api origin> npx -y @pipelex/mcp@latest login --paste` does the same. Then leave the dialog's key field empty and `PIPELEX_API_KEY` unset: the tools take the file's base URL only together with the file's key. The hook reads neither the file's key nor its address, so it lints and formats there without validating.
+
+**Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the tools find the login's key, and the hook validates only with a key in the plugin configuration dialog, against the hosted API alone. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
 
 **What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, through `npx` and with the same key, so they need Node.js on your `PATH` too. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
 

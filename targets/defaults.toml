@@ -89,9 +89,9 @@ pipelex = "0.79.0"
 # "Dual-MCP flip: every baked declaration is the local workshop launcher").
 # The workshop authenticates
 # with PIPELEX_API_KEY / PIPELEX_BASE_URL. Credential delivery per platform:
-# - Claude: the `user_config` tables below become the manifest's `userConfig`
-#   (Claude prompts for them when the plugin is enabled; sensitive values go
-#   to the OS keychain) and are injected into the spawn as PIPELEX_PLUGIN_*
+# - Claude: the `user_config` table below becomes the manifest's `userConfig`
+#   (Claude prompts for each option when the plugin is enabled; sensitive
+#   values go to the OS keychain), and each is injected into the spawn as PIPELEX_PLUGIN_*
 #   via `${user_config.*}` substitution. The launch-pipelex-mcp.sh wrapper
 #   promotes each one to its real PIPELEX_* name only when non-empty, so the
 #   session env still works as a fallback. This is required for GUI launches
@@ -126,13 +126,13 @@ env_vars = ["PIPELEX_API_KEY", "PIPELEX_BASE_URL", "PIPELEX_HOME"]
 # Claude plugin user configuration. Keys map onto env variables by convention:
 # option `foo` is injected as PIPELEX_PLUGIN_FOO and promoted to PIPELEX_FOO
 # (MCP launcher) / read from CLAUDE_PLUGIN_OPTION_FOO (hook wrapper).
+# The API key is the one option. The base URL is never asked for: the
+# workshop and the hook default to the hosted https://api.pipelex.com, and a
+# developer who needs another plane sets PIPELEX_BASE_URL in the shell, or in
+# ~/.pipelex/.env, which the workshop reads only with that file's key and the
+# hook never reads (docs/decisions.md, "The base URL is not a plugin option").
 [vars.mcp_server.user_config.api_key]
 type = "string"
 title = "Pipelex API key"
-description = "API key for the hosted Pipelex API (bundle validation and runs). Get one at https://app.pipelex.com. Leave empty to work offline: local lint/format still run; validation and runs are skipped."
+description = "API key for the hosted Pipelex API, which validates bundles and runs methods. Get one at https://app.pipelex.com. Leave empty to use the key saved by `npx -y @pipelex/mcp@latest login`, or PIPELEX_API_KEY from your shell; the validation hook validates only with a key given here or in your shell, and otherwise lints and formats."
 sensitive = true
-
-[vars.mcp_server.user_config.base_url]
-type = "string"
-title = "Pipelex API base URL"
-description = "Origin of the Pipelex API, host-only (e.g. https://api.pipelex.com). Leave empty for the hosted default."

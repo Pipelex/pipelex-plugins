@@ -577,7 +577,7 @@ class TestCredentialWiring:
             ("pipelex/.claude-plugin/plugin.json", '"userConfig"', '"userConfigGone"', "userConfig offers no `api_key` option"),
             ("pipelex/.claude-plugin/plugin.json", '"sensitive": true', '"sensitive": false', "userConfig `api_key` is no longer sensitive"),
             ("pipelex/.claude-plugin/plugin.json", '"${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"', '"npx"', "does not spawn"),
-            ("pipelex/.claude-plugin/plugin.json", '"PIPELEX_PLUGIN_BASE_URL"', '"PIPELEX_BASE_URL"', "does not set PIPELEX_PLUGIN_BASE_URL"),
+            ("pipelex/.claude-plugin/plugin.json", '"PIPELEX_PLUGIN_API_KEY"', '"PIPELEX_API_KEY"', "does not set PIPELEX_PLUGIN_API_KEY"),
             (
                 "pipelex/hooks/check-mthds.sh",
                 'export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"',

@@ -274,8 +274,7 @@ class TestClaudeCopy:
     def test_the_launcher_keeps_the_credential_promotion(self, repo: Path, checkout: Path) -> None:
         copy = render_claude_copy(repo, _built(checkout))
         launcher = (copy / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8")
-        for key in ("API_KEY", "BASE_URL"):
-            assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
+        assert 'export PIPELEX_API_KEY="$PIPELEX_PLUGIN_API_KEY"' in launcher
         assert launcher.rstrip().endswith(f'exec node "{checkout.resolve() / WORKSHOP_BUNDLE}"')
         assert os.access(copy / "hooks" / "launch-pipelex-mcp.sh", os.X_OK)
 

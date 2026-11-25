@@ -12,13 +12,8 @@
     "api_key": {
       "type": "string",
       "title": "Pipelex API key",
-      "description": "API key for the hosted Pipelex API (bundle validation and runs). Get one at https://app.pipelex.com. Leave empty to work offline: local lint/format still run; validation and runs are skipped.",
+      "description": "API key for the hosted Pipelex API, which validates bundles and runs methods. Get one at https://app.pipelex.com. Leave empty to use the key saved by `npx -y @pipelex/mcp@latest login`, or PIPELEX_API_KEY from your shell; the validation hook validates only with a key given here or in your shell, and otherwise lints and formats.",
       "sensitive": true
-    },
-    "base_url": {
-      "type": "string",
-      "title": "Pipelex API base URL",
-      "description": "Origin of the Pipelex API, host-only (e.g. https://api.pipelex.com). Leave empty for the hosted default."
     }
   },
   "mcpServers": {
@@ -27,8 +22,7 @@
       "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
       "args": [],
       "env": {
-        "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
-        "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}"
+        "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}"
       }
     }
   }

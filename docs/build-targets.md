@@ -71,14 +71,9 @@ type = "string"
 title = "Pipelex API key"
 description = "..."
 sensitive = true
-
-[vars.mcp_server.user_config.base_url]
-type = "string"
-title = "Pipelex API base URL"
-description = "..."
 ```
 
-Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Running against another workshop edits none of it: `make claude-local-mcp` renders the Claude target with `command`/`args` overridden into the ignored `.local-mcp/`, and `make codex-local-mcp` overrides Codex's entry with `-c`, as [development.md](development.md#a-local-build-of-pipelex-mcp) says; a target's own `[vars.mcp_server]` merges into this table, as "Variable resolution" below says, and so does that override, which keeps the rest of it). The `user_config` sub-tables become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
+Reintroduce a variable only when a skill or hook actually branches on it — the `[vars.mcp_server]` table arrived with MCP registration (it feeds the `mcpServers` entry of the generated Claude and Codex manifests, and the Vibe target's `mcp/vibe-mcp.toml` fragment, as the local workshop launcher; `env_vars` lists the variable names Codex forwards into the spawn, since Codex whitelist-filters MCP spawn env — see [decisions.md](decisions.md) "Dual-MCP flip". Running against another workshop edits none of it: `make claude-local-mcp` renders the Claude target with `command`/`args` overridden into the ignored `.local-mcp/`, and `make codex-local-mcp` overrides Codex's entry with `-c`, as [development.md](development.md#a-local-build-of-pipelex-mcp) says; a target's own `[vars.mcp_server]` merges into this table, as "Variable resolution" below says, and so does that override, which keeps the rest of it). The `user_config` sub-tables, the API key alone, become the Claude manifest's `userConfig` (enable-time prompt; sensitive values keychain-stored; the base URL is deliberately not an option, as [decisions.md](decisions.md) "The base URL is not a plugin option" says) and drive both the MCP entry's `env` block (`${user_config.*}` → `PIPELEX_*`) and the hook wrapper's `CLAUDE_PLUGIN_OPTION_*` promotion — see [decisions.md](decisions.md) "Claude credentials move to plugin userConfig". Don't port dead switches.
 
 ### Per-target files (prod.toml, codex.toml, mistral-vibe.toml)
 
