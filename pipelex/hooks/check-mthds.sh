@@ -40,9 +40,6 @@ fi
 if [[ -n "${CLAUDE_PLUGIN_OPTION_API_KEY:-}" ]]; then
   export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"
 fi
-if [[ -n "${CLAUDE_PLUGIN_OPTION_BASE_URL:-}" ]]; then
-  export PIPELEX_BASE_URL="$CLAUDE_PLUGIN_OPTION_BASE_URL"
-fi
 
 # Resolve the bundle beside this script (works with or without
 # CLAUDE_PLUGIN_ROOT in the environment).

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Removed
+
+- **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login with it set, which saves it beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell.
+
 ## [0.23.1] - 2026-11-25
 
 ### Changed

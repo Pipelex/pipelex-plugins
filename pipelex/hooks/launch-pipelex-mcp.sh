@@ -18,8 +18,4 @@ if [[ -n "${PIPELEX_PLUGIN_API_KEY:-}" ]]; then
   export PIPELEX_API_KEY="$PIPELEX_PLUGIN_API_KEY"
 fi
 
-if [[ -n "${PIPELEX_PLUGIN_BASE_URL:-}" ]]; then
-  export PIPELEX_BASE_URL="$PIPELEX_PLUGIN_BASE_URL"
-fi
-
 exec npx "-y" "@pipelex/mcp@latest"

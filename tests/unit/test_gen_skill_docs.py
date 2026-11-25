@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tomllib
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pytest
 
@@ -735,16 +735,28 @@ class TestTargetConfig:
                 "type": "stdio",
                 "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
                 "args": [],
-                "env": {"PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}", "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}"},
+                "env": {"PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}"},
             }
         }
         rendered = render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, config.template_vars, include_skills=[], target_name="prod")
         launcher = rendered[self.REPO_ROOT / "hooks" / "launch-pipelex-mcp.sh"]
         hook = rendered[self.REPO_ROOT / "hooks" / "check-mthds.sh"]
-        for key in ("API_KEY", "BASE_URL"):
-            assert f'export PIPELEX_{key}="$PIPELEX_PLUGIN_{key}"' in launcher
-            assert f'export PIPELEX_{key}="$CLAUDE_PLUGIN_OPTION_{key}"' in hook
+        assert 'export PIPELEX_API_KEY="$PIPELEX_PLUGIN_API_KEY"' in launcher
+        assert 'export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"' in hook
         assert launcher.rstrip().endswith('exec node "../pipelex-mcp/dist/main.js"')
+
+    def test_the_plugin_asks_for_the_key_alone(self) -> None:
+        """The base URL is not a plugin option: the hosted API is the default, and another plane is
+        the developer's to set in the shell or in `~/.pipelex/.env` (`docs/decisions.md`, "The base
+        URL is not a plugin option"). An option added back here would prompt every user at enable."""
+        defaults_server = load_defaults(self.REPO_ROOT / "targets")["mcp_server"]
+        assert isinstance(defaults_server, dict)
+        user_config = defaults_server["user_config"]
+        assert isinstance(user_config, dict)
+        assert set(cast("dict[str, object]", user_config)) == {"api_key"}
+        manifest = json.loads((self.REPO_ROOT / "pipelex" / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        assert set(manifest["userConfig"]) == {"api_key"}
+        assert "PIPELEX_PLUGIN_BASE_URL" not in json.dumps(manifest)
 
     def test_a_nested_table_merges_an_array_replaces_and_no_target_aliases_another(self, tmp_path: Path) -> None:
         tree = _create_codex_tree(tmp_path)
