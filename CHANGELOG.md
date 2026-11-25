@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **The validation hook is rebuilt from `pipelex-sdk` 0.69.5**: the `check.mjs` bundle every target runs on a `.mthds` edit is re-vendored from `pipelex-sdk` at `02ec4a9`, the release commit its header names, now embedding `@pipelex/sdk` 0.69.5 and still `@pipelex/tools-wasm` 0.6.3. The SDK releases it crosses bound how a run's stored texts are loaded and add the `attachment` upload kind, calls the hook never makes, so its lint, format and validate verdicts and the request it sends are unchanged; its `User-Agent` now names `pipelex-sdk-js/0.69.5`.
 - **The hook's corpus sweep runs on the corpus of pipelex 0.111.0**: the vendored MTHDS Test Corpus copy is re-synced, so its structured-output entry declares its list of stops as `item_type = "concept"` with `item_concept_ref = "Stop"`, the form the standard now writes, and the hook's sweep holds the vendored `check.mjs` to that form rather than to the older `item_type = "Stop"`.
 
 ## [0.23.0] - 2026-11-17
