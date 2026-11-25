@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.69.0 (2297118) + @pipelex/tools-wasm 0.6.3 (npm)
+// Provenance: @pipelex/sdk 0.69.5 (02ec4a9) + @pipelex/tools-wasm 0.6.3 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13153,6 +13153,8 @@ function selectionIncludesMainStuff(artifacts) {
 }
 var DEFAULT_POLL_INTERVAL_MS = 2e3;
 var DEFAULT_WAIT_TIMEOUT_MS = 12e5;
+var MAX_CONCEPTS_MISSING_POLLS = 5;
+var CONCEPTS_MISSING_REASON = "concepts_missing";
 function assertWaitOptions(options = {}) {
   const { intervalMs, timeoutMs } = options;
   if (Number.isNaN(intervalMs) || Number.isNaN(timeoutMs)) {
@@ -13174,8 +13176,14 @@ async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress, lo
   const linked = eitherSignal(deadline.signal, options.signal);
   const { signal } = linked;
   const timedOut = () => deadline.signal.aborted && options.signal?.aborted !== true;
-  const notFinished = () => new RunTimeoutError(
+  let completedSeen = false;
+  const notFinished = () => completedSeen ? completedButNotLoaded() : new RunTimeoutError(
     `Run ${runId} did not reach a terminal state within ${timeoutMs}ms.`,
+    runId,
+    timeoutMs
+  );
+  const completedButNotLoaded = () => new RunTimeoutError(
+    `Run ${runId} completed, but its stored texts did not load within ${timeoutMs}ms; read it again with getRunResult, or with loadStoredTexts: false for the wire shape.`,
     runId,
     timeoutMs
   );
@@ -13184,6 +13192,7 @@ async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress, lo
     const { onProgress } = options;
     let readsProgress = onProgress !== void 0 && fetchProgress !== void 0;
     let delivered;
+    let conceptsMissingPolls = 0;
     for (; ; ) {
       throwIfAborted(options.signal);
       const elapsedMs = Date.now() - startedAt;
@@ -13205,20 +13214,17 @@ async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress, lo
         try {
           return await loadCompleted(state.result, { signal });
         } catch (error) {
-          if (timedOut()) {
-            throw new RunTimeoutError(
-              `Run ${runId} completed, but its stored texts did not load within ${timeoutMs}ms; read it again with getRunResult, or with loadStoredTexts: false for the wire shape.`,
-              runId,
-              timeoutMs
-            );
-          }
-          throw error;
+          if (timedOut()) throw completedButNotLoaded();
+          const conceptsMissing = error instanceof StoredTextLoadError && error.reason === CONCEPTS_MISSING_REASON;
+          if (!conceptsMissing || conceptsMissingPolls >= MAX_CONCEPTS_MISSING_POLLS) throw error;
+          conceptsMissingPolls += 1;
+          completedSeen = true;
         }
       }
       if (state.state === "failed") {
         throw new RunFailedError(state.message, runId, state.status, { problem: state.problem });
       }
-      if (readsProgress && onProgress !== void 0 && fetchProgress !== void 0) {
+      if (state.state === "running" && readsProgress && onProgress !== void 0 && fetchProgress !== void 0) {
         let progress;
         try {
           progress = await fetchProgress(runId, { signal });
@@ -13234,7 +13240,7 @@ async function pollUntilResult(fetchOnce, runId, options = {}, fetchProgress, lo
       }
       attempt += 1;
       options.onPoll?.({ attempt, elapsedMs });
-      const retryMs = state.retry_after_seconds != null ? state.retry_after_seconds * 1e3 : 0;
+      const retryMs = state.state === "running" && state.retry_after_seconds != null ? state.retry_after_seconds * 1e3 : 0;
       const waitMs = Math.min(Math.max(intervalMs, retryMs), timeoutMs - elapsedMs);
       try {
         await sleep(waitMs, signal);
@@ -14205,7 +14211,7 @@ function methodShowcaseFreezeFault(answer) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.69.0";
+var SDK_VERSION = "0.69.5";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -14360,7 +14366,7 @@ function parseMethodSelector(selector) {
 }
 
 // src/upload.ts
-var UPLOAD_KINDS = ["uploaded", "test"];
+var UPLOAD_KINDS = ["uploaded", "attachment", "test"];
 function describedArgument(value) {
   if (value === null) return "null";
   if (typeof value === "string") return JSON.stringify(value);
@@ -14372,7 +14378,7 @@ function uploadKindFields(given, refusal2, field = "") {
   const methodId = raw.method_id ?? void 0;
   if (kind !== void 0 && !UPLOAD_KINDS.includes(kind)) {
     throw new InputPreparationError(
-      `${refusal2}: \`${field}kind\` is "uploaded" or "test", got ${describedArgument(kind)}.`,
+      `${refusal2}: \`${field}kind\` is "uploaded", "attachment" or "test", got ${describedArgument(kind)}.`,
       { problem: argumentInvalidProblem(`${field}kind`, "unknown_value") }
     );
   }
@@ -15165,15 +15171,22 @@ function storedTextKindOfNode(node) {
   return node.kind === "prose" || node.kind === "text" ? "text" : null;
 }
 function mainStuffNode(results) {
+  const conceptRef2 = mainStuffConceptRef(results);
+  if (conceptRef2 === null) return null;
+  return contentNode(conceptRef2, results.main_stuff, results);
+}
+function mainStuffConceptRef(results) {
   const memory = results.working_memory;
   if (memory == null || typeof memory !== "object") return null;
   const aliases = memory.aliases;
   const aliased = typeof aliases === "object" && aliases !== null ? aliases[MAIN_STUFF_ALIAS] : void 0;
   const name = typeof aliased === "string" ? aliased : MAIN_STUFF_ALIAS;
   const stuff = memory.root?.[name];
-  const conceptRef2 = conceptRefOf(stuff?.concept);
-  if (conceptRef2 === null) return null;
-  return contentNode(conceptRef2, results.main_stuff, results);
+  return conceptRefOf(stuff?.concept);
+}
+function describesConcept(conceptRef2, source) {
+  if (conceptRef2.startsWith(NATIVE_PREFIX2)) return true;
+  return formNodeForConcept(conceptRef2, source) !== void 0;
 }
 function workingMemoryNode(results) {
   const memory = results.working_memory;
@@ -15230,6 +15243,9 @@ function isPluralEnvelope(content, element) {
   return !(element.kind === "object" && element.fields.some((field) => field.name === LIST_ITEMS_FIELD));
 }
 function nodeForConcept(conceptRef2, source) {
+  return formNodeForConcept(conceptRef2, source) ?? nativeNode(conceptRef2);
+}
+function formNodeForConcept(conceptRef2, source) {
   for (const form of [source.output_form, source.input_form]) {
     if (form == null || typeof form !== "object") continue;
     for (const descriptor of Object.values(form)) {
@@ -15240,7 +15256,7 @@ function nodeForConcept(conceptRef2, source) {
       }
     }
   }
-  return nativeNode(conceptRef2);
+  return void 0;
 }
 function descriptorRoots(descriptor) {
   if (typeof descriptor !== "object" || descriptor === null) return [];
@@ -15825,9 +15841,12 @@ function formatMiB(bytes) {
   return `${Number.isInteger(mib) ? mib : mib.toFixed(1)} MiB`;
 }
 var DEFAULT_STORED_TEXT_MAX_BYTES = 100 * 1024 * 1024;
+var DEFAULT_STORED_TEXT_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 var DEFAULT_STORED_TEXT_CONCURRENCY = 8;
+var STORED_TEXT_CONCEPTS_MISSING = "concepts_missing";
 async function loadStoredTexts(client, results, options = {}) {
   if (results.main_stuff == null) return results;
+  if (lacksStoredTextConcepts(results)) throw conceptsMissingError(results);
   const node = mainStuffNode(results);
   if (node === null) return results;
   const loaded = await loadStoredTextValues(
@@ -15865,6 +15884,41 @@ function mayHoldStoredTexts(value) {
   }
   return Object.values(fields).some(mayHoldStoredTexts);
 }
+function lacksStoredTextConcepts(results) {
+  if (results.main_stuff == null || !mayHoldStoredTexts(results.main_stuff)) return false;
+  const conceptRef2 = mainStuffConceptRef(results);
+  if (conceptRef2 === null) return true;
+  return !describesConcept(conceptRef2, results);
+}
+function conceptsMissingError(results) {
+  const shaped = firstReferenceShape(results.main_stuff);
+  const path2 = renderPath2(shaped?.segments ?? []);
+  return new StoredTextLoadError(
+    `The stored text at ${path2} could not be loaded: the result does not say which of its values are stored texts (its working_memory or its output_form is missing), so none is handed on as its reference; read the result again in a moment, or with loadStoredTexts: false to see it as written.`,
+    { uri: shaped?.url ?? "", path: path2, reason: STORED_TEXT_CONCEPTS_MISSING },
+    { problem: responseUnreadableProblem(200, results.pipeline_run_id) }
+  );
+}
+function firstReferenceShape(value, segments = []) {
+  if (Array.isArray(value)) {
+    for (const [index, entry] of value.entries()) {
+      const found = firstReferenceShape(entry, [...segments, index]);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (typeof value !== "object" || value === null) return null;
+  const fields = value;
+  const url = fields["url"];
+  if (typeof url === "string" && Object.values(STORED_TEXT_VALUE_FIELD).every((field) => fields[field] == null) && ("size" in fields || "preview" in fields)) {
+    return { segments, url };
+  }
+  for (const [key, entry] of Object.entries(fields)) {
+    const found = firstReferenceShape(entry, [...segments, key]);
+    if (found !== null) return found;
+  }
+  return null;
+}
 function carriesConceptArtifacts(selection) {
   return selection === void 0 || CONCEPT_ARTIFACTS.every((artifact) => selection.includes(artifact));
 }
@@ -15878,22 +15932,90 @@ async function loadStoredTextValues(client, value, node, options, runId) {
       { problem: argumentInvalidProblem("concurrency", "not_positive") }
     );
   }
-  const bounds = fetchBounds({
-    maxBytes: options.maxBytes ?? DEFAULT_STORED_TEXT_MAX_BYTES,
-    timeoutMs: options.timeoutMs,
-    allowHttp: options.allowHttp,
-    signal: options.signal
-  });
+  const maxTotalBytes = options.maxTotalBytes ?? DEFAULT_STORED_TEXT_MAX_TOTAL_BYTES;
+  requirePositive("maxTotalBytes", maxTotalBytes);
+  const maxBytes = options.maxBytes ?? DEFAULT_STORED_TEXT_MAX_BYTES;
+  requirePositive("maxBytes", maxBytes);
   const firstSite = /* @__PURE__ */ new Map();
   for (const site of sites) if (!firstSite.has(site.url)) firstSite.set(site.url, site);
   const urls = [...firstSite.keys()];
-  const references = urls.filter(isStorageReference);
-  const resolved = /* @__PURE__ */ new Map();
-  let items;
+  let declaredTotal = 0;
+  for (const url of urls) {
+    const site = firstSite.get(url);
+    const size = site.reference["size"];
+    if (typeof size !== "number" || !(size > 0)) continue;
+    if (size > maxBytes) throw overTextCap(site, maxBytes, size);
+    declaredTotal += size;
+    if (declaredTotal > maxTotalBytes) throw overLoadCap(site, maxTotalBytes);
+  }
+  const stop = new AbortController();
+  const stopping = eitherSignal(stop.signal, options.signal);
+  let dispatcher = null;
+  const texts = /* @__PURE__ */ new Map();
+  let failed = false;
+  let firstFailure;
   try {
-    items = await resolveArtifacts(client, references, { signal: options.signal });
-  } catch (err) {
+    const bounds = fetchBounds({
+      maxBytes,
+      timeoutMs: options.timeoutMs,
+      allowHttp: options.allowHttp,
+      signal: stopping.signal
+    });
+    const references = urls.filter(isStorageReference);
+    const resolved = /* @__PURE__ */ new Map();
+    const items = await resolveForTexts(client, references, firstSite, options.signal);
+    references.forEach((uri, index) => resolved.set(uri, items[index]));
+    let held = 0;
+    const take = (bytes) => {
+      held += bytes;
+      return held <= maxTotalBytes;
+    };
+    dispatcher = await dispatcherFor(bounds.timeoutMs);
+    const readOne = async (url) => {
+      const site = firstSite.get(url);
+      let entry = resolved.get(url);
+      if (entry !== void 0 && entry.error === null && isExpired(entry.expires_at)) {
+        [entry] = await resolveForTexts(client, [url], firstSite, stopping.signal);
+      }
+      const bytes = await readStoredBytes(site, entry, bounds, maxTotalBytes, take, dispatcher);
+      texts.set(url, decodeStoredValue(site, bytes, runId));
+    };
+    let next = 0;
+    const worker = async () => {
+      while (!failed && next < urls.length) {
+        const url = urls[next];
+        next += 1;
+        try {
+          await readOne(url);
+        } catch (err) {
+          if (!failed) {
+            failed = true;
+            firstFailure = err;
+            stop.abort(err);
+          }
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, urls.length) }, worker));
+  } finally {
+    stopping.dispose();
+    void dispatcher?.close().catch(() => void 0);
+  }
+  if (failed) {
     if (options.signal?.aborted === true) throw options.signal.reason;
+    throw firstFailure;
+  }
+  let loaded = structuredClone(value);
+  for (const site of sites) {
+    loaded = replaceAt(loaded, site.segments, loadedForm(site, texts.get(site.url)));
+  }
+  return loaded;
+}
+async function resolveForTexts(client, references, firstSite, signal) {
+  try {
+    return await resolveArtifacts(client, references, { signal });
+  } catch (err) {
+    if (signal?.aborted === true) throw signal.reason;
     const site = firstSite.get(references[0]);
     const path2 = renderPath2(site.segments);
     const detail = err instanceof Error ? err.message : String(err);
@@ -15908,31 +16030,23 @@ async function loadStoredTextValues(client, value, node, options, runId) {
       { cause: err, problem: err instanceof ProblemError ? err.problem : void 0 }
     );
   }
-  references.forEach((uri, index) => resolved.set(uri, items[index]));
-  const texts = /* @__PURE__ */ new Map();
-  const dispatcher = await dispatcherFor(bounds.timeoutMs);
-  try {
-    let next = 0;
-    const worker = async () => {
-      for (; ; ) {
-        const index = next;
-        next += 1;
-        if (index >= urls.length) return;
-        const url = urls[index];
-        const site = firstSite.get(url);
-        const bytes = await readStoredBytes(site, resolved.get(url), bounds, dispatcher);
-        texts.set(url, decodeStoredValue(site, bytes, runId));
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(concurrency, urls.length) }, worker));
-  } finally {
-    void dispatcher?.close().catch(() => void 0);
-  }
-  let loaded = structuredClone(value);
-  for (const site of sites) {
-    loaded = replaceAt(loaded, site.segments, loadedForm(site, texts.get(site.url)));
-  }
-  return loaded;
+}
+function overTextCap(site, maxBytes, size) {
+  const path2 = renderPath2(site.segments);
+  const over = `over the ${formatMiB(maxBytes)} cap.`;
+  return new StoredTextLoadError(
+    `The stored text at ${path2} could not be loaded: it is ` + (size === void 0 ? over : `${formatMiB(size)}, ${over}`),
+    { uri: site.url, path: path2, reason: "too_large" },
+    { problem: downloadLimitProblem(maxBytes) }
+  );
+}
+function overLoadCap(site, maxTotalBytes) {
+  const path2 = renderPath2(site.segments);
+  return new StoredTextLoadError(
+    `The stored text at ${path2} could not be loaded: with the texts loaded before it, the load is over its ${formatMiB(maxTotalBytes)} total limit (maxTotalBytes).`,
+    { uri: site.url, path: path2, reason: "total_limit_exceeded" },
+    { problem: downloadLimitProblem(maxTotalBytes) }
+  );
 }
 function findStoredTexts(value, node) {
   const sites = [];
@@ -15976,7 +16090,7 @@ function findStoredTexts(value, node) {
   visit(value, node);
   return sites;
 }
-async function readStoredBytes(site, resolved, bounds, dispatcher) {
+async function readStoredBytes(site, resolved, bounds, maxTotalBytes, take, dispatcher) {
   const path2 = renderPath2(site.segments);
   const fail = (reason, detail, extra) => {
     throw new StoredTextLoadError(
@@ -15986,17 +16100,10 @@ async function readStoredBytes(site, resolved, bounds, dispatcher) {
     );
   };
   if (site.url.startsWith("data:")) {
-    const bytes = decodeDataUrl2(site.url);
-    if (bytes === null) return fail("unsupported_url", "its data URL does not decode.");
-    if (bytes.byteLength > bounds.maxBytes) {
-      return fail(
-        "too_large",
-        `it is ${formatMiB(bytes.byteLength)}, over the ${formatMiB(bounds.maxBytes)} cap.`,
-        {
-          problem: downloadLimitProblem(bounds.maxBytes)
-        }
-      );
-    }
+    const bytes = decodeDataUrl2(site.url, bounds.maxBytes);
+    if (bytes === "malformed") return fail("unsupported_url", "its data URL does not decode.");
+    if (bytes === "too_large") throw overTextCap(site, bounds.maxBytes);
+    if (!take(bytes.byteLength)) throw overLoadCap(site, maxTotalBytes);
     return bytes;
   }
   if (resolved === void 0) {
@@ -16004,10 +16111,32 @@ async function readStoredBytes(site, resolved, bounds, dispatcher) {
   }
   if (resolved.error !== null) return fail(resolved.error.code, resolved.error.detail);
   const link = resolved.url;
+  let reader;
   try {
     const response = await fetchResolvedUrl(site.url, link, bounds, dispatcher, () => void 0);
-    return new Uint8Array(await response.arrayBuffer());
+    if (response.body === null) return new Uint8Array(0);
+    reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    for (; ; ) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (!take(chunk.value.byteLength)) {
+        await reader.cancel().catch(() => void 0);
+        throw overLoadCap(site, maxTotalBytes);
+      }
+      chunks.push(chunk.value);
+      total += chunk.value.byteLength;
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes;
   } catch (err) {
+    if (err instanceof StoredTextLoadError) throw err;
     if (bounds.signal?.aborted === true) throw bounds.signal.reason;
     if (err instanceof ArtifactFetchError) {
       return fail(err.reason, err.message, {
@@ -16019,20 +16148,62 @@ async function readStoredBytes(site, resolved, bounds, dispatcher) {
     return fail("unknown", err instanceof Error ? err.message : String(err), { cause: err });
   }
 }
-function decodeDataUrl2(url) {
+function percentDecodedLength(payload, limit) {
+  let count = 0;
+  for (let index = 0; index < payload.length && count <= limit; index += 1) {
+    const code = payload.charCodeAt(index);
+    if (code === 37) {
+      count += 1;
+      index += 2;
+    } else if (code < 128) {
+      count += 1;
+    } else if (code < 2048) {
+      count += 2;
+    } else if (code >= 55296 && code <= 56319 && index + 1 < payload.length) {
+      count += 4;
+      index += 1;
+    } else {
+      count += 3;
+    }
+  }
+  return count;
+}
+function base64Significant(payload) {
+  let count = 0;
+  for (let index = 0; index < payload.length; index += 1) {
+    const code = payload.charCodeAt(index);
+    if (code !== 9 && code !== 10 && code !== 12 && code !== 13 && code !== 32) count += 1;
+  }
+  return count;
+}
+function decodeDataUrl2(url, maxBytes) {
   const comma = url.indexOf(",");
-  if (comma < 0) return null;
+  if (comma < 0) return "malformed";
   const header2 = url.slice("data:".length, comma);
   const payload = url.slice(comma + 1);
-  try {
-    if (/;base64$/i.test(header2)) {
-      const binary = atob(payload);
-      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  if (/;base64$/i.test(header2)) {
+    if (Math.floor((base64Significant(payload) - 2) * 3 / 4) > maxBytes) return "too_large";
+    let data = payload.replace(/[\t\n\f\r ]+/g, "");
+    if (data.length % 4 === 0 && data.endsWith("=")) {
+      data = data.slice(0, data.endsWith("==") ? -2 : -1);
     }
-    return new TextEncoder().encode(decodeURIComponent(payload));
-  } catch {
-    return null;
+    if (data.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(data)) return "malformed";
+    if (Math.floor(data.length * 3 / 4) > maxBytes) return "too_large";
+    try {
+      const binary = atob(data);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    } catch {
+      return "malformed";
+    }
   }
+  if (percentDecodedLength(payload, maxBytes) > maxBytes) return "too_large";
+  let bytes;
+  try {
+    bytes = new TextEncoder().encode(decodeURIComponent(payload));
+  } catch {
+    return "malformed";
+  }
+  return bytes.byteLength > maxBytes ? "too_large" : bytes;
 }
 function decodeStoredValue(site, bytes, runId) {
   const path2 = renderPath2(site.segments);
