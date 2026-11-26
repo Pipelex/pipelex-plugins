@@ -39,7 +39,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ## Prerequisites
 
-`git`; `node` at 22.12 or later with `npm`, for the method app and TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
+`git`; `node` at 22.12 or later with `npm` on every branch, before anything is created; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest.
 
 **On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
@@ -69,14 +69,14 @@ Its verdict is its last line not opening with `make`: `serving <url> — "<title
 2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Run the script, never its steps by hand:
 
    ```bash
-   bash "<skill-dir>/scripts/commit-pristine.sh" '<dir>' 'Scaffold <framework or language> project'
+   node "<skill-dir>/scripts/commit-pristine.mjs" '<dir>' 'Scaffold <framework or language> project'
    ```
 
    It keeps the dependency tree and `.env` out, makes `<dir>` a repository when none holds it or the one around it ignores it, and commits `<dir>` alone: the **one commit this skill makes**. `committed:` names it and lists the staged paths; `kept:` names the commit the initializer made itself; `inside:`, `unversioned:` and `nested:` name the enclosing repository, where it commits nothing.
 3. Write the env file. The script prints one line and never a value, `<key> base-url=<origin> plane=<plane>`:
 
    ```bash
-   bash "<skill-dir>/scripts/write-env-file.sh" '<dir>'
+   node "<skill-dir>/scripts/write-env-file.mjs" '<dir>'
    ```
 
 4. Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipelex-integrate` adds both with the first call site.
