@@ -771,9 +771,7 @@ POSIX_SHELL_ALLOWED: dict[tuple[str, str], str] = {
 }
 # Skills whose commands other items of the Windows epic are making shell-neutral; each is removed from this
 # table by the change that lands its item, after which the rule holds that skill too.
-POSIX_SHELL_PENDING_SKILLS: dict[str, str] = {
-    "pipelex-scaffold": "L-261126-b121b5, L-261126-54e9af",
-}
+POSIX_SHELL_PENDING_SKILLS: dict[str, str] = {}
 _FENCE_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})\s*([\w+-]*)")
 _INLINE_CODE_PATTERN = re.compile(r"(`+)(.+?)\1")
 

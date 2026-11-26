@@ -6,15 +6,15 @@ Read this when a prerequisite check of `/pipelex-scaffold` finds `node` or `uv` 
 
 Your shell state does not survive from one command to the next. Each command starts again from the user's profile, which is the profile that did not have the runtime, so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next.
 
-Resolve the binary once, keep its directory, and prefix **every** later command with it, as `PATH="<that dir>:$PATH" …`:
+Resolve the binary once, keep its directory, and run **every** later command with that directory first on its `PATH`, set for that one command in the form your shell gives a single command, since nothing exported survives to the next one:
 
-- `nvm`: `ls "$NVM_DIR"/versions/node/*/bin/node`
+- `nvm`: list `versions/node/` under nvm's directory, the one the `NVM_DIR` environment variable names, by default `.nvm` in the home directory; each version holds `bin/node`
 - `volta`: `volta which node`
 - `mise`: `mise which node`, or `mise which uv`
 - `asdf`: `asdf which node`, or `asdf which uv`
-- `fnm`: `fnm exec --using=<v> -- which node`
+- `fnm`: `fnm exec --using=<v> -- node -p process.execPath`
 
-Every later command means every one: the method app's initializer and `make serve`, the ecosystem's initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
+Every later command means every one: the method app's initializer and `npm run serve`, the ecosystem's initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
 
 Verify the runtime answers under that prefix, `node --version` or `uv --version`, **before** anything is created, so that a machine you cannot actually reach stops while nothing exists yet. Discovering it later means the pristine commit has already been spent.
 

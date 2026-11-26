@@ -1,10 +1,11 @@
 """Pin the pipelex-scaffold skill: two branches, no templates of its own, one commit, and a key that never crosses the conversation.
 
-The method app is the template family's own two commands, its initializer and `make serve`, whose programs
-and tests live in `pipelex-sdk`'s `method-apps/`. The initializer branch's two scripts are executed in
-`test_pipelex_scaffold_scripts.py`. What this module executes is what the skill still carries of the method
-app: the git reading and the `make create` run of `references/uncreated-copy.md`, for a copy of the template
-the initializer did not finish.
+The method app is the template family's own two commands, its initializer and `npm run serve`, whose programs
+and tests live in `pipelex-sdk`'s `method-apps/`, and which run with no `make` on every OS. The initializer
+branch's two scripts are executed in `test_pipelex_scaffold_scripts.py`, and the two scripts
+`references/uncreated-copy.md` runs, for a copy of the template the initializer did not finish, in
+`test_pipelex_scaffold_copy_scripts.py`. What this module executes is the report's plane test, a `node`
+one-liner, in every shell the machine has.
 """
 
 from __future__ import annotations
@@ -30,20 +31,27 @@ BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
 # The method app's two commands, each the whole of its block, and the uncreated copy's two blocks, each
 # named by a string that occurs in exactly one of them.
 CREATE_COMMAND = "npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --quiet"
-SERVE_COMMAND = "make -C '<dir>' serve"
-CREATE_MARKER = "create METHOD='<method>'"
-OWN_REPOSITORY_MARKER = "rev-parse --show-prefix"
-INITIALIZER_COPY_MARKER = "rev-parse --show-cdup"
+SERVE_COMMAND = "npm --prefix '<dir>' run serve"
+# The uncreated copy's three blocks: the git reading, the pristine commit and the gesture's run.
+READ_COPY_GIT_COMMAND = "node \"<skill-dir>/scripts/read-copy-git.mjs\" '<dir>'"
+RUN_CREATE_COMMAND = "node \"<skill-dir>/scripts/run-create.mjs\" '<dir>' '<method>'"
 # The pristine commit's subject, as `pipelex-sdk`'s initializer writes it (`method-apps/initializers/js/lib/git.mjs`,
 # `pristineMessage`), and as it wrote it from `pipelex-method-apps` before the move, which a copy made then keeps.
 PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-sdk/method-apps/webapp-js "
 PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE = "Start from Pipelex/pipelex-method-apps/webapp-js "
-PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- . && git -C <dir> commit -m "Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>" -- .'
+PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- .\ngit -C <dir> commit -m "Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>" -- .'
 TARGETS = ("prod", "codex", "mistral-vibe")
-# The method app's report reads the plane of the `.env.local` `make create` wrote with this test.
-PLANE_TEST = 'u=${PIPELEX_BASE_URL:-https://api.pipelex.com}; [ "${u%/}" = https://api.pipelex.com ] && echo production || echo other'
+# The method app's report reads the plane of the `.env.local` `npm run create` wrote with this test, a `node`
+# one-liner every shell runs, since a POSIX `${VAR:-…}` test is no PowerShell command.
+PLANE_TEST = (
+    "node -p \"['','https://api.pipelex.com','https://api.pipelex.com/'].includes(process.env.PIPELEX_BASE_URL ?? '') ? 'production' : 'other'\""
+)
+# Every `make` the template has is also an npm script, and the npm script is the one every OS runs, Windows
+# without `make` included. The one `make` a shipped file still names is the guard's `make dev`, a way of
+# starting the server the skill forbids.
+MAKE_COMMANDS_GONE = ("make create", "make serve", "make stop", "make all", "make add-method", "make -C")
 
-# What the family's initializer and `make serve` print, as `pipelex-sdk` documents them
+# What the family's initializer and `npm run serve` print, as `pipelex-sdk` documents them
 # (`method-apps/initializers/js/README.md`, `method-apps/webapp-js/scripts/lib/serve.mts`). The skill keys its stop table on
 # these words; a verdict the family adds or renames is re-read here and in the table together.
 INITIALIZER_VERDICTS_WITH_A_ROW = (
@@ -58,24 +66,40 @@ INITIALIZER_VERDICTS_WITH_A_ROW = (
 )
 SERVE_VERDICTS = ('`serving <url> — "<title>"`', "`already-serving`", "`refused: not-loopback`")
 
-NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="the uncreated copy's git reading is git")
-
 
 def _bash_blocks(text: str) -> list[str]:
     return [match.group(1) for match in BASH_BLOCK.finditer(text)]
 
 
 def _shells() -> list[list[str]]:
-    """Every POSIX shell on this machine an agent's harness might run the command in.
+    """Every shell on this machine an agent's harness might run a command in, with the arguments that make it run one line.
 
-    `zsh` runs with `-f` so that no `.zshenv` of the machine's can export a real credential into it.
+    On macOS and Linux they are bash, sh and zsh, the last with `-f` so that no `.zshenv` of the machine's can
+    export a real credential into it, and PowerShell when it is installed; on Windows they are Windows
+    PowerShell 5.1, PowerShell 7 when installed, and cmd.
     """
+    if os.name == "nt":
+        candidates = [
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command"],
+            ["pwsh", "-NoProfile", "-NonInteractive", "-Command"],
+            ["cmd", "/d", "/s", "/c"],
+        ]
+    else:
+        candidates = [["bash", "-c"], ["sh", "-c"], ["zsh", "-f", "-c"], ["pwsh", "-NoProfile", "-NonInteractive", "-Command"]]
     shells: list[list[str]] = []
-    for name, flags in (("bash", []), ("sh", []), ("zsh", ["-f"])):
-        executable = shutil.which(name)
+    for candidate in candidates:
+        executable = shutil.which(candidate[0])
         if executable is not None:
-            shells.append([executable, *flags])
+            shells.append([executable, *candidate[1:]])
     return shells
+
+
+def _run_in(shell: list[str], command: str, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    """`command` run by `shell` as typed. cmd reads its own command line, so it gets the line whole, not a list
+    quoted by the C runtime's rules."""
+    if Path(shell[0]).stem.lower() == "cmd":
+        return subprocess.run(f'"{shell[0]}" /d /s /c "{command}"', capture_output=True, text=True, check=True, env=environment)
+    return subprocess.run([*shell, command], capture_output=True, text=True, check=True, env=environment)
 
 
 def _render_skill(target_name: str) -> str:
@@ -89,13 +113,6 @@ def _render_skill(target_name: str) -> str:
         target_name=config.name,
     )
     return next(content for path, content in rendered.items() if path.match("skills/pipelex-scaffold/SKILL.md"))
-
-
-def _git_commit(repository: Path, message: str) -> None:
-    subprocess.run(
-        ["git", "-C", str(repository), "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", message],
-        check=True,
-    )
 
 
 def _recipe(text: str, marker: str) -> str:
@@ -125,6 +142,8 @@ class TestPipelexScaffoldSkill:
     TEMPLATE = SKILL_TEMPLATE
     REFERENCES = ("initializers.md", "version-managers.md", "github.md", "uncreated-copy.md")
     SCRIPTS = ("commit-pristine.mjs", "write-env-file.mjs")
+    # The scripts `references/uncreated-copy.md` runs, named by path there rather than in the skill.
+    REFERENCE_SCRIPTS = ("read-copy-git.mjs", "run-create.mjs")
     SCRIPTS_DIR = REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts"
     RULES = (
         "exactly two branches and carries no templates of its own",
@@ -301,8 +320,8 @@ class TestPipelexScaffoldSkill:
             ) in body
             assert "`ignored:`" not in body
             # The method app's report still reads the plane by a test, never an echo, and only of the file
-            # `make create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
-            assert f"the plane of the `.env.local` `make create` wrote, `{PLANE_TEST}`" in body
+            # `npm run create` wrote: one the user wrote is `uncreated-copy.md`'s to report.
+            assert f"the plane of the `.env.local` `npm run create` wrote, `{PLANE_TEST}`" in body
             # The env file's own command left the skill: the script is the only thing that writes it.
             assert ">> <dir>/.env" not in body
             assert "cp -n" not in body
@@ -343,19 +362,22 @@ class TestPipelexScaffoldSkill:
         assert "The script never copies the key the shell exports, whatever key that is, so never offer to copy it there either" in initializers
         assert "warn that a key from `app.pipelex.com` is production's and will be refused there" in initializers
 
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
+    @pytest.mark.cross_os
+    @pytest.mark.skipif(shutil.which("node") is None, reason="the plane test is a node one-liner")
+    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).stem)
     @pytest.mark.parametrize(
         ("base_url", "plane"),
         [(None, "production"), ("https://api.pipelex.com/", "production"), ("https://api-dev.pipelex.com", "other")],
         ids=["unset", "production-with-a-slash", "another-plane"],
     )
     def test_the_plane_test_reads_an_unset_base_url_as_production(self, shell: list[str], base_url: str | None, plane: str) -> None:
-        """`make create` writes production's URL when the shell exports none, so the test must say so too."""
+        """`npm run create` writes production's URL when the shell exports none, so the test must say so too, in
+        every shell: the same line runs in bash, zsh and sh, PowerShell 5.1 and 7, and cmd."""
         environment = {key: value for key, value in os.environ.items() if key != "PIPELEX_BASE_URL"}
         if base_url is not None:
             environment["PIPELEX_BASE_URL"] = base_url
-        result = subprocess.run([*shell, "-c", PLANE_TEST], capture_output=True, text=True, check=True, env=environment)
-        assert result.stdout == f"{plane}\n"
+        result = _run_in(shell, PLANE_TEST, environment)
+        assert result.stdout.strip() == plane
 
     def test_the_interpreter_check_needs_uv_only_where_uv_runs(self) -> None:
         """A poetry, pdm or hatch project on a machine with no uv is not stopped for lacking one."""
@@ -405,7 +427,10 @@ class TestPipelexScaffoldSkill:
         # invisible to the harness that spawns the workshop.
         assert "`mise which uv`" in managers and "`asdf which uv`" in managers
         assert "a `node` reached only through a `PATH` prefix means no workshop at all, whichever manager supplied it" in managers
-        assert "`make dev`" not in managers and "the method app's initializer and `make serve`" in managers
+        assert "`make dev`" not in managers and "the method app's initializer and `npm run serve`" in managers
+        # The `PATH` is set for one command in the form the shell gives, never as a POSIX prefix spelled out.
+        assert 'PATH="' not in managers and "$NVM_DIR" not in managers
+        assert "`fnm exec --using=<v> -- node -p process.execPath`" in managers
         github = (REFERENCES_DIR / "github.md").read_text(encoding="utf-8")
         assert github.split("\n\n")[1].startswith("Read this when ")
         assert "**state the exact command and confirm before running it**" in github
@@ -423,18 +448,20 @@ class TestPipelexScaffoldSkill:
         assert "never follow `gh`'s hint to `git init` the directory" in github
         assert "npm create next-app@latest <dir> -- --ts --app --src-dir --eslint --use-npm --yes" in initializers
         assert "No SDK dependency" in initializers
-        # Every `uv add` runs inside the new project: from the parent it writes to the user's own.
-        assert "**Every `uv add` above runs inside `<dir>`, and the parentheses are why.**" in initializers
+        # Every `uv add` runs inside the new project: from the parent it writes to the user's own. `--directory`
+        # scopes it in one command, which every shell runs, where a `(cd … && …)` subshell is POSIX alone.
+        assert "**Every `uv add` above runs inside `<dir>`, and `--directory <dir>` is why.**" in initializers
         for recipe in (
-            '(cd <dir> && uv add "fastapi[standard]")',
-            "(cd <dir> && uv add typer)",
-            "(cd <dir> && uv add django && uv run django-admin startproject config .)",
+            '`uv add --directory <dir> "fastapi[standard]"`',
+            "`uv add --directory <dir> typer`",
+            "`uv add --directory <dir> django`, then `uv run --directory <dir> django-admin startproject config .`",
         ):
             assert recipe in initializers, f"uv add not scoped to the project: {recipe}"
+        assert "(cd " not in initializers and "&&" not in initializers
         # Every `uv init` carries --no-workspace. Without it, run inside a directory that already
         # holds a pyproject.toml, uv appends a [tool.uv.workspace] table to the USER'S file and puts
         # the lock at the parent root, so the new project does not resolve standalone. Same hazard
-        # class as the `uv add` parentheses above, one command earlier.
+        # class as the `uv add --directory` above, one command earlier.
         assert "uv init --package --no-workspace <dir>" in initializers
         assert "uv init --app --no-workspace <dir>" in initializers
         # `pdm init` runs `git init` even inside another repository's work tree (PDM 2.29.2), which would
@@ -449,9 +476,16 @@ class TestPipelexScaffoldSkill:
         assert "`--no-workspace` is on every `uv init` above" in initializers
         # npm resolves the project it writes to upward exactly as uv does, and unlike uv it finds the
         # parent and silently succeeds, so every follow-on install is scoped too.
-        for recipe in ("(cd <dir> && npm install)", "(cd <dir> && npm install express && npm install --save-dev @types/express)"):
+        for recipe in (
+            "`npm install --prefix <dir>`",
+            "`npm install --prefix <dir> express`, then `npm install --prefix <dir> --save-dev @types/express`",
+        ):
             assert recipe in initializers, f"npm install not scoped to the project: {recipe}"
-        assert "**Every follow-on `npm install` above is parenthesised" in initializers
+        assert "**Every follow-on `npm install` above takes `--prefix <dir>`" in initializers
+        # `npm init` and `tsc --init` write where they run, whatever `--prefix` says, so the minimal recipe runs
+        # each of its commands from inside `<dir>`, never chained after a `cd`.
+        assert "each command on its own and run from inside `<dir>`: `npm init -y`," in initializers
+        assert "(`npm init` and `tsc --init` write where they run, whatever `--prefix` says)" in initializers
         # The minimal TS default meets the emitter defect, and a bundler resolution only moves it from the
         # type check to runtime when `tsc`'s ES module output runs under plain Node, as
         # `pipelex-integrate`'s TypeScript reference says. The CommonJS emit is the minimal shape it
@@ -479,11 +513,14 @@ class TestPipelexScaffoldSkill:
         assert "mcp__" not in body
         for rule in self.RULES:
             assert rule in body, f"{target_name}: missing rule: {rule}"
+        # A session is started inside the project in two commands, since Windows PowerShell 5.1 chains none.
+        assert "`cd <dir>`, then " in body
+        assert "`cd <dir> && " not in body
         if target_name == "prod":
-            assert "`cd <dir> && claude`" in body
+            assert "`cd <dir>`, then `claude` there" in body
             assert "`/pipelex-integrate` with the method" in body
         else:
-            assert "`cd <dir> && claude`" not in body
+            assert "`claude`" not in body
             assert "`../pipelex-integrate/SKILL.md` with the method" in body
 
         skill_dir = resolve_output_dir(REPO_ROOT, config.source) / "skills" / "pipelex-scaffold"
@@ -493,6 +530,13 @@ class TestPipelexScaffoldSkill:
         for script in self.SCRIPTS:
             assert (skill_dir / "scripts" / script).is_file(), f"{target_name}: missing scripts/{script}"
             assert f'/scripts/{script}"' in body, f"{target_name}: the skill does not run scripts/{script} by path"
+        uncreated_copy = (skill_dir / "references" / "uncreated-copy.md").read_text(encoding="utf-8")
+        for script in self.REFERENCE_SCRIPTS:
+            assert (skill_dir / "scripts" / script).is_file(), f"{target_name}: missing scripts/{script}"
+            assert f'node "<skill-dir>/scripts/{script}"' in uncreated_copy, f"{target_name}: the reference does not run scripts/{script} by path"
+        assert sorted(path.name for path in (skill_dir / "scripts").iterdir()) == sorted(self.SCRIPTS + self.REFERENCE_SCRIPTS), (
+            f"{target_name}: a stale script"
+        )
         if target_name != "prod":
             # Codex and Vibe substitute nothing, so the placeholder is defined before its first use.
             assert body.index("`<skill-dir>` stands for the directory holding this `SKILL.md`") < body.index("<skill-dir>/scripts/")
@@ -512,13 +556,13 @@ class TestPipelexScaffoldSkill:
                 f"{target_name}: references/{reference} is stale — run `make build`"
             )
         scripts = installed.parent / "scripts"
-        for script in self.SCRIPTS:
+        for script in self.SCRIPTS + self.REFERENCE_SCRIPTS:
             assert (scripts / script).read_bytes() == (self.SCRIPTS_DIR / script).read_bytes(), f"{target_name}: scripts/{script} is stale"
             assert os.access(scripts / script, os.X_OK), f"{target_name}: scripts/{script} lost its executable bit"
 
 
 class TestMethodAppBranch:
-    """The TypeScript branch is the method app: the family's initializer, then its serve target.
+    """The TypeScript branch is the method app: the family's initializer, then its serve script.
 
     Ratified on 2026-09-16 with the method-app template, and amended at the size diet's ratification on
     2026-09-23 (box E of the size diet's design, L-260923-a9bdfe): a program that belongs to a template lives in
@@ -529,7 +573,10 @@ class TestMethodAppBranch:
     """
 
     def test_the_method_app_is_the_family_s_two_commands(self) -> None:
+        """Ruled 2026-11-26 for Windows (L-261126-54e9af): the copy is created and served through its npm scripts
+        on every OS, since a Windows machine has no `make`, and with no per-OS branch."""
         for body in _bodies():
+            assert "runs the copy's own `npm run create` with the method; the copy's `npm run serve` then starts the app" in body
             assert _recipe(body, "@pipelex/method-app").strip() == CREATE_COMMAND
             assert _recipe(body, SERVE_COMMAND).strip() == SERVE_COMMAND
             assert "Both are the family's commands, and nothing they do is reimplemented here." in body
@@ -553,11 +600,15 @@ class TestMethodAppBranch:
                 "curl -sS",
             ):
                 assert gone not in text, f"the skill still carries {gone!r}"
+            # The template's npm scripts replaced its make targets in every command the skill gives (L-261126-54e9af).
+            for gone in MAKE_COMMANDS_GONE:
+                assert gone not in text, f"the skill still runs {gone!r}, which a Windows machine has no make for"
+            assert re.findall(r"`make [^`]*`", text) in ([], ["`make dev`"]), "a make command beyond the guard's `make dev`"
 
     def test_the_verdict_is_read_from_its_line_never_from_the_exit_code(self) -> None:
         """The registry proof of `L-260922-12f302`: under `npm create`, a run that exits 1 is followed by
         npm's own `npm error` lines, so the verdict is the last line opening with a verdict word rather than
-        the last line printed. `make serve`'s is the last line make itself did not print."""
+        the last line printed, and so is `npm run serve`'s."""
         for body in _bodies():
             assert (
                 "**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it"
@@ -565,7 +616,11 @@ class TestMethodAppBranch:
             )
             assert "with no such line, npm itself failed, and you relay its error" in body
             assert "Branch on the verdict's first word, never on the exit code." in body
-            assert "Its verdict is its last line not opening with `make`" in body
+            # `npm run serve` exits 1 on a refusal, which npm follows with its own `npm error` lines.
+            assert (
+                'Its verdict is the last line opening with `serving <url> — "<title>"`, `already-serving`, `refused:` or `failed:`. '
+                "**Never report a URL that did not answer**"
+            ) in body
 
     def test_a_command_whose_verdict_decides_the_next_step_runs_in_the_foreground(self) -> None:
         """A headless session ends with its turn and kills what it backgrounded, which left a half-made copy
@@ -573,7 +628,7 @@ class TestMethodAppBranch:
         for body in _bodies():
             assert "**Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step." in body
         reference = UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8")
-        assert "**Run the block in the foreground with a long timeout**, never in the background" in reference
+        assert "**Run the script in the foreground with a long timeout**, never in the background" in reference
 
     def test_the_stop_table_keys_on_the_family_s_verdicts(self) -> None:
         for body in _bodies():
@@ -581,8 +636,8 @@ class TestMethodAppBranch:
             for verdict in INITIALIZER_VERDICTS_WITH_A_ROW:
                 assert verdict in table, f"the stop table has no row for {verdict}"
             assert "| any other `refused:`, `failed: write` or `failed: commit` |" in table
-            assert "| any other `make serve` verdict |" in table
-            # A server the user started from the copy is left running by `make serve`, and its verdict says so.
+            assert "| any other `npm run serve` verdict |" in table
+            # A server the user started from the copy is left running by `npm run serve`, and its verdict says so.
             assert "when it says the server was stopped, read `<dir>/.serve/server.log`'s tail" in table
             assert "one still running is the user's to stop" in table
             # `copied` is what --dry-run and --no-create print, and it leads to the uncreated copy.
@@ -592,8 +647,9 @@ class TestMethodAppBranch:
 
     def test_the_key_reaches_the_gesture_without_crossing_the_conversation(self) -> None:
         for body in _bodies():
-            assert "`make create` reads it there, and **the user writes their own key into either file, never you**" in body
-            # Neither `make create` nor `write-env-file.mjs` copies the shell's key into a file, so the skill
+            assert "`npm run create` reads it there, and **the user writes their own key into either file, never you**" in body
+            assert "Never list the environment, never echo a key" in body
+            # Neither `npm run create` nor `write-env-file.mjs` copies the shell's key into a file, so the skill
             # never says a script moves one, and never reports a key as `filled`.
             assert "the method app's `.env.local` hold" not in body
             assert "`write-env-file.mjs` moves it" not in body
@@ -609,17 +665,18 @@ class TestMethodAppBranch:
 
     def test_the_method_app_ends_with_the_page_answering_and_the_url_first(self) -> None:
         for body in _bodies():
-            assert "**Never report a URL that did not answer**: only those two verdicts give one." in body
-            # The Server Actions spend the key for whoever calls them: `make serve` binds loopback and
-            # refuses a copy that cannot, and the skill starts the server no other way.
+            assert "**Never report a URL that did not answer**: only the first two give one." in body
+            # The Server Actions spend the key for whoever calls them: `npm run serve` binds loopback and
+            # refuses a copy that cannot, and the skill starts the server no other way, `make dev` included.
+            assert _recipe(body, SERVE_COMMAND).strip() == SERVE_COMMAND
             assert "**Never start the server any other way** (`make dev`, `npm run dev`, an `APP_HOST`)" in body
-            assert "| `make serve` says `refused: not-loopback` | report no URL" in body
+            assert "| `npm run serve` says `refused: not-loopback` | report no URL" in body
             assert "Nothing is run through the method." in body
             assert "**On the method app, the URL comes first**" in body
             assert "how the verdict says to stop it" in body
             # The running app took the key from the shell that started it; a restart from another shell
             # reads `.env.local`, where the user's own key goes.
-            assert "the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `make serve`" in body
+            assert "the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve`" in body
             assert "`make serve` inside the project restarts it" not in body
             # The warnings are relayed, the LICENSE holder first.
             assert "first that `LICENSE` still names the template's holder when it does" in body
@@ -655,11 +712,11 @@ class TestMethodAppBranch:
 
 
 class TestUncreatedCopyReference:
-    """`references/uncreated-copy.md`: a copy of the method app that `make create` has not run in.
+    """`references/uncreated-copy.md`: a copy of the method app that `npm run create` has not run in.
 
     The initializer leaves one after `--dry-run`, `--no-create` or a `failed: create`, and a user may stand
-    in one made by hand. The reference runs the copy's own `make create` directly, and reads git first for a
-    copy the initializer did not make. Its two blocks are extracted and executed below.
+    in one made by hand. The reference reads git with `scripts/read-copy-git.mjs` and runs the copy's own
+    `npm run create` with `scripts/run-create.mjs`, both executed in `test_pipelex_scaffold_copy_scripts.py`.
     """
 
     @property
@@ -671,370 +728,90 @@ class TestUncreatedCopyReference:
         assert entry.startswith("Read this when ")
         for condition in ("`copied` (after `--dry-run` or `--no-create`)", "`failed: create`", "the user stands in one"):
             assert condition in entry, condition
-        assert "`/pipelex-scaffold` then goes on at branch A's step 2, `make serve`" in self.reference
+        assert "`/pipelex-scaffold` then goes on at branch A's step 2, `npm run serve`" in self.reference
         # A Codex session served a copy whose `make all` was red in the phase 5b smoke sessions.
-        assert "**Never run `make serve` on a copy whose `make create` failed**" in entry
-        assert "and `make serve` waits until it is fixed. On `0`, go on to `make serve`." in self.reference
+        assert "**Never run `npm run serve` on a copy whose `npm run create` failed**" in entry
+        assert "and `npm run serve` waits until it is fixed. On `0`, go on to `npm run serve`." in self.reference
 
-    def test_a_copy_the_initializer_committed_goes_straight_to_create(self) -> None:
-        """A user standing in a copy seldom says who made it, so its history is read before the git reading a
-        hand-made copy gets, and a copy already committed is not read as one that needs a repository."""
+    def test_every_command_is_one_a_shell_runs_alone(self) -> None:
+        """Windows PowerShell 5.1 chains no command with `&&` or `||`, so each block gives one command a line,
+        and every program the reference used to spell in shell is a script run by path (L-261126-54e9af)."""
         reference = self.reference
-        block = _recipe(reference, INITIALIZER_COPY_MARKER)
-        pattern = re.search(r"grep -m1 -E '([^']+)'", block)
-        assert pattern is not None, "the block reads the history with one grep -E pattern"
-        subject = re.compile(pattern.group(1))
-        # Both subjects are recognized, the one written since the template moved into `pipelex-sdk` and the
-        # one a copy made before keeps; a sibling repository's name is not.
-        for prefix in (PRISTINE_SUBJECT_PREFIX, PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE):
-            assert subject.match(f"2598d4e {prefix}0.4.0 (2598d4e)"), prefix
-        assert not subject.match("2598d4e Start from Pipelex/pipelex-sdk-js/webapp-js 0.4.0")
-        assert reference.index(INITIALIZER_COPY_MARKER) < reference.index(OWN_REPOSITORY_MARKER)
-        # The commit this file makes by hand carries the new subject, which the block recognizes.
-        hand_made = PRISTINE_COPY_COMMIT.split('"')[1]
-        assert hand_made.startswith(PRISTINE_SUBJECT_PREFIX)
-        assert subject.match(f"2598d4e {hand_made}")
+        assert _recipe(reference, "read-copy-git.mjs").strip() == READ_COPY_GIT_COMMAND
+        assert _recipe(reference, "run-create.mjs").strip() == RUN_CREATE_COMMAND
+        assert "`<skill-dir>` is the directory holding the skill's `SKILL.md`, the parent of the directory holding this file" in reference
+        assert "Run them, never their steps by hand" in reference
+        for gone in ("&&", "||", "2>/dev/null", "mktemp", "grep", "rm -rf", "pwd -P", "TMPDIR", "LICENSE_HOLDER="):
+            assert gone not in reference, f"the reference still carries {gone!r}"
+        # The bootstrap's directory is removed by Node, the same in every shell.
+        assert "`node -e \"fs.rmSync(process.argv[1], { recursive: true })\" '<dir>/.claude/skills/bootstrap'`" in reference
+
+    def test_the_git_reading_names_every_verdict_of_its_script(self) -> None:
+        """The reference keys on the script's verdict words, so each one the script's header lists has a reading."""
+        reference = self.reference
+        header = (REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts" / "read-copy-git.mjs").read_text(encoding="utf-8").split("\nimport ", 1)[0]
+        for verdict in ("pristine:", "no-commit:", "history:", "inside:"):
+            assert f"//   {verdict}" in header, verdict
+            assert f"**`{verdict}" in reference, f"the reference has no reading of {verdict}"
+        for refusal in ("template-checkout", "tracked <root>", "usage", "no-directory", "no-git", "init-failed"):
+            assert refusal in header, refusal
+            assert refusal in reference, f"the reference has no reading of {refusal}"
+        # The history is read first, since the user seldom says who made the copy, and git before anything is initialized.
+        assert "Read git before anything else, since the user seldom says who made the copy, and before initializing anything" in reference
 
     def test_a_cause_the_sandbox_imposes_is_handed_to_the_user(self) -> None:
-        """Codex's `workspace-write` sandbox denies `ps`, which the template's tests and `make serve` need,
+        """Codex's `workspace-write` sandbox denies `ps`, which the template's tests and `npm run serve` need,
         and no edit in the copy lifts it (`L-260923-e82e4a`)."""
         reference = self.reference
         assert "**A cause the harness's own sandbox imposes is the user's to lift, never yours to work around**" in reference
-        assert "A red `make all` is fixed, never handed off, but for the one cause below." in reference
+        assert "a denied `ps`, which the template's tests and `npm run serve` both need" in reference
+        assert "A red `npm run all` is fixed, never handed off, but for the one cause below." in reference
 
     def test_the_create_gesture_is_driven_and_never_reimplemented(self) -> None:
         reference = self.reference
-        create = _recipe(reference, CREATE_MARKER)
-        assert "make -C <dir> create METHOD='<method>'" in create
-        assert "**given as an absolute path**" in reference
-        assert "None of `make create`'s work is reimplemented here" in reference
+        assert "None of `npm run create`'s work is reimplemented here" in reference
         assert "never by editing `src/generated/`" in reference
         assert "It commits nothing." in reference
-        # The warnings are read off the whole log and relayed, the LICENSE holder first.
-        # Byte order, so that no locale's collation merges two warnings that differ only in punctuation.
-        assert "grep -E '^(warning: |! )' \"$log\" | LC_ALL=C sort -u" in create
+        # A bundle is read from where the user stood, as the initializer reads it, so no path is rewritten.
+        assert "is read from the directory the script runs in, which is where the user stood" in reference
         assert "**The gesture's warnings are read from the whole log, not from its tail.**" in reference
-        assert "`LICENSE_HOLDER='…'`" in reference
+        assert "`--license-holder '…'`" in reference
         # A refusal in the read-only half can run again; a failure after the scaffold cannot.
         assert "changed no tracked file, so it can run again" in reference
-        assert "cannot be undone by running `make create` again" in reference
+        assert "cannot be undone by running `npm run create` again" in reference
         # The key reaches the gesture from the shell or a file the user wrote, and is never read back.
-        assert "`make create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back" in reference
+        assert "`npm run create` reads that file and never touches an `.env.local` that already exists. Nothing reads it back" in reference
         # A kept `.env.local` already holds the user's key, so the report does not send them to put it there.
         assert "the report says it was kept, in place of telling the user where their key goes" in reference
         assert "or from an env file already in the project, `.env.local` or `.env`, and refuses without one" in reference
         assert "so the log's tail is safe to read, and no env file is." in reference
-        assert "the `.env.local` it wrote is not" not in reference
         # The report's plane rule falls back to production, which a file the user wrote may contradict.
         assert "names its plane only from a `PIPELEX_BASE_URL` the shell exports, never production by default" in reference
+        # The gesture's run decides the next step, so it runs in the foreground.
+        assert "**Run the script in the foreground with a long timeout**, never in the background" in reference
 
     def test_the_fresh_copy_is_recognized_before_git_is_initialized_in_it(self) -> None:
         """The method app's own checkout sits inside the family repository.
 
         Initializing first would hide the family's `origin` behind a new, remote-less repository and
-        let `make create` rewrite the template's tracked files.
+        let `npm run create` rewrite the template's tracked files.
         """
         reference = self.reference
-        assert "Read git before initializing anything." in reference
         assert "**A directory another repository already tracks is not a fresh copy**" in reference
-        block = _recipe(reference, OWN_REPOSITORY_MARKER)
-        # The origin is read, and a tracked directory refused, before any repository is made.
-        assert block.index("remote get-url origin") < block.index("init -b main")
-        # Read as the initializer's `TEMPLATE_ORIGINS` reads it: in any letter case, with or without `.git` or a
-        # trailing slash, and naming the repository exactly.
-        assert "remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]'); origin=${origin%/}; origin=${origin%.git}" in block
-        assert "*[/:]pipelex/pipelex-sdk|*[/:]pipelex/pipelex-method-apps)" in block
-        # Only a copy outside every repository, or one the enclosing repository ignores, gets one: the family
-        # plants no repository where another repository sees it.
-        assert block.count("init -b main") == 2
-        assert "outside) git -C <dir> init -b main ;;" in block
-        assert 'check-ignore -q -- "./${real##*/}"; then git -C <dir> init -b main' in block
         assert (
             "**A copy that sits untracked inside another repository's work tree that does not ignore it gets no repository and no commit**"
             in reference
         )
-        # The first commit is looked for only once the copy is its own repository.
-        assert reference.index(OWN_REPOSITORY_MARKER) < reference.index("git -C <dir> rev-parse -q --verify HEAD")
+        # The pristine commit is made only once the script said the copy is its own repository with no commit.
+        assert reference.index(READ_COPY_GIT_COMMAND) < reference.index("On `no-commit:`, make the pristine commit")
 
     def test_the_copy_s_pristine_commit_cannot_reach_an_enclosing_repository(self) -> None:
         """`git -C <dir>` sets git's working directory and scopes nothing, and a bare `git commit`
-        commits the whole index, so the copy's commit carries the pathspec on both commands."""
+        commits the whole index, so the copy's commit carries the pathspec on both commands, which run
+        one after the other since Windows PowerShell 5.1 has no `&&`."""
         reference = self.reference
         assert reference.count("git -C <dir> add -A -- .") == 1
-        assert PRISTINE_COPY_COMMIT in reference
-        assert "git -C <dir> add -A &&" not in reference
-
-
-@NEEDS_GIT
-class TestUncreatedCopyRecipes:
-    """The uncreated copy's blocks, extracted from the reference and executed in every POSIX shell on the
-    machine: they are commands an agent types, and a harness may run them in any of those shells."""
-
-    @staticmethod
-    def _git(repository: Path, *arguments: str) -> str:
-        return subprocess.run(["git", "-C", str(repository), *arguments], capture_output=True, text=True, check=True).stdout
-
-    @staticmethod
-    def _own_repository(*, dir_literal: str, shell: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-        block = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), OWN_REPOSITORY_MARKER).replace("<dir>", dir_literal)
-        assert "<dir>" not in block
-        return subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, cwd=str(cwd))
-
-    @staticmethod
-    def _initializer_copy(*, dir_literal: str, shell: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-        block = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), INITIALIZER_COPY_MARKER).replace("<dir>", dir_literal)
-        assert "<dir>" not in block
-        return subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, cwd=str(cwd))
-
-    @classmethod
-    def _committed_copy(cls, target: Path, *subjects: str) -> None:
-        target.mkdir(parents=True)
-        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "main"], check=True)
-        for number, subject in enumerate(subjects):
-            (target / f"file-{number}.txt").write_text(f"{number}\n", encoding="utf-8")
-            subprocess.run(["git", "-C", str(target), "add", "-A", "--", "."], check=True)
-            _git_commit(target, subject)
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize(
-        "subject",
-        [
-            f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)",
-            f"{PRISTINE_SUBJECT_PREFIX}0.4.0",
-            f"{PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE}0.4.0 (2598d4e)",
-            f"{PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE}0.4.0",
-        ],
-        ids=["the-initializer-s", "made-by-hand", "the-initializer-s-before-the-move", "made-by-hand-before-the-move"],
-    )
-    def test_a_copy_already_committed_prints_its_pristine_commit(self, tmp_path: Path, shell: list[str], subject: str) -> None:
-        target = tmp_path / "receipt review"
-        self._committed_copy(target, subject, "the user's own change")
-        pristine = self._git(target, "log", "--format=%h", "-1", "HEAD~1").strip()
-        result = self._initializer_copy(dir_literal="'receipt review'", shell=shell, cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert result.stdout.splitlines() == [f"{pristine} {subject}"]
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize("case", ["no-repository", "another-history", "inside-a-repository-that-holds-one"])
-    def test_any_other_copy_prints_nothing(self, tmp_path: Path, shell: list[str], case: str) -> None:
-        """A copy the block prints nothing for goes on to the git reading for a copy made by hand."""
-        target = tmp_path / "receipt-review"
-        if case == "no-repository":
-            target.mkdir()
-        elif case == "another-history":
-            self._committed_copy(target, "the user's copy")
-        else:
-            self._committed_copy(tmp_path / "monorepo", f"{PRISTINE_SUBJECT_PREFIX}0.4.0 (2598d4e)")
-            target = tmp_path / "monorepo" / "apps" / "receipt-review"
-            target.mkdir(parents=True)
-        result = self._initializer_copy(dir_literal=str(target), shell=shell, cwd=tmp_path)
-        assert result.stdout == ""
-        assert not (case == "no-repository" and (target / ".git").exists())
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    def test_a_copy_without_a_repository_gets_one(self, tmp_path: Path, shell: list[str]) -> None:
-        target = tmp_path / "receipt review"
-        target.mkdir()
-        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
-        result = self._own_repository(dir_literal="'receipt review'", shell=shell, cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert (target / ".git").is_dir()
-        assert self._git(target, "symbolic-ref", "--short", "HEAD").strip() == "main"
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    def test_a_copy_inside_another_repository_gets_none_of_its_own(self, tmp_path: Path, shell: list[str]) -> None:
-        """The initializer plants no repository inside another's work tree, so a later session that meets
-        its copy there, after `--no-create` or `failed: create`, plants none either."""
-        parent = tmp_path / "monorepo"
-        parent.mkdir()
-        subprocess.run(["git", "-C", str(parent), "init", "-q", "-b", "trunk"], check=True)
-        (parent / "README.md").write_text("theirs\n", encoding="utf-8")
-        subprocess.run(["git", "-C", str(parent), "add", "README.md"], check=True)
-        _git_commit(parent, "the user's own history")
-        history = self._git(parent, "log", "--format=%H")
-        target = parent / "apps" / "receipt-review"
-        target.mkdir(parents=True)
-        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
-        result = self._own_repository(dir_literal=str(target), shell=shell, cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert result.stdout == "inside another repository's work tree: no repository and no commit of its own\n"
-        assert not (target / ".git").exists()
-        assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(parent.resolve())
-        assert self._git(parent, "log", "--format=%H") == history
-        assert self._git(parent, "diff", "--cached", "--name-only") == ""
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize(("rule", "own_repository"), [("apps/\n", True), ("*\n!*/\n", False)], ids=["ignored", "every-file-ignored"])
-    def test_a_copy_the_enclosing_repository_ignores_gets_one_of_its_own(
-        self, tmp_path: Path, shell: list[str], rule: str, own_repository: bool
-    ) -> None:
-        """Ruled 2026-09-25: the initializer gives a copy under an ignored path a repository of its own, so a
-        later session gives one to a copy it finds there. What counts is the directory: one the enclosing
-        repository sees, though it ignores every file in it, gets none, since a repository there would show."""
-        parent = tmp_path / "monorepo"
-        parent.mkdir()
-        subprocess.run(["git", "-C", str(parent), "init", "-q", "-b", "trunk"], check=True)
-        (parent / "README.md").write_text("theirs\n", encoding="utf-8")
-        subprocess.run(["git", "-C", str(parent), "add", "README.md"], check=True)
-        _git_commit(parent, "the user's own history")
-        (parent / ".gitignore").write_text(rule, encoding="utf-8")
-        target = parent / "apps" / "receipt-review"
-        target.mkdir(parents=True)
-        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
-        result = self._own_repository(dir_literal=str(target), shell=shell, cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        if own_repository:
-            assert self._git(target, "rev-parse", "--show-toplevel").strip() == str(target.resolve())
-            assert self._git(target, "symbolic-ref", "--short", "HEAD").strip() == "main"
-        else:
-            assert result.stdout == "inside another repository's work tree: no repository and no commit of its own\n"
-            assert not (target / ".git").exists()
-        assert self._git(parent, "status", "--porcelain", "--untracked-files=all", "--", "apps") == ""
-
-    @staticmethod
-    def _repository_tracking_a_copy(root: Path, origin: str) -> Path:
-        """A repository with `origin` set that tracks a method-app copy in `webapp-js/`, as the family does."""
-        root.mkdir()
-        subprocess.run(["git", "-C", str(root), "init", "-q", "-b", "main"], check=True)
-        subprocess.run(["git", "-C", str(root), "remote", "add", "origin", origin], check=True)
-        copy = root / "webapp-js"
-        (copy / "scripts").mkdir(parents=True)
-        (copy / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
-        (copy / "scripts" / "create.mts").write_text("// the create gesture\n", encoding="utf-8")
-        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
-        _git_commit(root, "the family as it came")
-        return copy
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize(
-        "origin",
-        [
-            "https://github.com/Pipelex/pipelex-sdk.git",
-            "https://github.com/Pipelex/pipelex-sdk",
-            "git@github.com:Pipelex/pipelex-sdk.git",
-            "git@github.com:pipelex/pipelex-sdk.git/",
-            "https://github.com/Pipelex/pipelex-method-apps.git",
-            "git@github.com:Pipelex/pipelex-method-apps.git",
-        ],
-        ids=["https", "https-without-suffix", "ssh", "ssh-lowercase-with-slash", "https-before-the-move", "ssh-before-the-move"],
-    )
-    def test_the_template_s_own_checkout_is_refused_and_left_alone(self, tmp_path: Path, shell: list[str], origin: str) -> None:
-        family = tmp_path / "template-repository"
-        copy = self._repository_tracking_a_copy(family, origin)
-        result = self._own_repository(dir_literal=str(copy), shell=shell, cwd=tmp_path)
-        assert result.returncode != 0
-        assert "template's own checkout" in result.stderr
-        assert not (copy / ".git").exists()
-        assert self._git(family, "status", "--porcelain") == ""
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize(
-        "origin",
-        [
-            "https://github.com/someone/pipelex-method-apps.git",
-            "https://github.com/Pipelex/pipelex-sdk-js.git",
-            "https://github.com/Pipelex/pipelex-sdk.wiki.git",
-            "https://gitlab.com/Pipelex/pipelex-sdk/other.git",
-        ],
-        ids=["a-fork", "a-sibling-of-the-template-s-repository", "the-template-s-wiki", "a-repository-nested-under-its-name"],
-    )
-    def test_a_directory_another_repository_tracks_is_refused_whatever_its_origin(self, tmp_path: Path, shell: list[str], origin: str) -> None:
-        """A fork of the family under another owner carries no Pipelex origin, and is still not a fresh copy; a
-        repository whose name only begins like the template's is not the template, and is refused the same way."""
-        fork = tmp_path / "our-apps"
-        copy = self._repository_tracking_a_copy(fork, origin)
-        result = self._own_repository(dir_literal=str(copy), shell=shell, cwd=tmp_path)
-        assert result.returncode != 0
-        assert "already tracks this directory" in result.stderr
-        assert not (copy / ".git").exists()
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize("through_symlink", [False, True], ids=["direct", "through-a-symlink"])
-    def test_a_copy_that_is_its_own_repository_is_left_alone(self, tmp_path: Path, shell: list[str], through_symlink: bool) -> None:
-        real = tmp_path / "real"
-        real.mkdir()
-        target = real / "receipt-review"
-        target.mkdir()
-        subprocess.run(["git", "-C", str(target), "init", "-q", "-b", "trunk"], check=True)
-        (target / "package.json").write_text('{"name": "pipelex-method-webapp-js"}\n', encoding="utf-8")
-        subprocess.run(["git", "-C", str(target), "add", "package.json"], check=True)
-        _git_commit(target, "the user's copy")
-        before = (self._git(target, "log", "--format=%H"), self._git(target, "reflog"), self._git(target, "rev-parse", "--abbrev-ref", "HEAD"))
-        spelled = target
-        if through_symlink:
-            (tmp_path / "linked").symlink_to(real, target_is_directory=True)
-            spelled = tmp_path / "linked" / "receipt-review"
-        result = self._own_repository(dir_literal=str(spelled), shell=shell, cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert "Reinitialized" not in result.stdout + result.stderr
-        assert (
-            self._git(target, "log", "--format=%H"),
-            self._git(target, "reflog"),
-            self._git(target, "rev-parse", "--abbrev-ref", "HEAD"),
-        ) == before
-
-    @staticmethod
-    def _make_shim(directory: Path, body: str) -> Path:
-        directory.mkdir(exist_ok=True)
-        shim = directory / "make"
-        shim.write_text(f"#!/bin/sh\n{body}", encoding="utf-8")
-        shim.chmod(0o755)
-        return directory
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    @pytest.mark.parametrize("exit_code", [0, 3])
-    def test_the_create_block_runs_the_gesture_and_reports_its_exit(self, tmp_path: Path, shell: list[str], exit_code: int) -> None:
-        """The block reports the gesture's exit status in every shell, zsh included, where `status` is read-only."""
-        arguments_log = tmp_path / "make-arguments.log"
-        shim_bin = self._make_shim(tmp_path / "shim-bin", f'printf \'%s\\n\' "$@" > "{arguments_log}"\necho "the gesture ran"\nexit {exit_code}\n')
-        target = tmp_path / "receipt-review"
-        target.mkdir()
-        bundle = tmp_path / "my bundles" / "receipt_review"
-        recipe = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), CREATE_MARKER)
-        block = recipe.replace("<dir>", str(target)).replace("<method>", str(bundle))
-        environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}", "TMPDIR": str(tmp_path)}
-
-        result = subprocess.run([*shell, "-c", block], capture_output=True, text=True, check=False, env=environment)
-
-        assert result.returncode == 0, result.stderr
-        assert "the gesture ran" in result.stdout
-        assert f"make create exited {exit_code};" in result.stdout
-        # The path reaches make as one argument, space and all.
-        assert arguments_log.read_text(encoding="utf-8").splitlines() == ["-C", str(target), "create", f"METHOD={bundle}"]
-        assert result.stdout.splitlines()[-2:] == ["its warnings:", "none"]
-
-    @pytest.mark.parametrize("shell", _shells(), ids=lambda shell: Path(shell[0]).name)
-    def test_the_create_block_lists_each_warning_the_gesture_printed_once(self, tmp_path: Path, shell: list[str]) -> None:
-        """The gesture's warnings come before `make all`, whose output fills the tail, and the bootstrap's come
-        twice, from its dry run and then from its write. The block lists each one once, whatever stream it was on."""
-        scope_warning = "! a method_id is scoped to your key's organization, so `npm run codegen` on this slice needs a key of that same org."
-        license_warning = "warning: LICENSE copyright line left untouched — pass --license-holder to claim it."
-        before = tmp_path / "before.log"
-        before.write_text(
-            f"create: Receipt Review\n\n{scope_warning}\ncreate: checking the project values with the bootstrap (--dry-run)\n", encoding="utf-8"
-        )
-        warned = tmp_path / "warned.log"
-        warned.write_text(f"{license_warning}\n", encoding="utf-8")
-        after = tmp_path / "after.log"
-        after.write_text("".join(f"make all: step {step}\n" for step in range(60)) + "npm warn deprecated glob@7.2.3\n", encoding="utf-8")
-        shim_bin = self._make_shim(
-            tmp_path / "shim-bin",
-            f'cat "{before}"\ncat "{warned}" >&2\n'
-            'echo "create: 2/6 run the bootstrap with the values above"\n'
-            f'cat "{warned}" >&2\ncat "{after}"\nexit 0\n',
-        )
-        target = tmp_path / "receipt-review"
-        target.mkdir()
-        recipe = _recipe(UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8"), CREATE_MARKER)
-        block = recipe.replace("<dir>", str(target)).replace("<method>", "mt_receipt")
-        environment = {**os.environ, "PATH": f"{shim_bin}{os.pathsep}{os.environ['PATH']}", "TMPDIR": str(tmp_path)}
-
-        result = subprocess.run([*shell, "-c", block], capture_output=True, text=True, encoding="utf-8", check=False, env=environment)
-
-        assert result.returncode == 0, result.stderr
-        lines = result.stdout.splitlines()
-        listed = lines[lines.index("its warnings:") + 1 :]
-        assert listed == [scope_warning, license_warning]
-        # The tail alone would have shown neither.
-        assert scope_warning not in lines[: lines.index("its warnings:")]
-        assert license_warning not in lines[: lines.index("its warnings:")]
+        assert _recipe(reference, "git -C <dir> add -A -- .").strip() == PRISTINE_COPY_COMMIT
+        assert "the second only once the first succeeded" in reference
+        hand_made = PRISTINE_COPY_COMMIT.split('"')[1]
+        assert hand_made.startswith(PRISTINE_SUBJECT_PREFIX)
