@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Shipped scripts keep LF line endings on a Windows clone**: the repository now carries a `.gitattributes` that commits and checks out every text file with LF, and every script explicitly, whatever `core.autocrlf` the clone uses. Git for Windows installs with `core.autocrlf=true` and Claude Code installs the plugin with `git clone`, so a default Windows machine received the hook wrappers, the MCP launcher and the scaffold's scripts with CRLF, where bash stops on their first line, and the gates `pipelex-integrate` copies into a project arrived with CRLF too. `make check` now refuses a shipped script that `.gitattributes` does not pin to LF, or that holds CRLF.
+- **Shipped scripts keep LF line endings on a Windows clone**: the repository now carries a `.gitattributes` that commits and checks out every text file with LF, and every script explicitly, whatever `core.autocrlf` the clone uses. Git for Windows installs with `core.autocrlf=true` and Claude Code installs the plugin with `git clone`, so a default Windows machine received the hook wrappers, the MCP launcher and the scaffold's scripts with CRLF, where bash stops on their first line, and the gates `pipelex-integrate` copies into a project arrived with CRLF too. `make check` now refuses a shipped script that `.gitattributes` does not pin to LF, or that holds CRLF, and `make build` writes every generated file with LF on every OS. Git does not rewrite a file an update leaves unchanged, so on Windows remove the Pipelex marketplace and add it again to replace scripts an earlier clone received with CRLF.
 
 ### Removed
 

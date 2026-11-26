@@ -1079,7 +1079,7 @@ def write_files(files: Mapping[Path, str]) -> None:
     """Write what a build rendered (`BuildResult.files`) to disk, making the hook scripts executable."""
     for output_path, content in files.items():
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
+        output_path.write_text(content, encoding="utf-8", newline="\n")
         if output_path.name in EXECUTABLE_OUTPUTS:
             output_path.chmod(0o755)
 
@@ -1122,7 +1122,7 @@ def generate(base_dir: Path, target_name: str = "prod") -> int:
     if discovery_content is not None:
         discovery_dst = base_dir / CODEX_DISCOVERY_MARKETPLACE_DST
         discovery_dst.parent.mkdir(parents=True, exist_ok=True)
-        discovery_dst.write_text(discovery_content, encoding="utf-8")
+        discovery_dst.write_text(discovery_content, encoding="utf-8", newline="\n")
         rel = discovery_dst.relative_to(base_dir)
         print(f"  [codex-discovery] Synced {rel}")
 
