@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The install page covers Claude Code on Windows**: a new section says what Windows needs, Node.js 24.14.1 or later from its official installer, Claude Code 2.1.139 or later and git, and that Git Bash is not required; gives the PowerShell steps for the marketplace and for a clone; shows what a working install looks like, the plugin's server connected in `claude mcp list` and the hook blocking a lint error; and covers the Claude desktop app and WSL. Codex and Mistral Vibe on Windows are not covered yet. The page now also states the Node.js floor for every agent, 24.14.1, the version the Pipelex tools declare.
+
 ### Changed
 
 - **The skills' commands run in PowerShell as in bash**: every command the skills give now runs in bash, zsh, PowerShell 7 and Windows PowerShell 5.1 alike. `pipelex-integrate` copies its offline gate with `node "<skill dir>/scripts/copy-gate.mjs" <gate>` instead of `mkdir -p` and `cp`, and that script now refuses to replace a `scripts/` file of the same name that is the project's own until you agree; `pipelex-inputs` makes its temporary directories with Node instead of `mktemp -d`; the search for a method's linked directory and for the generated trees a change may have outdated is the agent's own rather than a `grep`; `pipelex-integrate` and `pipelex-organize` resolve a path with Node instead of `pwd -P` or `realpath`; `pipelex-inputs` quotes the temporary directory in its conversion commands, so a user name holding a space no longer splits it; and Mistral Vibe's message for a missing workshop says where the entry to append is rather than giving a `cat` command.

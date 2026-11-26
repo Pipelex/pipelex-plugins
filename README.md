@@ -114,6 +114,8 @@ The plugin also installs in **Mistral Vibe** 3.0.4 or later, as a native Vibe pl
 
 **Claude Code in the Claude desktop app** does not inherit your shell environment, so an exported `PIPELEX_API_KEY` never reaches it. The Pipelex tools find the login's key there; for the hook's validation, set the key in the plugin configuration dialog, which opens when you enable the plugin.
 
+**On Windows**, the plugin runs in Claude Code, in the terminal and in the Claude desktop app, with PowerShell alone: it needs Node.js 24.14.1 or later and no Git Bash. Codex and Mistral Vibe on Windows are not covered yet. [Claude Code on Windows](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md#claude-code-on-windows).
+
 Which Pipelex product each app takes, and every agent's install in detail, are in [Install the plugin, agent by agent](https://github.com/Pipelex/pipelex-plugins/blob/main/docs/install.md).
 
 ## Configuration
