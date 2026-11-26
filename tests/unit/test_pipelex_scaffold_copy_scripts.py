@@ -383,6 +383,19 @@ class TestUncreatedCopyScripts:
         assert result.returncode == 0, result.stderr
         assert fake_key not in result.stdout + result.stderr
 
+    def test_a_ceiling_the_environment_carries_never_plants_a_repository_in_the_user_s(self, tmp_path: Path) -> None:
+        """Under a `GIT_CEILING_DIRECTORIES` naming the user's repository, git says "not a git repository" with a
+        repository above, as it does at a mount point; the reading searches past both, so the copy stays new files
+        of the user's repository."""
+        parent = _user_repository(tmp_path / "monorepo")
+        target = _copy(parent / "apps" / "receipt-review")
+        environment = _environment({"GIT_CEILING_DIRECTORIES": str(parent)})
+        result = _node(READ_COPY_GIT, str(target), cwd=tmp_path, env=environment)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith(INSIDE)
+        assert _names(result.stdout[len(INSIDE) :].rstrip("\n"), parent)
+        assert not (target / ".git").exists()
+
     # read-copy-git.mjs: git that cannot read the directory, and a git pointed elsewhere
 
     @pytest.mark.parametrize("where", ["a-gitfile-git-cannot-read", "inside-a-dot-git"])
@@ -460,6 +473,38 @@ class TestUncreatedCopyScripts:
         assert result.returncode == 1
         assert result.stdout.startswith("refused: no-request ")
         assert _names(result.stdout.rstrip("\n")[len("refused: no-request ") :], tmp_path / REQUEST_FILE)
+
+    @pytest.mark.parametrize("command", ["init", "create"])
+    @pytest.mark.parametrize("setting", ["child_process", "fs,CHILD_PROCESS", "child*", "*"])
+    def test_node_s_child_process_log_is_refused_before_anything_spawns(self, tmp_path: Path, command: str, setting: str) -> None:
+        """npm's environment carries the key, which the gesture reads, and Node's child_process log prints a spawn's
+        environment on stderr, so the script refuses to spawn while the log is on, matched as Node matches it, and
+        keeps the request, which it has not read."""
+        (tmp_path / "receipt-review").mkdir()
+        cli = tmp_path / "npm-cli.js"
+        cli.write_text(FAKE_NPM_CLI, encoding="utf-8")
+        record = tmp_path / "record.json"
+        request = _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        fake_key = "plx_fake_key_for_tests_0000"
+        environment = _environment({"npm_execpath": str(cli), "RECORD": str(record), "PIPELEX_API_KEY": fake_key, "NODE_DEBUG": setting})
+        result = _node(METHOD_APP, command, cwd=tmp_path, env=environment)
+        assert result.stdout == "refused: node-debug\n"
+        assert result.returncode == 1
+        assert "NODE_DEBUG" in result.stderr
+        assert fake_key not in result.stdout + result.stderr
+        assert request.exists()
+        assert not record.exists(), "npm was started"
+
+    def test_another_node_debug_log_is_no_refusal(self, tmp_path: Path) -> None:
+        cli = tmp_path / "npm-cli.js"
+        cli.write_text(FAKE_NPM_CLI, encoding="utf-8")
+        record = tmp_path / "record.json"
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        environment = _environment({"npm_execpath": str(cli), "RECORD": str(record), "NODE_DEBUG": "http,net"})
+        result = _node(METHOD_APP, "init", cwd=tmp_path, env=environment)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "created somewhere; next: npm run serve\n"
+        assert record.exists()
 
     # method-app.mjs init
 

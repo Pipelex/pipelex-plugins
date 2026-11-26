@@ -33,8 +33,10 @@
 //            npm install exited <code>; the whole log is <path>
 // Either prints one line instead when nothing ran:
 //   refused: <reason>    usage (no such command), no-request <path> (no request file at <path>),
-//                        bad-request (the request is not as above; what is wrong goes to stderr), or
-//                        no-directory (create alone: no directory at <dir>)
+//                        bad-request (the request is not as above; what is wrong goes to stderr),
+//                        no-directory (create alone: no directory at <dir>), or node-debug (`NODE_DEBUG`
+//                        names Node's child_process log, which prints every spawn's environment, the key
+//                        included, on stderr; checked before the request is read, which is kept)
 //   failed: npm          npm could not be started, the reason on stderr
 //   failed: log          create alone: the log could not be made or read, the file system's message on stderr
 // The exit code is presentation: for init, the initializer's; for create, 0 when the gesture or the install
@@ -46,7 +48,9 @@
 // array, through no shell. Why a log: the gesture prints its warnings before `npm run all`, whose output
 // fills the tail, and runs the bootstrap twice, so the warnings are read off the whole log, once each. It
 // names variables and never prints their values, so the tail is safe to read. The key reaches npm from
-// this process's environment, or from an env file in <dir>, and never through the request.
+// this process's environment, or from an env file in <dir>, and never through the request. That environment
+// cannot leave out the key, which the gesture reads, so the script refuses to spawn anything while Node's own
+// child_process log is on, the one place Node would print it.
 //
 // It is Node rather than shell so that it runs the same on macOS, Linux and Windows, where a
 // PowerShell-only machine has no bash, no `mktemp` and no `grep`. npm is the `npm-cli.js` that npm names
@@ -93,6 +97,17 @@ class Stop extends Error {
     this.line = line;
     this.detail = detail;
   }
+}
+
+// Whether `NODE_DEBUG` turns on Node's child_process log, matched as Node matches it: names separated by
+// commas, `*` matching anything, in any letter case. Node reads the setting once as it starts, so removing
+// it from this process's environment would not turn the log off.
+function logsSpawns(setting) {
+  if (!setting) {
+    return false;
+  }
+  const pattern = setting.replace(/[|\\{}()[\]^$+?.]/g, "\\$&").replaceAll("*", ".*").replaceAll(",", "$|^");
+  return new RegExp(`^${pattern}$`, "i").test("child_process");
 }
 
 function badRequest(detail) {
@@ -172,7 +187,7 @@ function readRequest(command) {
   }
   let request;
   try {
-    request = JSON.parse(raw.replace(/^﻿/, ""));
+    request = JSON.parse(raw.replace(/^\uFEFF/, ""));
   } catch (error) {
     badRequest(`${file} is not JSON: ${error.message}`);
   }
@@ -314,6 +329,12 @@ try {
   const [command, ...rest] = process.argv.slice(2);
   if (rest.length !== 0 || !["init", "create"].includes(command)) {
     throw new Stop("refused: usage", "usage: node method-app.mjs <init | create>, with the request in pipelex-scaffold-request.json");
+  }
+  if (logsSpawns(process.env.NODE_DEBUG)) {
+    throw new Stop(
+      "refused: node-debug",
+      "NODE_DEBUG turns on Node's child_process log, which prints npm's environment, the key included: start the harness from a shell without it",
+    );
   }
   outcome = command === "init" ? init() : create();
 } catch (error) {

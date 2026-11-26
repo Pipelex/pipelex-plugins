@@ -65,9 +65,20 @@ function refuse(reason, detail = "") {
 // repository other than the one it finds from <dir>, which a hook or a wrapper can leave set, as the
 // family's initializer drops them. Windows reads a variable's name in any case.
 const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX"];
-const GIT_ENV = Object.fromEntries(
-  Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_") && !GIT_REDIRECTS.includes(name.toUpperCase())),
-);
+// git's search for the repository around <dir> is not cut short either, by a `GIT_CEILING_DIRECTORIES` or at a
+// mount point, where git answers "not a git repository" with a repository above: a repository made there
+// would sit inside the user's work tree, which the family never does.
+const GIT_ENV = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) =>
+        !name.toUpperCase().startsWith("PIPELEX_") &&
+        !GIT_REDIRECTS.includes(name.toUpperCase()) &&
+        name.toUpperCase() !== "GIT_CEILING_DIRECTORIES",
+    ),
+  ),
+  GIT_DISCOVERY_ACROSS_FILESYSTEM: "1",
+};
 // git's own message for a directory outside every repository, read in the C locale so that it is the same words
 // in every language git speaks.
 const OUTSIDE = /not a git repository/i;

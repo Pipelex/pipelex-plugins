@@ -35,7 +35,7 @@ An inconclusive signal asks one question; nothing is guessed twice.
 
 ## Mode
 
-Automatic by default; an explicit signal wins ("just do it", "walk me through"). One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's first run takes `"dry-run": true`.
+Automatic by default; an explicit signal wins ("just do it", "walk me through"). One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's first run puts `"dry-run": true` in `options`.
 
 ## Prerequisites
 
@@ -67,8 +67,8 @@ Its verdict is the last line opening with `serving <url> — "<title>"`, `alread
 
 ## Branch B — the ecosystem's initializer
 
-1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync --directory <dir>`**, because `/pipelex-integrate` reads no lock file as `pip install`.
-2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. Run the script, never its steps by hand:
+1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync --directory '<dir>'`**, because `/pipelex-integrate` reads no lock file as `pip install`.
+2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C '<dir>' status --short`. Run the script, never its steps by hand:
 
    ```bash
    node "<skill-dir>/scripts/commit-pristine.mjs" '<dir>' 'Scaffold <framework or language> project'
@@ -85,7 +85,7 @@ Its verdict is the last line opening with `serving <url> — "<title>"`, `alread
 
 ## The report
 
-**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve`. Then say what was created and where, with its name and title; the template's version and the git outcome; that `npm run create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `npm run create` wrote, `node -p "['','https://api.pipelex.com','https://api.pipelex.com/'].includes(process.env.PIPELEX_BASE_URL ?? '') ? 'production' : 'other'"`; and `npm run add-method <method>` for a second method, `npm run codegen` after a bundle edit.
+**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve` in `<dir>`. Then say what was created and where, with its name and title; the template's version and the git outcome; that `npm run create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `npm run create` wrote, `node -p "['','https://api.pipelex.com','https://api.pipelex.com/'].includes(process.env.PIPELEX_BASE_URL ?? '') ? 'production' : 'other'"`; and `npm run add-method <method>` for a second method, `npm run codegen` after a bundle edit.
 
 **On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it, or on `inside:` that the project is new files of that repository; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the `unversioned:`, `nested:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL.
 
@@ -97,9 +97,9 @@ Two lines close it. **The project's own instructions and skills load in a sessio
 |---|---|
 | A toolchain piece is missing, or `refused: missing-tool` or `node-too-old` | STOP and name it, first reading [references/version-managers.md](references/version-managers.md) for `node` or `uv` |
 | The directory is not empty, or `refused: not-empty` | STOP and ask for another; never delete, move or write into it, and never offer to |
-| `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `"no-create": true` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
+| `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `"no-create": true` in `options` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
 | `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-sdk` | STOP: that is the template, not a copy |
-| any other `refused:`, `failed: write` or `failed: commit` | the line says what stands and names the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
+| any other `refused:` or `failed:` | the line, and the message under it, say what stands and name the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
 | `failed: create` | read the end of the log it named, then [references/uncreated-copy.md](references/uncreated-copy.md); never substitute a base URL the user did not declare |
 | `npm run serve` says `refused: not-loopback` | report no URL, and relay the cause it names |
 | any other `npm run serve` verdict | relay it; when it says the server was stopped, read `<dir>/.serve/server.log`'s tail, fix the cause and serve again; one still running is the user's to stop |

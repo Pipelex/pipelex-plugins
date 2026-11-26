@@ -375,6 +375,21 @@ class TestCommitPristine:
         untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
         assert sorted(untracked) == ["new-app/.gitignore", "new-app/main.py"]
 
+    def test_a_ceiling_the_environment_carries_never_plants_a_repository_in_the_user_s(self, tmp_path: Path) -> None:
+        """Under a `GIT_CEILING_DIRECTORIES` naming the user's repository, git says "not a git repository" with a
+        repository above, as it does at a mount point; the script searches past both, so `<dir>` stays new files
+        of the user's repository and nothing is committed."""
+        outer = _repository(tmp_path / "their-repo")
+        project = outer / "new-app"
+        project.mkdir()
+        (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+        environment = _environment()
+        environment["GIT_CEILING_DIRECTORIES"] = str(outer)
+        result = _run(COMMIT_PRISTINE, "new-app", "Scaffold Python project", cwd=outer, env=environment)
+        _assert_root_verdict(result, "inside", outer)
+        assert not (project / ".git").exists(), "a repository was planted inside the user's"
+        assert _has_no_commit(outer)
+
     @pytest.mark.parametrize("how", list(IGNORING_REPOSITORIES))
     def test_a_directory_the_user_s_repository_ignores_gets_a_repository_of_its_own(self, tmp_path: Path, how: str) -> None:
         """Ruled by Louis on 2026-09-25: under a path the enclosing repository ignores, a repository is as

@@ -65,10 +65,10 @@ INITIALIZER_VERDICTS_WITH_A_ROW = (
     "`refused: inside-template-checkout`",
     "`refused: missing-tool`",
     "`node-too-old`",
-    "`failed: write`",
-    "`failed: commit`",
     "`failed: create`",
 )
+# `failed: write` and `failed: commit`, like the script's own `failed: npm` and `failed: log`, fall to the stop table's
+# row for any other `refused:` or `failed:`, which reads the message under the line.
 SERVE_VERDICTS = ('`serving <url> — "<title>"`', "`already-serving`", "`refused: not-loopback`")
 
 
@@ -271,7 +271,7 @@ class TestPipelexScaffoldSkill:
             assert "A second confirms on branch B: a pristine commit into a directory that already held a repository." in body
             ask = body.index("**When `<dir>` held a `.git` before step 1, ask before running the script**")
             assert ask < body.index("scripts/commit-pristine.mjs\" '<dir>'")
-            assert "showing `git -C <dir> status --short`" in body
+            assert "showing `git -C '<dir>' status --short`" in body
         reference = UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8")
         assert "The directory is the user's, so this commit confirms in every mode" in reference
 
@@ -285,14 +285,14 @@ class TestPipelexScaffoldSkill:
         on the reference, because either alone is the half-application.
         """
         for body in _bodies():
-            assert "**On a project `uv init` created, finish with `uv sync --directory <dir>`**" in body
+            assert "**On a project `uv init` created, finish with `uv sync --directory '<dir>'`**" in body
         assert "`{{ skill_prefix }}pipelex-integrate` reads no lock file as `pip install`" in SKILL_TEMPLATE.read_text(encoding="utf-8")
         for target_name in TARGETS:
             prefix = load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
             assert f"`{prefix}pipelex-integrate` reads no lock file as `pip install`" in _render_skill(target_name), target_name
         reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
         assert (
-            "**On a project `uv init` created, run `uv sync --directory <dir>` before the pristine commit, and commit the `uv.lock` it writes.**"
+            "**On a project `uv init` created, run `uv sync --directory '<dir>'` before the pristine commit, and commit the `uv.lock` it writes.**"
             in reference
         )
         assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
@@ -646,7 +646,9 @@ class TestMethodAppBranch:
             table = body[body.index("## When something goes wrong") :]
             for verdict in INITIALIZER_VERDICTS_WITH_A_ROW:
                 assert verdict in table, f"the stop table has no row for {verdict}"
-            assert "| any other `refused:`, `failed: write` or `failed: commit` |" in table
+            # The script's own `failed: npm` and `failed: log`, and a `refused: bad-request` whose cause is on stderr,
+            # fall to the row that reads the message under the line.
+            assert "| any other `refused:` or `failed:` | the line, and the message under it, say what stands and name the fix:" in table
             assert "| any other `npm run serve` verdict |" in table
             # A server the user started from the copy is left running by `npm run serve`, and its verdict says so.
             assert "when it says the server was stopped, read `<dir>/.serve/server.log`'s tail" in table
@@ -669,7 +671,7 @@ class TestMethodAppBranch:
             assert "a harness restarted from a shell that exports the key" in row
             # An unattended model took the second way itself in the phase 5b smoke sessions.
             assert row.startswith("| `refused: no-key` | STOP and offer two ways, running neither until the user picks: ")
-            assert '`"no-create": true` and a `<dir>/.env.local` the user writes in their own editor' in row
+            assert '`"no-create": true` in `options` and a `<dir>/.env.local` the user writes in their own editor' in row
             # A key is refused by every plane but the one that issued it.
             assert "never substitute a base URL the user did not declare" in body
             assert "a git identity is the user's to set, never yours" in body
@@ -687,7 +689,7 @@ class TestMethodAppBranch:
             assert "how the verdict says to stop it" in body
             # The running app took the key from the shell that started it; a restart from another shell
             # reads `.env.local`, where the user's own key goes.
-            assert "the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve`" in body
+            assert "the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve` in `<dir>`" in body
             assert "`make serve` inside the project restarts it" not in body
             # The warnings are relayed, the LICENSE holder first.
             assert "first that `LICENSE` still names the template's holder when it does" in body
