@@ -33,14 +33,19 @@ WORKSHOP_TIMEOUT_SECONDS = 300
 SHIPPED_ARGS = ["-y", "@pipelex/mcp@latest"]
 # Set by the Windows job, which installs the Claude Code CLI: there a missing `claude` is a failure, never a skip.
 REQUIRE_CLAUDE_CLI = "PIPELEX_PLUGINS_REQUIRE_CLAUDE_CLI"
+# Set, to any value, it stops cmd.exe looking for a command in the current directory before the PATH.
+NO_CURRENT_DIRECTORY_SEARCH = "NoDefaultCurrentDirectoryInExePath"
+STDERR_TAIL_CHARACTERS = 4000
 
 # Stands in for the workshop, behind `npx-cli.js` and behind the `npx` on the PATH alike: it says which way it was
-# reached, what it was given and which key it sees, echoes its stdin upper-cased, and exits with FAKE_EXIT.
+# reached, what it was given, which key it sees and whether cmd.exe may search the current directory for a command,
+# echoes its stdin upper-cased, and exits with FAKE_EXIT.
 FAKE_WORKSHOP = """\
 const report = {
   via: process.env.FAKE_VIA ?? "npx-cli",
   argv: process.argv.slice(2),
   apiKey: process.env.PIPELEX_API_KEY ?? null,
+  noCurrentDirectorySearch: process.env.NoDefaultCurrentDirectoryInExePath ?? null,
 };
 process.stdout.write(JSON.stringify(report) + "\\n");
 let received = "";
@@ -113,15 +118,29 @@ def _launcher(plugin_root: Path) -> Path:
     return Path(command[1])
 
 
+def _plant_project_npx(project: Path, node: Path) -> None:
+    """A project's own `npx`, in the directory the launcher starts in, which says it was reached from there."""
+    fake_workshop = project / "project-workshop.mjs"
+    fake_workshop.write_text(FAKE_WORKSHOP, encoding="utf-8")
+    for name in ("npx.cmd", "npx.bat"):
+        (project / name).write_text(f'@set FAKE_VIA=project\r\n@"{node}" "{fake_workshop}" %*\r\n', encoding="utf-8", newline="")
+
+
 def _run_launcher(plugin_root: Path, home: NodeHome, *, stdin: str = "hello\n", **environment: str) -> LauncherRun:
+    """Run the launcher from the plugin root's parent, which stands for the user's project and holds a planted `npx`."""
     path = f"{home.path_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+    project = plugin_root.parent
+    _plant_project_npx(project, home.node)
+    child_environment = {
+        key: value for key, value in clean_environment(PATH=path, **environment).items() if key.upper() != NO_CURRENT_DIRECTORY_SEARCH.upper()
+    }
     completed = subprocess.run(
         [str(home.node), str(_launcher(plugin_root))],
         input=stdin,
         capture_output=True,
         text=True,
-        cwd=plugin_root.parent,
-        env=clean_environment(PATH=path, **environment),
+        cwd=project,
+        env=child_environment,
         timeout=LAUNCHER_TIMEOUT_SECONDS,
         check=False,
     )
@@ -141,8 +160,9 @@ def _is_alive(pid: int) -> bool:
 class _LineReader:
     """Reads a process's stdout on a thread, so a test can wait for a line with a timeout on every OS."""
 
-    def __init__(self, process: subprocess.Popen[str]) -> None:
+    def __init__(self, process: subprocess.Popen[str], stderr_path: Path) -> None:
         self.lines: queue.Queue[str | None] = queue.Queue()
+        self.stderr_path = stderr_path
         assert process.stdout is not None
         stdout = process.stdout
 
@@ -153,14 +173,24 @@ class _LineReader:
 
         threading.Thread(target=pump, daemon=True).start()
 
+    def stderr_tail(self) -> str:
+        """The end of what the workshop wrote to stderr, for a failure message."""
+        if not self.stderr_path.is_file():
+            return "(no stderr written)"
+        text = self.stderr_path.read_text(encoding="utf-8", errors="replace")
+        return text[-STDERR_TAIL_CHARACTERS:] or "(stderr empty)"
+
     def response(self, request_id: int, *, timeout: float) -> dict[str, Any]:
         """The JSON-RPC response to `request_id`, skipping notifications and any other line."""
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
-            assert remaining > 0, f"no response to request {request_id} within {timeout} s"
-            line = self.lines.get(timeout=remaining)
-            assert line is not None, f"the workshop closed its stdout before answering request {request_id}"
+            assert remaining > 0, f"no response to request {request_id} within {timeout} s; the workshop's stderr:\n{self.stderr_tail()}"
+            try:
+                line = self.lines.get(timeout=remaining)
+            except queue.Empty:
+                pytest.fail(f"no response to request {request_id} within {timeout} s; the workshop's stderr:\n{self.stderr_tail()}")
+            assert line is not None, f"the workshop closed its stdout before answering request {request_id}; its stderr:\n{self.stderr_tail()}"
             try:
                 message: object = json.loads(line)
             except json.JSONDecodeError:
@@ -173,23 +203,28 @@ class _LineReader:
 
 
 @pytest.fixture
-def workshop(plugin_root: Path, node: str) -> Iterator[tuple[subprocess.Popen[str], _LineReader]]:
-    """The real workshop from npm, started exactly as the manifest's command line says, with the option left unfilled."""
+def workshop(plugin_root: Path, node: str, tmp_path: Path) -> Iterator[tuple[subprocess.Popen[str], _LineReader]]:
+    """The real workshop from npm, started exactly as the manifest's command line says, with the option left unfilled.
+
+    Its stderr goes to a file, never a pipe nobody reads, which a chatty npm would fill until the workshop blocked; the
+    file's end is in the message of a response that never came."""
     assert node
     project = plugin_root.parent.parent / "a project"
     project.mkdir()
-    process = subprocess.Popen(
-        mcp_server_command(plugin_root),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        cwd=project,
-        env=clean_environment(PIPELEX_PLUGIN_API_KEY=""),
-    )
+    stderr_path = tmp_path / "workshop-stderr.log"
+    with stderr_path.open("w", encoding="utf-8") as stderr:
+        process = subprocess.Popen(
+            mcp_server_command(plugin_root),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=stderr,
+            text=True,
+            encoding="utf-8",
+            cwd=project,
+            env=clean_environment(PIPELEX_PLUGIN_API_KEY=""),
+        )
     try:
-        yield process, _LineReader(process)
+        yield process, _LineReader(process, stderr_path)
     finally:
         if process.stdin is not None:
             process.stdin.close()
@@ -219,6 +254,15 @@ class TestMcpLauncher:
         assert run.echoed == "HELLO\n"
 
     @pytest.mark.cross_os
+    def test_on_windows_the_workshop_starts_with_no_current_directory_search(self, plugin_root: Path, node_home: NodeHome) -> None:
+        """The launcher starts in the user's project, and cmd.exe, which npm's run-script and the shell route go through,
+        would run a project's own `npx.cmd` or `<bin>.cmd` before the PATH's, with the key in its environment. On Windows
+        the workshop's environment turns that search off; elsewhere the launcher adds nothing."""
+        run = _run_launcher(plugin_root, node_home)
+        assert run.returncode == 0, run.stderr
+        assert run.report["noCurrentDirectorySearch"] == ("1" if IS_WINDOWS else None)
+
+    @pytest.mark.cross_os
     def test_a_filled_option_becomes_the_key(self, plugin_root: Path, node_home: NodeHome) -> None:
         run = _run_launcher(plugin_root, node_home, PIPELEX_PLUGIN_API_KEY="plx_from_the_option", PIPELEX_API_KEY="plx_from_the_shell")
         assert run.report["apiKey"] == "plx_from_the_option"
@@ -245,7 +289,9 @@ class TestMcpLauncher:
         home = _node_home(tmp_path / "bare", node=node, with_npm=False)
         run = _run_launcher(plugin_root, home)
         assert run.returncode == 0, run.stderr
+        # The project's own `npx.cmd` sits in the directory cmd.exe starts in, and is passed over for the PATH's.
         assert run.report["via"] == "path"
+        assert run.report["noCurrentDirectorySearch"] == "1"
         assert run.report["argv"] == SHIPPED_ARGS
         assert run.echoed == "HELLO\n"
 
@@ -294,6 +340,29 @@ class TestMcpLauncher:
         while _is_alive(workshop_pid):
             assert time.monotonic() < deadline, "the workshop outlived the launcher"
             time.sleep(0.05)
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="POSIX signals")
+    @pytest.mark.parametrize("signal_name", ["SIGUSR1", "SIGPIPE"])
+    def test_a_signal_node_handles_itself_becomes_the_shell_exit_code(self, plugin_root: Path, tmp_path: Path, node: str, signal_name: str) -> None:
+        """Raised on the launcher, SIGUSR1 would start Node's inspector and SIGPIPE would be ignored, so a workshop that
+        dies of either leaves the launcher with the code a shell gives it, 128 plus the signal's number."""
+        number = int(getattr(signal, signal_name))
+        path_bin = tmp_path / "bin"
+        path_bin.mkdir()
+        stand_in = path_bin / "npx"
+        stand_in.write_text(f"#!/bin/sh\nkill -{signal_name.removeprefix('SIG')} $$\nsleep 30\n", encoding="utf-8")
+        stand_in.chmod(0o755)
+        completed = subprocess.run(
+            [node, str(_launcher(plugin_root))],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            env=clean_environment(PATH=f"{path_bin}{os.pathsep}{os.environ['PATH']}"),
+            timeout=LAUNCHER_TIMEOUT_SECONDS,
+            check=False,
+        )
+        assert completed.returncode == 128 + number, completed.stderr
+        assert "Debugger listening" not in completed.stderr
 
     @pytest.mark.cross_os
     def test_the_workshop_answers_initialize_over_stdio_when_started_as_the_manifest_says(

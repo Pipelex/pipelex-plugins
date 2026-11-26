@@ -60,6 +60,15 @@ class TestClaudeExecForm:
         errors = check_claude_exec_form(tree)
         assert any(expected in error for error in errors), errors
 
+    def test_a_manifest_without_user_config_is_held_to_the_same_form(self, tree: Path) -> None:
+        manifest_path = tree / "pipelex" / ".claude-plugin" / "plugin.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        del manifest["userConfig"]
+        manifest["mcpServers"]["pipelex"] = {"type": "stdio", "command": "npx", "args": ["-y", "@pipelex/mcp@latest"]}
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        errors = check_claude_exec_form(tree)
+        assert any("the `pipelex` server is not started" in error for error in errors), errors
+
     def test_an_unreadable_hooks_file_is_left_to_other_checks(self, tree: Path) -> None:
         (tree / "pipelex" / "hooks" / "hooks.json").write_text("{", encoding="utf-8")
         assert check_claude_exec_form(tree) == []

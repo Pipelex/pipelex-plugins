@@ -438,18 +438,6 @@ def resolve_output_dir(base_dir: Path, source: str) -> Path:
     return base_dir / source.rstrip("/")
 
 
-def shell_double_quoted(value: object) -> str:
-    """`value` as one double-quoted shell word, which a shell hands on exactly as it is.
-
-    Inside double quotes a shell still acts on `$`, a backtick and `\\`, and `"` ends the word, so each
-    of the four is escaped. A word holding none of them renders as it always did.
-    """
-    text = str(value)
-    for char in ("\\", '"', "$", "`"):
-        text = text.replace(char, f"\\{char}")
-    return f'"{text}"'
-
-
 def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, TemplateVarValue]) -> str:
     """Render one template by name, turning Jinja errors into a clean SystemExit."""
     try:
@@ -541,7 +529,6 @@ def render_templates(
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
-    env.filters["shell_double_quoted"] = shell_double_quoted
 
     def declared(names: Sequence[str], kind: str) -> list[str]:
         """The names, each of which must resolve to a file — fail loudly if one is missing."""
@@ -642,7 +629,8 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     #   PIPELEX_* names, keeping the session env as fallback — GUI launches
     #   (Claude Desktop) carry no shell env, so userConfig is the only
     #   credential channel there. Without a user_config block the entry
-    #   spawns the workshop command directly (full shell env passthrough).
+    #   still spawns the launcher, with no env block and nothing to promote,
+    #   since Windows cannot spawn `npx`, a batch file, without a shell.
     #   The non-empty guard is load-bearing, not indirection: injecting
     #   ${user_config.*} straight into PIPELEX_* means an unfilled option
     #   substitutes to "" and SHADOWS a working shell credential. The
@@ -678,28 +666,22 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
         raw_user_config = mcp_server.get("user_config")
         match config.platform:
             case Platform.CLAUDE:
+                # The server always starts through the Node launcher, never the workshop command itself:
+                # `npx` is a batch file on Windows, which Claude Code cannot spawn without a shell. With no
+                # user_config the launcher promotes nothing and the entry carries no env block.
+                claude_entry: dict[str, object] = {
+                    "type": "stdio",
+                    "command": CLAUDE_MCP_LAUNCHER_COMMAND,
+                    "args": list(CLAUDE_MCP_LAUNCHER_ARGS),
+                }
                 if isinstance(raw_user_config, dict):
                     user_config = cast("dict[str, object]", raw_user_config)
                     base["userConfig"] = user_config
                     option_env: dict[str, str] = {}
                     for option_key in user_config:
                         option_env[f"PIPELEX_PLUGIN_{option_key.upper()}"] = f"${{user_config.{option_key}}}"
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": CLAUDE_MCP_LAUNCHER_COMMAND,
-                            "args": list(CLAUDE_MCP_LAUNCHER_ARGS),
-                            "env": option_env,
-                        }
-                    }
-                else:
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": command,
-                            "args": launcher_args,
-                        }
-                    }
+                    claude_entry["env"] = option_env
+                base["mcpServers"] = {MCP_SERVER_NAME: claude_entry}
             case Platform.CODEX:
                 codex_entry: dict[str, object] = {
                     "command": command,

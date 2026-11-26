@@ -12,9 +12,12 @@
 // only credential channel.
 //
 // The workshop inherits stdin, stdout and stderr, which carry the MCP stdio
-// transport; its exit code is this process's, and a signal that ends it ends
-// this process the same way. A termination signal sent to this process is
-// passed on to the workshop.
+// transport; its exit code is this process's. A termination signal that ends
+// it (SIGTERM, SIGINT, SIGHUP, SIGKILL) ends this process the same way; any
+// other signal becomes the exit code a shell gives it, 128 plus its number,
+// because Node handles some itself (SIGUSR1 starts its inspector, SIGPIPE is
+// ignored). A termination signal sent to this process is passed on to the
+// workshop.
 //
 // How the command is spawned (docs/decisions.md, "The MCP launcher and the
 // Claude Code hook run on Node"):
@@ -30,6 +33,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { constants } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 
@@ -40,6 +44,23 @@ const TAG = "[pipelex-mcp-launcher]";
 const env = { ...process.env };
 if (process.env.PIPELEX_PLUGIN_API_KEY) {
   env.PIPELEX_API_KEY = process.env.PIPELEX_PLUGIN_API_KEY;
+}
+
+if (process.platform === "win32") {
+  // The workshop starts in Claude Code's own directory, the user's project, and
+  // cmd.exe (the shell route below, and npm's own run-script on the other) looks
+  // for a command in the current directory before the PATH: a project's own
+  // `npx.cmd` or `<bin>.cmd` would run with the key in its environment. This
+  // variable turns that search off for cmd.exe and every process spawned under it;
+  // only its existence counts (Microsoft's NeedCurrentDirectoryForExePathW). A copy
+  // of the environment has lost Windows' case-insensitive names, so any spelling
+  // of it is replaced by this one.
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase() === "NODEFAULTCURRENTDIRECTORYINEXEPATH") {
+      delete env[name];
+    }
+  }
+  env.NoDefaultCurrentDirectoryInExePath = "1";
 }
 
 function windowsNpxCli() {
@@ -71,6 +92,9 @@ function startWorkshop() {
 const workshop = startWorkshop();
 
 const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
+// The signals Node leaves at their default action once the forwarding listeners are off, so raising one ends this
+// process of it; SIGKILL cannot be handled at all.
+const RERAISED_SIGNALS = new Set([...FORWARDED_SIGNALS, "SIGKILL"]);
 const forward = (signal) => {
   workshop.kill(signal);
 };
@@ -89,8 +113,11 @@ workshop.on("exit", (code, signal) => {
   }
   if (signal !== null) {
     // End the same way the workshop did, so the harness sees the signal; Windows has no such signals.
-    process.kill(process.pid, signal);
-    process.exit(1);
+    const shellCode = 128 + (constants.signals[signal] ?? 0);
+    if (RERAISED_SIGNALS.has(signal)) {
+      process.kill(process.pid, signal);
+    }
+    process.exit(shellCode);
   }
   process.exit(code ?? 1);
 });

@@ -838,10 +838,10 @@ class TestPluginManifests:
             }
         }
 
-    def test_claude_plugin_json_without_user_config_spawns_directly(self, tmp_path: Path) -> None:
-        """Without a user_config block, the Claude manifest spawns the workshop
-        command directly — Claude Code passes the full shell env to the spawned
-        server (verified in live plugin-dir sessions)."""
+    def test_claude_plugin_json_without_user_config_still_starts_the_launcher(self, tmp_path: Path) -> None:
+        """Without a user_config block, the Claude manifest still starts the Node
+        launcher, never `npx` itself, which is a batch file Claude Code cannot
+        spawn on Windows; with nothing to promote, the entry carries no env."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         mcp_server = config.template_vars["mcp_server"]
@@ -852,8 +852,8 @@ class TestPluginManifests:
         assert plugin_json["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
-                "command": "npx",
-                "args": ["-y", "@pipelex/mcp@latest"],
+                "command": "node",
+                "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"],
             }
         }
 

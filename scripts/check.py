@@ -1232,7 +1232,15 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
         else:
             errors.extend(_vibe_mcp_fragment_errors(target_name, mcp_fragment))
 
-        for filename in ("hooks.json", "codex-hooks.json", "check-mthds.mjs", "launch-pipelex-mcp.mjs", "check-mthds-codex.sh"):
+        for filename in (
+            "hooks.json",
+            "codex-hooks.json",
+            "check-mthds.mjs",
+            "check-mthds.sh",
+            "launch-pipelex-mcp.mjs",
+            "launch-pipelex-mcp.sh",
+            "check-mthds-codex.sh",
+        ):
             if (output_dir / "hooks" / filename).exists():
                 errors.append(f"[{target_name}] hooks/{filename} is not an artifact of the native Vibe plugin")
 
@@ -1434,7 +1442,7 @@ def check_claude_exec_form(base_dir: Path) -> list[str]:
                             starts.append((f"{label}/hooks/hooks.json: a {event} hook", entry.get("command"), entry.get("args")))
         manifest = _read_json_object(output_dir / ".claude-plugin" / "plugin.json")
         server = _mcp_server_entry(manifest) if manifest is not None else None
-        if server is not None and isinstance(manifest, dict) and "userConfig" in manifest:
+        if server is not None:
             starts.append((f"{label}/.claude-plugin/plugin.json: the `{MCP_SERVER_NAME}` server", server.get("command"), server.get("args")))
         for where, command, args in starts:
             if command != "node" or not isinstance(args, list) or not args:
