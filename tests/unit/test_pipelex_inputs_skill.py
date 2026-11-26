@@ -263,7 +263,7 @@ class TestPipelexInputsSkill:
         assert "clips a cell's text where the next cell is filled" in office
         export = self.the_line(user_data, "**A runner with no document converter takes the PDF exported from it instead.**")
         assert "`input.file_type_unsupported`" in export
-        assert "`soffice --headless --convert-to pdf --outdir <dir> <file>`" in export
+        assert '`soffice --headless --convert-to pdf --outdir "<dir>" <file>`' in export
         assert "`node -p \"require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'pipelex-'))\"` makes and prints" in export
         assert "never beside the method or the original" in export
         assert "in place of the original" in export
@@ -291,7 +291,7 @@ class TestPipelexInputsSkill:
         assert "when the method asks for those" not in row
         conversion = self.the_line(text, "**A legacy or OpenDocument original can take its own route too.**")
         assert "Outside a case's copies, where `soffice` is on PATH" in conversion
-        assert "`soffice --headless --convert-to odt --outdir <dir> <file>`" in conversion
+        assert '`soffice --headless --convert-to odt --outdir "<dir>" <file>`' in conversion
         assert "never rename a file to change its format" in conversion
         assert "Without `soffice`, ask for the `pdf`." in conversion
 

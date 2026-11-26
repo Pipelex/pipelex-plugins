@@ -48,7 +48,7 @@ Pass exactly one selector to every tool call:
 
 **The project** is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory; several is a question, none means offering `/pipelex-scaffold`. Read its language reference now: [typescript.md](references/typescript.md) or [python.md](references/python.md).
 
-**Check containment before writing anything**: the project root must sit at or under the directory this session was launched in, both resolved (`pwd -P`, `realpath`), or STOP: relaunch the harness from the project root. **Never write the tree into the workshop's directory and move it across.**
+**Check containment before writing anything**: the project root must sit at or under the session's launch directory, both resolved (`node -p "fs.realpathSync(process.argv[1])" "<path>"`), or STOP: relaunch the harness from the project root. **Never write the tree into the workshop's directory and move it across.**
 
 Before step 2, read your branch: a `codegen` script or Makefile target, or a `sources.json` with a `derived` map → [references/harness.md](references/harness.md); this method's `sources.json` (`"generator": "pipelex-integrate"`), a refresh request or an editing skill's hand-off → [references/refresh.md](references/refresh.md).
 

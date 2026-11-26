@@ -62,6 +62,19 @@ def _run(shell: list[str], command: str, cwd: Path) -> subprocess.CompletedProce
     return subprocess.run([*shell, command], cwd=cwd, capture_output=True, text=True, check=False, timeout=120)
 
 
+def _is_a_made_temporary_directory(printed: str) -> bool:
+    """Whether `printed` names a directory the command made, the only thing the test may remove.
+
+    A shell that exits 0 and prints nothing would give `Path("")`, which is `.`, the checkout pytest runs in.
+    """
+    if not printed:
+        return False
+    made = Path(printed)
+    return (
+        made.is_absolute() and made.is_dir() and made.name.startswith("pipelex-") and made.parent.resolve() == Path(tempfile.gettempdir()).resolve()
+    )
+
+
 @pytest.mark.cross_os
 class TestShellNeutralCommands:
     @pytest.fixture()
@@ -93,27 +106,45 @@ class TestShellNeutralCommands:
 
     @pytest.mark.parametrize(("shell_name", "shell"), SHELLS, ids=[name for name, _ in SHELLS])
     @pytest.mark.parametrize("gate", GATES)
-    def test_the_gate_copy_runs_in_every_shell(self, shell_name: str, shell: list[str], gate: str, skill_dir: Path, project: Path) -> None:
+    def test_the_gate_copy_runs_in_every_shell(self, node: str, shell_name: str, shell: list[str], gate: str, skill_dir: Path, project: Path) -> None:
+        """`node` is requested for its skip: the shell finds its own `node` on the PATH."""
+        del node
         completed = _run(shell, self._gate_command(gate, skill_dir), project)
         assert completed.returncode == 0, f"{shell_name}: {completed.stdout}{completed.stderr}"
         assert completed.stdout.strip().splitlines()[-1] == f"copied {gate} to scripts/{gate}"
         assert (project / "scripts" / gate).read_bytes() == (INTEGRATE / "references" / gate).read_bytes()
 
     @pytest.mark.parametrize(("shell_name", "shell"), SHELLS, ids=[name for name, _ in SHELLS])
-    def test_the_temporary_directory_command_runs_in_every_shell(self, shell_name: str, shell: list[str], project: Path) -> None:
+    def test_the_temporary_directory_command_runs_in_every_shell(self, node: str, shell_name: str, shell: list[str], project: Path) -> None:
+        """`node` is requested for its skip: the shell finds its own `node` on the PATH."""
+        del node
         user_data = USER_DATA.read_text(encoding="utf-8")
         synthetic = SYNTHETIC.read_text(encoding="utf-8")
         (command,) = set(_code_spans(user_data, "node -p ") + _code_spans(synthetic, "node -p "))
         completed = _run(shell, command, project)
         assert completed.returncode == 0, f"{shell_name}: {completed.stdout}{completed.stderr}"
-        made = Path(completed.stdout.strip())
+        printed = completed.stdout.strip()
+        made = Path(printed)
         try:
-            assert made.is_absolute() and made.is_dir(), f"{shell_name}: {completed.stdout!r}"
+            assert printed and made.is_absolute() and made.is_dir(), f"{shell_name}: {completed.stdout!r}"
             assert made.name.startswith("pipelex-")
             assert made.parent.resolve() == Path(tempfile.gettempdir()).resolve()
             assert list(made.iterdir()) == []
         finally:
-            shutil.rmtree(made, ignore_errors=True)
+            if _is_a_made_temporary_directory(printed):
+                shutil.rmtree(made, ignore_errors=True)
+
+    def test_only_a_made_temporary_directory_is_ever_removed(self, tmp_path: Path) -> None:
+        """An empty print is `Path("")`, which is `.`: removing it would remove the checkout pytest runs in."""
+        nested = tmp_path / "pipelex-nested"
+        nested.mkdir()
+        for printed in ("", ".", str(Path.cwd()), str(REPO_ROOT), "pipelex-relative", str(nested), tempfile.gettempdir()):
+            assert not _is_a_made_temporary_directory(printed), printed
+        made = Path(tempfile.mkdtemp(prefix="pipelex-"))
+        try:
+            assert _is_a_made_temporary_directory(str(made))
+        finally:
+            made.rmdir()
 
     def _copy(self, node: str, project: Path, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run([node, str(COPY_GATE), *args], cwd=project, capture_output=True, text=True, check=False)

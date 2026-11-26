@@ -56,6 +56,23 @@ class TestCheckSkillPosixShell:
             ("grep -rl '\"pipelex-integrate\"' --include=sources.json .", "grep"),
             ("env | grep PIPELEX", "grep"),
             ("export PIPELEX_API_KEY=x", "export VAR="),
+            ("cd <dir>; pwd -P", "pwd -P"),
+            ("realpath <dir>", "realpath"),
+            ("rm -rf node_modules", "rm -rf"),
+            ("rm -f scripts/gate.mjs", "rm -rf"),
+            ("sed -i 's/a/b/' main.mthds", "sed"),
+            ("cat bundle.mthds | sed -n 1p", "sed"),
+            ("sed", "sed"),
+            ("awk '{print $1}' out.txt", "awk"),
+            ("which node", "which"),
+            ("chmod +x scripts/gate.sh", "chmod"),
+            ("touch .env", "touch"),
+            ("source .venv/bin/activate", "source"),
+            ("PIPELEX_API_KEY=x npx pipelex-mcp", "VAR=x cmd"),
+            ("CDPATH= cd -- <dir>", "VAR=x cmd"),
+            ('cat "$HOME/.vibe/config.toml"', "$VAR"),
+            ("echo ${PIPELEX_API_KEY}", "$VAR"),
+            ("node $PIPELEX_SCRIPT", "$VAR"),
         ],
     )
     def test_an_inline_command_is_refused(self, tree: Path, code: str, construct: str) -> None:
@@ -88,9 +105,36 @@ class TestCheckSkillPosixShell:
         _write(tree, f'\n```{language}\n"check": "npm run lint && npm run typecheck"\nif (a && b) {{}}\n```\n')
         assert check_skill_posix_shell(tree, allowed={}, pending={}) == []
 
-    def test_the_claude_code_substitutions_are_not_expansions(self, tree: Path) -> None:
+    @pytest.mark.parametrize(
+        "code",
+        [
+            'node "${CLAUDE_SKILL_DIR}/scripts/copy-gate.mjs" codegen-check.mjs',
+            'node "${CLAUDE_PLUGIN_ROOT}/x.mjs"',
+            'node "${CLAUDE_PLUGIN_DATA}/x.mjs" ${CLAUDE_SESSION_ID}',
+            "/pipelex-run $ARGUMENTS",
+            "/pipelex-run $ARGUMENTS[0]",
+        ],
+    )
+    def test_the_claude_code_substitutions_are_not_expansions(self, tree: Path, code: str) -> None:
         """Claude Code substitutes these before any shell runs the command."""
-        _write(tree, '\nRun `node "${CLAUDE_SKILL_DIR}/scripts/copy-gate.mjs" codegen-check.mjs` or `node "${CLAUDE_PLUGIN_ROOT}/x.mjs"`.\n')
+        _write(tree, f"\nRun `{code}`.\n")
+        assert check_skill_posix_shell(tree, allowed={}, pending={}) == []
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "$var.field",
+            "$page.text_and_images.raw_html",
+            "=SUM($D$4:D4)",
+            'prepare_inputs(method_ref="…", inputs=...)',
+            "the source check failed",
+            'node -p "fs.realpathSync(process.argv[1])" "<path>"',
+            "uv --version",
+        ],
+    )
+    def test_code_that_runs_in_every_shell_or_in_none_passes(self, tree: Path, code: str) -> None:
+        """A method's `$variable`, a spreadsheet formula, a keyword argument or a quoted phrase is no POSIX command."""
+        _write(tree, f"\nSee `{code}`.\n")
         assert check_skill_posix_shell(tree, allowed={}, pending={}) == []
 
     def test_a_fence_closes(self, tree: Path) -> None:
@@ -118,6 +162,20 @@ class TestCheckSkillPosixShell:
     def test_a_pending_skill_is_skipped(self, tree: Path) -> None:
         _write(tree, "\nRun `mktemp -d`.\n")
         assert check_skill_posix_shell(tree, allowed={}, pending={"pipelex-test": "L-000000-000000"}) == []
+
+    def test_a_pending_skill_that_already_passes_is_reported(self, tree: Path) -> None:
+        """A pending entry whose skill gives no POSIX-only command would only hide the next one added to it."""
+        _write(tree, "\nRun `uv --version`.\n")
+        assert check_skill_posix_shell(tree, allowed={}, pending={"pipelex-test": "L-000000-000000"}) == [
+            "pending skill pipelex-test (L-000000-000000) gives no POSIX-only command in any target: remove it from POSIX_SHELL_PENDING_SKILLS"
+        ]
+
+    def test_an_allowlisted_construct_does_not_keep_a_pending_skill_pending(self, tree: Path) -> None:
+        _write(tree, "\nWindows PowerShell 5.1 has no `&&`.\n")
+        allowed = {("pipelex-test/SKILL.md", "&&"): "names the operator PowerShell 5.1 lacks"}
+        assert check_skill_posix_shell(tree, allowed=allowed, pending={"pipelex-test": "L-000000-000000"}) == [
+            "pending skill pipelex-test (L-000000-000000) gives no POSIX-only command in any target: remove it from POSIX_SHELL_PENDING_SKILLS"
+        ]
 
     def test_every_target_passes(self) -> None:
         assert check_skill_posix_shell(REPO_ROOT) == []

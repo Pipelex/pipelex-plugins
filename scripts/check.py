@@ -652,7 +652,9 @@ def check_skill_links(base_dir: Path) -> list[str]:
 # Only code is read: inline code spans, and fenced blocks whose language is a shell's or unnamed. A fence in
 # another language (`ts`, `json`, `python`, `toml`, `make`…) is code for another reader, such as an npm
 # script, which npm runs through cmd.exe on Windows, where `&&` works. `${CLAUDE_SKILL_DIR}` and
-# `${CLAUDE_PLUGIN_ROOT}` are substituted by Claude Code before any shell runs, so they are not constructs.
+# `${CLAUDE_PLUGIN_ROOT}` are substituted by Claude Code before any shell runs, so they are not constructs, and
+# nor are Claude Code's other substitutions, `$ARGUMENTS` among them: none is an environment variable.
+CLAUDE_CODE_SUBSTITUTIONS = r"(?:CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT|CLAUDE_PLUGIN_DATA|CLAUDE_SESSION_ID|ARGUMENTS)"
 POSIX_SHELL_FENCE_LANGUAGES = frozenset({"", "bash", "sh", "shell", "zsh", "console", "powershell", "pwsh", "ps1", "cmd", "bat"})
 POSIX_SHELL_CONSTRUCTS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("command -v", re.compile(r"\bcommand -v\b"), "run the tool with `--version`, which every shell runs"),
@@ -671,11 +673,33 @@ POSIX_SHELL_CONSTRUCTS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ),
     ("grep", re.compile(r"(?:^|[\s|;(])grep\s"), "Windows has no `grep`; search with the agent's own tools"),
     ("export VAR=", re.compile(r"\bexport\s+[A-Za-z_]\w*="), "PowerShell sets a variable with `$env:`, not `export`"),
+    ("pwd -P", re.compile(r"\bpwd -P\b"), 'PowerShell\'s `pwd` takes no `-P`; resolve with `node -p "fs.realpathSync(process.argv[1])" "<path>"`'),
+    ("realpath", re.compile(r"\brealpath\b"), 'Windows has no `realpath`; resolve with `node -p "fs.realpathSync(process.argv[1])" "<path>"`'),
+    ("rm -rf", re.compile(r"\brm\s+-\w*[rf]"), "PowerShell's `rm` takes no `-r` or `-f`; let the agent's file tools remove it"),
+    ("sed", re.compile(r"(?:^|[;|&(])\s*sed(?:\s|$)"), "Windows has no `sed`; edit the file with the agent's own tools"),
+    ("awk", re.compile(r"(?:^|[;|&(])\s*awk(?:\s|$)"), "Windows has no `awk`; read the file with the agent's own tools"),
+    ("which", re.compile(r"(?:^|[;|&(])\s*which(?:\s|$)"), "Windows PowerShell has no `which`; run the tool with `--version`"),
+    ("chmod", re.compile(r"\bchmod\b"), "Windows has no `chmod`; run a script through its interpreter by path"),
+    ("touch", re.compile(r"(?:^|[;|&(])\s*touch(?:\s|$)"), "Windows has no `touch`; create the file with the agent's file tools"),
+    ("source", re.compile(r"(?:^|[;|&(])\s*source(?:\s|$)"), "PowerShell has no `source`; read the file with the agent's own tools"),
+    (
+        "VAR=x cmd",
+        re.compile(r"(?:^|[;|&(])\s*[A-Z_][A-Z0-9_]*=\S*\s+[\w./\"'-]"),
+        "PowerShell reads no environment prefix before a command; pass the value as an argument or set it in the harness",
+    ),
+    (
+        "$VAR",
+        re.compile(r"\$(?:\{(?!" + CLAUDE_CODE_SUBSTITUTIONS + r"\})[A-Z_][A-Z0-9_]+\}|(?!" + CLAUDE_CODE_SUBSTITUTIONS + r"\b)[A-Z_][A-Z0-9_]+\b)"),
+        "PowerShell reads an environment variable as `$env:NAME`, not `$NAME`; let a script read it",
+    ),
 )
 # A construct quoted as an example rather than given as a command, keyed on the file's path under a target's
 # `skills/` and the code span or fenced line exactly as rendered, with the reason it may stay. An entry that no
 # longer matches anything is reported, so the list cannot outlive what it excuses.
-POSIX_SHELL_ALLOWED: dict[tuple[str, str], str] = {}
+POSIX_SHELL_ALLOWED: dict[tuple[str, str], str] = {
+    ("shared/writing-mthds.md", "sed"): "names `sed` among the shell routes that leave a `.mthds` file unchecked, never as a command",
+    ("shared/credentials.md", "$VIBE_HOME/config.toml"): "names the file Vibe reads, in Vibe's own notation, for the user to open, never to run",
+}
 # Skills whose commands other items of the Windows epic are making shell-neutral; each is removed from this
 # table by the change that lands its item, after which the rule holds that skill too.
 POSIX_SHELL_PENDING_SKILLS: dict[str, str] = {
@@ -713,18 +737,20 @@ def check_skill_posix_shell(
     """Refuse a POSIX-only shell construct in the skill text every target ships (L-261126-4c4a95).
 
     Every Markdown file under each target's `skills/` is read, SKILL.md, references and shared files alike,
-    as rendered, so a template and a static reference are held to the same rule.
+    as rendered, so a template and a static reference are held to the same rule. A pending skill is read too, its
+    constructs set aside rather than reported, so that a pending entry whose skill already passes is reported, as a
+    stale allowlist entry is.
     """
     allowed = POSIX_SHELL_ALLOWED if allowed is None else allowed
     pending = POSIX_SHELL_PENDING_SKILLS if pending is None else pending
     errors: list[str] = []
     used: set[tuple[str, str]] = set()
+    pending_found: set[str] = set()
     for output_dir in _collect_output_dirs(base_dir):
         skills_dir = output_dir / "skills"
         for path in sorted(skills_dir.rglob("*.md")):
             key_path = path.relative_to(skills_dir).as_posix()
-            if key_path.split("/", 1)[0] in pending:
-                continue
+            skill = key_path.split("/", 1)[0]
             rel = path.relative_to(base_dir)
             for idx, code in _shell_code(path.read_text(encoding="utf-8")):
                 for name, pattern, advice in POSIX_SHELL_CONSTRUCTS:
@@ -733,9 +759,16 @@ def check_skill_posix_shell(
                     if (key_path, code) in allowed:
                         used.add((key_path, code))
                         continue
+                    if skill in pending:
+                        pending_found.add(skill)
+                        continue
                     shown = code.strip() if len(code.strip()) <= 100 else code.strip()[:97] + "..."
                     errors.append(f"{rel}:{idx}: `{name}` in `{shown}`: {advice}")
     errors.extend(f"allowlisted `{code}` in {key_path} no longer appears in any target" for key_path, code in sorted(allowed.keys() - used))
+    errors.extend(
+        f"pending skill {skill} ({pending[skill]}) gives no POSIX-only command in any target: remove it from POSIX_SHELL_PENDING_SKILLS"
+        for skill in sorted(pending.keys() - pending_found)
+    )
     return errors
 
 

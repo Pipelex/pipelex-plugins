@@ -54,7 +54,7 @@ class TestPipelexIntegrateSkill:
         # A bundle is one closure: the call site submits every file, not just main.mthds.
         "sending **the whole `bundle_dir` as the method's tree** at call time",
         # The containment reading is lexically wrong in both directions without resolving.
-        "both resolved (`pwd -P`, `realpath`)",
+        'both resolved (`node -p "fs.realpathSync(process.argv[1])" "<path>"`)',
         # A lock with no sidecar is also what this method's own interrupted run leaves.
         "This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place.",
         # A multiple output is a ListContent, so it arrives wrapped and a parser applied to main_stuff whole

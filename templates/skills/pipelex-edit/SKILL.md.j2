@@ -56,7 +56,7 @@ Validate the whole bundle **before editing**: call `mthds_validate` on the bundl
 
 ### Step 4: Apply the edits
 
-Before editing a construct you have not touched recently, read [the MTHDS reference]({{ shared_dir }}/writing-mthds.md). A rename is done only when **no stale reference remains**: grep the whole bundle for the old code.
+Before editing a construct you have not touched recently, read [the MTHDS reference]({{ shared_dir }}/writing-mthds.md). A rename is done only when **no stale reference remains**: search the whole bundle for the old code.
 
 - **Rename a pipe**: the `[pipe.<code>]` table header, every step or branch reference in controllers, and `main_pipe` in the root if it names this pipe.
 - **Rename a concept**: the declaration, every `inputs`/`output` mention, `refines` references, `concept` fields inside structures, and field-reads in prompts (a `$var.field` stays keyed to the *variable*, but construct `from` paths and concept-typed fields name the concept).
