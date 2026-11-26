@@ -820,7 +820,7 @@ def check_skill_posix_shell(
         for path in sorted(skills_dir.rglob("*.md")):
             key_path = path.relative_to(skills_dir).as_posix()
             skill = key_path.split("/", 1)[0]
-            rel = path.relative_to(base_dir)
+            rel = path.relative_to(base_dir).as_posix()
             for idx, code in _shell_code(path.read_text(encoding="utf-8")):
                 for name, pattern, advice in POSIX_SHELL_CONSTRUCTS:
                     if not pattern.search(code):
