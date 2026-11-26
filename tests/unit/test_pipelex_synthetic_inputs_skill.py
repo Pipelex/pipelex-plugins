@@ -218,7 +218,7 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "./inputs/" not in body
         assert ".gitignore` holding `*`" not in body, "nothing the factory writes by default lies in a tree it must mark"
         synthetic = (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "synthetic.md").read_text(encoding="utf-8")
-        assert "`<tmp>` being a temporary directory made once for the preparation with `mktemp -d`" in synthetic
+        assert "`<tmp>` being a temporary directory made once for the preparation with `node -p " in synthetic
         assert "For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>`" in synthetic
         assert "No `target` lies beside the method" in synthetic
         assert "The report gives each generated file's temporary path" in synthetic

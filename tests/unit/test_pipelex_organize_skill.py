@@ -149,7 +149,10 @@ class TestPipelexOrganizeSkill:
             "**A `PipeDocGen` step's template is the file its `template_file` reaches from the directory of the `.mthds` file holding the step**"
             in plan
         )
-        assert "record each one's real path (`realpath`) before composing, and never move or rename a template file" in plan
+        assert (
+            'record each one\'s real path (`node -p "fs.realpathSync(process.argv[1])" "<path>"`) before composing, '
+            "and never move or rename a template file" in plan
+        )
         assert "its `template_file` becomes the forward-slash path that reaches the same file from there" in plan
         assert "when only a path through `..` would, which the runner refuses, that step does not move" in plan
         proof = self.section(body, "### Step 3 — Prove equivalence before touching disk")

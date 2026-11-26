@@ -980,14 +980,14 @@ class TestSkillFailureDiscipline:
             absent = credentials.split("## The tool is absent", 1)[1].split("## Where the key comes from", 1)[0]
             assert "plugin manifest spawns" not in credentials, f"{target_name}: Vibe's plugin declares no server"
             assert "`mcp/vibe-mcp.toml`" in absent, f"{target_name}: Vibe's message must point at the shipped MCP fragment"
-            assert 'cat "${VIBE_HOME:-$HOME/.vibe}/plugins/pipelex/mcp/vibe-mcp.toml" >> "${VIBE_HOME:-$HOME/.vibe}/config.toml"' in absent, (
-                f"{target_name}: Vibe's message must give the command that appends the entry"
+            assert "append the plugin's `mcp/vibe-mcp.toml`, which is `plugins/pipelex/mcp/vibe-mcp.toml` in that file's directory" in absent, (
+                f"{target_name}: Vibe's message must say where the entry to append is, in words every shell's user can follow"
             )
             assert "`$VIBE_HOME/config.toml` when `VIBE_HOME` is set" in absent, f"{target_name}: name the file Vibe reads (L-260912-cd8054)"
             assert "rewrite a list on one `mcp_servers = [...]` line as `[[mcp_servers]]` tables" in absent, (
                 f"{target_name}: an inline array must become tables (L-260912-fdbf27)"
             )
-            assert absent.index("delete the `mcp_servers = []` line") < absent.index("cat "), (
+            assert absent.index("delete the `mcp_servers = []` line") < absent.index("Then append"), (
                 f"{target_name}: the deletion that keeps Vibe starting comes before the command that appends"
             )
             assert "env" not in absent, f"{target_name}: the entry carries no key, so the stop line sends the user to no env table"
@@ -1074,7 +1074,7 @@ class TestSharedSkillIncludes:
         "now stale and offer": "skills/shared/stale-types-notice.md.j2",
         "`PipeFunc` is experimental": "skills/shared/pipefunc-warning.md.j2",
         "**Save the linked method's draft.**": "skills/shared/saved-copy-notice.md.j2",
-        "One search over the link files": "skills/shared/catalog-id-bridge.md.j2",
+        "One search, from the working directory down and ignored files included,": "skills/shared/catalog-id-bridge.md.j2",
         "read [the catalog-id reference]({{ shared_dir }}/catalog-id.md) before reading any file": "skills/shared/catalog-id-pointer.md.j2",
         "a `setup.py` or a `requirements.txt` at or above the working directory": "skills/shared/project-root.md.j2",
         "read [methods-dir.md]({{ shared_dir }}/methods-dir.md) before choosing": "skills/shared/methods-dir-pointer.md.j2",
