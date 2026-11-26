@@ -54,7 +54,7 @@ class TestPipelexIntegrateSkill:
         # A bundle is one closure: the call site submits every file, not just main.mthds.
         "sending **the whole `bundle_dir` as the method's tree** at call time",
         # The containment reading is lexically wrong in both directions without resolving.
-        "both resolved (`pwd -P`, `realpath`)",
+        'both resolved (`node -p "fs.realpathSync(process.argv[1])" "<path>"`)',
         # A lock with no sidecar is also what this method's own interrupted run leaves.
         "This method's own interrupted run (its default destination, this target's artifacts, no sidecar) is regenerated in place.",
         # A multiple output is a ListContent, so it arrives wrapped and a parser applied to main_stuff whole
@@ -976,8 +976,8 @@ class TestPipelexIntegrateSkill:
         to tell that consumer no gate existed; it now installs one shaped like the TypeScript branch.
         """
         body = self.render("prod")  # rendered: step 8's floors and step 10's skill directory are template variables
-        python_branch = self.the_line(body, "- `python-pydantic`: `mkdir -p scripts && cp")
-        assert 'cp "${CLAUDE_SKILL_DIR}/references/codegen_check.py" scripts/codegen_check.py' in python_branch
+        python_branch = self.the_line(body, "- `python-pydantic`: `node ")
+        assert 'node "${CLAUDE_SKILL_DIR}/scripts/copy-gate.mjs" codegen_check.py' in python_branch
         wiring = self.the_line(body, "into the project's existing gate as the language reference shows")
         assert "`python-structures`' `pipelex codegen check`" in wiring
         assert "with none, the report says where to call it" in wiring
@@ -992,7 +992,7 @@ class TestPipelexIntegrateSkill:
 
         python = (self.REFERENCES_DIR / "python.md").read_text(encoding="utf-8")
         assert "## The offline gate" in python
-        assert "Copy `references/codegen_check.py` to `scripts/codegen_check.py` with step 10's `cp`, never by reading and rewriting it" in python
+        assert "Copy `references/codegen_check.py` to `scripts/codegen_check.py` with step 10's script, never by reading and rewriting it" in python
         assert "Run it from the project root with **the project's own environment**" in python
         assert "Do not add `pipelex` as a dependency to get a gate" in python
         assert "An interpreter without the SDK does not guess: it exits `2` and names the fix." in python
@@ -1998,14 +1998,14 @@ class TestPipelexIntegrateSkill:
         "**the drift gate of the refreshed method's language**, re-checked against step 10 on every refresh",
         "`scripts/codegen-check.mjs` for `ts-zod`, `scripts/codegen_check.py` for `python-pydantic`",
         "**a missing script is installed and wired as step 10 does**",
-        "**a script that differs byte for byte from the reference is re-copied with step 10's `cp`**, never read and written back",
+        "**a script that differs byte for byte from the reference is re-copied with step 10's script**, never read and written back",
         "**the refreshed method's generated directory is added to the gate command's arguments when it is not among them**",
         "each said in the report",
         "for `python-structures` there is no script to copy, so only the last applies, to its `pipelex codegen check` wiring",
     )
     REFRESH_REFERENCE_RULE = (
         "on a refresh add the refreshed method's directory when it is missing, leaving the others as they are. "
-        "A refresh also re-copies the script, with the same `cp`, when the project's copy differs from this reference, "
+        "A refresh also re-copies the script, with the same command, when the project's copy differs from this reference, "
         "and installs it when the project has none"
     )
 
@@ -2058,7 +2058,7 @@ class TestPipelexIntegrateSkill:
         assert "**Do this before step 6**" in step_5
         assert "keeping the tree type-checked and committed" in step_5
 
-        copy = self.the_line(body, "Copy the gate from the project root with `cp`")
+        copy = self.the_line(body, "Copy the gate from the project root with its script")
         assert "never by rewriting it, and never format the copy" in copy, f"{target_name}: step 10 lets the copy be formatted"
 
         step_11 = self.the_line(body, "Format **only the files you wrote**")
@@ -2099,12 +2099,13 @@ class TestPipelexIntegrateSkill:
             assert self.GATE_SCRIPT_EXCLUSION_REASON in text, f"{target_name}: references/{reference} no longer says why the script is excluded"
 
     @pytest.mark.parametrize("target_name", ["prod", "codex", "mistral-vibe"])
-    def test_the_gate_is_copied_from_the_skill_directory_with_cp(self, target_name: str) -> None:
+    def test_the_gate_is_copied_from_the_skill_directory_by_its_script(self, target_name: str) -> None:
         """Phase 0 of the size diet found Vibe copying the gate by reading it and writing it back through the
-        model's own output — identical only by luck, and capped at the tool's size. A verbatim copy is named as a
-        `cp` from the skill's directory, run from the project root: `${CLAUDE_SKILL_DIR}` on Claude, which Claude
-        Code substitutes, and on Codex and Vibe a `<skill-dir>` placeholder that one sentence defines before its
-        first use, because neither harness substitutes anything in a skill body."""
+        model's own output — identical only by luck, and capped at the tool's size. A verbatim copy is a script
+        named by the skill's directory, run through `node` from the project root, in place of the `mkdir -p` and
+        `cp` PowerShell cannot run (L-261126-4c4a95): `${CLAUDE_SKILL_DIR}` on Claude, which Claude Code
+        substitutes, and on Codex and Vibe a `<skill-dir>` placeholder that one sentence defines before its first
+        use, because neither harness substitutes anything in a skill body."""
         config = load_target_config(self.REPO_ROOT / "targets", target_name)
         body = self.render(target_name)
         if target_name == "prod":
@@ -2117,15 +2118,15 @@ class TestPipelexIntegrateSkill:
             harness = config.template_vars["harness_name"]
             definition = f"`<skill-dir>` stands for the directory holding this `SKILL.md`, the one {harness} named when it loaded the skill."
             assert body.count(definition) == 1, f"{target_name}: the placeholder is defined {body.count(definition)} times"
-            assert body.index(definition) < body.index('cp "<skill-dir>/'), f"{target_name}: the placeholder is used before it is defined"
+            assert body.index(definition) < body.index('node "<skill-dir>/'), f"{target_name}: the placeholder is used before it is defined"
             assert "${CLAUDE_SKILL_DIR}" not in body
         for script in ("codegen-check.mjs", "codegen_check.py"):
-            assert f'mkdir -p scripts && cp "{skill_dir}/references/{script}" scripts/{script}' in body, f"{target_name}: {script}"
+            assert f'`node "{skill_dir}/scripts/copy-gate.mjs" {script}`' in body, f"{target_name}: {script}"
             # The copy command is code, which the link check does not read, so the index names each script as a link.
             assert f"[{script}](references/{script})" in body
 
     def test_the_gate_copy_asks_before_replacing_a_file_it_did_not_write(self) -> None:
-        """`cp` replaces a same-named file without a word, and a project can keep its own script at that path —
+        """A plain copy replaces a same-named file without a word, and a project can keep its own script at that path —
         the Python starter ships a different `scripts/codegen_check.py`. The copy and the refresh's re-copy go ahead
         only over a file carrying the line both shipped scripts open with, so that line must stay in each of them."""
         mark = "Copied verbatim into a project by /pipelex-integrate"

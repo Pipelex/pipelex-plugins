@@ -31,7 +31,7 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 |---|---|
 | `format` | For `native.Document`, `docx`, `xlsx` or `pptx` when the user's originals are `.docx`, `.xlsx` or `.pptx` files, so the test takes the route the real files take; `pdf` when they are legacy or OpenDocument files (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`), which the platform reads as the PDF it converts them to, so the test exercises the reader but not the conversion's losses (below); and `pdf` otherwise; `png` for `native.Image` — plus the PNG category when the method implies one (`chart`, `diagram`, `document_scan`, `screenshot`); `photograph` for a `native.Image` the method reads as a photo of a real-world scene (damage, a room, a product), a photo of a document being a `document_scan` |
 | `brief` | one or two sentences in the method's own vocabulary — "an invoice from a hardware store with ten line items and a VAT total", not "a document" |
-| `target` | `<tmp>/<input_variable>.<ext>`, `<tmp>` being a temporary directory made once for the preparation with `mktemp -d`; a list input's items go in a directory named after it, one index each (`<tmp>/<input_variable>/1.<ext>`), so an item never takes another input's name. For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>` |
+| `target` | `<tmp>/<input_variable>.<ext>`, `<tmp>` being a temporary directory made once for the preparation with `node -p "require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'pipelex-'))"`, which prints its absolute path; a list input's items go in a directory named after it, one index each (`<tmp>/<input_variable>/1.<ext>`), so an item never takes another input's name. For a case's copies, `<output_dir>/inputs/` stands in for `<tmp>` |
 | `constraints` | whatever the input's description pins: page count, pixel size, language; and for an `xlsx`, its layout (below) |
 
 **An input a step reads as a spreadsheet or fills as a template takes that step's format, never a `pdf`.** A `PipeStructure` reads an `.xlsx` or a CSV file, and a `PipeDocGen`'s `template_input` a file of the step's `format`, `xlsx`, `docx` or `pptx`; both refuse a PDF and a legacy or OpenDocument file with `input.file_type_unsupported`. So ask for `xlsx`, or the `template_input` step's `format`, whatever the originals are, and take neither route below.
@@ -41,7 +41,7 @@ When an input needs an actual file — `native.Image`, `native.Document`, a Word
 - **`layout: plain`** when a step takes it through `sheet_range`, with that `sheet_range`'s `sheet` and `header_row` as written, or `none` for one it omits, and `totals: yes` when a `PipeDocGen` appends to it (`table_fill = "append"`), so the append moves a totals line: `layout: plain, sheet: Feuil1, header_row: 3, totals: yes`.
 - **`layout: table`** otherwise, with the name a `table` gives or a list the `PipeDocGen` fills by name: `layout: table, name: Expenses`. That name reaches a named range too, so pass **`layout: named, name: Expenses`** when the user's workbook, or their account of it, holds it as a defined name (Formulas > Define Name) rather than a Table; when you cannot tell, ask, or pass `table` and say so.
 
-**A legacy or OpenDocument original can take its own route too.** Outside a case's copies, where `soffice` is on PATH, you may ask instead for the modern counterpart, a `docx` for a `.doc` or `.odt`, an `xlsx` for a `.xls` or `.ods`, a `pptx` for a `.ppt` or `.odp`, and turn the file it returns into the original's format in a fresh temporary directory: `soffice --headless --convert-to odt --outdir "$(mktemp -d)" <file>`, with the original's extension in place of `odt`. The test then takes the conversion route and meets its losses. Put the converted file's path into the template in place of the factory's, and never rename a file to change its format. Without `soffice`, ask for the `pdf`.
+**A legacy or OpenDocument original can take its own route too.** Outside a case's copies, where `soffice` is on PATH, you may ask instead for the modern counterpart, a `docx` for a `.doc` or `.odt`, an `xlsx` for a `.xls` or `.ods`, a `pptx` for a `.ppt` or `.odp`, and turn the file it returns into the original's format in a fresh temporary directory `<dir>`, made as `<tmp>` is: `soffice --headless --convert-to odt --outdir "<dir>" <file>`, with the original's extension in place of `odt`. The test then takes the conversion route and meets its losses. Put the converted file's path into the template in place of the factory's, and never rename a file to change its format. Without `soffice`, ask for the `pdf`.
 
 No `target` lies beside the method: its folder is sent whole on every validation, run and catalog save, and shipped in the wheel of a Python package that holds it, so a test file reaches Pipelex only as step 5's upload, never as a file of the method. A case's copies are the one exception, in a case directory outside every method: `pipelex-lab` commits a case made only of synthetic files, since no render gives back the same bytes, so the factory writes them under the case's `inputs/`, which nothing marks.
 
@@ -71,17 +71,17 @@ When the answer carries `test_method_id`, step 5's report says the files went up
 A sales-chart reader expects `chart: Image` and `analysis_prompt: Text`.
 
 1. Get the template; the method needs an image it can read as a chart, and instruction text.
-2. `chart` is `native.Image`, so it goes to the factory: `format: png` with category `chart`, `brief: "a grouped bar chart of quarterly units shipped for three regions, with a legend and axis labels"`, `target: /tmp/tmp.Xq3v9K/chart.png`, in the directory `mktemp -d` made. It returns that path.
+2. `chart` is `native.Image`, so it goes to the factory: `format: png` with category `chart`, `brief: "a grouped bar chart of quarterly units shipped for three regions, with a legend and axis labels"`, `target: <tmp>/chart.png`, in the temporary directory made for the preparation, `<tmp>` standing for the path its command printed. It returns that path.
 3. Write an analysis prompt matching the method's context.
 4. Save `inputs.json`:
 
    ```json
    {
-     "chart": "/tmp/tmp.Xq3v9K/chart.png",
+     "chart": "<tmp>/chart.png",
      "analysis_prompt": "Read this chart. Report the trend per region and name the strongest quarter."
    }
    ```
 
-5. `chart` is a local path, so step 5 uploads it as a test file of the method, with `kind: "test"`, and writes the run-ready form over `inputs.json`, before the run is offered. The report names `/tmp/tmp.Xq3v9K/chart.png` and `chart.png`, its name among the team's files.
+5. `chart` is a local path, so step 5 uploads it as a test file of the method, with `kind: "test"`, and writes the run-ready form over `inputs.json`, before the run is offered. The report names `<tmp>/chart.png` and `chart.png`, its name among the team's files.
 
 Had the method wanted a photograph of a street scene, the factory would have generated one through the workshop, with the details the method must find written into its description, and reported its run id and cost beside the path. Had the workshop been unreachable, it would have come back with no path: `analysis_prompt` would still be filled, `inputs.json` still written, and the report would say which input is waiting on the user and why.
