@@ -67,10 +67,12 @@ jobs:
           python-version-file: .python-version
 
       # The launcher and the hook wrapper run on Node, and the launcher's
-      # workshop test fetches @pipelex/mcp through npx.
+      # workshop test fetches @pipelex/mcp through npx. The version is the floor
+      # docs/install.md states, the `engines.node` @pipelex/mcp declares, so the
+      # job proves the oldest Node the page supports.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24.14.1"
 
       - name: Install uv (with cache)
         uses: astral-sh/setup-uv@v7
