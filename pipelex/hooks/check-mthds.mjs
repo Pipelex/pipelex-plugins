@@ -1,0 +1,82 @@
+// PostToolUse hook: lint, format, and validate .mthds files after Write/Edit.
+// One script for macOS, Linux and Windows, which Claude Code spawns with no
+// shell: hooks.json names `node` as the command and this file as its argument.
+//
+// Two-layer design: this thin wrapper is the fail-open guard and the
+// per-platform seam; ALL validation logic lives in the vendored check.mjs
+// bundle beside it (built in pipelex-sdk's js/ — see docs/hooks.md):
+//   1. local lint   (@pipelex/tools-wasm — offline, no credentials) → block on errors
+//   2. local format (same engine) → write back in place when changed
+//   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)
+//      → block on an invalid verdict; non-blocking nudge on pending signatures
+//
+// Fail-open posture (Claude Code, CLI-free): a missing check.mjs, or one
+// still running near the hook's timeout, passes with a note on stderr; no
+// PIPELEX_API_KEY / API unreachable → check.mjs
+// skips only the validate stage while the local lint/format verdicts still
+// apply. Nothing here shells out to plxt or mthds-agent.
+
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+// --- Read stdin (PostToolUse JSON) once; re-fed to check.mjs below ---
+let input = "";
+process.stdin.setEncoding("utf8");
+for await (const chunk of process.stdin) {
+  input += chunk;
+}
+
+// Fast pre-filter: this hook only cares about .mthds files. Exit silently for
+// everything else, before the bundle is loaded.
+if (!/"file_path"\s*:\s*"[^"]*\.mthds"/.test(input)) {
+  process.exit(0);
+}
+
+// Plugin user-config credentials: Claude Code exports each `userConfig`
+// value to hook processes as CLAUDE_PLUGIN_OPTION_<KEY>. Promote them to the
+// real PIPELEX_* variables when non-empty — GUI launches (Claude Desktop)
+// carry no shell environment, so these are the only credential channel there.
+// A set option wins over inherited session env (matching the manifest's MCP
+// entry, which hands the same options to the launcher); an empty one leaves
+// the session env untouched.
+const env = { ...process.env };
+if (process.env.CLAUDE_PLUGIN_OPTION_API_KEY) {
+  env.PIPELEX_API_KEY = process.env.CLAUDE_PLUGIN_OPTION_API_KEY;
+}
+
+// Resolve the bundle beside this script.
+const checkMjs = join(dirname(fileURLToPath(import.meta.url)), "check.mjs");
+
+// Missing bundle = broken install — fail open rather than block every edit.
+if (!existsSync(checkMjs)) {
+  console.error("[mthds-hook] check.mjs not found beside check-mthds.mjs — passing (reinstall the plugin)");
+  process.exit(0);
+}
+
+// Claude Code kills this wrapper after the hook's timeout in hooks.json
+// (15 s), which would leave the bundle, a second process, running on. So the
+// bundle is stopped first, two seconds earlier, and the hook passes as a killed
+// hook would: the edit stands (docs/hooks.md, "Timeout").
+const BUNDLE_TIMEOUT_MS = 13000;
+
+// The bundle runs on the Node running this file, from the hook's own working
+// directory, with the payload on its stdin and its verdict on this hook's stdout.
+const result = spawnSync(process.execPath, [checkMjs], {
+  input,
+  stdio: ["pipe", "inherit", "inherit"],
+  env,
+  timeout: BUNDLE_TIMEOUT_MS,
+  killSignal: "SIGKILL",
+});
+if (result.error?.code === "ETIMEDOUT") {
+  console.error(`[mthds-hook] check.mjs ran past ${BUNDLE_TIMEOUT_MS / 1000} s and was stopped — passing`);
+  process.exit(0);
+}
+if (result.error) {
+  console.error(`[mthds-hook] could not run check.mjs: ${result.error.message} — passing`);
+  process.exit(0);
+}
+process.exit(result.status ?? 1);

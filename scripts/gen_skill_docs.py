@@ -177,20 +177,21 @@ SHARED_TEMPLATES = [
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
-# bundled `.mthds`-on-edit validation script. The CLI-free posture ports the
-# validation pipeline but flips missing-CLI behavior from block-with-install-hint
-# to silent pass — the hook no-ops when `plxt`/`mthds-agent`/`node` are absent
-# instead of blocking every edit. The predecessor's session-start doctor hook is
-# left behind (CLI-lifecycle territory).
+# bundled `.mthds`-on-edit validation wrapper, and the workshop launcher. Both
+# scripts are Node modules that Claude Code spawns as `node <script>` with no
+# shell, so they run alike on macOS, Linux and Windows (docs/decisions.md, "The
+# MCP launcher and the Claude Code hook run on Node"). The predecessor's
+# session-start doctor hook is left behind (CLI-lifecycle territory).
 HOOK_TEMPLATES = [
     "hooks/hooks.json.j2",
-    "hooks/check-mthds.sh.j2",
-    "hooks/launch-pipelex-mcp.sh.j2",
+    "hooks/check-mthds.mjs.j2",
+    "hooks/launch-pipelex-mcp.mjs.j2",
 ]
 
 # Hook templates by platform:
-# - Claude: hooks/hooks.json + the check-mthds.sh wrapper, and the
-#   launch-pipelex-mcp.sh launcher the manifest's MCP entry spawns.
+# - Claude: hooks/hooks.json, whose exec-form entries spawn the check-mthds.mjs
+#   wrapper with `node`, and the launch-pipelex-mcp.mjs launcher the manifest's
+#   MCP entry spawns the same way.
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
@@ -245,8 +246,9 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod
-# only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh", "launch-pipelex-mcp.sh"}
+# only touches files that were produced. The Claude target's Node scripts are not
+# among them: they are run as `node <script>`, never by their own path.
+EXECUTABLE_OUTPUTS = {"check-mthds-codex.sh", "check-mthds-vibe.sh"}
 
 # Name of the plugin-declared MCP server entry injected into the Claude and
 # Codex manifests. Its tools reach the model as
@@ -256,9 +258,12 @@ EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vib
 MCP_SERVER_NAME = "pipelex"
 
 # What the Claude manifest's MCP entry spawns when the target declares plugin
-# user configuration: the launcher that promotes the user's options to their
-# PIPELEX_* names (make_plugin_json, and scripts/check.py's credential check).
-CLAUDE_MCP_LAUNCHER_COMMAND = "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"
+# user configuration: `node` running the launcher that promotes the user's
+# options to their PIPELEX_* names (make_plugin_json, and scripts/check.py's
+# credential check). `node` is a real executable on every OS, where a script
+# named as the command is not one on Windows.
+CLAUDE_MCP_LAUNCHER_COMMAND = "node"
+CLAUDE_MCP_LAUNCHER_ARGS = ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"]
 
 
 @dataclass
@@ -433,18 +438,6 @@ def resolve_output_dir(base_dir: Path, source: str) -> Path:
     return base_dir / source.rstrip("/")
 
 
-def shell_double_quoted(value: object) -> str:
-    """`value` as one double-quoted shell word, which a shell hands on exactly as it is.
-
-    Inside double quotes a shell still acts on `$`, a backtick and `\\`, and `"` ends the word, so each
-    of the four is escaped. A word holding none of them renders as it always did.
-    """
-    text = str(value)
-    for char in ("\\", '"', "$", "`"):
-        text = text.replace(char, f"\\{char}")
-    return f'"{text}"'
-
-
 def _render_or_die(env: Environment, template_name: str, template_vars: Mapping[str, TemplateVarValue]) -> str:
     """Render one template by name, turning Jinja errors into a clean SystemExit."""
     try:
@@ -536,7 +529,6 @@ def render_templates(
         keep_trailing_newline=True,
         undefined=StrictUndefined,
     )
-    env.filters["shell_double_quoted"] = shell_double_quoted
 
     def declared(names: Sequence[str], kind: str) -> list[str]:
         """The names, each of which must resolve to a file — fail loudly if one is missing."""
@@ -631,13 +623,14 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # delivery differs per platform:
     # - Claude: the [vars.mcp_server.user_config] tables become the manifest's
     #   `userConfig` (prompted at enable time; sensitive values go to the OS
-    #   keychain) and the entry spawns the launch-pipelex-mcp.sh wrapper with
+    #   keychain) and the entry spawns `node` on the launch-pipelex-mcp.mjs launcher with
     #   each option injected as PIPELEX_PLUGIN_<KEY> via `${user_config.*}`
     #   substitution. The wrapper promotes non-empty values to their real
     #   PIPELEX_* names, keeping the session env as fallback — GUI launches
     #   (Claude Desktop) carry no shell env, so userConfig is the only
     #   credential channel there. Without a user_config block the entry
-    #   spawns the workshop command directly (full shell env passthrough).
+    #   still spawns the launcher, with no env block and nothing to promote,
+    #   since Windows cannot spawn `npx`, a batch file, without a shell.
     #   The non-empty guard is load-bearing, not indirection: injecting
     #   ${user_config.*} straight into PIPELEX_* means an unfilled option
     #   substitutes to "" and SHADOWS a working shell credential. The
@@ -673,28 +666,22 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
         raw_user_config = mcp_server.get("user_config")
         match config.platform:
             case Platform.CLAUDE:
+                # The server always starts through the Node launcher, never the workshop command itself:
+                # `npx` is a batch file on Windows, which Claude Code cannot spawn without a shell. With no
+                # user_config the launcher promotes nothing and the entry carries no env block.
+                claude_entry: dict[str, object] = {
+                    "type": "stdio",
+                    "command": CLAUDE_MCP_LAUNCHER_COMMAND,
+                    "args": list(CLAUDE_MCP_LAUNCHER_ARGS),
+                }
                 if isinstance(raw_user_config, dict):
                     user_config = cast("dict[str, object]", raw_user_config)
                     base["userConfig"] = user_config
                     option_env: dict[str, str] = {}
                     for option_key in user_config:
                         option_env[f"PIPELEX_PLUGIN_{option_key.upper()}"] = f"${{user_config.{option_key}}}"
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": CLAUDE_MCP_LAUNCHER_COMMAND,
-                            "args": [],
-                            "env": option_env,
-                        }
-                    }
-                else:
-                    base["mcpServers"] = {
-                        MCP_SERVER_NAME: {
-                            "type": "stdio",
-                            "command": command,
-                            "args": launcher_args,
-                        }
-                    }
+                    claude_entry["env"] = option_env
+                base["mcpServers"] = {MCP_SERVER_NAME: claude_entry}
             case Platform.CODEX:
                 codex_entry: dict[str, object] = {
                     "command": command,
@@ -1079,6 +1066,8 @@ def write_files(files: Mapping[Path, str]) -> None:
     """Write what a build rendered (`BuildResult.files`) to disk, making the hook scripts executable."""
     for output_path, content in files.items():
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        # `newline="\n"`: text mode on Windows would write every line ending as CRLF, and the
+        # generated trees are checked in, and compared byte for byte, with LF endings.
         output_path.write_text(content, encoding="utf-8", newline="\n")
         if output_path.name in EXECUTABLE_OUTPUTS:
             output_path.chmod(0o755)

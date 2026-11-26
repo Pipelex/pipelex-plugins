@@ -44,6 +44,7 @@ pythonpath = ["."]
 addopts = "-m 'not recipes'"
 markers = [
   "recipes: executes the pipelex-synthetic-inputs recipe blocks (runs uv, downloads packages)",
+  "cross_os: tests that must also pass on Windows under PowerShell with no bash",
 ]
 
 # The wheel carries the outside render's upstream inside the `scripts` package: the skill templates, the
