@@ -1982,6 +1982,8 @@ class TestPipelexCatalogSkill:
         design = _skill_source(self.TEMPLATES / "pipelex-design")
         assert "npm run add-method" in design, "the pull mirrors design's stop, so design must still carry it"
         assert "make add-method" not in design
+        for text in (body, design):
+            assert "add-method --" not in text, "PowerShell can drop a `--` before npm's shim sees it"
 
     def test_a_failed_link_write_is_never_reported_as_unlinked(self) -> None:
         """The workshop distinguishes linked-but-stale from genuinely-unlinked, and

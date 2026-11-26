@@ -43,6 +43,7 @@ class TestCheckSkillPosixShell:
         ("code", "construct"),
         [
             ("command -v uv >/dev/null", "command -v"),
+            ("npm run create -- --license-holder 'O'\\''Brien'", "'\\''"),
             ('mkdir -p scripts && cp "${CLAUDE_SKILL_DIR}/references/gate.mjs" scripts/gate.mjs', "mkdir -p"),
             ('mkdir -p scripts && cp "${CLAUDE_SKILL_DIR}/references/gate.mjs" scripts/gate.mjs', "&&"),
             ('cp "${CLAUDE_SKILL_DIR}/references/gate.mjs" scripts/gate.mjs', "cp from the skill's directory"),
@@ -130,6 +131,8 @@ class TestCheckSkillPosixShell:
             "the source check failed",
             'node -p "fs.realpathSync(process.argv[1])" "<path>"',
             "uv --version",
+            "npm --prefix '<dir>' run serve",
+            "$env:PATH = '<bin>' + [IO.Path]::PathSeparator + $env:PATH; <command>",
         ],
     )
     def test_code_that_runs_in_every_shell_or_in_none_passes(self, tree: Path, code: str) -> None:

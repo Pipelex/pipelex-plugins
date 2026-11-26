@@ -6,15 +6,20 @@ Read this when a prerequisite check of `/pipelex-scaffold` finds `node` or `uv` 
 
 Your shell state does not survive from one command to the next. Each command starts again from the user's profile, which is the profile that did not have the runtime, so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next.
 
-Resolve the binary once, keep its directory, and prefix **every** later command with it, as `PATH="<that dir>:$PATH" …`:
+Resolve the binary once, keep its directory, and run **every** later command with that directory first on its `PATH`, set within that same command, since nothing exported survives to the next one. Calling the binary by its absolute path is not enough, because `npm`, `npx` and the scripts they start find `node` on the `PATH`. Each shell sets it its own way, `<bin>` being the directory:
 
-- `nvm`: `ls "$NVM_DIR"/versions/node/*/bin/node`
+- PowerShell 7 and Windows PowerShell 5.1, on any system: `$env:PATH = '<bin>' + [IO.Path]::PathSeparator + $env:PATH; <command>`, the assignment and the command on one line, the `;` ending the assignment
+- bash and zsh: `PATH='<bin>':"$PATH" <command>`
+
+Find the binary with the manager:
+
+- `nvm`: list `versions/node/` under nvm's directory, the one the `NVM_DIR` environment variable names, by default `.nvm` in the home directory; each version holds `bin/node`
 - `volta`: `volta which node`
 - `mise`: `mise which node`, or `mise which uv`
 - `asdf`: `asdf which node`, or `asdf which uv`
-- `fnm`: `fnm exec --using=<v> -- which node`
+- `fnm`: `fnm exec --using=<v> -- node -p process.execPath`
 
-Every later command means every one: the method app's initializer and `make serve`, the ecosystem's initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
+Every later command means every one: the method app's initializer and `npm run serve`, the ecosystem's initializer and the commands after it, and the skill's own scripts. Each is a separate command, and each starts from the profile again.
 
 Verify the runtime answers under that prefix, `node --version` or `uv --version`, **before** anything is created, so that a machine you cannot actually reach stops while nothing exists yet. Discovering it later means the pristine commit has already been spent.
 
