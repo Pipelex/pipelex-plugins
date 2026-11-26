@@ -8,8 +8,10 @@ stand-in bundle shows what the wrapper hands it.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,14 @@ process.stdout.write(JSON.stringify({ apiKey: process.env.PIPELEX_API_KEY ?? nul
 process.stderr.write("stub bundle stderr");
 process.exitCode = Number(process.env.STUB_EXIT ?? "0");
 """
+# Stands in for a bundle that never ends: appends a tick to HANG_TICKS every 50 ms until it is killed.
+HANGING_BUNDLE = """\
+import { appendFileSync } from "node:fs";
+setInterval(() => appendFileSync(process.env.HANG_TICKS, "."), 50);
+"""
+# How much earlier than Claude Code's own timeout the wrapper stops the bundle.
+BUNDLE_TIMEOUT_MARGIN_MS = 2000
+BUNDLE_TIMEOUT_LINE = re.compile(r"^const BUNDLE_TIMEOUT_MS = (\d+);$", re.MULTILINE)
 
 
 def _write_payload(file_path: Path, project: Path) -> str:
@@ -100,6 +110,33 @@ def _stub_bundle(plugin_root: Path) -> None:
 @pytest.mark.cross_os
 @pytest.mark.usefixtures("node")
 class TestClaudeHook:
+    def test_the_bundle_is_stopped_a_little_before_the_hooks_timeout(self, plugin_root: Path) -> None:
+        """One number, the template's, sets both: the wrapper's limit trails hooks.json's timeout by the margin."""
+        hooks = json.loads((plugin_root / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        timeouts = {hook["timeout"] for entry in hooks["hooks"]["PostToolUse"] for hook in entry["hooks"]}
+        assert len(timeouts) == 1, f"the hook entries set different timeouts: {timeouts}"
+        match = BUNDLE_TIMEOUT_LINE.search((plugin_root / "hooks" / "check-mthds.mjs").read_text(encoding="utf-8"))
+        assert match is not None, "check-mthds.mjs no longer sets BUNDLE_TIMEOUT_MS"
+        assert int(match.group(1)) == timeouts.pop() * 1000 - BUNDLE_TIMEOUT_MARGIN_MS
+
+    def test_a_bundle_still_running_at_the_limit_is_killed_and_the_hook_passes(self, plugin_root: Path, project: Path, tmp_path: Path) -> None:
+        """Claude Code kills only the wrapper; the wrapper must not leave the bundle running behind it."""
+        (plugin_root / "hooks" / "check.mjs").write_text(HANGING_BUNDLE, encoding="utf-8")
+        wrapper = plugin_root / "hooks" / "check-mthds.mjs"
+        # The built limit is seconds long; one second proves the same code path.
+        wrapper.write_text(BUNDLE_TIMEOUT_LINE.sub("const BUNDLE_TIMEOUT_MS = 1000;", wrapper.read_text(encoding="utf-8")), encoding="utf-8")
+        ticks = tmp_path / "ticks.txt"
+        method = project / "valid.mthds"
+        method.write_text(VALID_METHOD, encoding="utf-8")
+        result = _run(plugin_root, project, _write_payload(method, project), HANG_TICKS=str(ticks))
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == ""
+        assert "check.mjs ran past 1 s and was stopped" in result.stderr
+        assert ticks.is_file(), "the hanging bundle never started"
+        stopped_at = ticks.stat().st_size
+        time.sleep(0.5)
+        assert ticks.stat().st_size == stopped_at, "the bundle is still running after the wrapper exited"
+
     def test_a_broken_method_is_blocked_with_its_lint_errors(self, plugin_root: Path, project: Path) -> None:
         method = project / "sub dir" / "broken.mthds"
         method.write_text(BROKEN_METHOD, encoding="utf-8")

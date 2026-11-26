@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The Claude Code `.mthds` hook runs on Node with no shell (Breaking)**: `hooks.json` declares the hook in Claude Code's exec form, `node` running `hooks/check-mthds.mjs`, which replaces the bash wrapper `check-mthds.sh`, so the hook checks every edit on Windows under PowerShell with no bash installed. It needs Claude Code 2.1.139 or later and Node.js on the `PATH`; without Node the hook no longer passes silently but fails to start, and the edit stands.
+- **The Claude Code `.mthds` hook runs on Node with no shell (Breaking)**: `hooks.json` declares the hook in Claude Code's exec form, `node` running `hooks/check-mthds.mjs`, which replaces the bash wrapper `check-mthds.sh`, so the hook checks every edit on Windows under PowerShell with no bash installed. It needs Claude Code 2.1.139 or later and Node.js on the `PATH`; without Node the hook no longer passes silently but fails to start, and the edit stands. A validation still running two seconds before the hook's 15-second timeout is stopped, and the edit passes with a note, so a slow check never outlives the hook.
 
 ### Fixed
 

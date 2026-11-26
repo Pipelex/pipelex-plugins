@@ -3,9 +3,14 @@
 # The first Windows machine the plugin targets has PowerShell and no Git Bash,
 # so nothing the plugin runs for Claude Code may need bash. This job runs the
 # `cross_os` selection of the unit suite (`make test-cross-os` on a Mac) the way
-# that machine would: every step in PowerShell, bash and sh taken off the PATH
-# before the tests, and the repository checked out with `core.autocrlf=true`,
-# as Git for Windows does by default. docs/ci.md says what it proves and what
+# that machine would: every step in PowerShell, and the repository checked out
+# with `core.autocrlf=true`, as Git for Windows does by default. Before the
+# tests, bash and sh go off the PATH, and Git for Windows's own bash.exe and
+# sh.exe, in Git\bin and Git\usr\bin, are renamed: Claude Code looks for Git
+# Bash at `C:\Program Files\Git\bin\bash.exe` and beside the git.exe it finds,
+# whatever the PATH says, and falls back to PowerShell only when both are
+# missing. git.exe in Git\cmd keeps working, since the git commands the tests
+# run are built in and start no shell. docs/ci.md says what it proves and what
 # it cannot.
 #
 # It calls no make target, since make and its recipes need bash: `uv run`
@@ -80,10 +85,20 @@ jobs:
         run: uv sync --all-extras
 
       # Git for Windows puts bash and sh in Git\bin and Git\usr\bin; Git\cmd
-      # holds git.exe alone and stays, since the tests call git. Any other
-      # directory holding a bash.exe or sh.exe goes too, except System32, whose
-      # bash.exe is the WSL launcher, which the next step proves runs nothing.
-      - name: Take bash off the PATH
+      # holds git.exe alone and stays on the PATH, since the tests call git.
+      # Any other directory holding a bash.exe or sh.exe goes too, except
+      # System32, whose bash.exe is the WSL launcher, which the next step
+      # proves runs nothing.
+      #
+      # Off the PATH is not enough for Claude Code, which looks for Git Bash at
+      # C:\Program Files\Git\bin\bash.exe and two levels above the git.exe on
+      # the PATH (Git\cmd\git.exe gives Git\bin\bash.exe) before it falls back
+      # to PowerShell. So Git's bash.exe and sh.exe are renamed in both of its
+      # bin directories; the runner is thrown away after the job. git.exe still
+      # works: the commands the tests run (init, check-attr) are built into git
+      # and start no shell, and git looks for sh only to run a hook, an alias
+      # starting with `!`, an editor or a pager, none of which a test reaches.
+      - name: Take bash off the PATH and hide Git Bash
         run: |
           $system32 = [Environment]::SystemDirectory
           $kept = $env:PATH -split ';' | Where-Object {
@@ -97,6 +112,21 @@ jobs:
           Write-Output "Removed from the PATH:"
           $removed | ForEach-Object { Write-Output "  $_" }
           "PATH=$($kept -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          # Git's installation directory, from the git.exe on the PATH just written (Git\cmd\git.exe), and the default one.
+          $git = $kept | ForEach-Object { Join-Path $_ 'git.exe' } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $git) { Write-Error "no git.exe is left on the PATH"; exit 1 }
+          $gitRoots = @((Split-Path -Parent (Split-Path -Parent $git)), (Join-Path $env:ProgramFiles 'Git')) | Sort-Object -Unique
+          Write-Output "Renamed in Git for Windows:"
+          foreach ($root in $gitRoots) {
+            foreach ($relative in 'bin\bash.exe', 'bin\sh.exe', 'usr\bin\bash.exe', 'usr\bin\sh.exe') {
+              $path = Join-Path $root $relative
+              if (Test-Path -LiteralPath $path) {
+                Rename-Item -LiteralPath $path -NewName ((Split-Path -Leaf $path) + '.hidden')
+                Write-Output "  $path"
+              }
+            }
+          }
 
       - name: Prove no bash runs
         run: |
@@ -115,8 +145,25 @@ jobs:
             }
             Write-Output "$($command.Source) resolves but runs no shell"
           }
+          # Where Claude Code looks for Git Bash whatever the PATH says.
+          $git = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+          $gitRoots = @((Split-Path -Parent (Split-Path -Parent $git)), (Join-Path $env:ProgramFiles 'Git')) | Sort-Object -Unique
+          foreach ($root in $gitRoots) {
+            foreach ($relative in 'bin\bash.exe', 'bin\sh.exe', 'usr\bin\bash.exe', 'usr\bin\sh.exe') {
+              $path = Join-Path $root $relative
+              if (Test-Path -LiteralPath $path) {
+                Write-Error "$path is still there, so Claude Code would find Git Bash"
+                exit 1
+              }
+              Write-Output "$path is gone"
+            }
+          }
+          # git still works without them, on the commands the tests run.
+          $probe = Join-Path $env:RUNNER_TEMP 'git-probe'
+          git init --quiet $probe
+          if ($LASTEXITCODE -ne 0) { Write-Error "git init fails without Git Bash"; exit 1 }
           Get-Command git, node, npx, uv, claude | Format-Table Name, Source
-          Write-Output "No bash or sh runs from the PATH."
+          Write-Output "No bash or sh runs from the PATH, and Git Bash is hidden from Claude Code."
 
       - name: Run the cross-OS tests
         run: uv run pytest -m cross_os -v

@@ -1,3 +1,4 @@
+{%- from "hooks/hooks.json.j2" import timeout_seconds -%}
 // PostToolUse hook: lint, format, and validate .mthds files after Write/Edit.
 // One script for macOS, Linux and Windows, which {{ harness_name }} spawns with no
 // shell: hooks.json names `node` as the command and this file as its argument.
@@ -10,8 +11,9 @@
 //   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)
 //      → block on an invalid verdict; non-blocking nudge on pending signatures
 //
-// Fail-open posture ({{ harness_name }}, CLI-free): a missing check.mjs passes
-// with a note on stderr; no PIPELEX_API_KEY / API unreachable → check.mjs
+// Fail-open posture ({{ harness_name }}, CLI-free): a missing check.mjs, or one
+// still running near the hook's timeout, passes with a note on stderr; no
+// PIPELEX_API_KEY / API unreachable → check.mjs
 // skips only the validate stage while the local lint/format verdicts still
 // apply. Nothing here shells out to plxt or mthds-agent.
 
@@ -56,9 +58,25 @@ if (!existsSync(checkMjs)) {
   process.exit(0);
 }
 
+// {{ harness_name }} kills this wrapper after the hook's timeout in hooks.json
+// ({{ timeout_seconds }} s), which would leave the bundle, a second process, running on. So the
+// bundle is stopped first, two seconds earlier, and the hook passes as a killed
+// hook would: the edit stands (docs/hooks.md, "Timeout").
+const BUNDLE_TIMEOUT_MS = {{ (timeout_seconds - 2) * 1000 }};
+
 // The bundle runs on the Node running this file, from the hook's own working
 // directory, with the payload on its stdin and its verdict on this hook's stdout.
-const result = spawnSync(process.execPath, [checkMjs], { input, stdio: ["pipe", "inherit", "inherit"], env });
+const result = spawnSync(process.execPath, [checkMjs], {
+  input,
+  stdio: ["pipe", "inherit", "inherit"],
+  env,
+  timeout: BUNDLE_TIMEOUT_MS,
+  killSignal: "SIGKILL",
+});
+if (result.error?.code === "ETIMEDOUT") {
+  console.error(`[mthds-hook] check.mjs ran past ${BUNDLE_TIMEOUT_MS / 1000} s and was stopped — passing`);
+  process.exit(0);
+}
 if (result.error) {
   console.error(`[mthds-hook] could not run check.mjs: ${result.error.message} — passing`);
   process.exit(0);

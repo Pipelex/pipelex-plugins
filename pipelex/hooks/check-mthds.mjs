@@ -10,8 +10,9 @@
 //   3. API validate (POST /v1/validate via @pipelex/sdk, allow_signatures)
 //      → block on an invalid verdict; non-blocking nudge on pending signatures
 //
-// Fail-open posture (Claude Code, CLI-free): a missing check.mjs passes
-// with a note on stderr; no PIPELEX_API_KEY / API unreachable → check.mjs
+// Fail-open posture (Claude Code, CLI-free): a missing check.mjs, or one
+// still running near the hook's timeout, passes with a note on stderr; no
+// PIPELEX_API_KEY / API unreachable → check.mjs
 // skips only the validate stage while the local lint/format verdicts still
 // apply. Nothing here shells out to plxt or mthds-agent.
 
@@ -55,9 +56,25 @@ if (!existsSync(checkMjs)) {
   process.exit(0);
 }
 
+// Claude Code kills this wrapper after the hook's timeout in hooks.json
+// (15 s), which would leave the bundle, a second process, running on. So the
+// bundle is stopped first, two seconds earlier, and the hook passes as a killed
+// hook would: the edit stands (docs/hooks.md, "Timeout").
+const BUNDLE_TIMEOUT_MS = 13000;
+
 // The bundle runs on the Node running this file, from the hook's own working
 // directory, with the payload on its stdin and its verdict on this hook's stdout.
-const result = spawnSync(process.execPath, [checkMjs], { input, stdio: ["pipe", "inherit", "inherit"], env });
+const result = spawnSync(process.execPath, [checkMjs], {
+  input,
+  stdio: ["pipe", "inherit", "inherit"],
+  env,
+  timeout: BUNDLE_TIMEOUT_MS,
+  killSignal: "SIGKILL",
+});
+if (result.error?.code === "ETIMEDOUT") {
+  console.error(`[mthds-hook] check.mjs ran past ${BUNDLE_TIMEOUT_MS / 1000} s and was stopped — passing`);
+  process.exit(0);
+}
 if (result.error) {
   console.error(`[mthds-hook] could not run check.mjs: ${result.error.message} — passing`);
   process.exit(0);
