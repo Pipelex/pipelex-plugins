@@ -19,8 +19,11 @@
 //   refused: <reason>              nothing was initialized, and <reason> is one of usage,
 //                                  no-directory, no-git, template-checkout (the repository holding
 //                                  <dir> is the template's own, pipelex-sdk or pipelex-method-apps,
-//                                  by its origin), tracked <root> (<root> already tracks <dir>), or
-//                                  init-failed (git's message on stderr)
+//                                  by its origin), tracked <root> (<root> already tracks <dir>),
+//                                  git-failed (git could not read <dir> for a reason other than its
+//                                  being outside every repository, such as a repository it calls
+//                                  dubious or a directory inside a `.git`) or init-failed (git's
+//                                  message on stderr for both)
 // The exit code is presentation: 0 unless refused.
 //
 // The order is the reading's correctness. The history is read first, since a user standing in a copy
@@ -58,13 +61,22 @@ function refuse(reason, detail = "") {
 }
 
 // git's environment: this process's without any PIPELEX_* variable, which git never needs and which
-// Node's debug log would otherwise print with the spawn. Windows reads a variable's name in any case.
-const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_")));
+// Node's debug log would otherwise print with the spawn, and without the variables that point git at a
+// repository other than the one it finds from <dir>, which a hook or a wrapper can leave set, as the
+// family's initializer drops them. Windows reads a variable's name in any case.
+const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX"];
+const GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_") && !GIT_REDIRECTS.includes(name.toUpperCase())),
+);
+// git's own message for a directory outside every repository, read in the C locale so that it is the same words
+// in every language git speaks.
+const OUTSIDE = /not a git repository/i;
 
 // git with its arguments as an array and no shell. The output loses its trailing line breaks, as a
 // shell's command substitution would, and `message` joins both streams for a refusal to relay.
-function git(args) {
-  const result = spawnSync("git", args, { encoding: "utf8", env: GIT_ENV, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+function git(args, extraEnv = {}) {
+  const env = { ...GIT_ENV, ...extraEnv };
+  const result = spawnSync("git", args, { encoding: "utf8", env, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   const stdout = (result.stdout ?? "").replace(/[\r\n]+$/, "");
   const stderr = (result.stderr ?? "").replace(/[\r\n]+$/, "");
   const message = [stdout, stderr, result.error?.message ?? ""].filter(Boolean).join("\n");
@@ -109,8 +121,18 @@ function readCopyGit(args) {
   }
 
   // `--show-prefix` prints nothing at a repository's root, which needs no path comparison and so
-  // survives symlinks and letter case, and fails outside every repository.
-  const prefix = git(["-C", dir, "rev-parse", "--show-prefix"]);
+  // survives symlinks and letter case, and fails outside every repository. It fails for other reasons
+  // too, a repository of another owner's that git calls dubious, a directory inside a `.git`, and only
+  // "not a git repository" means outside every one: anything else is refused with git's message, since
+  // a repository initialized there would sit inside one git could not read.
+  const prefix = git(["-C", dir, "rev-parse", "--show-prefix"], { LC_ALL: "C", LANGUAGE: "C" });
+  if (!prefix.ok && !OUTSIDE.test(prefix.message)) {
+    refuse("git-failed", prefix.message);
+  }
+  // Inside a `.git` directory git answers with an empty prefix, as at a work tree's root.
+  if (prefix.ok && git(["-C", dir, "rev-parse", "--is-inside-git-dir"]).out === "true") {
+    refuse("git-failed", `${dir} is inside a repository's .git directory`);
+  }
   const atRoot = prefix.ok && prefix.out === "";
   if (atRoot) {
     const pristine = git(["-C", dir, "log", "--format=%h %s"])

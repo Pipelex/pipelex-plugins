@@ -6,7 +6,12 @@ Read this when a prerequisite check of `/pipelex-scaffold` finds `node` or `uv` 
 
 Your shell state does not survive from one command to the next. Each command starts again from the user's profile, which is the profile that did not have the runtime, so `. nvm.sh` or `eval "$(fnm env)"` in one call buys nothing in the next.
 
-Resolve the binary once, keep its directory, and run **every** later command with that directory first on its `PATH`, set for that one command in the form your shell gives a single command, since nothing exported survives to the next one:
+Resolve the binary once, keep its directory, and run **every** later command with that directory first on its `PATH`, set within that same command, since nothing exported survives to the next one. Calling the binary by its absolute path is not enough, because `npm`, `npx` and the scripts they start find `node` on the `PATH`. Each shell sets it its own way, `<bin>` being the directory:
+
+- PowerShell 7 and Windows PowerShell 5.1, on any system: `$env:PATH = '<bin>' + [IO.Path]::PathSeparator + $env:PATH; <command>`, the assignment and the command on one line, the `;` ending the assignment
+- bash and zsh: `PATH='<bin>':"$PATH" <command>`
+
+Find the binary with the manager:
 
 - `nvm`: list `versions/node/` under nvm's directory, the one the `NVM_DIR` environment variable names, by default `.nvm` in the home directory; each version holds `bin/node`
 - `volta`: `volta which node`

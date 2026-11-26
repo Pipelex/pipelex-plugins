@@ -22,8 +22,10 @@
 //                                and <dir>/.git is left where it is, since removing it is the user's
 //                                choice
 //   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
-//                                no-directory, init-failed, write-failed, stage-failed,
-//                                nothing-to-commit, commit-failed; git's own message, if any,
+//                                no-directory, git-failed (git could not read <dir> for a reason
+//                                other than its being outside every repository), init-failed,
+//                                write-failed, stage-failed, nothing-to-commit, commit-failed;
+//                                git's own message, if any,
 //                                goes to stderr. Any other failure of the file system is
 //                                write-failed, with the system's message on stderr
 // The exit code is presentation: 0 for committed, kept, inside, unversioned and nested, 1 for
@@ -57,13 +59,20 @@ function refuse(reason, detail = "") {
 // stderr under `NODE_DEBUG=child_process`, so a key the shell exports would reach the transcript
 // through any git call made without this one. The name is compared in upper case because Windows
 // reads a variable's name in any case.
-const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_")));
+//
+// The variables that point git at a repository other than the one it finds from <dir>, which a hook or a
+// wrapper can leave set, are dropped as well, as the family's initializer drops them.
+const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX"];
+const GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_") && !GIT_REDIRECTS.includes(name.toUpperCase())),
+);
 
-// git with its arguments as an array and no shell, its environment GIT_ENV, and `input` on its standard
-// input. The output loses its trailing line breaks, as a shell's command substitution would, and
-// `message` joins both streams for a refusal to relay.
-function git(args, input = "") {
-  const result = spawnSync("git", args, { encoding: "utf8", env: GIT_ENV, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+// git with its arguments as an array and no shell, its environment GIT_ENV with `extraEnv` over it, and
+// `input` on its standard input. The output loses its trailing line breaks, as a shell's command
+// substitution would, and `message` joins both streams for a refusal to relay.
+function git(args, input = "", extraEnv = {}) {
+  const env = { ...GIT_ENV, ...extraEnv };
+  const result = spawnSync("git", args, { encoding: "utf8", env, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   const stdout = (result.stdout ?? "").replace(/[\r\n]+$/, "");
   const stderr = (result.stderr ?? "").replace(/[\r\n]+$/, "");
   const message = [stdout, stderr, result.error?.message ?? ""].filter(Boolean).join("\n");
@@ -211,7 +220,17 @@ function commitPristine(args) {
   };
   let enclosing = "";
   let nested = "";
-  const prefix = git(["-C", dir, "rev-parse", "--show-prefix"]);
+  // Only git's "not a git repository" means outside every one, read in the C locale so that it is the
+  // same words in every language: a repository git calls dubious, or a directory inside a `.git`, fails
+  // too, and a repository initialized there would sit inside one git could not read.
+  const prefix = git(["-C", dir, "rev-parse", "--show-prefix"], "", { LC_ALL: "C", LANGUAGE: "C" });
+  if (!prefix.ok && !/not a git repository/i.test(prefix.message)) {
+    refuse("git-failed", prefix.message);
+  }
+  // Inside a `.git` directory git answers with an empty prefix, as at a work tree's root.
+  if (prefix.ok && git(["-C", dir, "rev-parse", "--is-inside-git-dir"]).out === "true") {
+    refuse("git-failed", `${dir} is inside a repository's .git directory`);
+  }
   if (prefix.ok) {
     if (prefix.out === "") {
       const around = git(["-C", path.dirname(dir), "rev-parse", "--show-toplevel"]);

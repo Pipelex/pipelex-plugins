@@ -631,13 +631,15 @@ class TestCommitPristine:
         assert sorted(entry.name for entry in project.iterdir()) == ["main.py"]
 
     def test_a_repository_git_cannot_make_is_reported_with_git_s_message(self, tmp_path: Path) -> None:
-        """A `.git` file that is no gitfile is no repository git can read, and `git init` refuses it too."""
+        """A `.git` file that is no gitfile is no repository git can read, and nothing is initialized over it."""
         project = tmp_path / "app"
         project.mkdir()
         (project / ".git").write_text("not a gitfile\n", encoding="utf-8")
         (project / "main.py").write_text("\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
-        assert result.stdout == "refused: init-failed\n"
+        # git reads the `.git` file and refuses it, which is no sign of a directory outside every repository,
+        # so the script refuses with git's message rather than run `git init` there (L-261126-54e9af).
+        assert result.stdout == "refused: git-failed\n"
         assert result.returncode == 1
         assert result.stderr.strip(), "git's own message is relayed on standard error"
         assert not (project / ".gitignore").exists()
@@ -1163,7 +1165,10 @@ def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     # Handed no `env`, a spawn's environment is built from `process.env` and printed whole by Node's debug
     # log, so git's leaves out every PIPELEX_* name, in any letter case, as Windows reads names.
     assert '!name.toUpperCase().startsWith("PIPELEX_")' in shared
-    assert 'spawnSync("git", args, { encoding: "utf8", env: GIT_ENV,' in shared
+    assert "const env = { ...GIT_ENV, ...extraEnv };" in shared
+    assert 'spawnSync("git", args, { encoding: "utf8", env, input,' in shared
+    # Nor does git see a variable that points it at another repository than the one it finds from <dir>.
+    assert '"GIT_DIR", "GIT_WORK_TREE"' in shared
     for script in (COMMIT_PRISTINE, WRITE_ENV_FILE):
         text = script.read_text(encoding="utf-8")
         assert 'git(["-C", dir, "rev-parse", "--absolute-git-dir"]).out' in text

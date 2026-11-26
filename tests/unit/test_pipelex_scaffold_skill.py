@@ -30,16 +30,21 @@ UNCREATED_COPY_REFERENCE = REFERENCES_DIR / "uncreated-copy.md"
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.DOTALL)
 # The method app's two commands, each the whole of its block, and the uncreated copy's two blocks, each
 # named by a string that occurs in exactly one of them.
-CREATE_COMMAND = "npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --quiet"
+# The method app's commands that carry the user's values take none on their command line: the agent writes them
+# into a request file the script reads (L-261126-54e9af).
+CREATE_COMMAND = 'node "<skill-dir>/scripts/method-app.mjs" init'
+# The skill's directory as the template spells it, and as Claude Code and the other targets read it.
+SKILL_DIR_SPELLINGS = ("{{ skill_dir }}", "${CLAUDE_SKILL_DIR}", "<skill-dir>")
+REQUEST = '`{"dir": "<dir>", "method": "<method>", "options": {}}`'
 SERVE_COMMAND = "npm --prefix '<dir>' run serve"
 # The uncreated copy's three blocks: the git reading, the pristine commit and the gesture's run.
 READ_COPY_GIT_COMMAND = "node \"<skill-dir>/scripts/read-copy-git.mjs\" '<dir>'"
-RUN_CREATE_COMMAND = "node \"<skill-dir>/scripts/run-create.mjs\" '<dir>' '<method>'"
+RUN_CREATE_COMMAND = 'node "<skill-dir>/scripts/method-app.mjs" create'
 # The pristine commit's subject, as `pipelex-sdk`'s initializer writes it (`method-apps/initializers/js/lib/git.mjs`,
 # `pristineMessage`), and as it wrote it from `pipelex-method-apps` before the move, which a copy made then keeps.
 PRISTINE_SUBJECT_PREFIX = "Start from Pipelex/pipelex-sdk/method-apps/webapp-js "
 PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE = "Start from Pipelex/pipelex-method-apps/webapp-js "
-PRISTINE_COPY_COMMIT = 'git -C <dir> add -A -- .\ngit -C <dir> commit -m "Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>" -- .'
+PRISTINE_COPY_COMMIT = "git -C '<dir>' add -A -- .\ngit -C '<dir>' commit -m \"Start from Pipelex/pipelex-sdk/method-apps/webapp-js <version>\" -- ."
 TARGETS = ("prod", "codex", "mistral-vibe")
 # The method app's report reads the plane of the `.env.local` `npm run create` wrote with this test, a `node`
 # one-liner every shell runs, since a POSIX `${VAR:-…}` test is no PowerShell command.
@@ -143,7 +148,7 @@ class TestPipelexScaffoldSkill:
     REFERENCES = ("initializers.md", "version-managers.md", "github.md", "uncreated-copy.md")
     SCRIPTS = ("commit-pristine.mjs", "write-env-file.mjs")
     # The scripts `references/uncreated-copy.md` runs, named by path there rather than in the skill.
-    REFERENCE_SCRIPTS = ("read-copy-git.mjs", "run-create.mjs")
+    REFERENCE_SCRIPTS = ("read-copy-git.mjs", "method-app.mjs")
     SCRIPTS_DIR = REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts"
     RULES = (
         "exactly two branches and carries no templates of its own",
@@ -280,14 +285,14 @@ class TestPipelexScaffoldSkill:
         on the reference, because either alone is the half-application.
         """
         for body in _bodies():
-            assert "**On a project `uv init` created, finish with `uv sync` from inside `<dir>`**" in body
+            assert "**On a project `uv init` created, finish with `uv sync --directory <dir>`**" in body
         assert "`{{ skill_prefix }}pipelex-integrate` reads no lock file as `pip install`" in SKILL_TEMPLATE.read_text(encoding="utf-8")
         for target_name in TARGETS:
             prefix = load_target_config(REPO_ROOT / "targets", target_name).template_vars["skill_prefix"]
             assert f"`{prefix}pipelex-integrate` reads no lock file as `pip install`" in _render_skill(target_name), target_name
         reference = INITIALIZERS_REFERENCE.read_text(encoding="utf-8")
         assert (
-            "**On a project `uv init` created, run `uv sync` from inside `<dir>` before the pristine commit, and commit the `uv.lock` it writes.**"
+            "**On a project `uv init` created, run `uv sync --directory <dir>` before the pristine commit, and commit the `uv.lock` it writes.**"
             in reference
         )
         assert "`uv init` writes a `pyproject.toml` and nothing else: no lock file and no environment." in reference
@@ -483,8 +488,11 @@ class TestPipelexScaffoldSkill:
             assert recipe in initializers, f"npm install not scoped to the project: {recipe}"
         assert "**Every follow-on `npm install` above takes `--prefix <dir>`" in initializers
         # `npm init` and `tsc --init` write where they run, whatever `--prefix` says, so the minimal recipe runs
-        # each of its commands from inside `<dir>`, never chained after a `cd`.
-        assert "each command on its own and run from inside `<dir>`: `npm init -y`," in initializers
+        # each of its commands with `<dir>` as the harness's working directory, confirmed first, never after a
+        # chained `cd` (L-261126-54e9af).
+        assert "each command on its own, run with `<dir>` as its working directory as the note below says: `npm init -y`," in initializers
+        assert "its command tool's working-directory setting when it has one, else a `cd <dir>` it keeps" in initializers
+        assert '**Confirm the directory before the first of them**: `node -p "process.cwd()"` must print `<dir>`' in initializers
         assert "(`npm init` and `tsc --init` write where they run, whatever `--prefix` says)" in initializers
         # The minimal TS default meets the emitter defect, and a bundler resolution only moves it from the
         # type check to runtime when `tsc`'s ES module output runs under plain Node, as
@@ -577,7 +585,10 @@ class TestMethodAppBranch:
         on every OS, since a Windows machine has no `make`, and with no per-OS branch."""
         for body in _bodies():
             assert "runs the copy's own `npm run create` with the method; the copy's `npm run serve` then starts the app" in body
-            assert _recipe(body, "@pipelex/method-app").strip() == CREATE_COMMAND
+            # Run by its script, which reads the request and runs `npm create @pipelex/method-app@latest` with it.
+            assert _recipe(body, "method-app.mjs").strip() in {CREATE_COMMAND.replace("<skill-dir>", spelled) for spelled in SKILL_DIR_SPELLINGS}
+            assert f"Write `pipelex-scaffold-request.json` in the working directory with your file tools, {REQUEST}" in body
+            assert "`npm create @pipelex/method-app` never prompts and reads a bundle path from the working directory" in body
             assert _recipe(body, SERVE_COMMAND).strip() == SERVE_COMMAND
             assert "Both are the family's commands, and nothing they do is reimplemented here." in body
             assert "**The method app needs the method first**" in body
@@ -641,7 +652,7 @@ class TestMethodAppBranch:
             assert "when it says the server was stopped, read `<dir>/.serve/server.log`'s tail" in table
             assert "one still running is the user's to stop" in table
             # `copied` is what --dry-run and --no-create print, and it leads to the uncreated copy.
-            assert "`copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md)" in body
+            assert "`copied`, which only `dry-run` or `no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md)" in body
             for verdict in SERVE_VERDICTS:
                 assert verdict in body, f"the skill never reads {verdict}"
 
@@ -658,7 +669,7 @@ class TestMethodAppBranch:
             assert "a harness restarted from a shell that exports the key" in row
             # An unattended model took the second way itself in the phase 5b smoke sessions.
             assert row.startswith("| `refused: no-key` | STOP and offer two ways, running neither until the user picks: ")
-            assert "`--no-create` and a `<dir>/.env.local` the user writes in their own editor" in row
+            assert '`"no-create": true` and a `<dir>/.env.local` the user writes in their own editor' in row
             # A key is refused by every plane but the one that issued it.
             assert "never substitute a base URL the user did not declare" in body
             assert "a git identity is the user's to set, never yours" in body
@@ -683,12 +694,19 @@ class TestMethodAppBranch:
             # The method app's `git:` line says what happened, a repository under an ignored path included.
             assert "the template's version and the git outcome; that" in body
 
-    def test_placeholders_are_substituted_as_one_shell_word(self) -> None:
-        for body in _bodies():
-            assert "**Every placeholder is one shell word**" in body
+    def test_no_value_the_user_gave_is_typed_into_a_command(self) -> None:
+        """POSIX quoting spells a quote inside single quotes `'\\''`, which PowerShell reads as the end of a string
+        and a stray backslash, and no quoting reads alike in every shell, so the method and every option travel in
+        a request file the script reads; `<dir>` alone is typed, held to characters both shells read literally
+        inside single quotes (L-261126-54e9af)."""
+        for body in _bodies() + [UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8")]:
+            assert "'\\''" not in body
             for block in _bash_blocks(body):
-                for placeholder in ("<dir>", "<method>"):
-                    assert f"'{placeholder}'" in block or placeholder not in block, f"an unquoted {placeholder} in {block!r}"
+                assert "<method>" not in block, f"a method typed into a command: {block!r}"
+                assert "'<dir>'" in block or "<dir>" not in block, f"an unquoted <dir> in {block!r}"
+        for body in _bodies():
+            assert "**No value the user gave is typed into a command**, as no quoting reads alike in every shell" in body
+            assert "only of letters, digits, spaces and `. _ - / \\ :`, neither starting with `-` nor ending with `\\`; else ask for another" in body
 
     def test_no_block_assigns_a_name_zsh_reserves(self) -> None:
         """`status` is read-only in zsh, the default shell on macOS, so `status=$?` aborts the line."""
@@ -716,7 +734,7 @@ class TestUncreatedCopyReference:
 
     The initializer leaves one after `--dry-run`, `--no-create` or a `failed: create`, and a user may stand
     in one made by hand. The reference reads git with `scripts/read-copy-git.mjs` and runs the copy's own
-    `npm run create` with `scripts/run-create.mjs`, both executed in `test_pipelex_scaffold_copy_scripts.py`.
+    `npm run create` with `scripts/method-app.mjs`, both executed in `test_pipelex_scaffold_copy_scripts.py`.
     """
 
     @property
@@ -726,7 +744,7 @@ class TestUncreatedCopyReference:
     def test_it_opens_on_its_condition_and_hands_back_to_serve(self) -> None:
         entry = self.reference.split("\n\n")[1]
         assert entry.startswith("Read this when ")
-        for condition in ("`copied` (after `--dry-run` or `--no-create`)", "`failed: create`", "the user stands in one"):
+        for condition in ("`copied` (after a `dry-run` or `no-create` request)", "`failed: create`", "the user stands in one"):
             assert condition in entry, condition
         assert "`/pipelex-scaffold` then goes on at branch A's step 2, `npm run serve`" in self.reference
         # A Codex session served a copy whose `make all` was red in the phase 5b smoke sessions.
@@ -738,13 +756,13 @@ class TestUncreatedCopyReference:
         and every program the reference used to spell in shell is a script run by path (L-261126-54e9af)."""
         reference = self.reference
         assert _recipe(reference, "read-copy-git.mjs").strip() == READ_COPY_GIT_COMMAND
-        assert _recipe(reference, "run-create.mjs").strip() == RUN_CREATE_COMMAND
+        assert _recipe(reference, "method-app.mjs").strip() == RUN_CREATE_COMMAND
         assert "`<skill-dir>` is the directory holding the skill's `SKILL.md`, the parent of the directory holding this file" in reference
         assert "Run them, never their steps by hand" in reference
         for gone in ("&&", "||", "2>/dev/null", "mktemp", "grep", "rm -rf", "pwd -P", "TMPDIR", "LICENSE_HOLDER="):
             assert gone not in reference, f"the reference still carries {gone!r}"
         # The bootstrap's directory is removed by Node, the same in every shell.
-        assert "`node -e \"fs.rmSync(process.argv[1], { recursive: true })\" '<dir>/.claude/skills/bootstrap'`" in reference
+        assert "`node -e \"fs.rmSync(process.argv[1], { recursive: true, force: true })\" '<dir>/.claude/skills/bootstrap'`" in reference
 
     def test_the_git_reading_names_every_verdict_of_its_script(self) -> None:
         """The reference keys on the script's verdict words, so each one the script's header lists has a reading."""
@@ -772,10 +790,14 @@ class TestUncreatedCopyReference:
         assert "None of `npm run create`'s work is reimplemented here" in reference
         assert "never by editing `src/generated/`" in reference
         assert "It commits nothing." in reference
-        # A bundle is read from where the user stood, as the initializer reads it, so no path is rewritten.
-        assert "is read from the directory the script runs in, which is where the user stood" in reference
+        # A bundle is read from where the user stood, as the initializer reads it, and passed on as an absolute path.
+        assert "is read from the working directory, which is where the user stood, and the script passes it on as an absolute path" in reference
+        # The values travel in the request, never on the command line, and the script installs what the gesture imports.
+        assert "**No value the user gave goes on the command line**" in reference
+        assert "the script runs `npm install` in it first, as the template's own gesture expects" in reference
+        assert "`npm install exited <code>; the whole log is <path>` when the install failed and the gesture never started" in reference
         assert "**The gesture's warnings are read from the whole log, not from its tail.**" in reference
-        assert "`--license-holder '…'`" in reference
+        assert 'goes into the real run\'s request as `"license-holder"`' in reference
         # A refusal in the read-only half can run again; a failure after the scaffold cannot.
         assert "changed no tracked file, so it can run again" in reference
         assert "cannot be undone by running `npm run create` again" in reference
@@ -810,8 +832,8 @@ class TestUncreatedCopyReference:
         commits the whole index, so the copy's commit carries the pathspec on both commands, which run
         one after the other since Windows PowerShell 5.1 has no `&&`."""
         reference = self.reference
-        assert reference.count("git -C <dir> add -A -- .") == 1
-        assert _recipe(reference, "git -C <dir> add -A -- .").strip() == PRISTINE_COPY_COMMIT
-        assert "the second only once the first succeeded" in reference
+        assert reference.count("git -C '<dir>' add -A -- .") == 1
+        assert _recipe(reference, "git -C '<dir>' add -A -- .").strip() == PRISTINE_COPY_COMMIT
+        assert "each only once the one before succeeded" in reference
         hand_made = PRISTINE_COPY_COMMIT.split('"')[1]
         assert hand_made.startswith(PRISTINE_SUBJECT_PREFIX)

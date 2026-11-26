@@ -65,13 +65,20 @@ function refuse(reason, detail = "") {
 // stderr under `NODE_DEBUG=child_process`, so a key the shell exports would reach the transcript
 // through any git call made without this one. The name is compared in upper case because Windows
 // reads a variable's name in any case.
-const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_")));
+//
+// The variables that point git at a repository other than the one it finds from <dir>, which a hook or a
+// wrapper can leave set, are dropped as well, as the family's initializer drops them.
+const GIT_REDIRECTS = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_PREFIX"];
+const GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_") && !GIT_REDIRECTS.includes(name.toUpperCase())),
+);
 
-// git with its arguments as an array and no shell, its environment GIT_ENV, and `input` on its standard
-// input. The output loses its trailing line breaks, as a shell's command substitution would, and
-// `message` joins both streams for a refusal to relay.
-function git(args, input = "") {
-  const result = spawnSync("git", args, { encoding: "utf8", env: GIT_ENV, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+// git with its arguments as an array and no shell, its environment GIT_ENV with `extraEnv` over it, and
+// `input` on its standard input. The output loses its trailing line breaks, as a shell's command
+// substitution would, and `message` joins both streams for a refusal to relay.
+function git(args, input = "", extraEnv = {}) {
+  const env = { ...GIT_ENV, ...extraEnv };
+  const result = spawnSync("git", args, { encoding: "utf8", env, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   const stdout = (result.stdout ?? "").replace(/[\r\n]+$/, "");
   const stderr = (result.stderr ?? "").replace(/[\r\n]+$/, "");
   const message = [stdout, stderr, result.error?.message ?? ""].filter(Boolean).join("\n");

@@ -727,6 +727,12 @@ CLAUDE_CODE_SUBSTITUTIONS = r"(?:CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT|CLAUDE_PLUG
 POSIX_SHELL_FENCE_LANGUAGES = frozenset({"", "bash", "sh", "shell", "zsh", "console", "powershell", "pwsh", "ps1", "cmd", "bat"})
 POSIX_SHELL_CONSTRUCTS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("command -v", re.compile(r"\bcommand -v\b"), "run the tool with `--version`, which every shell runs"),
+    (
+        "'\\''",
+        re.compile(r"'\\''"),
+        "PowerShell spells a quote inside single quotes `''`, so a value holding one has no quoting both shells read; "
+        "pass it in a file a script reads",
+    ),
     ("mkdir -p", re.compile(r"\bmkdir -p\b"), "PowerShell's `mkdir` takes no `-p`; let a script or the agent's file tools create it"),
     ("mktemp", re.compile(r"\bmktemp\b"), "Windows has no `mktemp`; make the directory with Node's `fs.mkdtempSync`"),
     ("${VAR:-…}", re.compile(r"\$\{[A-Za-z_]\w*:?[-=?+]"), "a POSIX parameter expansion, which PowerShell does not read"),
@@ -768,6 +774,10 @@ POSIX_SHELL_CONSTRUCTS: tuple[tuple[str, re.Pattern[str], str], ...] = (
 POSIX_SHELL_ALLOWED: dict[tuple[str, str], str] = {
     ("shared/writing-mthds.md", "sed"): "names `sed` among the shell routes that leave a `.mthds` file unchecked, never as a command",
     ("shared/credentials.md", "$VIBE_HOME/config.toml"): "names the file Vibe reads, in Vibe's own notation, for the user to open, never to run",
+    (
+        "pipelex-scaffold/references/version-managers.md",
+        "PATH='<bin>':\"$PATH\" <command>",
+    ): "the bash and zsh form, given beside the PowerShell form of the same one-command PATH, each for its own shell",
 }
 # Skills whose commands other items of the Windows epic are making shell-neutral; each is removed from this
 # table by the change that lands its item, after which the rule holds that skill too.

@@ -31,11 +31,11 @@ An inconclusive signal asks one question; nothing is guessed twice.
 
 **A copy of the template not yet made the user's**, whose `package.json` says `pipelex-method-webapp-js` and which still has `scripts/create.mts`, is finished and never created again: read [references/uncreated-copy.md](references/uncreated-copy.md) before running anything in it.
 
-**Every placeholder is one shell word**: `<dir>`, `<method>` and the rest go in single quotes, with a quote inside spelled `'\''`.
+**No value the user gave is typed into a command**, as no quoting reads alike in every shell: the method and options go in step 1's request file. Only `<dir>` is typed, in single quotes, relative when under the working directory, and only of letters, digits, spaces and `. _ - / \ :`, neither starting with `-` nor ending with `\`; else ask for another.
 
 ## Mode
 
-Automatic by default; an explicit signal wins ("just do it", "walk me through"). One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's command takes `--dry-run` first.
+Automatic by default; an explicit signal wins ("just do it", "walk me through"). One thing always confirms, in every mode: **`gh repo create`**. A second confirms on branch B: a pristine commit into a directory that already held a repository. In interactive mode, the method app's first run takes `"dry-run": true`.
 
 ## Prerequisites
 
@@ -47,13 +47,15 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ### Step 1: Create
 
+Write `pipelex-scaffold-request.json` in the working directory with your file tools, `{"dir": "<dir>", "method": "<method>", "options": {}}`. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. Run the family's initializer on it:
+
 ```bash
-npm create --yes @pipelex/method-app@latest '<dir>' -- --method '<method>' --quiet
+node "<skill-dir>/scripts/method-app.mjs" init
 ```
 
-It never prompts and reads a bundle path from where it runs. **Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step. Pass an identity option (`--name`, `--title`, `--author-name`, `--license…` and the rest) only with a value the user gave, never an invented one, and `--pipe`, `--method-name` or `--label` to answer a refusal that names it.
+It removes the file on reading it, so write it before every run; `npm create @pipelex/method-app` never prompts and reads a bundle path from the working directory. **Run it in the foreground with a long timeout**: it takes minutes, and its verdict decides the next step. Put an identity option in `options` (`"title"`, `"author-name"`, `"license-holder"` and the rest) only with a value the user gave, never an invented one, and `"pipe"`, `"method-name"` or `"label"` to answer a refusal that names it.
 
-**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome and `npm run create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `--dry-run` or `--no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
+**Its verdict is the last line opening with `created`, `copied`, `refused:` or `failed:`**, not npm's `npm error` lines after it; with no such line, npm itself failed, and you relay its error. Branch on the verdict's first word, never on the exit code. Above it come the git outcome and `npm run create`'s warnings, for the report. `created` goes on to step 2; `copied`, which only `dry-run` or `no-create` prints, to [references/uncreated-copy.md](references/uncreated-copy.md); any other verdict is in the stop table.
 
 ### Step 2: Serve
 
@@ -65,8 +67,8 @@ Its verdict is the last line opening with `serving <url> — "<title>"`, `alread
 
 ## Branch B — the ecosystem's initializer
 
-1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync` from inside `<dir>`**, because `/pipelex:pipelex-integrate` reads no lock file as `pip install`.
-2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. Run the script, never its steps by hand:
+1. **Read [references/initializers.md](references/initializers.md) before running any initializer**, then run the named framework's, or the language's minimal one, with its non-interactive flags. One that only runs interactively is the user's to run, and you resume after. Nothing beyond what the initializer writes is authored by this skill. **On a project `uv init` created, finish with `uv sync --directory <dir>`**, because `/pipelex:pipelex-integrate` reads no lock file as `pip install`.
+2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. Run the script, never its steps by hand:
 
    ```bash
    node "<skill-dir>/scripts/commit-pristine.mjs" '<dir>' 'Scaffold <framework or language> project'
@@ -83,7 +85,7 @@ Its verdict is the last line opening with `serving <url> — "<title>"`, `alread
 
 ## The report
 
-**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve`. Then say what was created and where, with its name and title; the template's version and the git outcome; that `npm run create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `npm run create` wrote, `node -p "['','https://api.pipelex.com','https://api.pipelex.com/'].includes(process.env.PIPELEX_BASE_URL ?? '') ? 'production' : 'other'"`; and `npm run add-method -- <method>` for a second method, `npm run codegen` after a bundle edit.
+**On the method app, the URL comes first**, with that it runs in the background on this machine alone, how the verdict says to stop it, and that the user puts their own key in `<dir>/.env.local` before restarting it from another shell with `npm run serve`. Then say what was created and where, with its name and title; the template's version and the git outcome; that `npm run create`'s changes are uncommitted for review; each warning with what answers it, first that `LICENSE` still names the template's holder when it does, which the user claims by editing that line; the plane of the `.env.local` `npm run create` wrote, `node -p "['','https://api.pipelex.com','https://api.pipelex.com/'].includes(process.env.PIPELEX_BASE_URL ?? '') ? 'production' : 'other'"`; and `npm run add-method <method>` for a second method, `npm run codegen` after a bundle edit.
 
 **On the initializer's project**, say what was created and where; the initializer and its version; the pristine commit and who made it, or on `inside:` that the project is new files of that repository; that `.env.example`, `.env` and any `.gitignore` line are uncommitted; and the `unversioned:`, `nested:` and env verdicts in the words [references/initializers.md](references/initializers.md) gives each, never the URL.
 
@@ -95,17 +97,10 @@ Two lines close it. **The project's own instructions and skills load in a sessio
 |---|---|
 | A toolchain piece is missing, or `refused: missing-tool` or `node-too-old` | STOP and name it, first reading [references/version-managers.md](references/version-managers.md) for `node` or `uv` |
 | The directory is not empty, or `refused: not-empty` | STOP and ask for another; never delete, move or write into it, and never offer to |
-| `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `--no-create` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
+| `refused: no-key` | STOP and offer two ways, running neither until the user picks: a harness restarted from a shell that exports the key, or `"no-create": true` and a `<dir>/.env.local` the user writes in their own editor, then [references/uncreated-copy.md](references/uncreated-copy.md) |
 | `refused: inside-template-checkout`, or an `origin` at `Pipelex/pipelex-sdk` | STOP: that is the template, not a copy |
 | any other `refused:`, `failed: write` or `failed: commit` | the line says what stands and names the fix: apply it when it is a value from the conversation, else relay it and ask; a git identity is the user's to set, never yours |
 | `failed: create` | read the end of the log it named, then [references/uncreated-copy.md](references/uncreated-copy.md); never substitute a base URL the user did not declare |
 | `npm run serve` says `refused: not-loopback` | report no URL, and relay the cause it names |
 | any other `npm run serve` verdict | relay it; when it says the server was stopped, read `<dir>/.serve/server.log`'s tail, fix the cause and serve again; one still running is the user's to stop |
 | A script says `refused:` | `usage`, `no-directory` and `not-a-repository` mean a wrong `<dir>` or step 3 before step 2; `nothing-to-commit`: the initializer wrote nothing in `<dir>`; read its output and rerun it; relay the others with git's message, since a permission, a git identity or a tracked `.env` is the user's to fix |
-
-## Reference
-
-- [references/uncreated-copy.md](references/uncreated-copy.md) — a copy of the method app that `npm run create` has not run in.
-- [references/initializers.md](references/initializers.md) — before running an initializer.
-- [references/version-managers.md](references/version-managers.md) — `node` or `uv` missing, or `node` below the floor.
-- [references/github.md](references/github.md) — the repository on GitHub, before any `gh` command.

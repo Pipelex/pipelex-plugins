@@ -1,10 +1,12 @@
-"""Execute the two scripts `pipelex-scaffold`'s `references/uncreated-copy.md` runs by path.
+"""Execute the scripts `pipelex-scaffold` runs by path for the method app: `read-copy-git.mjs` and `method-app.mjs`.
 
 `read-copy-git.mjs` reads where a copy of the method app stands in git and gives it a repository only where the
-family's initializer would; `run-create.mjs` runs the copy's own `npm run create` with its output in a log and lists
-the gesture's warnings once each. They replaced the reference's bash blocks, which a Windows machine with PowerShell
-alone could not run (L-261126-54e9af), so the suite runs them as a user's harness does, through `node`, and is marked
-`cross_os`. The reference's side, which keys on their verdicts, is pinned in `test_pipelex_scaffold_skill.py`.
+family's initializer would. `method-app.mjs` reads the user's values from a request file and runs the family's
+initializer (`init`) or the copy's own `npm run create` (`create`), installing the copy's dependencies first when
+they are missing, with the gesture's output in a log and its warnings listed once each. They replaced bash blocks
+and POSIX-quoted command lines, which a Windows machine with PowerShell alone could not run (L-261126-54e9af), so the
+suite runs them as a user's harness does, through `node`, and is marked `cross_os`. The skill's side, which keys on
+their verdicts, is pinned in `test_pipelex_scaffold_skill.py`.
 """
 
 from __future__ import annotations
@@ -20,7 +22,8 @@ import pytest
 REPO_ROOT = Path(__file__).parents[2]
 SCRIPTS = REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts"
 READ_COPY_GIT = SCRIPTS / "read-copy-git.mjs"
-RUN_CREATE = SCRIPTS / "run-create.mjs"
+METHOD_APP = SCRIPTS / "method-app.mjs"
+REQUEST_FILE = "pipelex-scaffold-request.json"
 WINDOWS = os.name == "nt"
 
 # The pristine commit's subject, as `pipelex-sdk`'s initializer writes it (`method-apps/initializers/js/lib/git.mjs`,
@@ -30,11 +33,13 @@ PRISTINE_SUBJECT_PREFIX_BEFORE_THE_MOVE = "Start from Pipelex/pipelex-method-app
 INSIDE = "inside: "
 MADE_NOW = " (a repository made now on main)"
 
-# A stand-in for the template's `scripts/create.mts`: it records how it was run, prints a long log with the
-# gesture's warnings early on both streams and twice, as the bootstrap's dry run and write print them, then sixty
-# lines of `npm run all`, and exits with the code the test asks for.
+# A stand-in for the template's `scripts/create.mts`: like it, it loads a dependency as it starts, so it fails in a
+# copy whose dependencies are not installed; it records how it was run, prints a long log with the gesture's
+# warnings early on both streams and twice, as the bootstrap's dry run and write print them, then sixty lines of
+# `npm run all`, and exits with the code the test asks for.
 FAKE_CREATE = """\
 const fs = require("node:fs");
+require("fake-dep");
 fs.writeFileSync(process.env.RECORD, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), initCwd: process.env.INIT_CWD }));
 const warn = process.env.WARN === "1";
 console.log("create: Receipt Review");
@@ -46,6 +51,9 @@ for (let step = 0; step < 60; step++) console.log(`npm run all: step ${step}`);
 process.exitCode = Number(process.env.EXIT_CODE ?? "0");
 """
 SCOPE_WARNING = "! a method_id is scoped to your key's organization."
+# A value holding what bash, PowerShell or cmd.exe reads as syntax: quotes of each kind, POSIX's quote escape,
+# expansions, a backtick, separators, redirections and cmd's variables.
+HOSTILE = """O'Brien's "app" '\\'' ‘curly’ $(whoami) ${HOME} $env:PATH `id` ; & && | || < > %PATH% ^ ! é"""
 LICENSE_WARNING = "warning: LICENSE copyright line left untouched — pass --license-holder to claim it."
 
 pytestmark = [
@@ -137,14 +145,49 @@ def _names(printed: str, expected: Path) -> bool:
     return Path(printed).resolve() == expected.resolve()
 
 
-def _fake_project(directory: Path) -> Path:
+def _fake_project(directory: Path, dependency: str = "file:./fake-dep") -> Path:
+    """A copy whose `create` script needs its dependency installed, which is a local package, so no install
+    reaches the network."""
     directory.mkdir(parents=True)
     (directory / "package.json").write_text(
-        json.dumps({"name": "pipelex-method-webapp-js", "version": "0.0.0", "private": True, "scripts": {"create": "node create.js"}}),
+        json.dumps(
+            {
+                "name": "pipelex-method-webapp-js",
+                "version": "0.0.0",
+                "private": True,
+                "dependencies": {"fake-dep": dependency},
+                "scripts": {"create": "node create.js"},
+            }
+        ),
         encoding="utf-8",
     )
     (directory / "create.js").write_text(FAKE_CREATE, encoding="utf-8")
+    (directory / "fake-dep").mkdir()
+    (directory / "fake-dep" / "package.json").write_text('{"name": "fake-dep", "version": "1.0.0", "main": "index.js"}\n', encoding="utf-8")
+    (directory / "fake-dep" / "index.js").write_text("module.exports = 1;\n", encoding="utf-8")
     return directory
+
+
+def _request(where: Path, payload: object) -> Path:
+    """The request the agent writes with its file tools, in the directory the script runs in."""
+    request = where / REQUEST_FILE
+    request.write_text(payload if isinstance(payload, str) else json.dumps(payload), encoding="utf-8")
+    return request
+
+
+def _log_of(stdout: str) -> Path:
+    return Path(stdout.splitlines()[-1].split("; the whole log is ", 1)[1])
+
+
+# A stand-in for npm's own `npm-cli.js`, which the script runs when `npm_execpath` names it: it records the
+# arguments it was given and where it ran, prints a verdict line as the family's initializer would, and exits with
+# the code the test asks for.
+FAKE_NPM_CLI = """\
+const fs = require("node:fs");
+fs.writeFileSync(process.env.RECORD, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), gitDir: process.env.GIT_DIR ?? null }));
+console.log("created somewhere; next: npm run serve");
+process.exitCode = Number(process.env.EXIT_CODE ?? "0");
+"""
 
 
 class TestUncreatedCopyScripts:
@@ -340,37 +383,201 @@ class TestUncreatedCopyScripts:
         assert result.returncode == 0, result.stderr
         assert fake_key not in result.stdout + result.stderr
 
-    # run-create.mjs
+    # read-copy-git.mjs: git that cannot read the directory, and a git pointed elsewhere
+
+    @pytest.mark.parametrize("where", ["a-gitfile-git-cannot-read", "inside-a-dot-git"])
+    def test_a_directory_git_cannot_read_is_refused_and_never_initialized(self, tmp_path: Path, where: str) -> None:
+        """Only git's "not a git repository" means outside every one; any other failure of `rev-parse`, such as a
+        `.git` file git cannot read or a directory inside a `.git`, is refused with git's message, since a
+        repository initialized there would sit inside one git could not read."""
+        if where == "a-gitfile-git-cannot-read":
+            target = _copy(tmp_path / "receipt-review")
+            (target / ".git").write_text("not a gitfile\n", encoding="utf-8")
+        else:
+            repository = _repository(tmp_path / "repository")
+            target = _copy(repository / ".git" / "receipt-review")
+        result = _node(READ_COPY_GIT, str(target), cwd=tmp_path)
+        assert result.stdout == "refused: git-failed\n"
+        assert result.returncode == 1
+        assert result.stderr.strip(), "git's own message is relayed on standard error"
+        assert not (target / ".git").is_dir()
+
+    def test_a_git_dir_the_environment_carries_is_ignored(self, tmp_path: Path) -> None:
+        """A hook or a wrapper can leave `GIT_DIR` and `GIT_WORK_TREE` set; the reading is about the copy, as the
+        family's initializer makes it, so a copy outside every repository still gets its own."""
+        elsewhere = _user_repository(tmp_path / "elsewhere")
+        history = _git(elsewhere, "log", "--format=%H")
+        target = _copy(tmp_path / "copies" / "receipt-review")
+        environment = _environment({"GIT_DIR": str(elsewhere / ".git"), "GIT_WORK_TREE": str(elsewhere)})
+        result = _node(READ_COPY_GIT, str(target), cwd=tmp_path, env=environment)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith("no-commit: ") and result.stdout.endswith(f"{MADE_NOW}\n")
+        assert (target / ".git").is_dir()
+        assert _git(elsewhere, "log", "--format=%H") == history
+
+    # method-app.mjs: the request
+
+    @pytest.mark.parametrize(
+        ("command", "payload", "message"),
+        [
+            ("create", "{not json", "is not JSON"),
+            ("create", [], "not a JSON object"),
+            ("create", {"dir": "receipt-review"}, '"method" must be a string'),
+            ("create", {"dir": "receipt-review", "method": "  "}, '"method" must be a string'),
+            ("create", {"dir": "", "method": "mt_receipt"}, '"dir" must be a string'),
+            ("create", {"dir": "receipt-review", "method": "mt_receipt", "extra": 1}, '"extra" is not a field'),
+            ("create", {"dir": "receipt-review", "method": "mt_receipt", "options": {"bogus": "x"}}, '"bogus" is not an option of create'),
+            ("create", {"dir": "receipt-review", "method": "mt_receipt", "options": {"no-create": True}}, '"no-create" is not an option of create'),
+            ("init", {"dir": "receipt-review", "method": "mt_receipt", "options": {"dry-run": "yes"}}, '"dry-run" is a switch'),
+            ("init", {"dir": "receipt-review", "method": "mt_receipt", "options": {"title": 3}}, '"title" must be a string'),
+            ("init", {"dir": "receipt-review", "method": "mt_receipt", "options": {"title": "a\nb"}}, '"title" holds a line break'),
+            ("init", {"dir": "receipt-review", "method": "mt_receipt", "options": []}, '"options" is not a JSON object'),
+        ],
+        ids=lambda value: value if isinstance(value, str) and len(value) < 30 else None,
+    )
+    def test_a_malformed_request_is_refused_and_removed(self, tmp_path: Path, command: str, payload: object, message: str) -> None:
+        """The request is removed whatever it holds, so the next run reads only the request written for it."""
+        (tmp_path / "receipt-review").mkdir()
+        request = _request(tmp_path, payload)
+        result = _node(METHOD_APP, command, cwd=tmp_path, env=_environment({"npm_execpath": str(tmp_path / "npm-cli.js")}))
+        assert result.stdout == "refused: bad-request\n"
+        assert result.returncode == 1
+        assert message in result.stderr
+        assert not request.exists()
+
+    @pytest.mark.parametrize("arguments", [(), ("serve",), ("create", "receipt-review"), ("init", "mt_receipt")], ids=str)
+    def test_a_value_on_the_command_line_is_refused(self, tmp_path: Path, arguments: tuple[str, ...]) -> None:
+        """The scripts take no value on their command line, where no quoting reads alike in every shell."""
+        request = _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        result = _node(METHOD_APP, *arguments, cwd=tmp_path)
+        assert result.stdout == "refused: usage\n"
+        assert result.returncode == 1
+        assert request.exists(), "a refused command line reads no request"
+
+    @pytest.mark.parametrize("command", ["init", "create"])
+    def test_a_missing_request_names_where_it_was_looked_for(self, tmp_path: Path, command: str) -> None:
+        result = _node(METHOD_APP, command, cwd=tmp_path)
+        assert result.returncode == 1
+        assert result.stdout.startswith("refused: no-request ")
+        assert _names(result.stdout.rstrip("\n")[len("refused: no-request ") :], tmp_path / REQUEST_FILE)
+
+    # method-app.mjs init
+
+    @pytest.mark.parametrize("exit_code", [0, 1])
+    def test_init_hands_every_value_to_the_initializer_as_one_argument(self, tmp_path: Path, exit_code: int) -> None:
+        """Every value reaches npm as written, whatever a shell would have read in it, the directory and a bundle the
+        working directory holds as absolute paths, the switches after the options and `--quiet` last; the
+        initializer's output and exit code pass through untouched, and git's redirections never reach npm."""
+        (tmp_path / "my methods").mkdir()
+        (tmp_path / "my methods" / "receipt.mthds").write_text("domain = 'receipt'\n", encoding="utf-8")
+        cli = tmp_path / "npm" / "npm-cli.js"
+        cli.parent.mkdir()
+        cli.write_text(FAKE_NPM_CLI, encoding="utf-8")
+        record = tmp_path / "record.json"
+        request = _request(
+            tmp_path,
+            {
+                "dir": "O'Brien app",
+                "method": "my methods/receipt.mthds",
+                "options": {"title": HOSTILE, "author-name": "Mary O'Brien", "license-holder": "", "dry-run": True, "no-create": False},
+            },
+        )
+        environment = _environment(
+            {"npm_execpath": str(cli), "RECORD": str(record), "EXIT_CODE": str(exit_code), "GIT_DIR": str(tmp_path / "elsewhere")}
+        )
+        result = _node(METHOD_APP, "init", cwd=tmp_path, env=environment)
+        assert result.returncode == exit_code, result.stderr
+        assert result.stdout == "created somewhere; next: npm run serve\n"
+        assert not request.exists()
+        recorded = json.loads(record.read_text(encoding="utf-8"))
+        args = recorded["args"]
+        assert args[:3] == ["create", "--yes", "@pipelex/method-app@latest"]
+        assert _names(args[3], tmp_path / "O'Brien app")
+        assert args[4:6] == ["--", "--method"]
+        assert _names(args[6], tmp_path / "my methods" / "receipt.mthds")
+        assert args[7:] == ["--title", HOSTILE, "--author-name", "Mary O'Brien", "--dry-run", "--quiet"]
+        assert _names(recorded["cwd"], tmp_path)
+        assert recorded["gitDir"] is None
+
+    def test_init_passes_a_catalog_id_or_an_address_as_written(self, tmp_path: Path) -> None:
+        cli = tmp_path / "npm-cli.js"
+        cli.write_text(FAKE_NPM_CLI, encoding="utf-8")
+        record = tmp_path / "record.json"
+        _request(tmp_path, {"dir": "receipt-review", "method": "github.com/acme/methods/receipt@v1", "options": {"no-create": True}})
+        result = _node(METHOD_APP, "init", cwd=tmp_path, env=_environment({"npm_execpath": str(cli), "RECORD": str(record)}))
+        assert result.returncode == 0, result.stderr
+        args = json.loads(record.read_text(encoding="utf-8"))["args"]
+        assert args[6:] == ["github.com/acme/methods/receipt@v1", "--no-create", "--quiet"]
+
+    # method-app.mjs create
 
     @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
     @pytest.mark.parametrize("exit_code", [0, 3])
-    def test_the_gesture_runs_in_the_copy_with_the_method_read_from_where_the_user_stood(self, tmp_path: Path, exit_code: int) -> None:
-        """Every argument after `<dir>` reaches `npm run create` as one argument, a space and a quote included, and
-        the gesture runs in the copy while `INIT_CWD`, from which it reads a relative bundle path, is where the user
-        stood, as under the family's initializer. The gesture's code is reported, never taken as the script's."""
-        project = _fake_project(tmp_path / "receipt review")
+    def test_create_installs_then_runs_the_gesture_with_every_value_as_one_argument(self, tmp_path: Path, exit_code: int) -> None:
+        """A copy whose dependencies are not installed, as `--no-create` or a copy made by hand leaves it, gets
+        `npm install` first, as the template's `make create` ran it, since the gesture loads its dependencies as it
+        starts. Every value then reaches `npm run create` as written, a bundle the working directory holds as an
+        absolute path, and the gesture runs in the copy. Its code is reported, never taken as the script's."""
+        project = _fake_project(tmp_path / "O'Brien app")
+        (tmp_path / "my methods").mkdir()
+        (tmp_path / "my methods" / "receipt.mthds").write_text("domain = 'receipt'\n", encoding="utf-8")
         record = tmp_path / "record.json"
+        request = _request(
+            tmp_path, {"dir": "O'Brien app", "method": "my methods/receipt.mthds", "options": {"license-holder": HOSTILE, "title": " "}}
+        )
         environment = _environment({"RECORD": str(record), "EXIT_CODE": str(exit_code)})
-        result = _node(RUN_CREATE, "receipt review", "methods/receipt_review", "--license-holder", "O'Brien Holdings", cwd=tmp_path, env=environment)
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=environment)
         assert result.returncode == 0, result.stdout + result.stderr
+        assert not request.exists()
         recorded = json.loads(record.read_text(encoding="utf-8"))
-        assert recorded["args"] == ["methods/receipt_review", "--license-holder", "O'Brien Holdings"]
+        assert _names(recorded["args"][0], tmp_path / "my methods" / "receipt.mthds")
+        assert recorded["args"][1:] == ["--license-holder", HOSTILE]
         assert _names(recorded["cwd"], project)
         assert _names(recorded["initCwd"], tmp_path)
+        assert (project / "node_modules" / ".package-lock.json").is_file()
+        assert (project / "node_modules" / ".lock-installed").is_file()
         last = result.stdout.splitlines()[-1]
         assert last.startswith(f"npm run create exited {exit_code}; the whole log is ")
-        log = Path(last.split("; the whole log is ", 1)[1])
+        log = _log_of(result.stdout)
         assert log.is_file() and log.name == "create.log" and log.parent.name.startswith("pipelex-create-")
         assert "npm run all: step 0" in log.read_text(encoding="utf-8")
         shutil.rmtree(log.parent)
+
+    @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
+    def test_a_failed_install_stops_before_the_gesture(self, tmp_path: Path) -> None:
+        _fake_project(tmp_path / "receipt-review", dependency="file:./missing-dep.tgz")
+        record = tmp_path / "record.json"
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=_environment({"RECORD": str(record)}))
+        assert result.returncode == 0, result.stdout + result.stderr
+        last = result.stdout.splitlines()[-1]
+        assert last.startswith("npm install exited ") and not last.startswith("npm install exited 0;")
+        assert "warnings" not in result.stdout.splitlines()[-2]
+        assert not record.exists(), "the gesture never started"
+        shutil.rmtree(_log_of(result.stdout).parent)
+
+    @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
+    def test_an_installed_copy_is_not_installed_again(self, tmp_path: Path) -> None:
+        """npm's record of an install says the dependencies are there, so a copy the dry run or a first run
+        installed goes straight to the gesture: an install here would fail on the dependency that is gone."""
+        project = _fake_project(tmp_path / "receipt-review", dependency="file:./missing-dep.tgz")
+        (project / "node_modules" / "fake-dep").mkdir(parents=True)
+        (project / "node_modules" / "fake-dep" / "index.js").write_text("module.exports = 1;\n", encoding="utf-8")
+        (project / "node_modules" / ".package-lock.json").write_text("{}\n", encoding="utf-8")
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=_environment({"RECORD": str(tmp_path / "record.json")}))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert result.stdout.splitlines()[-1].startswith("npm run create exited 0; ")
+        shutil.rmtree(_log_of(result.stdout).parent)
 
     @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
     def test_each_warning_the_gesture_printed_is_listed_once(self, tmp_path: Path) -> None:
         """The gesture's warnings come before `npm run all`, whose output fills the tail, and the bootstrap's come
         twice. The script lists each one once, in byte order, whatever stream it was on."""
         _fake_project(tmp_path / "receipt-review")
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
         environment = _environment({"RECORD": str(tmp_path / "record.json"), "WARN": "1"})
-        result = _node(RUN_CREATE, "receipt-review", "mt_receipt", cwd=tmp_path, env=environment)
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=environment)
         assert result.returncode == 0, result.stdout + result.stderr
         lines = result.stdout.splitlines()
         listed = lines[lines.index("warnings:") + 1 : -1]
@@ -380,36 +587,34 @@ class TestUncreatedCopyScripts:
         assert len(tail) == 40
         assert tail[-1] == "npm run all: step 59"
         assert SCOPE_WARNING not in tail and LICENSE_WARNING not in tail
-        shutil.rmtree(Path(lines[-1].split("; the whole log is ", 1)[1]).parent)
+        shutil.rmtree(_log_of(result.stdout).parent)
 
     @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
     def test_a_gesture_with_no_warning_says_so(self, tmp_path: Path) -> None:
         _fake_project(tmp_path / "receipt-review")
-        result = _node(RUN_CREATE, "receipt-review", "mt_receipt", cwd=tmp_path, env=_environment({"RECORD": str(tmp_path / "record.json")}))
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=_environment({"RECORD": str(tmp_path / "record.json")}))
         assert result.returncode == 0, result.stdout + result.stderr
         assert result.stdout.splitlines()[-2] == "warnings: none"
-        shutil.rmtree(Path(result.stdout.splitlines()[-1].split("; the whole log is ", 1)[1]).parent)
+        shutil.rmtree(_log_of(result.stdout).parent)
 
-    @pytest.mark.parametrize(
-        ("arguments", "verdict"),
-        [((), "usage"), (("receipt-review",), "usage"), (("receipt-review", ""), "usage"), (("missing", "mt_receipt"), "no-directory")],
-        ids=str,
-    )
-    def test_a_mistyped_run_is_refused_before_anything_runs(self, tmp_path: Path, arguments: tuple[str, ...], verdict: str) -> None:
-        (tmp_path / "receipt-review").mkdir()
-        result = _node(RUN_CREATE, *arguments, cwd=tmp_path)
-        assert result.stdout == f"refused: {verdict}\n"
+    def test_create_refuses_a_directory_that_is_not_there(self, tmp_path: Path) -> None:
+        request = _request(tmp_path, {"dir": "missing", "method": "mt_receipt"})
+        result = _node(METHOD_APP, "create", cwd=tmp_path)
+        assert result.stdout == "refused: no-directory\n"
         assert result.returncode == 1
+        assert not request.exists()
 
-    @pytest.mark.skipif(WINDOWS, reason="on Windows npm is the npm-cli.js beside node.exe, not a name on the PATH")
+    @pytest.mark.skipif(WINDOWS, reason="on Windows npm is an npm-cli.js run with node, not a name on the PATH")
     def test_an_npm_that_cannot_start_is_a_verdict(self, tmp_path: Path) -> None:
         node = shutil.which("node")
         assert node is not None
         _fake_project(tmp_path / "receipt-review")
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
         empty = tmp_path / "empty-bin"
         empty.mkdir()
         result = subprocess.run(
-            [node, str(RUN_CREATE), "receipt-review", "mt_receipt"],
+            [node, str(METHOD_APP), "create"],
             cwd=tmp_path,
             env=_environment({"PATH": str(empty)}),
             capture_output=True,
@@ -420,13 +625,70 @@ class TestUncreatedCopyScripts:
         assert result.returncode == 1
         assert "ENOENT" in result.stderr
 
-    @pytest.mark.parametrize("script", [READ_COPY_GIT, RUN_CREATE], ids=lambda path: path.name)
+    @pytest.mark.skipif(shutil.which("npm") is None, reason="the gesture runs through npm")
+    @pytest.mark.parametrize("named", ["pnpm.cjs", "yarn.js", "npx-cli.js"])
+    def test_only_npm_s_own_script_is_taken_from_npm_execpath(self, tmp_path: Path, named: str) -> None:
+        """pnpm, yarn and npx name scripts of their own in `npm_execpath`; the gesture is run with npm all the same,
+        as the template's `scripts/lib/npm.mts` decides."""
+        _fake_project(tmp_path / "receipt-review")
+        impostor = tmp_path / named
+        impostor.write_text(f'require("node:fs").writeFileSync({json.dumps(str(tmp_path / "impostor-ran"))}, "");\n', encoding="utf-8")
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        environment = _environment({"RECORD": str(tmp_path / "record.json"), "npm_execpath": str(impostor)})
+        result = _node(METHOD_APP, "create", cwd=tmp_path, env=environment)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not (tmp_path / "impostor-ran").exists()
+        assert (tmp_path / "record.json").is_file(), "npm ran the gesture"
+        shutil.rmtree(_log_of(result.stdout).parent)
+
+    @pytest.mark.skipif(not WINDOWS, reason="Windows alone runs npm as an npm-cli.js found beside node.exe or an npm.cmd")
+    def test_on_windows_npm_is_found_beside_an_npm_cmd_or_reported_missing(self, tmp_path: Path) -> None:
+        """A node.exe with no npm beside it, as a version manager may lay it out, takes the `npm-cli.js` beside an
+        `npm.cmd` on the PATH, and with none, `failed: npm` names what it looked for rather than an exit code that
+        reads like the initializer's."""
+        node = shutil.which("node")
+        assert node is not None
+        lone = tmp_path / "lone-node"
+        lone.mkdir()
+        shutil.copy2(node, lone / "node.exe")
+        record = tmp_path / "record.json"
+        empty = tmp_path / "empty-bin"
+        empty.mkdir()
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        missing = subprocess.run(
+            [str(lone / "node.exe"), str(METHOD_APP), "init"],
+            cwd=tmp_path,
+            env=_environment({"PATH": str(empty)}),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert missing.stdout == "failed: npm\n"
+        assert missing.returncode == 1
+        assert "npm-cli.js" in missing.stderr
+        npm_home = tmp_path / "npm-home"
+        (npm_home / "node_modules" / "npm" / "bin").mkdir(parents=True)
+        (npm_home / "npm.cmd").write_text("@echo off\r\n", encoding="utf-8")
+        (npm_home / "node_modules" / "npm" / "bin" / "npm-cli.js").write_text(FAKE_NPM_CLI, encoding="utf-8")
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        found = subprocess.run(
+            [str(lone / "node.exe"), str(METHOD_APP), "init"],
+            cwd=tmp_path,
+            env=_environment({"PATH": f"{empty};{npm_home}", "RECORD": str(record)}),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert found.returncode == 0, found.stdout + found.stderr
+        assert json.loads(record.read_text(encoding="utf-8"))["args"][:3] == ["create", "--yes", "@pipelex/method-app@latest"]
+
+    @pytest.mark.parametrize("script", [READ_COPY_GIT, METHOD_APP], ids=lambda path: path.name)
     def test_each_script_says_what_it_prints_and_is_executable(self, script: Path) -> None:
         """The reference keys on the verdict words, so each script's header states them. The reference runs each
         through `node`, and the build keeps the executable bit it ships with for a direct run on macOS and Linux."""
         header = script.read_text(encoding="utf-8").split("\nimport ", 1)[0]
         assert header.startswith("#!/usr/bin/env node\n")
-        assert f"// Usage: node {script.name} <dir>" in header
+        assert f"// Usage: node {script.name} " in header
         assert "refused: <reason>" in header
         assert "The exit code is presentation" in header
         text = script.read_text(encoding="utf-8")
