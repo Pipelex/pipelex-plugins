@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import ClassVar
 
@@ -21,6 +22,7 @@ from scripts.check import (
     check_no_claude_artifacts,
     check_no_templates_in_output,
     check_python_pin,
+    check_script_line_endings,
     check_shared_files_exist,
     check_skill_argument_placeholders,
     check_skill_ceiling,
@@ -1298,3 +1300,82 @@ class TestSkillLinks:
         skill_md = self._skill(skill_tree) / "SKILL.md"
         skill_md.write_text(skill_md.read_text() + "On a branch, read [references/sub/x.md](references/sub/x.md).\n")
         assert check_skill_links(skill_tree) == []
+
+
+@pytest.mark.cross_os
+class TestScriptLineEndings:
+    """Git for Windows installs with `core.autocrlf=true`, and Claude Code installs a marketplace
+    plugin with `git clone`, so a script no attribute pins to LF arrives as CRLF on a default
+    Windows machine, where bash stops on `set -euo pipefail\\r`. The check holds every script a
+    target ships to an `eol=lf` attribute from the repository's own `.gitattributes`, and to LF on
+    disk, so a new script cannot regress."""
+
+    PINNED = "* text=auto eol=lf\n"
+    SCRIPTS = ("hooks/check-mthds.sh", "hooks/check.mjs", "skills/pipelex-test/references/gate.py")
+
+    @pytest.fixture()
+    def repo(self, skill_tree: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        """The skill tree as a git work tree holding one script of each kind, and no attribute
+        from the machine: the global file and the system file are kept out."""
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(skill_tree / "no-global-config"))
+        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(skill_tree.parent))
+        subprocess.run(["git", "init", "--quiet"], cwd=skill_tree, check=True)
+        for rel in self.SCRIPTS:
+            path = skill_tree / "pipelex" / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"first line\nsecond line\n")
+        return skill_tree
+
+    def _unpinned(self, rel: str) -> str:
+        return f"pipelex/{rel}: no `eol=lf` attribute pins this script to LF, so a Windows clone checks it out with CRLF"
+
+    def test_scripts_the_attributes_pin_pass(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text(self.PINNED)
+        assert check_script_line_endings(repo) == []
+
+    def test_without_attributes_every_shipped_script_fails(self, repo: Path) -> None:
+        assert check_script_line_endings(repo) == [self._unpinned(rel) for rel in sorted(self.SCRIPTS)]
+
+    def test_a_rule_for_one_kind_leaves_the_others_failing(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text("*.sh text eol=lf\n")
+        assert check_script_line_endings(repo) == [self._unpinned(rel) for rel in sorted(self.SCRIPTS) if not rel.endswith(".sh")]
+
+    def test_a_later_rule_that_unpins_a_script_fails_it(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text(self.PINNED + "pipelex/hooks/*.sh eol=crlf\n*.mjs -eol\n")
+        assert check_script_line_endings(repo) == [self._unpinned("hooks/check-mthds.sh"), self._unpinned("hooks/check.mjs")]
+
+    def test_a_script_without_a_suffix_is_known_by_its_shebang(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text("*.sh text eol=lf\n*.mjs text eol=lf\n*.py text eol=lf\n")
+        (repo / "pipelex" / "hooks" / "launcher").write_bytes(b"#!/usr/bin/env node\nconsole.log(1)\n")
+        (repo / "pipelex" / "skills" / "pipelex-test" / "notes.txt").write_bytes(b"plain text\n")
+        assert check_script_line_endings(repo) == [self._unpinned("hooks/launcher")]
+
+    def test_a_file_that_is_no_script_is_not_held(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text("*.sh text eol=lf\n*.mjs text eol=lf\n*.py text eol=lf\n")
+        assert check_script_line_endings(repo) == []
+
+    def test_a_script_written_with_crlf_fails_even_when_pinned(self, repo: Path) -> None:
+        (repo / ".gitattributes").write_text(self.PINNED)
+        (repo / "pipelex" / "hooks" / "check-mthds.sh").write_bytes(b"set -euo pipefail\r\necho ok\r\n")
+        assert check_script_line_endings(repo) == ["pipelex/hooks/check-mthds.sh: holds CRLF line endings; a shipped script must be written with LF"]
+
+    def test_the_machines_global_attributes_do_not_count(self, repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A developer's own `core.attributesFile` pins nothing for the user who clones the plugin."""
+        global_attributes = repo / "global-attributes"
+        global_attributes.write_text(self.PINNED)
+        global_config = repo / "global-config"
+        global_config.write_text(f"[core]\n\tattributesFile = {global_attributes.as_posix()}\n")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
+        assert check_script_line_endings(repo) == [self._unpinned(rel) for rel in sorted(self.SCRIPTS)]
+
+    def test_outside_a_git_work_tree_the_check_fails(self, skill_tree: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(skill_tree.parent))
+        (skill_tree / "pipelex" / "hooks").mkdir()
+        (skill_tree / "pipelex" / "hooks" / "check-mthds.sh").write_bytes(b"echo ok\n")
+        errors = check_script_line_endings(skill_tree)
+        assert len(errors) == 1
+        assert "cannot read the git attributes" in errors[0]
+
+    def test_this_repository_pins_every_script_it_ships(self) -> None:
+        assert check_script_line_endings(Path(__file__).resolve().parents[2]) == []

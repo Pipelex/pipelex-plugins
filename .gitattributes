@@ -1,0 +1,15 @@
+# Every text file is committed and checked out with LF, on every OS, whatever the clone's core.autocrlf says.
+# Git for Windows installs with core.autocrlf=true and Claude Code installs a marketplace plugin with
+# `git clone`, so without this a Windows user gets CRLF copies: bash stops on a hook script's first line,
+# the gates a skill copies into the user's project arrive with CRLF, and the generated trees no longer
+# match their templates byte for byte. `text=auto` still leaves a file git detects as binary untouched.
+* text=auto eol=lf
+
+# Scripts are text whatever git's detection guesses. `make check` refuses a shipped script that is not
+# pinned to LF (`check_script_line_endings` in scripts/check.py).
+*.sh text eol=lf
+*.bash text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.js text eol=lf
+*.py text eol=lf
