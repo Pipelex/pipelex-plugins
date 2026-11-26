@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from jinja2.utils import htmlsafe_json_dumps
 from pytest_mock import MockerFixture
+
+# `make claude-local-mcp` takes a POSIX file lock and replaces its process, so the module is not for Windows.
+pytest.importorskip("fcntl", reason="scripts/local_mcp.py locks its copies with fcntl, which Windows lacks")
 
 from scripts import local_mcp
 from scripts.gen_skill_docs import build_target, load_target_config, write_files
@@ -100,8 +104,8 @@ def _npm_answers(mocker: MockerFixture, *, stdout: str, stderr: str = "", return
 
 
 def _exec_line(launcher: Launcher) -> str:
-    """How `launch-pipelex-mcp.sh` spawns the workshop."""
-    return f"exec {launcher.command}" + "".join(f' "{arg}"' for arg in launcher.args)
+    """How `launch-pipelex-mcp.mjs` names the workshop it spawns: Jinja's `tojson` of the command and the arguments."""
+    return f"const COMMAND = {htmlsafe_json_dumps(launcher.command)};\nconst ARGS = {htmlsafe_json_dumps(launcher.args)};"
 
 
 def _spoken(launcher: Launcher) -> str:
@@ -269,18 +273,16 @@ class TestClaudeCopy:
                 content = content.replace(local_text, shipped_text)
             assert content == (shipped_dir / rel).read_text(encoding="utf-8"), f"{rel} differs from the shipped file beyond the workshop"
             swapped.append(rel)
-        assert Path("hooks/launch-pipelex-mcp.sh") in swapped
+        assert Path("hooks/launch-pipelex-mcp.mjs") in swapped
 
     def test_the_launcher_keeps_the_credential_promotion(self, repo: Path, checkout: Path) -> None:
         copy = render_claude_copy(repo, _built(checkout))
-        launcher = (copy / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8")
-        assert 'export PIPELEX_API_KEY="$PIPELEX_PLUGIN_API_KEY"' in launcher
-        assert launcher.rstrip().endswith(f'exec node "{checkout.resolve() / WORKSHOP_BUNDLE}"')
-        assert os.access(copy / "hooks" / "launch-pipelex-mcp.sh", os.X_OK)
+        launcher = (copy / "hooks" / "launch-pipelex-mcp.mjs").read_text(encoding="utf-8")
+        assert "env.PIPELEX_API_KEY = process.env.PIPELEX_PLUGIN_API_KEY;" in launcher
+        assert _exec_line(_built(checkout)) in launcher
 
-    @pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on the PATH")
-    def test_the_launcher_hands_the_workshop_a_path_the_shell_would_act_on_as_it_is(self, repo: Path, tmp_path: Path) -> None:
-        """A checkout is any directory, so its path reaches the launcher's `exec` line with whatever it holds."""
+    def test_the_launcher_hands_the_workshop_a_path_the_shell_would_act_on_as_it_is(self, repo: Path, tmp_path: Path, node: str) -> None:
+        """A checkout is any directory, so its path reaches the launcher's spawn with whatever it holds."""
         odd = tmp_path / 'a $HOME `true` "quoted" back\\slash' / "pipelex-mcp"
         (odd / WORKSHOP_BUNDLE).parent.mkdir(parents=True)
         (odd / WORKSHOP_BUNDLE).write_text("// the workshop\n", encoding="utf-8")
@@ -291,7 +293,9 @@ class TestClaudeCopy:
         (bin_dir / "node").write_text('#!/bin/sh\nprintf "%s" "$1"\n', encoding="utf-8")
         (bin_dir / "node").chmod(0o755)
         environment = {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "HOME": str(tmp_path)}
-        completed = subprocess.run([str(copy / "hooks" / "launch-pipelex-mcp.sh")], capture_output=True, text=True, check=False, env=environment)
+        completed = subprocess.run(
+            [node, str(copy / "hooks" / "launch-pipelex-mcp.mjs")], capture_output=True, text=True, check=False, env=environment
+        )
         assert completed.returncode == 0, completed.stderr
         assert completed.stdout == str(odd.resolve() / WORKSHOP_BUNDLE)
 
@@ -312,7 +316,7 @@ class TestClaudeCopy:
         second = render_claude_copy(repo, _published("latest"))
         assert second != first
         assert _tree(first) == before
-        assert (second / "hooks" / "launch-pipelex-mcp.sh").read_text(encoding="utf-8").rstrip().endswith('exec npx "-y" "@pipelex/mcp@0.20.0"')
+        assert 'const ARGS = ["-y", "@pipelex/mcp@0.20.0"];' in (second / "hooks" / "launch-pipelex-mcp.mjs").read_text(encoding="utf-8")
 
     def test_renders_of_one_workshop_at_once_each_swap_in_a_whole_copy(self, repo: Path, checkout: Path) -> None:
         """Two starts at the same moment render apart and swap in turn, so neither fails and neither leaves a partial copy."""

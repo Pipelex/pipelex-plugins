@@ -177,20 +177,21 @@ SHARED_TEMPLATES = [
 ]
 
 # Hook templates rendered for the Claude target: the PostToolUse wiring plus the
-# bundled `.mthds`-on-edit validation script. The CLI-free posture ports the
-# validation pipeline but flips missing-CLI behavior from block-with-install-hint
-# to silent pass — the hook no-ops when `plxt`/`mthds-agent`/`node` are absent
-# instead of blocking every edit. The predecessor's session-start doctor hook is
-# left behind (CLI-lifecycle territory).
+# bundled `.mthds`-on-edit validation wrapper, and the workshop launcher. Both
+# scripts are Node modules that Claude Code spawns as `node <script>` with no
+# shell, so they run alike on macOS, Linux and Windows (docs/decisions.md, "The
+# MCP launcher and the Claude Code hook run on Node"). The predecessor's
+# session-start doctor hook is left behind (CLI-lifecycle territory).
 HOOK_TEMPLATES = [
     "hooks/hooks.json.j2",
-    "hooks/check-mthds.sh.j2",
-    "hooks/launch-pipelex-mcp.sh.j2",
+    "hooks/check-mthds.mjs.j2",
+    "hooks/launch-pipelex-mcp.mjs.j2",
 ]
 
 # Hook templates by platform:
-# - Claude: hooks/hooks.json + the check-mthds.sh wrapper, and the
-#   launch-pipelex-mcp.sh launcher the manifest's MCP entry spawns.
+# - Claude: hooks/hooks.json, whose exec-form entries spawn the check-mthds.mjs
+#   wrapper with `node`, and the launch-pipelex-mcp.mjs launcher the manifest's
+#   MCP entry spawns the same way.
 # - Codex: hooks/codex-hooks.json (the plugin-bundled PostToolUse config,
 #   referenced from the Codex manifest's `hooks` field; ${PLUGIN_ROOT} is
 #   substituted by Codex's hook engine) + the check-mthds-codex.sh wrapper.
@@ -245,8 +246,9 @@ STATIC_HOOK_ASSETS_BY_PLATFORM: dict[Platform, list[str]] = {
 }
 
 # Files that should be made executable after rendering (hook scripts). A chmod
-# only touches files that were produced.
-EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vibe.sh", "launch-pipelex-mcp.sh"}
+# only touches files that were produced. The Claude target's Node scripts are not
+# among them: they are run as `node <script>`, never by their own path.
+EXECUTABLE_OUTPUTS = {"check-mthds-codex.sh", "check-mthds-vibe.sh"}
 
 # Name of the plugin-declared MCP server entry injected into the Claude and
 # Codex manifests. Its tools reach the model as
@@ -256,9 +258,12 @@ EXECUTABLE_OUTPUTS = {"check-mthds.sh", "check-mthds-codex.sh", "check-mthds-vib
 MCP_SERVER_NAME = "pipelex"
 
 # What the Claude manifest's MCP entry spawns when the target declares plugin
-# user configuration: the launcher that promotes the user's options to their
-# PIPELEX_* names (make_plugin_json, and scripts/check.py's credential check).
-CLAUDE_MCP_LAUNCHER_COMMAND = "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"
+# user configuration: `node` running the launcher that promotes the user's
+# options to their PIPELEX_* names (make_plugin_json, and scripts/check.py's
+# credential check). `node` is a real executable on every OS, where a script
+# named as the command is not one on Windows.
+CLAUDE_MCP_LAUNCHER_COMMAND = "node"
+CLAUDE_MCP_LAUNCHER_ARGS = ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"]
 
 
 @dataclass
@@ -631,7 +636,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
     # delivery differs per platform:
     # - Claude: the [vars.mcp_server.user_config] tables become the manifest's
     #   `userConfig` (prompted at enable time; sensitive values go to the OS
-    #   keychain) and the entry spawns the launch-pipelex-mcp.sh wrapper with
+    #   keychain) and the entry spawns `node` on the launch-pipelex-mcp.mjs launcher with
     #   each option injected as PIPELEX_PLUGIN_<KEY> via `${user_config.*}`
     #   substitution. The wrapper promotes non-empty values to their real
     #   PIPELEX_* names, keeping the session env as fallback — GUI launches
@@ -683,7 +688,7 @@ def make_plugin_json(base_dir: Path, config: TargetConfig) -> dict[str, object]:
                         MCP_SERVER_NAME: {
                             "type": "stdio",
                             "command": CLAUDE_MCP_LAUNCHER_COMMAND,
-                            "args": [],
+                            "args": list(CLAUDE_MCP_LAUNCHER_ARGS),
                             "env": option_env,
                         }
                     }
@@ -1079,7 +1084,9 @@ def write_files(files: Mapping[Path, str]) -> None:
     """Write what a build rendered (`BuildResult.files`) to disk, making the hook scripts executable."""
     for output_path, content in files.items():
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
+        # `newline="\n"`: text mode on Windows would write every line ending as CRLF, and the
+        # generated trees are checked in, and compared byte for byte, with LF endings.
+        output_path.write_text(content, encoding="utf-8", newline="\n")
         if output_path.name in EXECUTABLE_OUTPUTS:
             output_path.chmod(0o755)
 
@@ -1122,7 +1129,7 @@ def generate(base_dir: Path, target_name: str = "prod") -> int:
     if discovery_content is not None:
         discovery_dst = base_dir / CODEX_DISCOVERY_MARKETPLACE_DST
         discovery_dst.parent.mkdir(parents=True, exist_ok=True)
-        discovery_dst.write_text(discovery_content, encoding="utf-8")
+        discovery_dst.write_text(discovery_content, encoding="utf-8", newline="\n")
         rel = discovery_dst.relative_to(base_dir)
         print(f"  [codex-discovery] Synced {rel}")
 

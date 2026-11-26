@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The Claude Code `.mthds` hook runs on Node with no shell (Breaking)**: `hooks.json` declares the hook in Claude Code's exec form, `node` running `hooks/check-mthds.mjs`, which replaces the bash wrapper `check-mthds.sh`, so the hook checks every edit on Windows under PowerShell with no bash installed. It needs Claude Code 2.1.139 or later and Node.js on the `PATH`; without Node the hook no longer passes silently but fails to start, and the edit stands.
+
+### Fixed
+
+- **The Pipelex tools start in Claude Code on Windows**: the manifest's `pipelex` server runs `node` on `hooks/launch-pipelex-mcp.mjs`, which replaces the bash launcher `launch-pipelex-mcp.sh` that Windows could not start, and which on Windows runs `npx` through the npm installed beside `node.exe`, or through the shell when there is none, and spawns it by name on macOS and Linux as before.
+
 ### Removed
 
 - **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login as `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which saves the address beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty and `PIPELEX_API_KEY` unset, since the saved address is used only with the saved key. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell, and that the hook validates only with a key given in the dialog or the shell.

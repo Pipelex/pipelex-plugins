@@ -7,13 +7,15 @@
           {
             "type": "command",
             "if": "Edit(*.mthds)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/check-mthds.sh",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/check-mthds.mjs"],
             "timeout": 15
           },
           {
             "type": "command",
             "if": "Write(*.mthds)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/check-mthds.sh",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/check-mthds.mjs"],
             "timeout": 15
           }
         ]

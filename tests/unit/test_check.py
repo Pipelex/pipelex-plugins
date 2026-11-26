@@ -499,7 +499,7 @@ class TestVibeTargetArtifacts:
         (self._vibe_target(tmp_path) / "hooks" / "check-mthds-vibe.sh").chmod(0o644)
         assert check_vibe_target_artifacts(tmp_path) == ["[mistral-vibe] hooks/check-mthds-vibe.sh is not executable"]
 
-    @pytest.mark.parametrize("filename", ["check-mthds.sh", "hooks.json", "codex-hooks.json"])
+    @pytest.mark.parametrize("filename", ["check-mthds.mjs", "launch-pipelex-mcp.mjs", "hooks.json", "codex-hooks.json"])
     def test_rejects_another_hook_artifact(self, tmp_path: Path, filename: str) -> None:
         (self._vibe_target(tmp_path) / "hooks" / filename).write_text("")
         assert check_vibe_target_artifacts(tmp_path) == [f"[mistral-vibe] hooks/{filename} is not an artifact of the native Vibe plugin"]
@@ -576,19 +576,20 @@ class TestCredentialWiring:
         [
             ("pipelex/.claude-plugin/plugin.json", '"userConfig"', '"userConfigGone"', "userConfig offers no `api_key` option"),
             ("pipelex/.claude-plugin/plugin.json", '"sensitive": true', '"sensitive": false', "userConfig `api_key` is no longer sensitive"),
-            ("pipelex/.claude-plugin/plugin.json", '"${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh"', '"npx"', "does not spawn"),
+            ("pipelex/.claude-plugin/plugin.json", '"${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"', '"-y"', "does not spawn"),
+            ("pipelex/.claude-plugin/plugin.json", '"command": "node"', '"command": "npx"', "does not spawn"),
             ("pipelex/.claude-plugin/plugin.json", '"PIPELEX_PLUGIN_API_KEY"', '"PIPELEX_API_KEY"', "does not set PIPELEX_PLUGIN_API_KEY"),
             (
-                "pipelex/hooks/check-mthds.sh",
-                'export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"',
-                ": dropped",
-                "hooks/check-mthds.sh: does not promote CLAUDE_PLUGIN_OPTION_API_KEY to PIPELEX_API_KEY",
+                "pipelex/hooks/check-mthds.mjs",
+                "env.PIPELEX_API_KEY = process.env.CLAUDE_PLUGIN_OPTION_API_KEY;",
+                "// dropped",
+                "hooks/check-mthds.mjs: does not promote CLAUDE_PLUGIN_OPTION_API_KEY to PIPELEX_API_KEY",
             ),
             (
-                "pipelex/hooks/launch-pipelex-mcp.sh",
-                'if [[ -n "${PIPELEX_PLUGIN_API_KEY:-}" ]]; then',
-                "if true; then",
-                "hooks/launch-pipelex-mcp.sh: does not promote PIPELEX_PLUGIN_API_KEY to PIPELEX_API_KEY when it is non-empty",
+                "pipelex/hooks/launch-pipelex-mcp.mjs",
+                "if (process.env.PIPELEX_PLUGIN_API_KEY) {",
+                "if (true) {",
+                "hooks/launch-pipelex-mcp.mjs: does not promote PIPELEX_PLUGIN_API_KEY to PIPELEX_API_KEY when it is non-empty",
             ),
             (
                 "pipelex-codex/.codex-plugin/plugin.json",
@@ -676,7 +677,7 @@ class TestBuildErrorMarkers:
         assert "edti" in errors[0]
 
     @pytest.mark.parametrize(
-        "generated", ["skills/shared/writing-mthds.md", "hooks/check-mthds.sh", "mcp/vibe-mcp.toml", ".claude-plugin/plugin.json"]
+        "generated", ["skills/shared/writing-mthds.md", "hooks/check-mthds.mjs", "mcp/vibe-mcp.toml", ".claude-plugin/plugin.json"]
     )
     def test_every_generated_file_is_read_not_only_the_skills(self, skill_tree: Path, generated: str) -> None:
         """The check read `SKILL.md` alone while its account said any generated file: a shared
