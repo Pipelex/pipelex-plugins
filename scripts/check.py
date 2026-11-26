@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -614,6 +616,73 @@ def check_build_error_markers(base_dir: Path) -> list[str]:
             for idx, line in enumerate(text.splitlines(), start=1):
                 if BUILD_ERROR_MARKER in line:
                     errors.append(f"{rel}:{idx}: {line.strip()}")
+    return errors
+
+
+# What a shipped file is run by: bash, Node or Python. A file with another suffix is a script too when it opens
+# with a shebang line.
+SCRIPT_SUFFIXES = frozenset({".sh", ".bash", ".mjs", ".cjs", ".js", ".py"})
+SHEBANG = b"#!"
+
+
+def _is_script(path: Path) -> bool:
+    if path.suffix in SCRIPT_SUFFIXES:
+        return True
+    with path.open("rb") as stream:
+        return stream.read(len(SHEBANG)) == SHEBANG
+
+
+def _eol_attributes(base_dir: Path, rel_paths: list[str]) -> dict[str, str]:
+    """The `eol` attribute of each path, as the repository's own attribute files set it.
+
+    The machine's global attributes file and the system one are kept out: they pin nothing for the
+    user who clones the plugin. Raises `OSError` or `subprocess.CalledProcessError` when git cannot
+    answer, as outside a work tree.
+    """
+    env = {**os.environ, "GIT_ATTR_NOSYSTEM": "1"}
+    completed = subprocess.run(
+        ["git", "-c", f"core.attributesFile={os.devnull}", "check-attr", "--stdin", "-z", "eol"],
+        cwd=base_dir,
+        env=env,
+        input="".join(f"{rel}\0" for rel in rel_paths).encode("utf-8"),
+        capture_output=True,
+        check=True,
+    )
+    fields = completed.stdout.decode("utf-8").split("\0")
+    return {fields[idx]: fields[idx + 2] for idx in range(0, len(fields) - 2, 3)}
+
+
+def check_script_line_endings(base_dir: Path) -> list[str]:
+    """Check that every script a target ships is pinned to LF by `.gitattributes`, and holds LF.
+
+    Git for Windows installs with `core.autocrlf=true`, and Claude Code installs a marketplace
+    plugin with `git clone`, so a script no `eol=lf` attribute pins is checked out with CRLF on a
+    default Windows machine: bash stops on its first line (`set -euo pipefail\\r`), and a gate a
+    skill copies into the user's project arrives with CRLF too. The attribute is read from the
+    repository's attribute files, never the machine's global or system ones, through git itself
+    (`.git/info/attributes` still counts locally, but a clone never carries it), so a later rule
+    that unpins a path counts as git counts it. A script written with CRLF fails as well, since
+    the attribute normalises what is committed but not a copy already on disk.
+    """
+    scripts: list[tuple[str, Path]] = []
+    for output_dir in _collect_output_dirs(base_dir):
+        for path in _generated_files(base_dir, output_dir):
+            if _is_script(path):
+                scripts.append((path.relative_to(base_dir).as_posix(), path))
+    if not scripts:
+        return []
+    scripts.sort()
+    try:
+        eol = _eol_attributes(base_dir, [rel for rel, _ in scripts])
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = exc.stderr.decode("utf-8", "replace").strip() if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+        return [f"{base_dir}: cannot read the git attributes of the shipped scripts ({detail})"]
+    errors: list[str] = []
+    for rel, path in scripts:
+        if eol.get(rel) != "lf":
+            errors.append(f"{rel}: no `eol=lf` attribute pins this script to LF, so a Windows clone checks it out with CRLF")
+        if b"\r\n" in path.read_bytes():
+            errors.append(f"{rel}: holds CRLF line endings; a shipped script must be written with LF")
     return errors
 
 
@@ -1482,6 +1551,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_build_error_markers(base_dir),
         "FAIL: A template rendered its build-error branch: a parameter was given a value none of its branches names.",
         "  No generated file carries a build-error marker.",
+    )
+    failed |= _run_check(
+        "Checking every shipped script is pinned to LF line endings...",
+        check_script_line_endings(base_dir),
+        "FAIL: A shipped script is not pinned to LF by .gitattributes, or holds CRLF; a Windows clone would break it.",
+        "  Every shipped script is pinned to LF and holds LF.",
     )
     failed |= _run_check(
         "Checking that links resolve both ways in every target...",

@@ -9,6 +9,7 @@
 ### Fixed
 
 - **The Pipelex tools start in Claude Code on Windows**: the manifest's `pipelex` server runs `node` on `hooks/launch-pipelex-mcp.mjs`, which replaces the bash launcher `launch-pipelex-mcp.sh` that Windows could not start, and which on Windows runs `npx` through the npm installed beside `node.exe`, or through the shell when there is none, and spawns it by name on macOS and Linux as before.
+- **Shipped scripts keep LF line endings on a Windows clone**: the repository now carries a `.gitattributes` that commits and checks out every text file with LF, and every script explicitly, whatever `core.autocrlf` the clone uses. Git for Windows installs with `core.autocrlf=true` and Claude Code installs the plugin with `git clone`, so a default Windows machine received the hook wrappers, the MCP launcher and the scaffold's scripts with CRLF, where bash stops on their first line, and the gates `pipelex-integrate` copies into a project arrived with CRLF too. `make check` now refuses a shipped script that `.gitattributes` does not pin to LF, or that holds CRLF, and `make build` writes every generated file with LF on every OS. Git does not rewrite a file an update leaves unchanged, so on Windows remove the Pipelex marketplace and add it again to replace scripts an earlier clone received with CRLF.
 
 ### Removed
 
