@@ -1,6 +1,6 @@
 // check.mjs — .mthds PostToolUse hook (lint/format local via WASM, validate via Pipelex API)
 // GENERATED FILE — do not edit. Rebuild with `npm run build:hook` in the js/ directory of Pipelex/pipelex-sdk.
-// Provenance: @pipelex/sdk 0.69.5 (02ec4a9) + @pipelex/tools-wasm 0.6.3 (npm)
+// Provenance: @pipelex/sdk 0.71.1 (b7bc97b) + @pipelex/tools-wasm 0.6.3 (npm)
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -6553,11 +6553,11 @@ var init_membership = __esm({
 
 // node_modules/mthds/dist/method-tree/discovery.js
 import { lstatSync, readdirSync } from "node:fs";
-import { dirname, join as join2 } from "node:path";
+import { dirname as dirname2, join as join3 } from "node:path";
 function exactEntryKind(directory, name) {
   let stats;
   try {
-    stats = lstatSync(join2(directory, name));
+    stats = lstatSync(join3(directory, name));
   } catch {
     return null;
   }
@@ -6575,7 +6575,7 @@ function findManifestDirectory(startDirectory) {
       return current;
     if (exactEntryKind(current, GIT_ENTRY_NAME) !== null)
       return null;
-    const parent = dirname(current);
+    const parent = dirname2(current);
     if (parent === current)
       return null;
     current = parent;
@@ -8389,13 +8389,13 @@ var init_exceptions3 = __esm({
 });
 
 // node_modules/mthds/dist/method-tree/file-reading.js
-import { constants } from "node:fs";
+import { constants as constants2 } from "node:fs";
 import { open } from "node:fs/promises";
 import { createHash as createHash2 } from "node:crypto";
 function describe(err) {
   return err instanceof Error ? err.message : String(err);
 }
-function errorCode(err) {
+function errorCode2(err) {
   const code = err?.code;
   return typeof code === "string" ? code : void 0;
 }
@@ -8411,7 +8411,7 @@ function unreadable(path2, where, err) {
   });
 }
 function refusalOfOpenError(err, path2, where) {
-  switch (errorCode(err)) {
+  switch (errorCode2(err)) {
     // `O_NOFOLLOW` on a link fails with ELOOP, or EMLINK on the BSDs.
     case "ELOOP":
     case "EMLINK":
@@ -8474,7 +8474,7 @@ var OPEN_FLAGS, CHUNK_SIZE;
 var init_file_reading = __esm({
   "node_modules/mthds/dist/method-tree/file-reading.js"() {
     init_exceptions3();
-    OPEN_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
+    OPEN_FLAGS = constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0) | (constants2.O_NONBLOCK ?? 0);
     CHUNK_SIZE = 64 * 1024;
   }
 });
@@ -8759,16 +8759,16 @@ function bytesEqual(left, leftStart, right, rightStart, length) {
   }
   return true;
 }
-function matchBasename(basename4, pattern) {
+function matchBasename(basename5, pattern) {
   const { pattern: bytes, noWildcardLength } = pattern;
   if (noWildcardLength === bytes.length) {
-    return bytes.length === basename4.length && bytesEqual(bytes, 0, basename4, 0, bytes.length);
+    return bytes.length === basename5.length && bytesEqual(bytes, 0, basename5, 0, bytes.length);
   }
   if (pattern.endsWith) {
     const suffixLength = bytes.length - 1;
-    return suffixLength <= basename4.length && bytesEqual(bytes, 1, basename4, basename4.length - suffixLength, suffixLength);
+    return suffixLength <= basename5.length && bytesEqual(bytes, 1, basename5, basename5.length - suffixLength, suffixLength);
   }
-  return wildmatch(bytes, basename4, false);
+  return wildmatch(bytes, basename5, false);
 }
 function matchPathname(pathname, pattern) {
   let bytes = pattern.pattern;
@@ -8795,13 +8795,13 @@ function matchPathname(pathname, pattern) {
   }
   return wildmatch(bytes, name, true);
 }
-function lastMatchingPattern(list, pathname, basename4, isDirectory2) {
+function lastMatchingPattern(list, pathname, basename5, isDirectory2) {
   for (let index = list.patterns.length - 1; index >= 0; index -= 1) {
     const pattern = list.patterns[index];
     if (pattern.mustBeDirectory && !isDirectory2)
       continue;
     if (pattern.noDirectory) {
-      if (matchBasename(basename4, pattern))
+      if (matchBasename(basename5, pattern))
         return pattern;
       continue;
     }
@@ -8810,14 +8810,14 @@ function lastMatchingPattern(list, pathname, basename4, isDirectory2) {
   }
   return null;
 }
-function excludingSource(gitignoreLists, manifestList, pathname, basename4, isDirectory2) {
+function excludingSource(gitignoreLists, manifestList, pathname, basename5, isDirectory2) {
   for (let index = gitignoreLists.length - 1; index >= 0; index -= 1) {
-    const matched = lastMatchingPattern(gitignoreLists[index], pathname, basename4, isDirectory2);
+    const matched = lastMatchingPattern(gitignoreLists[index], pathname, basename5, isDirectory2);
     if (matched !== null)
       return matched.negative ? null : matched.source;
   }
   if (manifestList !== null) {
-    const matched = lastMatchingPattern(manifestList, pathname, basename4, isDirectory2);
+    const matched = lastMatchingPattern(manifestList, pathname, basename5, isDirectory2);
     if (matched !== null)
       return matched.negative ? null : matched.source;
   }
@@ -9246,7 +9246,7 @@ var init_tree = __esm({
 
 // node_modules/mthds/dist/method-tree/lister.js
 import { lstat, readFile, readdir as readdir2, realpath, stat } from "node:fs/promises";
-import { basename as basename2, dirname as dirname2, join as join3, relative, resolve as resolve2, sep as sep2 } from "node:path";
+import { basename as basename3, dirname as dirname3, join as join4, relative, resolve as resolve2, sep as sep2 } from "node:path";
 function joinPath(directory, name) {
   return directory === "" ? name : `${directory}/${name}`;
 }
@@ -9413,7 +9413,7 @@ async function walk(listing, directory) {
   }
 }
 async function readManifestPatterns(root) {
-  const manifestPath = join3(root, MANIFEST_NAME);
+  const manifestPath = join4(root, MANIFEST_NAME);
   let raw;
   try {
     raw = parse(await readFile(manifestPath, "utf-8"));
@@ -9449,7 +9449,7 @@ async function hashMembers(members, where) {
   return { files, absolutes };
 }
 async function listOneFileTree(file, kind, limits) {
-  const name = basename2(file).normalize("NFC");
+  const name = basename3(file).normalize("NFC");
   if (name.startsWith(".")) {
     throw refusal("lone_file_excluded", `The file '${name}' starts with a dot, so the membership rule keeps it out of its own tree; rename it.`, [name], { excludedBy: "dot_segment" });
   }
@@ -9482,7 +9482,7 @@ async function readHandedOver(handedOver) {
     if (stats.isDirectory() || stats.isSymbolicLink() && await isDirectoryBehind(absolute)) {
       return { kind: "directory", directory: await realpath(absolute) };
     }
-    const file = stats.isSymbolicLink() ? join3(await realpath(dirname2(absolute)), basename2(absolute)) : await realpath(absolute);
+    const file = stats.isSymbolicLink() ? join4(await realpath(dirname3(absolute)), basename3(absolute)) : await realpath(absolute);
     return { kind: "lone", file, entryKind: entryKindOf(stats) };
   } catch (err) {
     throw new MethodTreeError("not_found", `Cannot read '${handedOver}': ${describeIoError(err)}`, {
@@ -9503,7 +9503,7 @@ async function listMethodTree(handedOver, options = {}) {
   if (handed.kind === "lone" && !handed.file.endsWith(".mthds")) {
     throw new MethodTreeError("not_listable", `'${handedOver}' is not a .mthds file; hand over a method's directory or a .mthds file.`, { names: [handedOver] });
   }
-  const start = handed.kind === "directory" ? handed.directory : dirname2(handed.file);
+  const start = handed.kind === "directory" ? handed.directory : dirname3(handed.file);
   const manifestDirectory = handed.kind === "directory" && options.discover === false ? null : findManifestDirectory(start);
   if (handed.kind === "lone" && manifestDirectory === null) {
     return listOneFileTree(handed.file, handed.entryKind, limits);
@@ -12258,6 +12258,122 @@ function encodeOutcome(outcome, platform = "claude") {
   }
 }
 
+// src/hooks/format-write.ts
+import { randomBytes } from "node:crypto";
+import * as nodeFs from "node:fs";
+import { basename as basename2, dirname, join as join2 } from "node:path";
+var WINDOWS_RENAME_RETRY_DELAYS_MS = [10, 20, 40, 80, 160, 300];
+var WINDOWS_TRANSIENT_RENAME_CODES = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function errorCode(err) {
+  if (typeof err === "object" && err !== null && "code" in err) {
+    const code = err.code;
+    return typeof code === "string" ? code : void 0;
+  }
+  return void 0;
+}
+function writeBackFormatted(filePath, original, result, options = {}) {
+  if (!result.changed) {
+    return "unchanged";
+  }
+  return replaceFileContent(filePath, original, result.formatted, options);
+}
+function replaceFileContent(filePath, original, content, options = {}) {
+  const fs2 = options.fs ?? nodeFs;
+  const platform = options.platform ?? process.platform;
+  const sleep2 = options.sleep ?? sleepSync;
+  const retryDelays = platform === "win32" ? options.renameRetryDelaysMs ?? WINDOWS_RENAME_RETRY_DELAYS_MS : [];
+  const target = fs2.realpathSync.native(filePath);
+  fs2.accessSync(target, nodeFs.constants.W_OK);
+  const stats = fs2.statSync(target);
+  if (stats.nlink > 1) {
+    fs2.writeFileSync(target, content);
+    return "written-in-place";
+  }
+  const mode = stats.mode & 4095;
+  const temporary = join2(
+    dirname(target),
+    `.${basename2(target)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
+  );
+  let created = false;
+  let ownershipKept = false;
+  try {
+    const fd = fs2.openSync(temporary, "wx", mode);
+    created = true;
+    try {
+      ownershipKept = platform === "win32" || giveOwnership(fs2, fd, stats);
+      if (ownershipKept) {
+        fs2.writeFileSync(fd, content);
+        fs2.fsyncSync(fd);
+      }
+    } finally {
+      fs2.closeSync(fd);
+    }
+    if (ownershipKept) {
+      fs2.chmodSync(temporary, mode);
+      renameWithRetries(fs2, temporary, target, original, retryDelays, sleep2);
+      created = false;
+      return "replaced";
+    }
+  } finally {
+    if (created) {
+      try {
+        fs2.unlinkSync(temporary);
+      } catch {
+      }
+    }
+  }
+  fs2.writeFileSync(target, content);
+  return "written-in-place";
+}
+function giveOwnership(fs2, fd, original) {
+  const created = fs2.fstatSync(fd);
+  if (created.uid === original.uid && created.gid === original.gid) {
+    return true;
+  }
+  try {
+    fs2.fchownSync(fd, original.uid, original.gid);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function annotateStillHeld(err, attempts) {
+  if (err instanceof Error) {
+    err.message = `${err.message} (still held after ${attempts} attempts; the file was left as it was)`;
+  }
+  return err;
+}
+function renameWithRetries(fs2, from, to, original, retryDelays, sleep2) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs2.renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = errorCode(err);
+      const retried = code !== void 0 && WINDOWS_TRANSIENT_RENAME_CODES.has(code);
+      const delay = retryDelays[attempt];
+      if (!retried || delay === void 0) {
+        throw retried && attempt > 0 ? annotateStillHeld(err, attempt + 1) : err;
+      }
+      sleep2(delay);
+      let current;
+      try {
+        current = fs2.readFileSync(to, "utf-8");
+      } catch {
+        throw annotateStillHeld(err, attempt + 1);
+      }
+      if (current !== original) {
+        throw new Error(
+          `${to} changed while its formatted copy waited to replace it; the newer content was kept`
+        );
+      }
+    }
+  }
+}
+
 // src/problem-items.ts
 init_protocol();
 
@@ -12301,7 +12417,7 @@ function readProblemItems(entries) {
 
 // src/hooks/bundle-gather.ts
 import { realpathSync } from "node:fs";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join5, relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
 
 // src/method-trees.ts
 init_protocol();
@@ -12683,15 +12799,17 @@ var ArtifactFetchError = class extends ArtifactOperationError {
   uri;
   reason;
   status;
+  requirement;
   constructor(message, uri, reason, status, options) {
     super(message, {
       cause: options?.cause,
-      problem: options?.problem ?? artifactFetchProblem(reason, uri, status)
+      problem: options?.problem ?? artifactFetchProblem(reason, uri, status, options?.requirement)
     });
     this.name = "ArtifactFetchError";
     this.uri = uri;
     this.reason = reason;
     this.status = status;
+    this.requirement = options?.requirement;
   }
 };
 var StoredTextLoadError = class extends ArtifactOperationError {
@@ -12699,26 +12817,32 @@ var StoredTextLoadError = class extends ArtifactOperationError {
   path;
   reason;
   status;
+  requirement;
+  /** Assignable only for `startAndWaitForResult`'s blocking fallback, which sets it once. */
   wireResults;
   constructor(message, details, options) {
     super(message, {
       cause: options?.cause,
-      problem: options?.problem ?? artifactFetchProblem(details.reason, details.uri, details.status)
+      problem: options?.problem ?? artifactFetchProblem(details.reason, details.uri, details.status, details.requirement)
     });
     this.name = "StoredTextLoadError";
     this.uri = details.uri;
     this.path = details.path;
     this.reason = details.reason;
     this.status = details.status;
+    this.requirement = details.requirement;
     this.wireResults = details.wireResults;
   }
 };
-function artifactFetchProblem(reason, uri, status) {
+var READ_SCOPE_UNDER_CALLER_REQUIREMENT = "read_scope_under_caller";
+function artifactFetchProblem(reason, uri, status, requirement) {
   switch (reason) {
     case "pipelex.storage.uri_invalid":
     case "pipelex.org.mismatch":
     case "not_found":
       return buildProblem("input.reference_not_found", { input: uri });
+    case "auth.forbidden":
+      return requirement === READ_SCOPE_UNDER_CALLER_REQUIREMENT ? buildProblem("input.reference_not_found", { input: uri }) : buildProblem("runtime.unexpected", {});
     case "unsupported_url":
       return buildProblem("client.link_refused", { reason: "unsupported_scheme" });
     case "plain_http_refused":
@@ -13977,7 +14101,7 @@ async function gatherMethodTree(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
   let tree;
   try {
     tree = await listDirectoryTree(
-      dirname3(editedAbs),
+      dirname4(editedAbs),
       {
         maxFileCount: caps.maxFiles,
         maxFileSize: caps.maxFileBytes,
@@ -14006,7 +14130,7 @@ async function gatherMethodTree(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
   );
   const shownRoot = shownRootOf(editedAbs, root);
   const withheld = findings.map((finding) => ({
-    path: join4(shownRoot, ...finding.path.split("/")),
+    path: join5(shownRoot, ...finding.path.split("/")),
     reason: finding.reason
   }));
   if (findings.some((finding) => isReadByEveryValidation(finding.path))) {
@@ -14022,7 +14146,7 @@ async function gatherMethodTree(editedFilePath, caps = DEFAULT_GATHER_CAPS) {
   return { ok: true, tree: await treeOver(files, bytesByPath), withheld };
 }
 function shownRootOf(editedAbs, root) {
-  const editedDir = dirname3(editedAbs);
+  const editedDir = dirname4(editedAbs);
   try {
     const candidate = resolve3(editedDir, relative2(realpathSync(editedDir), root));
     return realpathSync(candidate) === root ? candidate : root;
@@ -14211,7 +14335,7 @@ function methodShowcaseFreezeFault(answer) {
 }
 
 // src/version.ts
-var SDK_VERSION = "0.69.5";
+var SDK_VERSION = "0.71.1";
 
 // src/user-agent.ts
 var SDK_TOKEN_NAME = "pipelex-sdk-js";
@@ -14440,7 +14564,7 @@ var EXTENSION_MIME = {
   csv: "text/csv",
   json: "application/json"
 };
-function basename3(path2) {
+function basename4(path2) {
   const parts = path2.split(/[\\/]/);
   return parts[parts.length - 1] || path2;
 }
@@ -14484,7 +14608,7 @@ function bytesToBase64(bytes) {
 async function toAssetBytes(asset, options) {
   if (typeof asset === "string") {
     const bytes2 = await readLocalPath(asset);
-    const filename2 = options.filename ?? basename3(asset);
+    const filename2 = options.filename ?? basename4(asset);
     return { bytes: bytes2, filename: filename2, contentType: options.contentType ?? guessContentType(filename2) };
   }
   if (asset instanceof Uint8Array) {
@@ -15410,6 +15534,10 @@ var TEXT_EXTENSION_BY_KIND = {
   html: ".html",
   json: ".json"
 };
+function refusalRequirement(error) {
+  const requirement = error.params?.requirement;
+  return typeof requirement === "string" ? requirement : void 0;
+}
 var IDENTIFIER_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function walkReferences(value, withPaths = true, described2, includeTexts = false) {
   const byUri = /* @__PURE__ */ new Map();
@@ -15550,17 +15678,19 @@ async function resolveArtifacts(client, uris, options = {}) {
   return items;
 }
 async function fetchArtifact(client, uri, options = {}) {
-  const bounds = fetchBounds(options);
+  const bounds = fetchBounds(options, client.originUrl);
   const [resolved] = await resolveArtifacts(client, [uri], { signal: options.signal });
   if (resolved.error !== null) {
-    throw new ArtifactFetchError(resolved.error.detail, uri, resolved.error.code);
+    throw new ArtifactFetchError(resolved.error.detail, uri, resolved.error.code, void 0, {
+      requirement: refusalRequirement(resolved.error)
+    });
   }
   const dispatcher = await dispatcherFor(bounds.timeoutMs);
   return fetchResolvedUrl(uri, resolved.url, bounds, dispatcher, () => {
     void dispatcher?.close().catch(() => void 0);
   });
 }
-function fetchBounds(options) {
+function fetchBounds(options, originUrl) {
   const maxBytes = options.maxBytes ?? DEFAULT_ARTIFACT_MAX_BYTES;
   const timeoutMs = options.timeoutMs ?? DEFAULT_ARTIFACT_TIMEOUT_MS;
   requirePositive("maxBytes", maxBytes);
@@ -15570,7 +15700,23 @@ function fetchBounds(options) {
       { problem: argumentInvalidProblem("timeoutMs", "not_positive") }
     );
   }
-  return { maxBytes, timeoutMs, allowHttp: options.allowHttp ?? false, signal: options.signal };
+  return {
+    maxBytes,
+    timeoutMs,
+    allowHttp: options.allowHttp ?? false,
+    clientOrigin: originOf(originUrl),
+    signal: options.signal
+  };
+}
+function originOf(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  return url.origin;
 }
 function requirePositive(name, value) {
   if (!Number.isFinite(value) || value <= 0) {
@@ -15589,34 +15735,34 @@ async function dispatcherFor(timeoutMs) {
     return null;
   }
 }
-function checkUrl(uri, downloadUrl, allowHttp) {
+function checkUrl(uri, downloadUrl, allowHttp, clientOrigin) {
   let url;
   try {
     url = new URL(downloadUrl);
   } catch {
     throw new ArtifactFetchError(
-      "The platform resolved the reference to a link that is not a valid absolute URL.",
+      "The server resolved the reference to a link that is not a valid absolute URL.",
       uri,
       "unsupported_url"
     );
   }
-  if (url.protocol === "http:" && !allowHttp) {
+  if (url.protocol === "http:" && !allowHttp && (clientOrigin === null || url.origin !== clientOrigin)) {
     throw new ArtifactFetchError(
-      "The platform resolved the reference to a plain http link, which is refused by default; pass allowHttp: true to accept it (the local stack's object store hands out such links).",
+      "The server resolved the reference to a plain http link on an origin other than the client's own, which is refused by default; pass allowHttp: true to accept it (the local stack's object store hands out such links).",
       uri,
       "plain_http_refused"
     );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new ArtifactFetchError(
-      `The platform resolved the reference to a "${url.protocol.replace(":", "")}" link, which is not fetched; only http(s) links are.`,
+      `The server resolved the reference to a "${url.protocol.replace(":", "")}" link, which is not fetched; only http(s) links are.`,
       uri,
       "unsupported_url"
     );
   }
   if (url.username !== "" || url.password !== "") {
     throw new ArtifactFetchError(
-      "The platform resolved the reference to a link carrying credentials, which is not fetched.",
+      "The server resolved the reference to a link carrying credentials, which is not fetched.",
       uri,
       "unsupported_url"
     );
@@ -15626,7 +15772,7 @@ function checkUrl(uri, downloadUrl, allowHttp) {
 async function fetchResolvedUrl(uri, downloadUrl, bounds, dispatcher, release) {
   let url;
   try {
-    url = checkUrl(uri, downloadUrl, bounds.allowHttp);
+    url = checkUrl(uri, downloadUrl, bounds.allowHttp, bounds.clientOrigin);
   } catch (err) {
     release();
     throw err;
@@ -15955,12 +16101,15 @@ async function loadStoredTextValues(client, value, node, options, runId) {
   let failed = false;
   let firstFailure;
   try {
-    const bounds = fetchBounds({
-      maxBytes,
-      timeoutMs: options.timeoutMs,
-      allowHttp: options.allowHttp,
-      signal: stopping.signal
-    });
+    const bounds = fetchBounds(
+      {
+        maxBytes,
+        timeoutMs: options.timeoutMs,
+        allowHttp: options.allowHttp,
+        signal: stopping.signal
+      },
+      client.originUrl
+    );
     const references = urls.filter(isStorageReference);
     const resolved = /* @__PURE__ */ new Map();
     const items = await resolveForTexts(client, references, firstSite, options.signal);
@@ -16020,7 +16169,7 @@ async function resolveForTexts(client, references, firstSite, signal) {
     const path2 = renderPath2(site.segments);
     const detail = err instanceof Error ? err.message : String(err);
     throw new StoredTextLoadError(
-      `The stored text at ${path2} could not be loaded: the platform's bulk resolve route failed: ${detail}`,
+      `The stored text at ${path2} could not be loaded: the bulk resolve route failed: ${detail}`,
       {
         uri: site.url,
         path: path2,
@@ -16095,7 +16244,7 @@ async function readStoredBytes(site, resolved, bounds, maxTotalBytes, take, disp
   const fail = (reason, detail, extra) => {
     throw new StoredTextLoadError(
       `The stored text at ${path2} could not be loaded: ${detail}`,
-      { uri: site.url, path: path2, reason, status: extra?.status },
+      { uri: site.url, path: path2, reason, status: extra?.status, requirement: extra?.requirement },
       { cause: extra?.cause, problem: extra?.problem }
     );
   };
@@ -16107,9 +16256,13 @@ async function readStoredBytes(site, resolved, bounds, maxTotalBytes, take, disp
     return bytes;
   }
   if (resolved === void 0) {
-    return fail("unsupported_url", "its url was not resolved by the platform.");
+    return fail("unsupported_url", "its url was not resolved by the bulk resolve route.");
   }
-  if (resolved.error !== null) return fail(resolved.error.code, resolved.error.detail);
+  if (resolved.error !== null) {
+    return fail(resolved.error.code, resolved.error.detail, {
+      requirement: refusalRequirement(resolved.error)
+    });
+  }
   const link = resolved.url;
   let reader;
   try {
@@ -16142,7 +16295,8 @@ async function readStoredBytes(site, resolved, bounds, maxTotalBytes, take, disp
       return fail(err.reason, err.message, {
         cause: err,
         problem: err.problem,
-        status: err.status
+        status: err.status,
+        requirement: err.requirement
       });
     }
     return fail("unknown", err instanceof Error ? err.message : String(err), { cause: err });
@@ -16285,7 +16439,7 @@ var ArtifactWriteError = class extends Error {
 var SKIPPED_ABORTED = "The download was aborted before this artifact was fetched.";
 var SKIPPED_CREDENTIAL = "The download stopped on a credential failure before this artifact was fetched.";
 var SKIPPED_TOTAL = "Skipped: the download's total byte limit was reached by an earlier artifact.";
-function itemError(location, contentType, code, detail) {
+function itemError(location, contentType, code, detail, params) {
   return {
     uri: location.uri,
     kind: location.kind,
@@ -16293,7 +16447,7 @@ function itemError(location, contentType, code, detail) {
     path: null,
     content_type: contentType,
     size: null,
-    error: { code, detail }
+    error: params === void 0 || params === null ? { code, detail } : { code, detail, params }
   };
 }
 function isExpired(expiresAt) {
@@ -16344,7 +16498,7 @@ async function downloadArtifacts(client, request) {
     );
   }
   requirePositive("maxTotalBytes", maxTotalBytes);
-  const bounds = fetchBounds(request);
+  const bounds = fetchBounds(request, client.originUrl);
   const hasRunId = typeof request.run_id === "string" && request.run_id !== "";
   const hasResults = request.results != null;
   if (hasRunId === hasResults) {
@@ -16616,7 +16770,8 @@ async function downloadArtifacts(client, request) {
           location,
           contentTypeOf(index, null),
           entry.error.code,
-          entry.error.detail
+          entry.error.detail,
+          entry.error.params
         );
         continue;
       }
@@ -17020,6 +17175,12 @@ function methodVersionShowcasesPath(methodId, version, call) {
 }
 var isString3 = (value) => typeof value === "string";
 var FILE_ARCHIVE_STATES = ["queued", "building", "ready", "failed"];
+var FILE_PREVIEW_STATES = [
+  "ready",
+  "preparing",
+  "failed",
+  "unavailable"
+];
 var DRAFT_FILE_BLOBS = ["copied", "already_held"];
 var METHOD_COPY_OUTCOMES = ["copied", "refused"];
 var RUN_FILES_STATES = ["listing", "listed"];
@@ -17063,7 +17224,10 @@ var METHOD_EXAMPLE_FIELDS = {
 var PipelexApiClient = class {
   apiKey;
   baseUrl;
-  /** Origin root derived from the base URL — `/health` lives here, not under `/v1`. */
+  /**
+   * The origin (`scheme://host[:port]`) of the configured base URL — `/health` lives here, not
+   * under `/v1`, and a resolved storage link on it is fetched over plain http without `allowHttp`.
+   */
   originUrl;
   /** Cached `/v1/version` handshake outcome — whether the durable lifecycle is served. */
   lifecycleAvailable;
@@ -20290,7 +20454,13 @@ var PipelexApiClient = class {
   async submitOnboarding(input) {
     await this.requestProduct("POST", "onboarding/submit", input);
   }
-  /** Resolve a storage URI to a presigned URL — `POST /v1/resolve-storage-url`. */
+  /**
+   * Resolve a storage URI to a presigned URL — `POST /v1/resolve-storage-url`.
+   * Only the hosted platform serves this route: a self-hosted runner, from
+   * pipelex-api 0.118.0, serves the bulk route alone and answers this one a
+   * `404`, so a self-hosted caller with one link to mint calls
+   * {@link resolveArtifacts} with a one-item list.
+   */
   async resolveStorageUrl(input) {
     return this.requestProduct("POST", "resolve-storage-url", input);
   }
@@ -20301,7 +20471,9 @@ var PipelexApiClient = class {
    * and the request is a `200` whenever every reference got a verdict. At most
    * `BULK_RESOLVE_MAX_URIS` references per call (a longer list is a `422`) —
    * {@link resolveArtifacts} chunks a longer set. Served by the hosted platform
-   * only: a deployment without the route answers a `404` `ApiResponseError`.
+   * and, from pipelex-api 0.118.0, a self-hosted runner, which resolves the
+   * references under the caller's own scope to links on its own origin: a
+   * deployment without the route answers a `404` `ApiResponseError`.
    */
   async resolveStorageUrls(input, options = {}) {
     return this.requestProductObject("POST", "resolve-storage-url/bulk", input, options);
@@ -20806,6 +20978,74 @@ var PipelexApiClient = class {
     return archive;
   }
   /**
+   * Where the PDF preview of an Office file stands — `GET /v1/files/preview?uri=` — naming the file
+   * by its `pipelex-storage://` address. The platform converts Word, Excel and PowerPoint files and
+   * their OpenDocument and older counterparts (`docx`, `xlsx`, `pptx`, `doc`, `xls`, `ppt`, `odt`,
+   * `ods`, `odp`), chosen by the address's extension.
+   *
+   * **The answer is always a `200`: branch on `state`.** The platform never waits on a conversion:
+   * the first ask queues one and answers `preparing` at once, and asking again queues nothing more,
+   * so polling is safe (the app polls for up to three minutes). `ready` carries `url`, a presigned
+   * `GET` of the PDF signed fresh on each read and valid for fifteen minutes, with its
+   * `url_expires_at`; it is a bearer capability, so keep it out of logs. `failed` carries
+   * `failure`, `{ code, detail }`, which stands for a day from when it failed, asking again within
+   * it answering the same failure. `unavailable` means the file gets no preview: a type that is not
+   * converted, a file over 50 MB, or an address holding nothing. The SDK has no waiting helper,
+   * since how long to wait and how to show it is the caller's.
+   *
+   * Throws `RequestArgumentError` for a `uri` that is not a non-empty string, before any request.
+   * Throws `ApiResponseError`: `422` `pipelex.storage.uri_invalid` for a malformed address, `403`
+   * `pipelex.org.mismatch` for another organization's, `422` `request.invalid` for an address over
+   * 512 characters, and `503` `runtime.unavailable`, `retry` `yes`, when the conversion could not
+   * be queued, so the same request can be sent again. An
+   * answer that is not a preview, an object with a known `state` and the members that state fills,
+   * is an answer the SDK cannot read, thrown as an `ApiResponseError` whose body hides the link.
+   */
+  async getFilePreview(uri) {
+    const checkedUri = requireNonEmptyId(uri, "getFilePreview", STORAGE_URI_ARGUMENT);
+    const endpoint = `files/preview${productQuery({ uri: checkedUri })}`;
+    const res = withLinks(await this.requestProductAnswer("GET", endpoint, void 0));
+    const answer = this.readObjectAnswer("GET", endpoint, res);
+    const unreadable2 = (what) => this.unreadableAnswer("GET", `/${API_PREFIX2}/${endpoint}`, res, what);
+    switch (answer.state) {
+      case "ready":
+        if (typeof answer.url !== "string" || answer.url === "") {
+          throw unreadable2("a ready preview whose `url` is not a non-empty string");
+        }
+        if (typeof answer.url_expires_at !== "string") {
+          throw unreadable2("a ready preview whose `url_expires_at` is not a string");
+        }
+        return {
+          state: "ready",
+          url: answer.url,
+          url_expires_at: answer.url_expires_at,
+          failure: null
+        };
+      case "failed": {
+        const failure = answer.failure;
+        if (!isPlainObject(failure) || typeof failure.code !== "string" || typeof failure.detail !== "string") {
+          throw unreadable2("a failed preview whose `failure` is not a `code` and a `detail`");
+        }
+        return {
+          state: "failed",
+          url: null,
+          url_expires_at: null,
+          failure: { code: failure.code, detail: failure.detail }
+        };
+      }
+      case "preparing":
+      case "unavailable":
+        return { state: answer.state, url: null, url_expires_at: null, failure: null };
+      default:
+        throw unreadable2(
+          `a preview whose \`state\` is not ${inWords(
+            FILE_PREVIEW_STATES.map((state) => `\`${state}\``),
+            "or"
+          )}`
+        );
+    }
+  }
+  /**
    * Copy one of the organization's files into a method's draft —
    * `POST /v1/methods/{id}/draft/files/from-file`, "Add to method files".
    *
@@ -21201,17 +21441,8 @@ var PipelexApiClient = class {
       return await this.withStoredTextsLoaded(results, void 0, signal);
     } catch (err) {
       if (!(err instanceof StoredTextLoadError)) throw err;
-      throw new StoredTextLoadError(
-        err.message,
-        {
-          uri: err.uri,
-          path: err.path,
-          reason: err.reason,
-          status: err.status,
-          wireResults: results
-        },
-        { cause: err.cause, problem: err.problem }
-      );
+      err.wireResults = results;
+      throw err;
     }
   }
 };
@@ -21852,10 +22083,7 @@ async function checkOneFile(engine, filePath) {
     return lintOutcome;
   }
   try {
-    const formatted = engine.formatMthds(content);
-    if (formatted.changed) {
-      writeFileSync(filePath, formatted.formatted);
-    }
+    writeBackFormatted(filePath, content, engine.formatMthds(content));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     warn(`Warning: format failed: ${message}`);
