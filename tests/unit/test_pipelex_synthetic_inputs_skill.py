@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+from pytest_mock import MockerFixture
 
 from scripts.check import SKILL_CEILING_CHARS
 from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
@@ -26,6 +31,7 @@ class TestPipelexSyntheticInputsSkillShape:
     REPO_ROOT = Path(__file__).parents[2]
     REFERENCES_DIR = REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "references"
     REFERENCES = ("pdf.md", "png.md", "office.md", "venv.md", "photograph.md")
+    VENV_SCRIPT = REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "scripts" / "synth_venv.py"
 
     def render(self, target_name: str) -> str:
         """The skill as the named target renders it — what a user of that harness installs."""
@@ -55,7 +61,7 @@ class TestPipelexSyntheticInputsSkillShape:
         point, read before acting — a pointer only in the closing index is a caveat that will not be read."""
         body = self.render(target_name)
         at_the_decision = {
-            "**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.**": ("references/venv.md",),
+            "**Rung 2 — no `uv`, but a Python 3 with `venv` and `pip`.**": ("references/venv.md",),
             "Read the format's reference": ("references/pdf.md", "references/png.md", "references/office.md"),
             "A `photograph` follows": ("references/photograph.md",),
         }
@@ -198,10 +204,11 @@ class TestPipelexSyntheticInputsSkillShape:
         body = self.render(target_name)
         target = self.the_line(body, "- `target`: the path to write;")
         assert target == (
-            "- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in a fresh temporary directory "
-            "made once with `mktemp -d`, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. "
+            "- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in step 2's temporary "
+            "directory, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. "
             "A target the caller or the user names is honoured."
         )
+        assert "prints this invocation's temporary directory" in self.the_line(body, "**Rung 1 — `uv --version` answers**")
         assert "./inputs/" not in body
         assert ".gitignore` holding `*`" not in body, "nothing the factory writes by default lies in a tree it must mark"
         synthetic = (self.REPO_ROOT / "skills" / "pipelex-inputs" / "references" / "synthetic.md").read_text(encoding="utf-8")
@@ -212,21 +219,24 @@ class TestPipelexSyntheticInputsSkillShape:
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_failure_removes_the_recipes_partial_file(self, target_name: str) -> None:
-        """Every recipe renders to a hidden `PART` beside `OUT` and renames it on success, so a recipe that crashes
-        mid-save leaves that file behind. Step 4's cleanup names it, spelled as the recipes compute it, or "a
-        failure leaves nothing behind" is false."""
+        """Every recipe renders to a hidden `PART` beside `OUT`, deletes it in a `finally` and renames it onto `OUT` only on
+        success, so only a run killed mid-save leaves that file behind. Step 4's cleanup names it, spelled as the recipes
+        compute it, and deletes it through the runner, in any shell, or "a failure leaves nothing behind" is false."""
         part_line = 'PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))'
         for name in ("pdf.md", "png.md", "office.md"):
             text = self.reference(name)
             recipes = text.count("os.replace(PART, OUT)")
             assert recipes > 0, f"references/{name} has no recipe renaming PART onto OUT"
             assert text.count(part_line) == recipes, f"references/{name}: a recipe computes its partial file another way"
+            assert text.count("finally:\n    Path(PART).unlink(missing_ok=True)") == recipes, (
+                f"references/{name}: a recipe keeps its partial file on failure"
+            )
         example = Path("invoice.pdf")
         partial = example.with_name(f".{example.stem}.part{example.suffix}")
         cleanup = self.render(target_name).split("### Step 4", 1)[1].split("### Step 5", 1)[0]
         assert f"`{partial.as_posix()}` for `{example.as_posix()}`" in cleanup
-        assert 'rm -f "<target_dir>/.<target_stem>.part<target_ext>"' in cleanup
-        assert 'rm -f "<target>"' in cleanup
+        assert '`<runner> -c "import os, sys; os.remove(sys.argv[1])" "<partial file>"`' in cleanup
+        assert "rm -f" not in cleanup
 
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_the_verify_step_matches_the_harness(self, target_name: str) -> None:
@@ -261,3 +271,63 @@ class TestPipelexSyntheticInputsSkillShape:
         assert size <= SKILL_CEILING_CHARS, (
             f"{target_name}: pipelex-synthetic-inputs renders {size} characters, over the {SKILL_CEILING_CHARS} ceiling"
         )
+
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_every_target_ships_the_venv_script_byte_for_byte(self, target_name: str) -> None:
+        """The venv rung is the script, so the copy a user installs is the one that must match."""
+        config = load_target_config(self.REPO_ROOT / "targets", target_name)
+        installed = resolve_output_dir(self.REPO_ROOT, config.source) / "skills" / "pipelex-synthetic-inputs" / "scripts"
+        assert sorted(path.name for path in installed.iterdir()) == [self.VENV_SCRIPT.name], f"{target_name}: stale or missing scripts"
+        assert (installed / self.VENV_SCRIPT.name).read_bytes() == self.VENV_SCRIPT.read_bytes(), f"{target_name}: the venv script is stale"
+
+    def load_venv_script(self) -> ModuleType:
+        """The shipped script as a module, so a test can narrow its allowlist to what needs no network. It is compiled
+        from its source rather than imported, which would leave a `__pycache__` beside it for the build to ship."""
+        module = ModuleType("synth_venv")
+        module.__file__ = str(self.VENV_SCRIPT)
+        exec(compile(self.VENV_SCRIPT.read_text(encoding="utf-8"), str(self.VENV_SCRIPT), "exec"), module.__dict__)
+        return module
+
+    @pytest.mark.cross_os
+    def test_the_venv_script_refuses_a_path_that_is_not_a_venv(self, tmp_path: Path) -> None:
+        """The script builds with `--clear`, which empties the directory first, and it runs unattended: a path that
+        exists and is not a venv is refused, untouched, with the reason on stderr and exit code 1."""
+        venv = tmp_path / "pipelex-plugins" / "synth-venv"
+        venv.mkdir(parents=True)
+        precious = venv / "notes.txt"
+        precious.write_text("someone's file", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(self.VENV_SCRIPT)],
+            env={**os.environ, "XDG_CACHE_HOME": str(tmp_path)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 1, result.stderr
+        assert "refusing to build a venv over" in result.stderr and "it exists and is not a venv" in result.stderr
+        assert result.stdout == ""
+        assert precious.read_text(encoding="utf-8") == "someone's file"
+
+    @pytest.mark.cross_os
+    def test_the_venv_script_builds_reuses_and_hands_over(self, tmp_path: Path, mocker: MockerFixture, capfd: pytest.CaptureFixture[str]) -> None:
+        """With no argument the script builds the venv with the interpreter that started it and prints the venv's
+        interpreter, `Scripts\\python.exe` on Windows and `bin/python` elsewhere; with arguments it hands them to that
+        interpreter and passes its exit code back, which is what makes it the runner in every shell; a second call
+        reuses the venv. The allowlist is narrowed to the standard library so no package is downloaded."""
+        module = self.load_venv_script()
+        mocker.patch.object(module, "IMPORTS", ("json",))
+        mocker.patch.object(module, "PACKAGES", ())
+        mocker.patch.dict(os.environ, {"XDG_CACHE_HOME": str(tmp_path)})
+        venv = tmp_path / "pipelex-plugins" / "synth-venv"
+        expected = (venv / "Scripts" / "python.exe") if os.name == "nt" else (venv / "bin" / "python")
+
+        assert module.main([]) == 0
+        built = capfd.readouterr()
+        assert built.out.strip() == str(expected.absolute()), built.err
+        assert "building the venv" in built.err
+
+        code = "import sys; print(sys.prefix); sys.exit(7)"
+        assert module.main(["-c", code]) == 7, "the interpreter's exit code is not passed back"
+        handed = capfd.readouterr()
+        assert Path(handed.out.strip()).resolve() == venv.resolve(), "the arguments did not run in the venv"
+        assert handed.err == "", f"the reuse path built or installed again: {handed.err}"

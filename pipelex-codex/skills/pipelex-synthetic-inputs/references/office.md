@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `docx`, `xlsx` or `pptx`, before writing any code; each recipe ends with step 5's verify command.
 
-Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner line, and a verify step. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
+Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner, and a verify step. Each Python recipe is a program written to a `.py` file in Step 2's temporary directory with your file tool and run with Step 2's runner, `<runner> <file>.py`; the comment on its first line is that command on the `uv` rung, and on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
 
 ## Word documents (DOCX)
 
@@ -14,16 +14,16 @@ Use the /docx skill to create a Word document with the following content:
 Save to: <target>
 ```
 
-**If not**, create it with `python-docx` (MIT). Runner line per the skill's Step 2; the package set is `python-docx`:
+**If not**, create it with `python-docx` (MIT). Runner per the skill's Step 2; the package set is `python-docx`:
 
-```bash
-uv run --quiet --no-project --with python-docx python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with python-docx python <file>.py
 import os
 from pathlib import Path
 
 from docx import Document
 
-OUT = "<target_dir>/test_document.docx"
+OUT = r"<target_dir>/test_document.docx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -33,13 +33,15 @@ doc = Document()
 doc.add_heading("Test Document", 0)
 doc.add_paragraph("This is synthetic test content for method testing.")
 # Add more content as needed: doc.add_heading("Section", 1), doc.add_paragraph("…"), doc.add_table(rows=2, cols=3)
-doc.save(PART)
-os.replace(PART, OUT)
+try:
+    doc.save(PART)
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT)
-PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "from docx import Document; d = Document('<target>'); print([p.text for p in d.paragraphs][:5])"`.
+Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "import sys; from docx import Document; d = Document(sys.argv[1]); print([p.text for p in d.paragraphs][:5])" "<target>"`.
 
 ## Spreadsheets (XLSX)
 
@@ -55,8 +57,8 @@ A sheet holding a Table is read and filled as that Table, so a Table in a workbo
 
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
-```bash
-uv run --quiet --no-project --with openpyxl python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with openpyxl python <file>.py
 import os
 from pathlib import Path
 
@@ -65,7 +67,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.table import Table
 
-OUT = "<target_dir>/test_spreadsheet.xlsx"
+OUT = r"<target_dir>/test_spreadsheet.xlsx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -103,13 +105,15 @@ elif TOTALS_COLUMN is not None and len(ROWS) >= 2:  # a total over one data row 
     if len(HEADER) > 1:  # the label goes in another of the header's columns, never past them
         ws.cell(row=last + 1, column=1 if total > 1 else 2, value="Total")
 # A second sheet, never for a `sheet_range` naming no `sheet`: wb.create_sheet("Summary")
-wb.save(PART)
-os.replace(PART, OUT)
+try:
+    wb.save(PART)
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT)
-PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "from openpyxl import load_workbook; wb = load_workbook('<target>'); ws = wb.active; print(ws.title, ws.dimensions, list(ws.tables))"`.
+Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "import sys; from openpyxl import load_workbook; wb = load_workbook(sys.argv[1]); ws = wb.active; print(ws.title, ws.dimensions, list(ws.tables))" "<target>"`.
 
 
 ## Presentations (PPTX)
@@ -124,15 +128,15 @@ Save to: <target>
 
 **If not**, create it with `python-pptx` (MIT). The package set is `python-pptx`:
 
-```bash
-uv run --quiet --no-project --with python-pptx python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with python-pptx python <file>.py
 import os
 from pathlib import Path
 
 from pptx import Presentation
 from pptx.util import Inches
 
-OUT = "<target_dir>/test_presentation.pptx"
+OUT = r"<target_dir>/test_presentation.pptx"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -164,10 +168,12 @@ for row_index, row in enumerate(rows):
     for column_index, value in enumerate(row):
         table.cell(row_index, column_index).text = value
 # Add more slides as needed: prs.slides.add_slide(prs.slide_layouts[1])
-prs.save(PART)
-os.replace(PART, OUT)
+try:
+    prs.save(PART)
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT)
-PYEOF
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with python-pptx python -c "from pptx import Presentation; p = Presentation('<target>'); print(len(p.slides), [s.shapes.title.text for s in p.slides if s.shapes.title is not None])"`.
+Verify by reopening: `uv run --quiet --no-project --with python-pptx python -c "import sys; from pptx import Presentation; p = Presentation(sys.argv[1]); print(len(p.slides), [s.shapes.title.text for s in p.slides if s.shapes.title is not None])" "<target>"`.

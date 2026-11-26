@@ -11,7 +11,7 @@ It makes `pdf`; `png` as a `chart` (bar, line, pie, scatter), a `diagram` (flowc
 
 ## Requirements
 
-A Python this skill can reach: `uv` on `PATH`, or `python3` with `venv` and `pip`. Only a `photograph` needs more: the workshop (the `pipelex` MCP server's `mthds_run`, `mthds_run_status`, `mthds_run_results` and `mthds_download_artifacts`, with its API key), and it spends inference credit.
+A Python this skill can reach: `uv` on `PATH`, or a Python 3 with `venv` and `pip`. Only a `photograph` needs more: the workshop (the `pipelex` MCP server's `mthds_run`, `mthds_run_status`, `mthds_run_results` and `mthds_download_artifacts`, with its API key), and it spends inference credit.
 
 ## Guards
 
@@ -27,30 +27,26 @@ A request carries four fields: explicit when `/pipelex:pipelex-inputs` calls, ot
 
 - `format`: `pdf`, `png` with its category, `photograph`, `docx`, `xlsx` or `pptx`. By default from the target concept, `native.Document` → `pdf` and `native.Image` → `png`, or `photograph` when the method reads the image as a photo of a real-world scene (damage to inspect, a room, a product) rather than of a document, a chart or a screen; and the category from the brief ("a chart of…" → `chart`, "a scanned…" → `document_scan`). A `Document` whose originals are `.docx`, `.xlsx` or `.pptx` files is one like them, or a `pdf` when the caller asks. A legacy or OpenDocument original (`.doc`, `.xls`, `.ppt`, `.odt`, `.ods`, `.odp`) gets a `pdf`, the form Pipelex reads it in: the test exercises the reader, not the conversion's losses.
 - `brief`: one or two sentences on what the file must contain or depict, in the vocabulary of the method that will read it. Derive it from the method's purpose and the input's description, or ask for it — one question, then proceed.
-- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in a fresh temporary directory made once with `mktemp -d`, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. A target the caller or the user names is honoured.
+- `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in step 2's temporary directory, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. A target the caller or the user names is honoured.
 - `constraints`: page count, pixel size, language, anything the input's description pins, and an `xlsx`'s layout; otherwise the recipe's defaults.
 
 A `photograph` follows [photograph.md](references/photograph.md) from here: read it before drafting, since it replaces steps 2, 4 and 5 for that file. Mode follows the caller: a request from `/pipelex:pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
 
 ### Step 2: Resolve the environment
 
-Once per invocation, before any recipe. The outcome is the **runner line**, the first line of every recipe; everything below it is identical whichever rung produced it.
+Once per invocation, before any recipe. The outcome is the **runner**, the command every recipe file and verify command runs under; nothing else differs between the rungs.
 
 **Package sets by format:** `pdf` → `reportlab`; `png` → `pillow matplotlib numpy`; `docx` → `python-docx`; `xlsx` → `openpyxl`; `pptx` → `python-pptx`.
 
-**Rung 1 — `uv` is on `PATH`** (the normal case). Preflight the format's set once:
+**Rung 1 — `uv --version` answers** (the normal case). The runner is `uv run --quiet --no-project --with <set> python`, a `--with` per package of the format's set, and the project is untouched. Preflight it once; it fetches the set and prints this invocation's temporary directory, here for a `pdf`:
 
-```bash
-command -v uv >/dev/null && uv run --quiet --no-project --with reportlab python -c "import reportlab; print('pdf ready', reportlab.Version)"
+```shell
+uv run --quiet --no-project --with reportlab python -c "import tempfile; print(tempfile.mkdtemp())"
 ```
 
-```bash
-command -v uv >/dev/null && uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -c "import PIL, matplotlib, numpy; print('png ready', PIL.__version__, matplotlib.__version__)"
-```
+On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
 
-On success the runner line is `uv run --quiet --no-project --with <set> python << 'PYEOF'`, exactly as the recipes are written, and the project is untouched. On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
-
-**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.** When `uv` is not on `PATH` (the preflight prints nothing, and `command -v uv` finds nothing for a format that has no preflight), read [venv.md](references/venv.md) before creating anything: it builds the venv this skill owns under `${XDG_CACHE_HOME:-$HOME/.cache}/pipelex-plugins/synth-venv` and gives the runner line.
+**Rung 2 — no `uv`, but a Python 3 with `venv` and `pip`.** When `uv --version` fails, read [venv.md](references/venv.md) before creating anything. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Mistral Vibe named when it loaded the skill. The rung runs `<skill-dir>/scripts/synth_venv.py`, which builds the venv this skill owns and gives the runner.
 
 ### Step 3: Draft the content
 
@@ -58,19 +54,13 @@ Before opening a recipe, write down what the file will say — in the reply, bri
 
 ### Step 4: Render
 
-Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep step 2's runner line and the recipe's `SEED` and `invariant=1`, and run it.
+Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep the recipe's `SEED` and `invariant=1`, write it to a `.py` file in step 2's temporary directory with your file tool, and run `<runner> <file>.py`.
 
-**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: if the run fails, remove what this run created, and nothing else — the hidden partial file a recipe that crashes mid-save leaves beside `target` (its `PART`: `.invoice.part.pdf` for `invoice.pdf`), and `target` when this run created it:
-
-```bash
-rm -f "<target_dir>/.<target_stem>.part<target_ext>"
-# Only when target did not exist before this render — never on a path you did not create.
-rm -f "<target>"
-```
+**An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: a recipe renders to a hidden partial file beside `target` (its `PART`: `.invoice.part.pdf` for `invoice.pdf`), deletes it when it fails, and moves it onto `target` only on success. A run killed mid-save leaves it: delete it with `<runner> -c "import os, sys; os.remove(sys.argv[1])" "<partial file>"`, and nothing else — never on a path you did not create.
 
 ### Step 5: Verify
 
-Reopen the file with its reference's verify command, through step 2's interpreter and never a bare `python3`, and confirm what the brief asked for: `%PDF-`, a size in the kilobytes and the page count for a PDF; for a PNG the declared size, `RGB` (`RGBA` from the chart recipe) and its kilobytes, a `document_scan` in the low megabytes and any other category under one (a scan is the one output that can meet the upload's size limit: if that limit is the problem, re-render it at 100 dpi or with less grain, as `png.md` says, before anything else); the headings, sheets or slides for Word, Excel and PowerPoint. Open a PNG if the harness can display images; otherwise trust the check and the recipe's declared layout.
+Reopen the file with its reference's verify command, through step 2's runner and never a bare `python3`, and confirm what the brief asked for: `%PDF-`, a size in the kilobytes and the page count for a PDF; for a PNG the declared size, `RGB` (`RGBA` from the chart recipe) and its kilobytes, a `document_scan` in the low megabytes and any other category under one (a scan is the one output that can meet the upload's size limit: if that limit is the problem, re-render it at 100 dpi or with less grain, as `png.md` says, before anything else); the headings, sheets or slides for Word, Excel and PowerPoint. Open a PNG if the harness can display images; otherwise trust the check and the recipe's declared layout.
 
 ### Step 6: Report
 
@@ -85,7 +75,7 @@ When a rung fails, quote the error and say exactly what failed and what fixes it
 
 | Condition | Do this |
 |---|---|
-| `python3 -m venv` fails, or there is no `python3` at all | offer the recommended cure, the `uv` installer, `curl -LsSf https://astral.sh/uv/install.sh \| sh`, which also brings a Python where there is none, and for a failed `venv` the platform cure, `sudo apt install python3-venv`; both install a tool, so ask before running either, and continue once one has run |
+| the venv script fails, or no Python runs it | offer the cures [venv.md](references/venv.md) gives: the `uv` installer, which also brings a Python where there is none, and for a failed `venv` the platform's; both install a tool, so ask before running either, and continue once one has run |
 | a download fails on either rung (offline, proxy, registry down) | run the preflight anyway before concluding, since a warm `uv` cache still works; if it fails too, say the machine needs network once, and stop |
 | no rung is reachable, or the user declined | **stop gracefully**: state what is missing and the one command that fixes it, and offer the user's own file for this input, whatever the format, `pdf` included: there is no public last resort. Never fabricate a file, and never substitute a document the brief did not ask for. Then report as step 6 says |
 | a `photograph` cannot be generated: the workshop is not connected, the key is refused, or the run fails | stop for that file alone: quote the error, offer the user's own photo, and report as step 6 says; never draw a stand-in |
@@ -95,5 +85,5 @@ When a rung fails, quote the error and say exactly what failed and what fixes it
 ## References
 
 - [pdf.md](references/pdf.md), [png.md](references/png.md), [office.md](references/office.md): the recipes and their verify commands, at steps 4 and 5, for their format.
-- [venv.md](references/venv.md): at step 2, when `uv` is not on `PATH`.
+- [venv.md](references/venv.md): at step 2, when `uv --version` fails, and for its stop's cures.
 - [photograph.md](references/photograph.md): at step 1, when the brief is a photograph.

@@ -1,10 +1,13 @@
 # The shipped synthetic-inputs recipes, executed.
 #
-# `make test-recipes` runs every runnable block the pipelex-synthetic-inputs
-# references ship, through both rungs of the environment ladder, and it is the
-# only thing that would catch a reference recipe rotting. It needs network and
-# downloads packages on a cold uv cache, so it is kept off the ordinary pull
-# request and runs on three triggers instead:
+# `make test-recipes` runs every recipe the pipelex-synthetic-inputs references
+# ship, through both rungs of the environment ladder, and it is the only thing
+# that would catch a reference recipe rotting. It runs on Ubuntu and on Windows,
+# where it runs under PowerShell with Git's bash taken off PATH: the skill gives
+# commands every shell runs, and the suite runs each through the platform's own
+# shell, Windows PowerShell there, so a construct only bash knows fails here.
+# It needs network and downloads packages on a cold uv cache, so it is kept off
+# the ordinary pull request and runs on three triggers instead:
 #
 #   - nightly, which is the backstop against a recipe that rots because a
 #     dependency moved rather than because anybody edited it;
@@ -26,7 +29,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "skills/pipelex-synthetic-inputs/references/**"
+      - "skills/pipelex-synthetic-inputs/**"
       - "templates/skills/pipelex-synthetic-inputs/**"
       - "tests/recipes/**"
       - ".github/workflows/recipes.yml"
@@ -50,8 +53,12 @@ env:
 
 jobs:
   recipes:
-    name: Recipes
-    runs-on: ubuntu-latest
+    name: Recipes (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
@@ -75,4 +82,17 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Execute the shipped recipes
+        if: runner.os != 'Windows'
         run: make test-recipes
+
+      # The runner has no `make`, so this is the target's own command, and it drops
+      # every PATH entry under Git's install, which is where its bash lives.
+      - name: Execute the shipped recipes, under PowerShell with no bash
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object { $_ -notlike '*\Git\*' }) -join ';'
+          $bash = Get-Command bash -ErrorAction SilentlyContinue
+          if ($bash) { Write-Output "::warning::a bash is still on PATH, at $($bash.Source); the suite calls none" }
+          uv sync --all-extras --quiet
+          uv run --no-sync pytest tests/recipes -m recipes -v
