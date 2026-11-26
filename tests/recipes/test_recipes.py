@@ -113,6 +113,10 @@ WITH_PACKAGE = re.compile(r"--with (\S+)")
 PACKAGE_SETS_LINE = re.compile(r"^\*\*Package sets by format:\*\* (.+)$", re.MULTILINE)
 PACKAGE_SET_ENTRY = re.compile(r"`(\w+)` → `([^`]+)`")
 UV_RUN = re.compile(r"uv run(?P<arguments>[^`\n]*)")
+# The interpreter every runner line starts: isolated from the project and PYTHON* variables, printing UTF-8.
+ISOLATED_PYTHON = re.compile(r"\bpython -I -X utf8\b")
+# Text no Windows ANSI code page holds whole, which a recipe may print: a name, an arrow, a check mark.
+NOT_IN_A_CODE_PAGE = "Łódź → 東京 ✓"
 JINJA = re.compile(r"\{[{%]")
 # Constructs one of the shells the skill must run in lacks: a heredoc, a `&&` or `||`
 # chain (Windows PowerShell 5.1 has neither), `command -v`, a POSIX parameter default,
@@ -536,6 +540,43 @@ class TestRecipes:
         assert invocations, "no `uv run` invocation found — the extractor stopped seeing the recipe commands"
         assert not offenders, "`uv run` without --no-project syncs the user's project:\n" + "\n".join(offenders)
 
+    def test_every_runner_line_is_isolated_and_prints_utf8(self) -> None:
+        """A recipe runs in the user's project, where a `reportlab.py` would shadow the package, and on Windows a
+        piped stdout encodes in the ANSI code page, where printing a name outside it fails after a good render. So
+        every `uv run` the skill gives starts `python -I -X utf8`, the same flags the venv rung's hand-over adds."""
+        offenders: list[str] = []
+        invocations = 0
+        for path in [SKILL_TEMPLATE, *sorted(REFERENCES_DIR.glob("*.md"))]:
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                for match in UV_RUN.finditer(line):
+                    arguments = match.group("arguments")
+                    if not arguments.strip() or arguments.strip().startswith("…"):
+                        continue  # prose naming the command, not running it
+                    invocations += 1
+                    if not ISOLATED_PYTHON.search(arguments):
+                        offenders.append(f"{path.name}:{number}: {line.strip()[:160]}")
+        assert invocations, "no `uv run` invocation found — the extractor stopped seeing the recipe commands"
+        assert not offenders, "`uv run … python` without `-I -X utf8`:\n" + "\n".join(offenders)
+
+    @NEEDS_UV
+    def test_the_uv_runner_ignores_a_shadowing_module_and_prints_utf8(self, tmp_path: Path) -> None:
+        """Rung 1 as the recipes give it, in a directory holding a `reportlab.py` that exits 5 when imported: the
+        recipe still renders, and a recipe printing text outside every code page exits 0 under
+        `PYTHONIOENCODING=cp1252`, which stands in for a Windows code page where there is none."""
+        recipe = next(candidate for candidate in RECIPES if candidate.reference == "pdf.md")
+        marker = tmp_path / "shadow-ran"
+        (tmp_path / "reportlab.py").write_text(f"open({str(marker)!r}, 'w').write('ran')\nraise SystemExit(5)\n", encoding="utf-8")
+        rendered = _run_recipe(recipe, recipe.script, tmp_path=tmp_path)
+        assert rendered.returncode == 0, rendered.stderr
+        assert not marker.exists(), "the recipe imported the project's reportlab.py"
+
+        printing = _write_recipe(f"print({NOT_IN_A_CODE_PAGE!r})\n", tmp_path=tmp_path, name="prints.py")
+        command = recipe.command.replace(RECIPE_FILE_PLACEHOLDER, f'"{printing}"')
+        result = _shell(command, cwd=tmp_path, env={"PYTHONIOENCODING": "cp1252"})
+        assert result.returncode == 0, f"printing outside the code page failed on rung 1\n{result.stderr}"
+        if os.name != "nt":
+            assert result.stdout.strip() == NOT_IN_A_CODE_PAGE  # PowerShell re-encodes what passes through it
+
     def test_package_sets_stay_inside_the_documented_allowlist(self) -> None:
         """The recipe commands may not reach for a package the skill's Step 2 does
         not declare — the allowlist is a licence decision, not a convenience."""
@@ -599,6 +640,12 @@ class TestRecipes:
             result = _venv_script(_venv_command(_venv_blocks()[0], arguments=f'"{recipe_file}"'), cwd=tmp_path, cache=cache)
             assert result.returncode == 0, f"{recipe.heading} failed on the venv rung\n{result.stderr}"
             assert (tmp_path / recipe.output).read_bytes().startswith(MAGIC_BY_SUFFIX[suffix])
+
+        # The hand-over prints UTF-8 whatever the code page, `PYTHONIOENCODING=cp1252` standing in for one.
+        printing = _write_recipe(f"print({NOT_IN_A_CODE_PAGE!r})\n", tmp_path=tmp_path, name="prints.py")
+        shell_env = {"XDG_CACHE_HOME": str(cache), "PATH": _python3_on_path(cache.parent / "python3-shim"), "PYTHONIOENCODING": "cp1252"}
+        printed_text = _shell(_venv_command(_venv_blocks()[0], arguments=f'"{printing}"'), cwd=tmp_path, env=shell_env)
+        assert printed_text.returncode == 0, f"printing outside the code page failed on the venv rung\n{printed_text.stderr}"
 
     def test_venv_rung_is_created_once_and_reused(self, tmp_path: Path) -> None:
         """ "Create a venv this skill owns, once … and reuse it on every later

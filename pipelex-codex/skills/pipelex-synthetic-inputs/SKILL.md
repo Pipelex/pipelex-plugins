@@ -38,10 +38,10 @@ Once per invocation, before any recipe. The outcome is the **runner**, the comma
 
 **Package sets by format:** `pdf` → `reportlab`; `png` → `pillow matplotlib numpy`; `docx` → `python-docx`; `xlsx` → `openpyxl`; `pptx` → `python-pptx`.
 
-**Rung 1 — `uv --version` answers** (the normal case). The runner is `uv run --quiet --no-project --with <set> python`, a `--with` per package of the format's set, and the project is untouched. Preflight it once; it fetches the set and prints this invocation's temporary directory, here for a `pdf`:
+**Rung 1 — `uv --version` answers** (the normal case). The runner is `uv run --quiet --no-project --with <set> python -I -X utf8`, a `--with` per package of the format's set, and the project is untouched. Preflight it once; it fetches the set and prints this invocation's temporary directory, here for a `pdf`:
 
 ```shell
-uv run --quiet --no-project --with reportlab python -c "import tempfile; print(tempfile.mkdtemp())"
+uv run --quiet --no-project --with reportlab python -I -X utf8 -c "import tempfile; print(tempfile.mkdtemp())"
 ```
 
 On a cold cache the first run downloads the packages, up to a minute: say so in one line.

@@ -32,6 +32,8 @@ on:
       - "skills/pipelex-synthetic-inputs/**"
       - "templates/skills/pipelex-synthetic-inputs/**"
       - "tests/recipes/**"
+      # The helper the suite runs every command through, shared with the unit suite.
+      - "tests/platform_shell.py"
       - ".github/workflows/recipes.yml"
       # The harness the suite runs through: renaming the `recipes` marker or
       # editing the target breaks it just as surely as editing a recipe.

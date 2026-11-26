@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `docx`, `xlsx` or `pptx`, before writing any code; each recipe ends with step 5's verify command.
 
-Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner, and a verify step. Each Python recipe is a program written to a `.py` file in Step 2's temporary directory with your file tool and run with Step 2's runner, `<runner> "<file>.py"`; the comment on its first line is that command on the `uv` rung, and on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
+Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner, and a verify step. Each Python recipe is a program written to a `.py` file in Step 2's temporary directory with your file tool and run with Step 2's runner, `<runner> "<file>.py"`; the comment on its first line is that command on the `uv` rung, and on the venv rung the runner Step 2 settled stands in place of `uv run … python -I -X utf8`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
 
 ## Word documents (DOCX)
 
@@ -17,7 +17,7 @@ Save to: <target>
 **If not**, create it with `python-docx` (MIT). Runner per the skill's Step 2; the package set is `python-docx`:
 
 ```python
-# uv run --quiet --no-project --with python-docx python "<file>.py"
+# uv run --quiet --no-project --with python-docx python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
@@ -41,7 +41,7 @@ finally:
 print("wrote", OUT)
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with python-docx python -c "import sys; from docx import Document; d = Document(sys.argv[1]); print([p.text for p in d.paragraphs][:5])" "<target>"`.
+Verify by reopening: `uv run --quiet --no-project --with python-docx python -I -X utf8 -c "import sys; from docx import Document; d = Document(sys.argv[1]); print([p.text for p in d.paragraphs][:5])" "<target>"`.
 
 ## Spreadsheets (XLSX)
 
@@ -58,7 +58,7 @@ A sheet holding a Table is read and filled as that Table, so a Table in a workbo
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
 ```python
-# uv run --quiet --no-project --with openpyxl python "<file>.py"
+# uv run --quiet --no-project --with openpyxl python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
@@ -113,7 +113,7 @@ finally:
 print("wrote", OUT)
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with openpyxl python -c "import sys; from openpyxl import load_workbook; wb = load_workbook(sys.argv[1]); ws = wb.active; print(ws.title, ws.dimensions, list(ws.tables))" "<target>"`.
+Verify by reopening: `uv run --quiet --no-project --with openpyxl python -I -X utf8 -c "import sys; from openpyxl import load_workbook; wb = load_workbook(sys.argv[1]); ws = wb.active; print(ws.title, ws.dimensions, list(ws.tables))" "<target>"`.
 
 
 ## Presentations (PPTX)
@@ -129,7 +129,7 @@ Save to: <target>
 **If not**, create it with `python-pptx` (MIT). The package set is `python-pptx`:
 
 ```python
-# uv run --quiet --no-project --with python-pptx python "<file>.py"
+# uv run --quiet --no-project --with python-pptx python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
@@ -176,4 +176,4 @@ finally:
 print("wrote", OUT)
 ```
 
-Verify by reopening: `uv run --quiet --no-project --with python-pptx python -c "import sys; from pptx import Presentation; p = Presentation(sys.argv[1]); print(len(p.slides), [s.shapes.title.text for s in p.slides if s.shapes.title is not None])" "<target>"`.
+Verify by reopening: `uv run --quiet --no-project --with python-pptx python -I -X utf8 -c "import sys; from pptx import Presentation; p = Presentation(sys.argv[1]); print(len(p.slides), [s.shapes.title.text for s in p.slides if s.shapes.title is not None])" "<target>"`.

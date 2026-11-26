@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `pdf`, before writing any code; its **Verify** section is step 5's check.
 
-Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace what sits between the `CONTENT` markers with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> "<file>.py"`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
+Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace what sits between the `CONTENT` markers with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> "<file>.py"`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python -I -X utf8`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
 
 `reportlab` is BSD-licensed and pure Python; every recipe below was executed under reportlab 4.5.1 and 5.0.1 before it was committed.
 
@@ -31,7 +31,7 @@ Page size: the recipes use `letter`; set `PAGE_SIZE = A4` in the content block w
 One page drawn with the canvas API, for letters, notes, notices and certificates. Coordinates are points (1/72 inch) up and right from the bottom-left corner; y is the text's baseline.
 
 ```python
-# uv run --quiet --no-project --with reportlab python "<file>.py"
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -124,7 +124,7 @@ The canvas never wraps, so the script wraps paragraphs and fails rather than let
 Headings and paragraphs that Platypus flows over numbered pages, for reports, policies, contracts and manuals; the title is also the PDF's title metadata.
 
 ```python
-# uv run --quiet --no-project --with reportlab python "<file>.py"
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -248,7 +248,7 @@ Add items to `SECTIONS` to lengthen it. Sections flow on; `SECTIONS_START_ON_NEW
 A titled table for price lists, schedules, rosters and any other grid of text; every cell wraps.
 
 ```python
-# uv run --quiet --no-project --with reportlab python "<file>.py"
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -353,7 +353,7 @@ A table too wide for the page runs off it silently, so the widths are checked ag
 Measurements judged against limits, for lab results, inspections and test reports: the script computes each verdict from the values as printed, highlights failing values and states the limits beneath the table. Widths are checked as in the table report; `A4` gives A4 and `landscape(letter)` room for more columns.
 
 ```python
-# uv run --quiet --no-project --with reportlab python "<file>.py"
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from decimal import ROUND_HALF_UP, Decimal
@@ -493,7 +493,7 @@ print(f"wrote {OUT}")
 The shape of an invoice, statement, purchase order or receipt: header, parties, line items, totals and a closing line, every figure computed exactly with `Decimal`.
 
 ```python
-# uv run --quiet --no-project --with reportlab python "<file>.py"
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from decimal import ROUND_HALF_UP, Decimal
@@ -637,9 +637,9 @@ Every printed word and the way figures are written sit in the content block, as 
 ## Verify
 
 ```shell
-uv run --quiet --no-project python -c "import re, sys; data = open(sys.argv[1], 'rb').read(); print(data[:5], len(data) // 1024, 'KB', 'pages:', len(re.findall(rb'/Type\s*/Page[^s]', data)))" "<target_dir>/<name>.pdf"
+uv run --quiet --no-project python -I -X utf8 -c "import re, sys; data = open(sys.argv[1], 'rb').read(); print(data[:5], len(data) // 1024, 'KB', 'pages:', len(re.findall(rb'/Type\s*/Page[^s]', data)))" "<target_dir>/<name>.pdf"
 ```
 
-The check needs no packages, so it runs under whichever runner Step 2 settled — the `uv run` above on rung 1, the venv rung's runner in place of `uv run … python` on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
+The check needs no packages, so it runs under whichever runner Step 2 settled — the `uv run` above on rung 1, the venv rung's runner in place of `uv run … python -I -X utf8` on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
 
 Expect `b'%PDF-'`, a size in the kilobytes, and the page count the brief asked for. A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.

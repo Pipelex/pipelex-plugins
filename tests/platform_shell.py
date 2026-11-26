@@ -20,7 +20,11 @@ def run_in_platform_shell(command: str, *, cwd: Path, env: dict[str, str] | None
         argv = ["powershell", "-NoProfile", "-NonInteractive", "-Command", command]
     else:
         argv = ["/bin/sh", "-c", command]
-    return subprocess.run(argv, cwd=cwd, env={**os.environ, **(env or {})}, capture_output=True, text=True, check=False)
+    # Decoded as UTF-8, what the recipes print under `-X utf8`; a byte PowerShell re-encoded becomes a replacement
+    # character rather than an error in the harness.
+    return subprocess.run(
+        argv, cwd=cwd, env={**os.environ, **(env or {})}, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
+    )
 
 
 def remove_printed_temp_dir(printed: Path, *, prefix: str) -> None:

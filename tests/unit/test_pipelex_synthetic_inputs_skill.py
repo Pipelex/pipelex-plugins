@@ -7,11 +7,12 @@ import hashlib
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from pytest_mock import MockerFixture
@@ -413,3 +414,121 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "reinstalling it into" in repaired.err and "--force-reinstall" in repaired.err, repaired.err
         assert repaired.out.strip() == str(module.venv_python(venv).absolute())
         assert package.is_dir(), "the forced reinstall did not write the package's files again"
+
+    @staticmethod
+    def plant_shadows(directory: Path, *, names: tuple[str, ...]) -> Path:
+        """A module per name in `directory` that, imported, leaves a marker in `directory/ran/` and exits: a project
+        holding a `pip.py` or a `reportlab.py` that an unisolated interpreter would run in place of the real one."""
+        markers = directory / "ran"
+        markers.mkdir(parents=True)
+        for name in names:
+            marker = markers / name
+            (directory / f"{name}.py").write_text(f"open({str(marker)!r}, 'w').write('ran')\nraise SystemExit(5)\n", encoding="utf-8")
+        return markers
+
+    @pytest.mark.cross_os
+    def test_the_venv_script_runs_nothing_from_the_project_or_pythonpath(
+        self, tmp_path: Path, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+    ) -> None:
+        """The script runs in the user's project, so every interpreter it starts runs with `-I`: a `pip.py`, a
+        `venv.py` or a module of the allowlist lying in the working directory or on `PYTHONPATH` never runs. The
+        control run proves the shadows would have run without it. The allowlist is narrowed to `json`, shadowed too."""
+        module = self.load_venv_script()
+        mocker.patch.object(module, "IMPORTS", ("json",))
+        mocker.patch.object(module, "PACKAGES", ())
+        project = tmp_path / "project"
+        on_path = tmp_path / "on-pythonpath"
+        project_markers = self.plant_shadows(project, names=("pip", "venv", "json"))
+        path_markers = self.plant_shadows(on_path, names=("pip", "venv", "json"))
+        monkeypatch.chdir(project)
+        mocker.patch.dict(os.environ, {"XDG_CACHE_HOME": str(tmp_path / "cache"), "PYTHONPATH": str(on_path)})
+
+        control = subprocess.run([sys.executable, "-c", "import json"], capture_output=True, text=True, check=False)
+        assert control.returncode == 5, "the shadow modules would not have run anyway, so this test proves nothing"
+        for markers in (project_markers, path_markers):
+            shutil.rmtree(markers)
+            markers.mkdir()
+
+        assert module.main([]) == 0, capfd.readouterr().err
+        assert module.main(["-c", "import json, sys; sys.exit(0)"]) == 0, capfd.readouterr().err
+        ran = sorted(marker.name for marker in [*project_markers.iterdir(), *path_markers.iterdir()])
+        assert ran == [], f"the script ran the project's or PYTHONPATH's own {ran}"
+        assert module.handover_command(Path("venv-python"), ["recipe.py"]) == ["venv-python", "-I", "-X", "utf8", "recipe.py"]
+
+    @pytest.mark.cross_os
+    def test_a_junction_is_refused_on_every_python(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """`venv --clear` empties its target, so a link is refused; but a Windows junction is no symlink, and
+        `Path.is_junction` exists only from Python 3.12. The script reads the reparse-point attribute itself, which
+        every version reports on Windows. Mocked here on every OS, and a real junction on Windows."""
+        module = self.load_venv_script()
+        assert module.FILE_ATTRIBUTE_REPARSE_POINT == getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT"), "the constant drifted from the stdlib's"
+        assert module.is_reparse_point(tmp_path / "missing", windows=True) is False
+
+        lstat = mocker.patch.object(module.os, "lstat", return_value=SimpleNamespace(st_file_attributes=module.FILE_ATTRIBUTE_REPARSE_POINT | 0x10))
+        assert module.is_reparse_point(tmp_path, windows=True) is True
+        lstat.return_value = SimpleNamespace(st_file_attributes=0x10)
+        assert module.is_reparse_point(tmp_path, windows=True) is False
+        lstat.reset_mock()
+        assert module.is_reparse_point(tmp_path, windows=False) is False
+        lstat.assert_not_called()
+        mocker.stopall()
+
+        if os.name != "nt":
+            return
+        target = tmp_path / "someone-else"
+        target.mkdir()
+        (target / "pyvenv.cfg").write_text("home = elsewhere\n", encoding="utf-8")
+        junction = tmp_path / "synth-venv"
+        made = subprocess.run(["cmd", "/c", "mklink", "/J", str(junction), str(target)], capture_output=True, text=True, check=False)
+        assert made.returncode == 0, made.stdout + made.stderr
+        assert module.is_reparse_point(junction) is True
+        reason = module.refusal(junction)
+        assert reason is not None and "it is a link" in reason, reason
+        assert (target / "pyvenv.cfg").is_file()
+
+    @pytest.mark.cross_os
+    def test_two_cold_runs_at_once_build_the_venv_once(self, tmp_path: Path) -> None:
+        """Two invocations at once, as two agents or two recipes started together, would each build the venv with
+        `--clear` under the other. The script holds a lock beside the venv around the check, the build and the
+        install, and reads the state again once it holds it: both runs succeed, one builds and installs, and the
+        other waits and finds the venv ready. The allowlist is a hand-made local wheel, so nothing is downloaded."""
+        wheel = self.build_wheel(tmp_path)
+        driver = (
+            "import sys, types; path = sys.argv[1]; module = types.ModuleType('synth_venv'); "
+            "exec(compile(open(path, encoding='utf-8').read(), path, 'exec'), module.__dict__); "
+            "module.PACKAGES = (sys.argv[2],); module.IMPORTS = ('synthprobe',); sys.exit(module.main([]))"
+        )
+        cache = tmp_path / "cache"
+        env = {**os.environ, "XDG_CACHE_HOME": str(cache)}
+        command = [sys.executable, "-c", driver, str(self.VENV_SCRIPT), str(wheel)]
+        runs = [subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for _ in range(2)]
+        results = [(run.wait(timeout=300), *run.communicate()) for run in runs]
+        for code, _, err in results:
+            assert code == 0, err
+        venv = cache / "pipelex-plugins" / "synth-venv"
+        expected = str(self.load_venv_script().venv_python(venv).absolute())
+        assert [out.strip() for _, out, _ in results] == [expected, expected]
+        logs = "".join(err for _, _, err in results)
+        assert logs.count("building the venv") == 1, logs
+        assert logs.count("installing") == 1, logs
+        assert (cache / "pipelex-plugins" / "synth-venv.lock").is_file(), "the lock is not beside the venv"
+
+    @pytest.mark.cross_os
+    def test_the_hand_over_prints_utf8_whatever_the_code_page(self, tmp_path: Path, mocker: MockerFixture, capfd: pytest.CaptureFixture[str]) -> None:
+        """A piped stdout on Windows encodes in the ANSI code page, so a recipe printing a character outside it
+        fails after writing a good file, and the stop table then deletes the file. The hand-over runs `-X utf8`,
+        which `-I` does not ignore as it ignores `PYTHONUTF8`. `PYTHONIOENCODING=cp1252` stands in for the code page:
+        the control shows it breaks a plain interpreter, and the hand-over exits 0 under it."""
+        module = self.load_venv_script()
+        mocker.patch.object(module, "ensure", return_value=0)
+        mocker.patch.object(module, "venv_python", return_value=Path(sys.executable))
+        text = "Łódź → 東京 ✓"
+        recipe = tmp_path / "recipe.py"
+        recipe.write_text(f"print({text!r})\n", encoding="utf-8")
+        mocker.patch.dict(os.environ, {"PYTHONIOENCODING": "cp1252"})
+
+        control = subprocess.run([sys.executable, str(recipe)], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+        assert control.returncode != 0 and "UnicodeEncodeError" in control.stderr, "the simulated code page encodes the text anyway"
+
+        assert module.main([str(recipe)]) == 0, capfd.readouterr().err
+        assert capfd.readouterr().out.strip() == text

@@ -83,7 +83,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.pyright]
-include = ["scripts", "tests", "skills/pipelex-integrate/references"]
+include = ["scripts", "tests", "skills/pipelex-integrate/references", "skills/pipelex-synthetic-inputs/scripts"]
 analyzeUnannotatedFunctions = true
 deprecateTypingAliases = false
 disableBytesTypePromotions = true
