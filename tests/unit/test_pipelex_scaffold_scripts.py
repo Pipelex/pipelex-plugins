@@ -2,7 +2,9 @@
 
 Box E of the size diet's design (L-260923-a9bdfe): a procedure whose text is its correctness
 ships as a script, and the unit suite executes the script directly. These tests run each one as a
-user's harness does, through `bash`, against a scratch project, and read what it leaves behind.
+user's harness does, through `node`, against a scratch project, and read what it leaves behind. The
+scripts are Node so that they run on Windows under PowerShell, with no bash, so the suite is marked
+`cross_os` and holds on every OS.
 The skill's side, which runs the scripts and keys its stop table on their verdicts, is pinned in
 `test_pipelex_scaffold_skill.py`.
 """
@@ -12,14 +14,16 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).parents[2]
 SCRIPTS = REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts"
-COMMIT_PRISTINE = SCRIPTS / "commit-pristine.sh"
-WRITE_ENV_FILE = SCRIPTS / "write-env-file.sh"
+COMMIT_PRISTINE = SCRIPTS / "commit-pristine.mjs"
+WRITE_ENV_FILE = SCRIPTS / "write-env-file.mjs"
+WINDOWS = os.name == "nt"
 
 PRODUCTION_URL = "https://api.pipelex.com"
 # Fake credentials only. The machine's own PIPELEX_* values are removed from every environment
@@ -29,19 +33,22 @@ FAKE_URL = "https://api.fake-plane.example"
 COMMENT_LINE = "# Copied from the shell environment; a later line overrides an earlier one."
 EXAMPLE = f"PIPELEX_BASE_URL={PRODUCTION_URL}\nPIPELEX_API_KEY=\n"
 
-pytestmark = pytest.mark.skipif(shutil.which("git") is None or shutil.which("bash") is None, reason="the scripts are bash over git")
+pytestmark = [
+    pytest.mark.cross_os,
+    pytest.mark.skipif(shutil.which("git") is None or shutil.which("node") is None, reason="the scripts are Node over git"),
+]
 
 
 def _environment(credentials: dict[str, str] | None = None) -> dict[str, str]:
     """The test process's environment with this machine's credentials and git configuration removed.
 
-    A fixed identity makes a commit deterministic in CI, and `BASH_ENV` is dropped so that no startup
-    file can put a real value back.
+    A fixed identity makes a commit deterministic in CI, and `NODE_OPTIONS` and `NODE_DEBUG` are dropped
+    so that no preloaded module or debug log can change what a script does or prints.
     """
     environment = {
         name: value
         for name, value in os.environ.items()
-        if name not in {"PIPELEX_API_KEY", "PIPELEX_BASE_URL", "BASH_ENV", "ENV"} and not name.startswith("GIT_")
+        if name not in {"PIPELEX_API_KEY", "PIPELEX_BASE_URL", "NODE_OPTIONS", "NODE_DEBUG"} and not name.startswith("GIT_")
     }
     environment.update(
         {
@@ -61,7 +68,7 @@ def _run(
     script: Path, *arguments: str, cwd: Path, credentials: dict[str, str] | None = None, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["bash", str(script), *arguments],
+        ["node", str(script), *arguments],
         cwd=cwd,
         env=env if env is not None else _environment(credentials),
         capture_output=True,
@@ -87,7 +94,8 @@ def _ignored_only_on_this_machine(tmp_path: Path, project: Path, where: str, pat
         excludes = tmp_path / "global-ignore"
         excludes.write_text(f"{pattern}\n", encoding="utf-8")
         config = tmp_path / "global-config"
-        config.write_text(f"[core]\n\texcludesFile = {excludes}\n", encoding="utf-8")
+        # A backslash opens an escape in a git config file, so a Windows path is written with slashes.
+        config.write_text(f"[core]\n\texcludesFile = {excludes.as_posix()}\n", encoding="utf-8")
         environment["GIT_CONFIG_GLOBAL"] = str(config)
     else:
         exclude = project / ".git" / "info" / "exclude"
@@ -130,6 +138,32 @@ def _initializer_output(project: Path) -> None:
     (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
     (project / ".gitignore").write_text("build/\n", encoding="utf-8")
     (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
+
+
+def _same_directory(printed: str, expected: Path) -> bool:
+    """Whether a path git or a script printed names `expected`. Windows spells one directory several ways
+    (slashes or backslashes, a short 8.3 name or the long one), so both sides are resolved first."""
+    return Path(printed).resolve() == expected.resolve()
+
+
+def _assert_root_verdict(result: subprocess.CompletedProcess[str], verdict: str, root: Path) -> None:
+    """The script printed `<verdict>: <root>` and nothing else, and exited 0."""
+    assert result.returncode == 0, result.stdout + result.stderr
+    line, *rest = result.stdout.split("\n")
+    assert rest == [""], f"more than one line: {result.stdout!r}"
+    word, _, printed = line.partition(": ")
+    assert word == verdict, result.stdout
+    assert _same_directory(printed, root), f"{printed!r} does not name {root}"
+
+
+def _remove_tree(path: Path) -> None:
+    """Remove a directory git wrote, whose object files Git for Windows makes read-only."""
+
+    def _make_writable_and_retry(function: Callable[[str], object], failed: str, _error: BaseException) -> None:
+        Path(failed).chmod(0o700)
+        function(failed)
+
+    shutil.rmtree(path, onexc=_make_writable_and_retry)
 
 
 def _has_no_commit(repository: Path) -> bool:
@@ -272,7 +306,7 @@ class TestCommitPristine:
 
     def test_an_env_file_the_user_committed_stays_tracked(self, tmp_path: Path) -> None:
         """Only what the index holds and HEAD does not is unstaged: a path the user committed is theirs,
-        and `write-env-file.sh` then refuses to put a key into it."""
+        and `write-env-file.mjs` then refuses to put a key into it."""
         project = _repository(tmp_path / "mine")
         (project / ".env").write_text("MINE=1\n", encoding="utf-8")
         _git(project, "add", ".env")
@@ -317,8 +351,7 @@ class TestCommitPristine:
         (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
         (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, "new-app", "Scaffold Python project", cwd=outer)
-        assert result.returncode == 0, result.stderr
-        assert result.stdout == f"inside: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        _assert_root_verdict(result, "inside", outer)
         assert not (project / ".git").exists(), "a repository was planted inside the user's"
         # The user's repository is exactly as they left it: HEAD where it was, their staging intact.
         if history:
@@ -345,7 +378,7 @@ class TestCommitPristine:
         lines = result.stdout.splitlines()
         assert lines[0].startswith("committed: ") and lines[0].endswith(" Scaffold Python project")
         assert sorted(lines[1:]) == [".gitignore", "main.py"]
-        assert _git(project, "rev-parse", "--show-toplevel") == str(project.resolve())
+        assert _same_directory(_git(project, "rev-parse", "--show-toplevel"), project)
         assert _git(project, "symbolic-ref", "--short", "HEAD") == "main"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\nnode_modules/\n\n.env\n"
         assert _git(outer, "rev-parse", "HEAD") == head_before
@@ -363,8 +396,7 @@ class TestCommitPristine:
         head_before = _git(outer, "rev-parse", "HEAD")
         _initializer_output(project)
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert result.stdout == f"unversioned: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        _assert_root_verdict(result, "unversioned", outer)
         assert not (project / ".git").exists(), "a repository was planted where the enclosing one sees it"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "build/\n\nnode_modules/\n\n.env\n"
         assert _git(outer, "rev-parse", "HEAD") == head_before
@@ -383,7 +415,7 @@ class TestCommitPristine:
         (outer / ".gitignore").write_text("*\n", encoding="utf-8")
         (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
-        assert result.stdout == f"inside: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        _assert_root_verdict(result, "inside", outer)
         assert not (project / ".git").exists()
 
     @pytest.mark.parametrize("history", [False, True], ids=["unborn", "with-a-commit"])
@@ -429,8 +461,7 @@ class TestCommitPristine:
         (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
         (project / "main.js").write_text("//\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Astro project", cwd=tmp_path)
-        assert result.returncode == 0, result.stderr
-        assert result.stdout == f"nested: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+        _assert_root_verdict(result, "nested", outer)
         assert (project / ".git").is_dir(), "the nested repository is the user's to remove, never the script's"
         assert _has_no_commit(project)
         assert _git(project, "diff", "--cached", "--name-only") == ""
@@ -438,7 +469,7 @@ class TestCommitPristine:
         assert _git(outer, "diff", "--cached", "--name-only") == ""
         assert "new-app/" in _git(outer, "status", "--porcelain").splitlines()[0]
         # The .gitignore is written, and once the user removes `<dir>/.git` the enclosing repository reads it.
-        shutil.rmtree(project / ".git")
+        _remove_tree(project / ".git")
         untracked = _git(outer, "ls-files", "--others", "--exclude-standard", "--", "new-app").splitlines()
         assert sorted(untracked) == ([] if rule else ["new-app/.gitignore", "new-app/main.js"])
 
@@ -456,14 +487,17 @@ class TestCommitPristine:
         (project / "main.py").write_text("print('hi')\n", encoding="utf-8")
         link = tmp_path / "elsewhere" / "the-link"
         link.parent.mkdir()
-        link.symlink_to(project, target_is_directory=True)
+        try:
+            link.symlink_to(project, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"this machine makes no symbolic link: {exc}")
         result = _run(COMMIT_PRISTINE, str(link), "Scaffold Python project", cwd=tmp_path)
         assert result.returncode == 0, result.stderr
         if target == "ignored-directory":
             assert result.stdout.startswith("committed: ")
-            assert _git(project, "rev-parse", "--show-toplevel") == str(project.resolve())
+            assert _same_directory(_git(project, "rev-parse", "--show-toplevel"), project)
         else:
-            assert result.stdout == f"nested: {_git(outer, 'rev-parse', '--show-toplevel')}\n"
+            _assert_root_verdict(result, "nested", outer)
             assert _has_no_commit(project)
         assert not (link.parent / ".git").exists()
 
@@ -554,9 +588,59 @@ class TestCommitPristine:
         project = tmp_path / "my app"
         project.mkdir()
         (project / "main.py").write_text("\n", encoding="utf-8")
-        result = _run(COMMIT_PRISTINE, "my app", "Scaffold Python project", cwd=tmp_path)
+        result = _run(COMMIT_PRISTINE, "my app", "Scaffold my app's project", cwd=tmp_path)
         assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines()[0].endswith(" Scaffold my app's project")
         assert (project / ".git").is_dir()
+        assert _git(project, "log", "--format=%s") == "Scaffold my app's project"
+
+    def test_an_enclosing_repository_whose_path_holds_a_space_is_printed_whole(self, tmp_path: Path) -> None:
+        outer = _repository(tmp_path / "their repo")
+        project = outer / "new app"
+        project.mkdir()
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        _assert_root_verdict(result, "inside", outer)
+        assert (project / ".gitignore").is_file()
+
+    def test_without_git_nothing_is_written(self, tmp_path: Path) -> None:
+        """git is looked up on the `PATH`, which here holds an empty directory alone, so node is run by its path."""
+        project = tmp_path / "app"
+        project.mkdir()
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        empty = tmp_path / "empty-path"
+        empty.mkdir()
+        environment = _environment()
+        environment["PATH"] = str(empty)
+        node = shutil.which("node")
+        assert node is not None
+        result = subprocess.run([node, str(COMMIT_PRISTINE), str(project), "Scaffold"], env=environment, capture_output=True, text=True, check=False)
+        assert result.stdout == "refused: no-git\n"
+        assert result.returncode == 1
+        assert sorted(entry.name for entry in project.iterdir()) == ["main.py"]
+
+    def test_a_repository_git_cannot_make_is_reported_with_git_s_message(self, tmp_path: Path) -> None:
+        """A `.git` file that is no gitfile is no repository git can read, and `git init` refuses it too."""
+        project = tmp_path / "app"
+        project.mkdir()
+        (project / ".git").write_text("not a gitfile\n", encoding="utf-8")
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.stdout == "refused: init-failed\n"
+        assert result.returncode == 1
+        assert result.stderr.strip(), "git's own message is relayed on standard error"
+        assert not (project / ".gitignore").exists()
+
+    def test_a_staging_git_refuses_is_reported_with_git_s_message(self, tmp_path: Path) -> None:
+        """A lock another git process holds on the index stops `git add`, and nothing is committed."""
+        project = _repository(tmp_path / "app")
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        (project / ".git" / "index.lock").write_text("", encoding="utf-8")
+        result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
+        assert result.stdout == "refused: stage-failed\n"
+        assert result.returncode == 1
+        assert "index.lock" in result.stderr
+        assert _has_no_commit(project)
 
 
 class TestWriteEnvFile:
@@ -615,7 +699,8 @@ class TestWriteEnvFile:
         assert appended == ([COMMENT_LINE, f"PIPELEX_BASE_URL={base_url}"] if base_url else [])
         # `.env` is ignored, and closed to other users, before the user's key can reach it.
         assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
-        assert (project / ".env").stat().st_mode & 0o077 == 0
+        if not WINDOWS:
+            assert (project / ".env").stat().st_mode & 0o077 == 0
 
     @pytest.mark.parametrize(
         "carried",
@@ -671,20 +756,16 @@ class TestWriteEnvFile:
         assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules\n.env*\n\n!.env.example\n"
 
-    @pytest.mark.parametrize("inherited", ["shellopts", "bash-env"])
-    def test_an_inherited_trace_prints_no_value(self, tmp_path: Path, inherited: str) -> None:
-        """Bash starts traced when the environment carries `SHELLOPTS=xtrace` or a `BASH_ENV` that sets
-        it, and a trace prints each command with its variables expanded."""
+    def test_an_inherited_debug_log_prints_no_value(self, tmp_path: Path) -> None:
+        """Node logs each spawn on stderr when the environment carries `NODE_DEBUG=child_process`, its
+        environment included when the spawn is handed one, so the script hands git none and no value
+        in its arguments."""
         project = self.project(tmp_path)
         environment = _environment({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL})
-        if inherited == "shellopts":
-            environment["SHELLOPTS"] = "xtrace"
-        else:
-            startup = tmp_path / "startup.sh"
-            startup.write_text("set -x\n", encoding="utf-8")
-            environment["BASH_ENV"] = str(startup)
+        environment["NODE_DEBUG"] = "child_process,fs"
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
         assert result.stdout == "empty base-url=copied plane=other\n"
+        assert "CHILD_PROCESS" in result.stderr, "the debug log is on, so the test reads what it prints"
         for value in (FAKE_KEY, FAKE_URL):
             assert value not in result.stdout and value not in result.stderr
 
@@ -755,6 +836,7 @@ class TestWriteEnvFile:
         assert result.stdout == "empty base-url=file plane=other\n"
         assert (project / name).read_text(encoding="utf-8") == f"{carried}\nPIPELEX_API_KEY=\n"
 
+    @pytest.mark.skipif(WINDOWS, reason="Windows has no owner-only file mode, so the script leaves it to the folder's access rules")
     def test_an_existing_env_file_without_a_key_is_closed_to_other_users(self, tmp_path: Path) -> None:
         """Round 3: an initializer writes `.env` under the user's umask, and the report sends the user's own
         key to its `PIPELEX_API_KEY=` line, so the file is closed to other users before they write it."""
@@ -766,6 +848,7 @@ class TestWriteEnvFile:
         assert (project / ".env").stat().st_mode & 0o777 == 0o600
         assert FAKE_KEY not in (project / ".env").read_text(encoding="utf-8")
 
+    @pytest.mark.skipif(WINDOWS, reason="Windows has no owner-only file mode, so the script leaves it to the folder's access rules")
     def test_a_new_env_file_is_readable_by_its_owner_alone(self, tmp_path: Path) -> None:
         project = self.project(tmp_path)
         (project / ".env.example").chmod(0o644)
@@ -885,15 +968,37 @@ class TestWriteEnvFile:
         assert result.stdout == "refused: not-a-repository\n"
         assert list(project.iterdir()) == []
 
-    @pytest.mark.parametrize(("arguments", "verdict"), [((), "usage"), (("no-such-dir",), "no-directory")], ids=["no-arguments", "no-directory"])
+    @pytest.mark.parametrize(
+        ("arguments", "verdict"),
+        [((), "usage"), (("app", "extra"), "usage"), (("no-such-dir",), "no-directory")],
+        ids=["no-arguments", "two-arguments", "no-directory"],
+    )
     def test_a_mistyped_command_is_refused(self, tmp_path: Path, arguments: tuple[str, ...], verdict: str) -> None:
-        assert _run(WRITE_ENV_FILE, *arguments, cwd=tmp_path).stdout == f"refused: {verdict}\n"
+        result = _run(WRITE_ENV_FILE, *arguments, cwd=tmp_path)
+        assert result.stdout == f"refused: {verdict}\n"
+        assert result.returncode == 1
+
+    @pytest.mark.parametrize("inside", [False, True], ids=["own-repository", "inside-another"])
+    def test_paths_holding_a_space_are_one_path(self, tmp_path: Path, inside: bool) -> None:
+        """git is spawned with no shell, so a space in `<dir>` or in the repository around it splits nothing."""
+        if inside:
+            project = _repository(tmp_path / "their repo") / "my app"
+            project.mkdir()
+            (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        else:
+            project = _repository(tmp_path / "my app")
+            (project / ".env.example").write_text(EXAMPLE, encoding="utf-8")
+        result = _run(WRITE_ENV_FILE, project.name, cwd=project.parent, credentials={"PIPELEX_BASE_URL": FAKE_URL})
+        assert result.stdout == "empty base-url=copied plane=other\n"
+        assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
+        assert _dotenv_reading((project / ".env").read_text(encoding="utf-8"))["PIPELEX_BASE_URL"] == FAKE_URL
 
 
 @pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)
 def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Path) -> None:
-    """`cd` searches `CDPATH` before the working directory, so a same-named directory elsewhere would
-    be the one resolved, and printed onto the resolved path."""
+    """A relative `<dir>` is read from the working directory alone: the shell scripts these replaced
+    resolved it with `cd`, which searches `CDPATH` first, and a same-named directory elsewhere would have
+    been the one written to."""
     decoy = tmp_path / "elsewhere" / "app"
     decoy.mkdir(parents=True)
     project = _repository(tmp_path / "work" / "app")
@@ -909,32 +1014,37 @@ def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Pa
 
 def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     """The helpers are copied into each script, which runs alone, so the copies are held together here."""
+    start = "// The helpers below are the same in commit-pristine.mjs and write-env-file.mjs"
+    end = "// End of the helpers both scripts share."
 
-    def block(script: Path, first_line: str, last_function: str) -> str:
+    def block(script: Path) -> str:
         text = script.read_text(encoding="utf-8")
-        start = text.index(first_line)
-        end = text.index("\n}\n", text.index(f"\n{last_function}() {{"))
-        return text[start:end]
+        return text[text.index(start) : text.index(end)]
 
-    for first_line, last_function in (
-        ("# Whether the repository whose work tree holds <dir>'s parent ignores <dir>", "ignored_around"),
-        ("# git over <dir> as its ignore rules are judged.", "ignored_by_the_project"),
-    ):
-        assert block(COMMIT_PRISTINE, first_line, last_function) == block(WRITE_ENV_FILE, first_line, last_function)
+    assert block(COMMIT_PRISTINE) == block(WRITE_ENV_FILE)
+    shared = block(COMMIT_PRISTINE)
+    # Both read `<dir>` where it physically is, never ask about it from inside, which adds the slash, spawn
+    # git with no shell, and point the global excludes file at this OS's null device.
+    assert "fs.realpathSync.native(" in shared
+    assert '"check-ignore", "-q", "--", `./${path.basename(dir)}`' in shared
+    assert "shell:" not in shared
+    assert "core.excludesFile=${os.devNull}" in shared
+    assert "/dev/null" not in shared.replace("`/dev/null` or", "")
     for script in (COMMIT_PRISTINE, WRITE_ENV_FILE):
         text = script.read_text(encoding="utf-8")
-        # Both read `<dir>` where it physically is, and neither asks about it from inside, which adds the slash.
-        assert "&& pwd -P) || refuse no-directory" in text
-        assert "check-ignore -q ." not in text
-        assert 'own_rules=$(git -C "$dir" rev-parse --absolute-git-dir)\n' in text
+        assert 'git(["-C", dir, "rev-parse", "--absolute-git-dir"]).out' in text
+        # The one thing taken from `child_process` is the spawn that runs no shell unless asked to.
+        assert 'import { spawnSync } from "node:child_process";\n' in text
+        assert "shell:" not in text
 
 
 @pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)
 def test_each_script_says_what_it_prints_and_is_executable(script: Path) -> None:
-    """The stop table keys on the verdict words, so each script's header states them, and the build keeps
-    the executable bit it ships with."""
-    header = script.read_text(encoding="utf-8").split("\nset -u\n", 1)[0]
-    assert header.startswith("#!/usr/bin/env bash\n")
+    """The stop table keys on the verdict words, so each script's header states them. The skill runs each
+    through `node`, and the build keeps the executable bit it ships with for a direct run on macOS and Linux."""
+    header = script.read_text(encoding="utf-8").split("\nimport ", 1)[0]
+    assert header.startswith("#!/usr/bin/env node\n")
+    assert f"// Usage: node {script.name} <dir>" in header
     assert "refused: <reason>" in header
     assert "The exit code is presentation" in header
     assert os.access(script, os.X_OK)

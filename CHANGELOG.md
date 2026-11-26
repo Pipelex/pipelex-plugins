@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`pipelex-scaffold`'s two scripts are Node, so its initializer branch runs on Windows**: the pristine commit and the env file are now written by `commit-pristine.mjs` and `write-env-file.mjs`, which the skill runs with `node` where it ran `commit-pristine.sh` and `write-env-file.sh` with `bash`, so a Windows machine with PowerShell and no bash can create a project from a framework's or a language's initializer, with nothing to install beyond the Node the workshop and the hook already need. Their verdict lines are unchanged, and on Windows, which has no owner-only file mode, the new `.env` is left to the access rules of the folder it is in.
+
 ### Removed
 
 - **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login as `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which saves the address beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty and `PIPELEX_API_KEY` unset, since the saved address is used only with the saved key. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell, and that the hook validates only with a key given in the dialog or the shell.

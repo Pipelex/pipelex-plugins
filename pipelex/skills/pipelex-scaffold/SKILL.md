@@ -76,14 +76,14 @@ Its verdict is its last line not opening with `make`: `serving <url> — "<title
 2. **When `<dir>` held a `.git` before step 1, ask before running the script**, showing `git -C <dir> status --short`. Run the script, never its steps by hand:
 
    ```bash
-   bash "${CLAUDE_SKILL_DIR}/scripts/commit-pristine.sh" '<dir>' 'Scaffold <framework or language> project'
+   node "${CLAUDE_SKILL_DIR}/scripts/commit-pristine.mjs" '<dir>' 'Scaffold <framework or language> project'
    ```
 
    It keeps the dependency tree and `.env` out, makes `<dir>` a repository when none holds it or the one around it ignores it, and commits `<dir>` alone: the **one commit this skill makes**. `committed:` names it and lists the staged paths; `kept:` names the commit the initializer made itself; `inside:`, `unversioned:` and `nested:` name the enclosing repository, where it commits nothing.
 3. Write the env file. The script prints one line and never a value, `<key> base-url=<origin> plane=<plane>`:
 
    ```bash
-   bash "${CLAUDE_SKILL_DIR}/scripts/write-env-file.sh" '<dir>'
+   node "${CLAUDE_SKILL_DIR}/scripts/write-env-file.mjs" '<dir>'
    ```
 
 4. Add **no** SDK dependency and create **no** empty `methods/` directory: `/pipelex-integrate` adds both with the first call site.
