@@ -19,7 +19,7 @@
 //                       not-a-repository (<dir> is not where the pristine commit leaves it: it
 //                       has not run), not-ignored, write-failed (a file in <dir> could not be
 //                       written, or, except on Windows, a `.env` without a key could not be closed
-//                       to other users)
+//                       to other users, or the file system failed otherwise, its message on stderr)
 // The exit code is presentation: 0 unless refused.
 //
 // Why the key the shell exports is never copied: it is whichever key was exported last, often a
@@ -30,7 +30,8 @@
 // command, a file-editing tool's parameters or a read of the file lands in the transcript, and a
 // key there is a key to rotate. The script reads the variables from its own environment, so only
 // their names are ever written down, and the file is read here only to test it. No value is ever
-// passed to git, which is spawned with its arguments as an array and no shell.
+// passed to git, which is spawned with its arguments as an array, no shell and no PIPELEX_* variable
+// in its environment.
 //
 // It is Node rather than shell so that it runs the same on macOS, Linux and Windows, where a
 // PowerShell-only machine has no bash. Windows has no owner-only file mode, so there `.env` is left
@@ -59,11 +60,18 @@ function refuse(reason, detail = "") {
   throw new Refusal(reason, detail);
 }
 
-// git with its arguments as an array and no shell, and `input` on its standard input. The output loses
-// its trailing line breaks, as a shell's command substitution would, and `message` joins both streams
-// for a refusal to relay.
+// git's environment: this process's without any PIPELEX_* variable, which git never needs. Node builds
+// every spawn's environment list from `process.env` when it is handed none, and logs that list on
+// stderr under `NODE_DEBUG=child_process`, so a key the shell exports would reach the transcript
+// through any git call made without this one. The name is compared in upper case because Windows
+// reads a variable's name in any case.
+const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_")));
+
+// git with its arguments as an array and no shell, its environment GIT_ENV, and `input` on its standard
+// input. The output loses its trailing line breaks, as a shell's command substitution would, and
+// `message` joins both streams for a refusal to relay.
 function git(args, input = "") {
-  const result = spawnSync("git", args, { encoding: "utf8", input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const result = spawnSync("git", args, { encoding: "utf8", env: GIT_ENV, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   const stdout = (result.stdout ?? "").replace(/[\r\n]+$/, "");
   const stderr = (result.stderr ?? "").replace(/[\r\n]+$/, "");
   const message = [stdout, stderr, result.error?.message ?? ""].filter(Boolean).join("\n");
@@ -298,15 +306,16 @@ function writeEnvFile(args) {
   return `${key} base-url=${origin} plane=${plane}`;
 }
 
+// A failure nothing above expected, which only the file system can raise, still ends on a verdict
+// and never on a stack trace, which the stop table cannot key on. A system error's message names a
+// path and a cause, never a value this script holds.
 try {
   process.stdout.write(`${writeEnvFile(process.argv.slice(2))}\n`);
 } catch (error) {
-  if (!(error instanceof Refusal)) {
-    throw error;
-  }
-  process.stdout.write(`refused: ${error.reason}\n`);
-  if (error.detail) {
-    process.stderr.write(`${error.detail}\n`);
+  const refusal = error instanceof Refusal ? error : new Refusal("write-failed", String(error?.message ?? error));
+  process.stdout.write(`refused: ${refusal.reason}\n`);
+  if (refusal.detail) {
+    process.stderr.write(`${refusal.detail}\n`);
   }
   process.exitCode = 1;
 }

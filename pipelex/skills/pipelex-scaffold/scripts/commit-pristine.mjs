@@ -24,13 +24,14 @@
 //   refused: <reason>            nothing was committed, and <reason> is one of usage, no-git,
 //                                no-directory, init-failed, write-failed, stage-failed,
 //                                nothing-to-commit, commit-failed; git's own message, if any,
-//                                goes to stderr
+//                                goes to stderr. Any other failure of the file system is
+//                                write-failed, with the system's message on stderr
 // The exit code is presentation: 0 for committed, kept, inside, unversioned and nested, 1 for
 // refused.
 //
 // It is Node rather than shell so that it runs the same on macOS, Linux and Windows, where a
 // PowerShell-only machine has no bash. git is spawned with its arguments as an array and no shell,
-// so no path or message is ever parsed by one.
+// so no path or message is ever parsed by one, and with no PIPELEX_* variable in its environment.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -52,11 +53,18 @@ function refuse(reason, detail = "") {
   throw new Refusal(reason, detail);
 }
 
-// git with its arguments as an array and no shell, and `input` on its standard input. The output loses
-// its trailing line breaks, as a shell's command substitution would, and `message` joins both streams
-// for a refusal to relay.
+// git's environment: this process's without any PIPELEX_* variable, which git never needs. Node builds
+// every spawn's environment list from `process.env` when it is handed none, and logs that list on
+// stderr under `NODE_DEBUG=child_process`, so a key the shell exports would reach the transcript
+// through any git call made without this one. The name is compared in upper case because Windows
+// reads a variable's name in any case.
+const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("PIPELEX_")));
+
+// git with its arguments as an array and no shell, its environment GIT_ENV, and `input` on its standard
+// input. The output loses its trailing line breaks, as a shell's command substitution would, and
+// `message` joins both streams for a refusal to relay.
 function git(args, input = "") {
-  const result = spawnSync("git", args, { encoding: "utf8", input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const result = spawnSync("git", args, { encoding: "utf8", env: GIT_ENV, input, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
   const stdout = (result.stdout ?? "").replace(/[\r\n]+$/, "");
   const stderr = (result.stderr ?? "").replace(/[\r\n]+$/, "");
   const message = [stdout, stderr, result.error?.message ?? ""].filter(Boolean).join("\n");
@@ -129,15 +137,20 @@ function append(file, text) {
   }
 }
 
+// Any failure to read the entry, not only its absence, reads as no directory, as a shell's `[ -d ]`.
 function isDirectory(file) {
-  return fs.statSync(file, { throwIfNoEntry: false })?.isDirectory() ?? false;
+  try {
+    return fs.statSync(file).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function commitPristine(args) {
   if (args.length !== 2 || args[1] === "") {
     refuse("usage", "usage: node commit-pristine.mjs <dir> <message>");
   }
-  if (spawnSync("git", ["--version"], { windowsHide: true }).status !== 0) {
+  if (!git(["--version"]).ok) {
     refuse("no-git");
   }
   const dir = physicalDirectory(args[0]);
@@ -147,8 +160,15 @@ function commitPristine(args) {
   const message = args[1];
 
   // An initializer that wrote nothing leaves nothing to commit, and a commit of the .gitignore
-  // below alone would read as a scaffold. A lone .git is the user's repository, not a scaffold.
-  if (fs.readdirSync(dir).every((entry) => entry === ".git")) {
+  // below alone would read as a scaffold. A lone .git is the user's repository, not a scaffold. A
+  // directory that cannot be listed shows nothing to commit either, as an `ls` that fails does.
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch (error) {
+    refuse("nothing-to-commit", error.message);
+  }
+  if (entries.every((entry) => entry === ".git")) {
     refuse("nothing-to-commit");
   }
 
@@ -289,15 +309,15 @@ function commitPristine(args) {
   return [`committed: ${git(["-C", dir, "log", "-1", "--format=%h %s"]).out}`, staged];
 }
 
+// A failure nothing above expected, which only the file system can raise, still ends on a verdict
+// and never on a stack trace, which the stop table cannot key on.
 try {
   process.stdout.write(`${commitPristine(process.argv.slice(2)).join("\n")}\n`);
 } catch (error) {
-  if (!(error instanceof Refusal)) {
-    throw error;
-  }
-  process.stdout.write(`refused: ${error.reason}\n`);
-  if (error.detail) {
-    process.stderr.write(`${error.detail}\n`);
+  const refusal = error instanceof Refusal ? error : new Refusal("write-failed", String(error?.message ?? error));
+  process.stdout.write(`refused: ${refusal.reason}\n`);
+  if (refusal.detail) {
+    process.stderr.write(`${refusal.detail}\n`);
   }
   process.exitCode = 1;
 }

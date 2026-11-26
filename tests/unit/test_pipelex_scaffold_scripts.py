@@ -756,19 +756,6 @@ class TestWriteEnvFile:
         assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules\n.env*\n\n!.env.example\n"
 
-    def test_an_inherited_debug_log_prints_no_value(self, tmp_path: Path) -> None:
-        """Node logs each spawn on stderr when the environment carries `NODE_DEBUG=child_process`, its
-        environment included when the spawn is handed one, so the script hands git none and no value
-        in its arguments."""
-        project = self.project(tmp_path)
-        environment = _environment({"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL})
-        environment["NODE_DEBUG"] = "child_process,fs"
-        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, env=environment)
-        assert result.stdout == "empty base-url=copied plane=other\n"
-        assert "CHILD_PROCESS" in result.stderr, "the debug log is on, so the test reads what it prints"
-        for value in (FAKE_KEY, FAKE_URL):
-            assert value not in result.stdout and value not in result.stderr
-
     @pytest.mark.parametrize(
         "credentials",
         [{"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL}, {"PIPELEX_API_KEY": FAKE_KEY}, {"PIPELEX_BASE_URL": FAKE_URL}],
@@ -1012,6 +999,107 @@ def test_an_exported_cdpath_never_moves_the_directory(tmp_path: Path, script: Pa
     assert (project / ".gitignore").is_file()
 
 
+# What Node and git need to start on each OS, Windows included; every other variable is left out of the
+# debug-log test, so that the list Node prints is short enough to be printed whole.
+MINIMAL_ENVIRONMENT = {
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "HOME",
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "APPDATA",
+    "LOCALAPPDATA",
+}
+# Sorts after every PIPELEX_* name, as Windows sorts a spawn's environment, and is set after them elsewhere.
+DEBUG_CANARY = ("ZZ_SCAFFOLD_DEBUG_CANARY", "canary_printed_after_the_credentials")
+
+
+def _script_and_project(tmp_path: Path, script: Path) -> tuple[tuple[str, ...], str]:
+    """A project each script reaches its success verdict on, the arguments it is run with and that verdict's opening."""
+    if script == COMMIT_PRISTINE:
+        project = tmp_path / "app"
+        project.mkdir()
+        (project / "main.py").write_text("\n", encoding="utf-8")
+        return (str(project), "Scaffold Python project"), "committed: "
+    return (str(TestWriteEnvFile.project(tmp_path)),), "empty base-url=copied plane=other\n"
+
+
+@pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)
+def test_an_inherited_debug_log_prints_no_value(tmp_path: Path, script: Path) -> None:
+    """Node logs every spawn on stderr when the environment carries `NODE_DEBUG=child_process`, with the
+    environment list it builds from `process.env` whether or not the spawn is handed one, so each script hands
+    git an environment without the PIPELEX_* variables. Node's log prints the first hundred entries of a list
+    and no more, so the environment here is minimal, the credentials come first, and a canary set after them,
+    which sorts after them too, must be printed: a list cut short would hide the credentials and the canary
+    together."""
+    arguments, verdict = _script_and_project(tmp_path, script)
+    credentials = {"PIPELEX_API_KEY": FAKE_KEY, "PIPELEX_BASE_URL": FAKE_URL}
+    if not WINDOWS:
+        # A name in another letter case is the same variable on Windows, and is left out there as well.
+        credentials["Pipelex_Api_Key"] = "plx_fake_mixed_case_key_0000"
+    environment = {
+        **credentials,
+        **{name: value for name, value in _environment().items() if name.upper() in MINIMAL_ENVIRONMENT or name.startswith("GIT_")},
+        "NODE_DEBUG": "child_process,fs",
+        DEBUG_CANARY[0]: DEBUG_CANARY[1],
+    }
+    result = _run(script, *arguments, cwd=tmp_path, env=environment)
+    assert result.stdout.startswith(verdict), result.stdout
+    assert "CHILD_PROCESS" in result.stderr, "the debug log is on, so the test reads what it prints"
+    assert "=".join(DEBUG_CANARY) in result.stderr, "the environment list is printed whole"
+    for value in credentials.values():
+        assert value not in result.stdout and value not in result.stderr
+
+
+@pytest.mark.parametrize("script", [COMMIT_PRISTINE, WRITE_ENV_FILE], ids=lambda path: path.name)
+def test_a_failure_nothing_expected_still_ends_on_a_verdict(tmp_path: Path, script: Path) -> None:
+    """The stop table keys on the verdict line, and a stack trace has none. A file system that fails where no
+    refusal was written for it reads as `write-failed`, its message relayed on stderr. The failure is planted
+    by a module Node loads first, since no file system state makes `existsSync` throw on every OS."""
+    arguments, _ = _script_and_project(tmp_path, script)
+    failing = tmp_path / "failing-fs.cjs"
+    failing.write_text(
+        'const fs = require("node:fs");\nfs.existsSync = () => { throw new Error("EIO: i/o error, planted by the test"); };\n', encoding="utf-8"
+    )
+    result = subprocess.run(
+        ["node", "--require", str(failing), str(script), *arguments], cwd=tmp_path, env=_environment(), capture_output=True, text=True, check=False
+    )
+    assert result.stdout == "refused: write-failed\n"
+    assert result.returncode == 1
+    assert result.stderr == "EIO: i/o error, planted by the test\n"
+
+
+def test_a_directory_that_cannot_be_listed_has_nothing_to_commit(tmp_path: Path) -> None:
+    """The shell script read the directory with `ls`, and a listing that failed left nothing to commit. A
+    failure planted by a module Node loads first stands for a folder the user may not read, on every OS."""
+    arguments, _ = _script_and_project(tmp_path, COMMIT_PRISTINE)
+    failing = tmp_path / "unlistable.cjs"
+    failing.write_text(
+        'const fs = require("node:fs");\nfs.readdirSync = () => { throw new Error("EACCES: permission denied, planted by the test"); };\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["node", "--require", str(failing), str(COMMIT_PRISTINE), *arguments],
+        cwd=tmp_path,
+        env=_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.stdout == "refused: nothing-to-commit\n"
+    assert result.returncode == 1
+    assert result.stderr == "EACCES: permission denied, planted by the test\n"
+    assert not (tmp_path / "app" / ".git").exists(), "a refusal initialized nothing"
+
+
 def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     """The helpers are copied into each script, which runs alone, so the copies are held together here."""
     start = "// The helpers below are the same in commit-pristine.mjs and write-env-file.mjs"
@@ -1024,17 +1112,24 @@ def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     assert block(COMMIT_PRISTINE) == block(WRITE_ENV_FILE)
     shared = block(COMMIT_PRISTINE)
     # Both read `<dir>` where it physically is, never ask about it from inside, which adds the slash, spawn
-    # git with no shell, and point the global excludes file at this OS's null device.
+    # git with no shell and an environment of their own, and point the global excludes file at this OS's
+    # null device.
     assert "fs.realpathSync.native(" in shared
     assert '"check-ignore", "-q", "--", `./${path.basename(dir)}`' in shared
     assert "shell:" not in shared
     assert "core.excludesFile=${os.devNull}" in shared
     assert "/dev/null" not in shared.replace("`/dev/null` or", "")
+    # Handed no `env`, a spawn's environment is built from `process.env` and printed whole by Node's debug
+    # log, so git's leaves out every PIPELEX_* name, in any letter case, as Windows reads names.
+    assert '!name.toUpperCase().startsWith("PIPELEX_")' in shared
+    assert 'spawnSync("git", args, { encoding: "utf8", env: GIT_ENV,' in shared
     for script in (COMMIT_PRISTINE, WRITE_ENV_FILE):
         text = script.read_text(encoding="utf-8")
         assert 'git(["-C", dir, "rev-parse", "--absolute-git-dir"]).out' in text
-        # The one thing taken from `child_process` is the spawn that runs no shell unless asked to.
+        # The one thing taken from `child_process` is the spawn that runs no shell unless asked to, and the
+        # helper is its only caller, so no spawn goes out without git's environment.
         assert 'import { spawnSync } from "node:child_process";\n' in text
+        assert text.count("spawnSync(") == 1
         assert "shell:" not in text
 
 
