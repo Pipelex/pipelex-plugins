@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from types import ModuleType
 
@@ -14,6 +18,7 @@ from pytest_mock import MockerFixture
 
 from scripts.check import SKILL_CEILING_CHARS
 from scripts.gen_skill_docs import load_target_config, render_templates, resolve_output_dir
+from tests.platform_shell import remove_printed_temp_dir, run_in_platform_shell
 
 TARGETS = ("prod", "codex", "mistral-vibe")
 
@@ -217,6 +222,33 @@ class TestPipelexSyntheticInputsSkillShape:
         assert "No `target` lies beside the method" in synthetic
         assert "The report gives each generated file's temporary path" in synthetic
 
+    @pytest.mark.cross_os
+    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_a_photograph_alone_makes_its_own_temporary_directory(self, target_name: str, tmp_path: Path) -> None:
+        """The default `target` lies in step 2's temporary directory, but a photograph replaces step 2, so a request
+        for photographs alone never ran the preflight that makes it. `photograph.md` makes the directory itself with
+        Node, which the workshop needs anyway, in a command every shell runs: no double quote inside the script,
+        which Windows PowerShell 5.1 strips on its way to a native program. Run through the platform's shell, it
+        prints a fresh directory in the system temp folder."""
+        body = self.render(target_name)
+        assert "in step 2's temporary directory, **never beside a method**" in self.the_line(body, "- `target`: the path to write;")
+        pointer = self.the_line(body, "A `photograph` follows [photograph.md](references/photograph.md) from here")
+        assert "read before drafting: it replaces steps 2, 4 and 5 for that file, its temporary directory included." in pointer
+        text = self.reference("photograph.md")
+        assert "no step 2 makes one when the request holds photographs alone" in text
+        assert "When step 2 runs for another file of the same request, its directory serves the photographs too." in text
+        (command,) = re.findall(r"```shell\n(.*?)\n```", text, re.DOTALL)
+        assert command == """node -p "require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'synth-'))\""""
+        assert command.count('"') == 2, "a double quote inside the script does not survive Windows PowerShell 5.1"
+        node = shutil.which("node")
+        if node is None or target_name != "prod":
+            return  # the wording holds on every target; the command itself runs once, where Node is installed
+        result = run_in_platform_shell(command, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        made = Path(result.stdout.strip())
+        assert made.is_dir(), f"the command printed {result.stdout!r}, not a directory"
+        remove_printed_temp_dir(made, prefix="synth-")
+
     @pytest.mark.parametrize("target_name", TARGETS)
     def test_a_failure_removes_the_recipes_partial_file(self, target_name: str) -> None:
         """Every recipe renders to a hidden `PART` beside `OUT`, deletes it in a `finally` and renames it onto `OUT` only on
@@ -331,3 +363,53 @@ class TestPipelexSyntheticInputsSkillShape:
         handed = capfd.readouterr()
         assert Path(handed.out.strip()).resolve() == venv.resolve(), "the arguments did not run in the venv"
         assert handed.err == "", f"the reuse path built or installed again: {handed.err}"
+
+    @staticmethod
+    def build_wheel(directory: Path) -> Path:
+        """A pure-Python wheel of one module, made by hand so pip installs it with no network and no build backend."""
+        files = {
+            "synthprobe/__init__.py": b"VALUE = 1\n",
+            "synthprobe-1.0.dist-info/METADATA": b"Metadata-Version: 2.1\nName: synthprobe\nVersion: 1.0\n",
+            "synthprobe-1.0.dist-info/WHEEL": b"Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        }
+        record_lines: list[str] = []
+        for name, data in files.items():
+            digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
+            record_lines.append(f"{name},sha256={digest},{len(data)}")
+        record_lines.append("synthprobe-1.0.dist-info/RECORD,,")
+        wheel = directory / "synthprobe-1.0-py3-none-any.whl"
+        with zipfile.ZipFile(wheel, "w") as archive:
+            for name, data in files.items():
+                archive.writestr(name, data)
+            archive.writestr("synthprobe-1.0.dist-info/RECORD", "\n".join(record_lines) + "\n")
+        return wheel
+
+    @pytest.mark.cross_os
+    def test_the_venv_script_reinstalls_a_package_whose_files_are_gone(
+        self, tmp_path: Path, mocker: MockerFixture, capfd: pytest.CaptureFixture[str]
+    ) -> None:
+        """A package whose files were deleted while its install record stayed is one pip counts as installed: a plain
+        `pip install` is then a no-op, and a script that stopped there returned 3 on every call, the venv never
+        repaired. The script reinstalls with `--force-reinstall` when the allowlist still does not import. The
+        allowlist is a hand-made local wheel, so nothing is downloaded."""
+        module = self.load_venv_script()
+        wheel = self.build_wheel(tmp_path)
+        mocker.patch.object(module, "PACKAGES", (str(wheel),))
+        mocker.patch.object(module, "IMPORTS", ("synthprobe",))
+        cache = tmp_path / "cache"
+        mocker.patch.dict(os.environ, {"XDG_CACHE_HOME": str(cache)})
+        venv = cache / "pipelex-plugins" / "synth-venv"
+
+        assert module.main([]) == 0
+        built = capfd.readouterr()
+        assert "installing" in built.err and "--force-reinstall" not in built.err, built.err
+
+        (package,) = [path for path in venv.rglob("site-packages/synthprobe") if path.is_dir()]
+        shutil.rmtree(package)
+        assert list(venv.rglob("site-packages/synthprobe-1.0.dist-info")), "the install record went with the files"
+
+        assert module.main([]) == 0, capfd.readouterr().err
+        repaired = capfd.readouterr()
+        assert "reinstalling it into" in repaired.err and "--force-reinstall" in repaired.err, repaired.err
+        assert repaired.out.strip() == str(module.venv_python(venv).absolute())
+        assert package.is_dir(), "the forced reinstall did not write the package's files again"

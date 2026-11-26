@@ -30,11 +30,11 @@ A request carries four fields: explicit when `/pipelex-inputs` calls, otherwise 
 - `target`: the path to write; by default `<input_variable>.<ext>`, standalone `<name>.<ext>`, in step 2's temporary directory, **never beside a method**, whose folder travels whole: a test file reaches a run as an upload. A target the caller or the user names is honoured.
 - `constraints`: page count, pixel size, language, anything the input's description pins, and an `xlsx`'s layout; otherwise the recipe's defaults.
 
-A `photograph` follows [photograph.md](references/photograph.md) from here: read it before drafting, since it replaces steps 2, 4 and 5 for that file. Mode follows the caller: a request from `/pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
+A `photograph` follows [photograph.md](references/photograph.md) from here, read before drafting: it replaces steps 2, 4 and 5 for that file, its temporary directory included. Mode follows the caller: a request from `/pipelex-inputs` runs in that skill's mode; a direct invocation is **automatic** — state the assumptions in one line and proceed — unless the user asks to be walked through it.
 
 ### Step 2: Resolve the environment
 
-Once per invocation, before any recipe. The outcome is the **runner**, the command every recipe file and verify command runs under; nothing else differs between the rungs.
+Once per invocation, before any recipe. The outcome is the **runner**, the command every recipe and verify command runs under; nothing else differs between rungs.
 
 **Package sets by format:** `pdf` → `reportlab`; `png` → `pillow matplotlib numpy`; `docx` → `python-docx`; `xlsx` → `openpyxl`; `pptx` → `python-pptx`.
 
@@ -44,7 +44,7 @@ Once per invocation, before any recipe. The outcome is the **runner**, the comma
 uv run --quiet --no-project --with reportlab python -c "import tempfile; print(tempfile.mkdtemp())"
 ```
 
-On a cold cache the first run downloads the packages and can take a minute: say so in one line, then continue.
+On a cold cache the first run downloads the packages, up to a minute: say so in one line.
 
 **Rung 2 — no `uv`, but a Python 3 with `venv` and `pip`.** When `uv --version` fails, read [venv.md](references/venv.md) before creating anything. `<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. The rung runs `<skill-dir>/scripts/synth_venv.py`, which builds the venv this skill owns and gives the runner.
 
@@ -54,7 +54,7 @@ Before opening a recipe, write down what the file will say — in the reply, bri
 
 ### Step 4: Render
 
-Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep the recipe's `SEED` and `invariant=1`, write it to a `.py` file in step 2's temporary directory with your file tool, and run `<runner> <file>.py`.
+Read the format's reference — [pdf.md](references/pdf.md), [png.md](references/png.md) or [office.md](references/office.md) — before writing any code, and take the recipe that matches the content (its opening table says which). Copy it, replace its content block with step 3's draft, set `OUT` to `target` with every `<…>` placeholder resolved, keep the recipe's `SEED` and `invariant=1`, write it to a `.py` file in step 2's temporary directory with your file tool, and run `<runner> "<file>.py"`.
 
 **An existing file at `target` is the user's**: say so and confirm before overwriting it. **A failure leaves nothing behind**: a recipe renders to a hidden partial file beside `target` (its `PART`: `.invoice.part.pdf` for `invoice.pdf`), deletes it when it fails, and moves it onto `target` only on success. A run killed mid-save leaves it: delete it with `<runner> -c "import os, sys; os.remove(sys.argv[1])" "<partial file>"`, and nothing else — never on a path you did not create.
 

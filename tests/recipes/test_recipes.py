@@ -35,11 +35,14 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import NamedTuple, cast
 
 import pytest
+
+from tests.platform_shell import remove_printed_temp_dir, run_in_platform_shell
 
 pytestmark = pytest.mark.recipes
 
@@ -58,7 +61,7 @@ VENV_SCRIPT = SKILL_ROOT / "scripts" / "synth_venv.py"
 VENV_SCRIPT_PLACEHOLDER = "<the script's path from step 2>"
 
 OUTPUT_DIR_PLACEHOLDER = "<target_dir>"
-RECIPE_FILE_PLACEHOLDER = "<file>.py"
+RECIPE_FILE_PLACEHOLDER = '"<file>.py"'
 # A command block carrying this placeholder is a template the agent fills in (the
 # "Verify" snippets), not a runnable recipe — running it would open a file
 # literally named "<name>.png".
@@ -101,7 +104,7 @@ PYTHON_BLOCK = re.compile(r"```python\n(.*?)```", re.DOTALL)
 # The blocks of commands the skill gives, written for any shell.
 COMMAND_BLOCK = re.compile(r"```shell\n(.*?)```", re.DOTALL)
 # A recipe's first line: the command that runs it on the `uv` rung.
-RECIPE_COMMAND = re.compile(r"^# (uv run .+ <file>\.py)$")
+RECIPE_COMMAND = re.compile(r'^# (uv run .+ "<file>\.py")$')
 HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
 OUT_ASSIGNMENT = re.compile(r'^OUT = r"([^"]+)"', re.MULTILINE)
 DECLARED_SIZE = re.compile(r"^WIDTH, HEIGHT(?:, DPI)? = (\d+), (\d+)", re.MULTILINE)
@@ -189,13 +192,8 @@ def _png_size(data: bytes) -> tuple[int, int]:
 
 
 def _shell(command: str, *, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    """Run `command` as written through the platform's own shell: Windows PowerShell, the stricter of the two
-    PowerShells, on Windows, and `sh` elsewhere — never bash, which the skill may not assume."""
-    if os.name == "nt":
-        argv = ["powershell", "-NoProfile", "-NonInteractive", "-Command", command]
-    else:
-        argv = ["/bin/sh", "-c", command]
-    return subprocess.run(argv, cwd=cwd, env={**os.environ, **(env or {})}, capture_output=True, text=True, check=False)
+    """Run `command` as written through the platform's own shell, never bash, which the skill may not assume."""
+    return run_in_platform_shell(command, cwd=cwd, env=env)
 
 
 def _write_recipe(script: str, *, tmp_path: Path, name: str = "recipe.py") -> Path:
@@ -212,16 +210,36 @@ def _run_recipe(recipe: RecipeBlock, script: str, *, tmp_path: Path) -> subproce
     return _shell(recipe.command.replace(RECIPE_FILE_PLACEHOLDER, f'"{recipe_file}"'), cwd=tmp_path)
 
 
-def _venv_script(arguments: list[str], *, cwd: Path, cache: Path) -> subprocess.CompletedProcess[str]:
-    """Start the venv script with this interpreter, as `python3 "<script>" …` starts it on a user's machine."""
-    return subprocess.run(
-        [sys.executable, str(VENV_SCRIPT), *arguments],
-        cwd=cwd,
-        env={**os.environ, "XDG_CACHE_HOME": str(cache)},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _python3_on_path(shim_dir: Path) -> str:
+    """A PATH whose `python3` is this interpreter, ahead of whatever `python3` the machine has, so the venv is built
+    by the Python the suite runs on: a `sh` script on macOS and Linux, a `.cmd` file on Windows, which PowerShell
+    finds through PATHEXT. Either passes its arguments on untouched, as a user's own `python3` takes them."""
+    shim_dir.mkdir(exist_ok=True)
+    if os.name == "nt":
+        (shim_dir / "python3.cmd").write_text(f'@"{sys.executable}" %*\n', encoding="utf-8")
+    else:
+        shim = shim_dir / "python3"
+        shim.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n', encoding="utf-8")
+        shim.chmod(0o755)
+    return f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+
+
+def _venv_command(block: str, *, arguments: str = "") -> str:
+    """A venv.md block as the agent fills it: the script's path in its placeholder, and what it runs after it."""
+    command = block.strip().replace(VENV_SCRIPT_PLACEHOLDER, str(VENV_SCRIPT))
+    return f"{command} {arguments}" if arguments else command
+
+
+def _venv_script(command: str, *, cwd: Path, cache: Path) -> subprocess.CompletedProcess[str]:
+    """Run a venv.md command as a user's shell runs it, `python3 "<script>" …` through `sh` or Windows PowerShell,
+    with the venv under `cache`."""
+    path = _python3_on_path(cache.parent / "python3-shim")
+    return _shell(command, cwd=cwd, env={"XDG_CACHE_HOME": str(cache), "PATH": path})
+
+
+def _venv_start() -> str:
+    """venv.md's first block, the script started bare, filled in."""
+    return _venv_command(_venv_blocks()[0])
 
 
 def _venv_python(cache: Path) -> Path:
@@ -494,7 +512,9 @@ class TestRecipes:
         withs = " ".join(f"--with {package}" for package in sorted(package_set))
         result = _shell(preflight.replace("--with reportlab", withs), cwd=tmp_path)
         assert result.returncode == 0, f"package set '{withs}' does not resolve\n{result.stderr}"
-        assert Path(result.stdout.strip()).is_dir(), f"the preflight printed no temporary directory: {result.stdout!r}"
+        printed = Path(result.stdout.strip())
+        assert printed.is_dir(), f"the preflight printed no temporary directory: {result.stdout!r}"
+        remove_printed_temp_dir(printed, prefix=tempfile.template)
 
     def test_runner_lines_never_touch_the_users_project(self) -> None:
         """`uv run` discovers the nearest project and syncs it — creating a
@@ -558,23 +578,25 @@ class TestRecipes:
         """
         cache = tmp_path / "cache"
         cache.mkdir()
-        created = _venv_script([], cwd=tmp_path, cache=cache)
+        created = _venv_script(_venv_start(), cwd=tmp_path, cache=cache)
         assert created.returncode == 0, f"the venv script failed\n{created.stderr}"
         printed = Path(created.stdout.strip())
         assert printed == _venv_python(cache).absolute(), f"the script printed {printed}, not the venv's interpreter"
         assert printed.is_file(), "the venv landed somewhere other than the path the skill documents"
 
         (_, workdir_block) = _venv_blocks()
-        arguments = shlex.split(workdir_block)[2:]
-        workdir = _venv_script(arguments, cwd=tmp_path, cache=cache)
+        workdir = _venv_script(_venv_command(workdir_block), cwd=tmp_path, cache=cache)
         assert workdir.returncode == 0, workdir.stderr
-        assert Path(workdir.stdout.strip()).is_dir(), f"the temporary-directory command printed {workdir.stdout!r}"
+        made = Path(workdir.stdout.strip())
+        assert made.is_dir(), f"the temporary-directory command printed {workdir.stdout!r}"
+        remove_printed_temp_dir(made, prefix=tempfile.template)
 
-        # Rung 2 installs the whole allowlist, so every format it covers must run.
+        # Rung 2 installs the whole allowlist, so every format it covers must run, each recipe file started as
+        # step 4 says, its path quoted after the runner.
         for suffix in sorted(MAGIC_BY_SUFFIX):
             recipe = next(candidate for candidate in RECIPES if candidate.output.endswith(suffix))
             recipe_file = _write_recipe(recipe.script, tmp_path=tmp_path, name=f"recipe{suffix.replace('.', '_')}.py")
-            result = _venv_script([str(recipe_file)], cwd=tmp_path, cache=cache)
+            result = _venv_script(_venv_command(_venv_blocks()[0], arguments=f'"{recipe_file}"'), cwd=tmp_path, cache=cache)
             assert result.returncode == 0, f"{recipe.heading} failed on the venv rung\n{result.stderr}"
             assert (tmp_path / recipe.output).read_bytes().startswith(MAGIC_BY_SUFFIX[suffix])
 
@@ -587,12 +609,12 @@ class TestRecipes:
         cache.mkdir()
         venv = cache / "pipelex-plugins" / "synth-venv"
 
-        first = _venv_script([], cwd=tmp_path, cache=cache)
+        first = _venv_script(_venv_start(), cwd=tmp_path, cache=cache)
         assert first.returncode == 0, first.stderr
         site = sorted(path.name for path in venv.rglob("site-packages/*"))
         assert site, "the first run installed nothing"
 
-        second = _venv_script([], cwd=tmp_path, cache=cache)
+        second = _venv_script(_venv_start(), cwd=tmp_path, cache=cache)
         assert second.returncode == 0, f"the reuse path failed\n{second.stderr}"
         assert second.stderr == "", f"the reuse path built or installed again:\n{second.stderr}"
         assert sorted(path.name for path in venv.rglob("site-packages/*")) == site
@@ -609,6 +631,6 @@ class TestRecipes:
         assert broken.returncode == 0, broken.stderr
         assert _venv_python(cache).is_file(), "the simulated half-made venv has no interpreter to trip the guard"
 
-        repaired = _venv_script([], cwd=tmp_path, cache=cache)
+        repaired = _venv_script(_venv_start(), cwd=tmp_path, cache=cache)
         assert repaired.returncode == 0, f"the ladder did not repair a pip-less venv\n{repaired.stderr}"
         assert Path(repaired.stdout.strip()) == _venv_python(cache).absolute()

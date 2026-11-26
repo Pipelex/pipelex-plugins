@@ -2,15 +2,16 @@
 
 Run it with any Python 3 that has its `venv` module, by path, in any shell:
 
-    python3 <skill-dir>/scripts/synth_venv.py              # builds or reuses the venv, prints its interpreter
-    python3 <skill-dir>/scripts/synth_venv.py <file>.py    # the same, then runs <file>.py with that interpreter
-    python3 <skill-dir>/scripts/synth_venv.py -c "<code>"  # or any other arguments the interpreter takes
+    python3 "<skill-dir>/scripts/synth_venv.py"               # builds or reuses the venv, prints its interpreter
+    python3 "<skill-dir>/scripts/synth_venv.py" "<file>.py"   # the same, then runs <file>.py with that interpreter
+    python3 "<skill-dir>/scripts/synth_venv.py" -c "<code>"   # or any other arguments the interpreter takes
 
 `py -3` or `python` start it as well as `python3`: the launcher only has to run this file. It owns one venv,
 under `$XDG_CACHE_HOME/pipelex-plugins/synth-venv` when that variable is set, else under `%LOCALAPPDATA%` on
 Windows and `~/.cache` elsewhere. It builds the venv once with the interpreter that started it, installs the
 skill's whole package allowlist into it, and reuses it afterwards, rebuilding only a venv whose pip does not
-answer and reinstalling only when the allowlist does not import. With arguments it hands them to the venv's
+answer and installing only when the allowlist does not import, with `--force-reinstall` when a plain install
+leaves it broken. With arguments it hands them to the venv's
 interpreter and exits with its code, so `python3 synth_venv.py` stands where `uv run … python` stands on the
 other rung, and no caller ever has to spell the interpreter's path, which on Windows lives under `Scripts\\`
 rather than `bin/` and, quoted, would need PowerShell's call operator.
@@ -82,6 +83,21 @@ def _quiet(command: list[str]) -> bool:
     return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
 
 
+def _imports(python: Path) -> bool:
+    """Whether the whole allowlist imports in the venv."""
+    return _quiet([str(python), "-c", "import " + ", ".join(IMPORTS)])
+
+
+def _install(python: Path, *options: str) -> bool:
+    """Install the allowlist into the venv, pip's output on stderr so stdout carries only the interpreter's path."""
+    installed = subprocess.run(
+        [str(python), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *options, *PACKAGES],
+        stdout=sys.stderr,
+        check=False,
+    )
+    return installed.returncode == 0
+
+
 def ensure(venv: Path) -> int:
     """Build or reuse the venv and fill it with the allowlist; 0 when it is ready."""
     reason = refusal(venv)
@@ -93,20 +109,24 @@ def ensure(venv: Path) -> int:
     # file, and rebuild with --clear rather than trust a half-made venv.
     if not _quiet([str(python), "-m", "pip", "--version"]):
         print(f"building the venv {venv} with {sys.executable}", file=sys.stderr)
-        built = subprocess.run([sys.executable, "-m", "venv", "--clear", str(venv)], check=False)
+        built = subprocess.run([sys.executable, "-m", "venv", "--clear", str(venv)], stdout=sys.stderr, check=False)
         if built.returncode != 0 or not _quiet([str(python), "-m", "pip", "--version"]):
             print(f"could not build a venv with pip at {venv} using {sys.executable}", file=sys.stderr)
             return EXIT_VENV_FAILED
-    if not _quiet([str(python), "-c", "import " + ", ".join(IMPORTS)]):
-        print(f"installing {' '.join(PACKAGES)} into {venv}", file=sys.stderr)
-        installed = subprocess.run(
-            [str(python), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *PACKAGES],
-            stdout=sys.stderr,
-            check=False,
-        )
-        if installed.returncode != 0 or not _quiet([str(python), "-c", "import " + ", ".join(IMPORTS)]):
-            print(f"could not install {' '.join(PACKAGES)} into {venv}", file=sys.stderr)
-            return EXIT_INSTALL_FAILED
+    if _imports(python):
+        return 0
+    print(f"installing {' '.join(PACKAGES)} into {venv}", file=sys.stderr)
+    if not _install(python):
+        print(f"could not install {' '.join(PACKAGES)} into {venv}", file=sys.stderr)
+        return EXIT_INSTALL_FAILED
+    if _imports(python):
+        return 0
+    # A package whose files are gone but whose install record is intact counts as installed, so the plain
+    # install above changed nothing; only a forced one writes its files again.
+    print(f"the allowlist still does not import; reinstalling it into {venv} with --force-reinstall", file=sys.stderr)
+    if not _install(python, "--force-reinstall") or not _imports(python):
+        print(f"could not install {' '.join(PACKAGES)} into {venv}", file=sys.stderr)
+        return EXIT_INSTALL_FAILED
     return 0
 
 

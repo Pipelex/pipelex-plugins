@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `docx`, `xlsx` or `pptx`, before writing any code; each recipe ends with step 5's verify command.
 
-Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner, and a verify step. Each Python recipe is a program written to a `.py` file in Step 2's temporary directory with your file tool and run with Step 2's runner, `<runner> <file>.py`; the comment on its first line is that command on the `uv` rung, and on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
+Recipes for the `docx`, `xlsx` and `pptx` formats of `/pipelex-synthetic-inputs`, the first two carried over from `/pipelex-inputs` and brought into line with the other references — an `OUT` variable, directory creation, a `--no-project` runner, and a verify step. Each Python recipe is a program written to a `.py` file in Step 2's temporary directory with your file tool and run with Step 2's runner, `<runner> "<file>.py"`; the comment on its first line is that command on the `uv` rung, and on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes. The content they produce is the same. A host skill for the format, when one is installed, is the better tool — it knows the format's conventions — and the Python recipe is the fallback. Either way the content comes from the skill's Step 3 draft.
 
 ## Word documents (DOCX)
 
@@ -17,7 +17,7 @@ Save to: <target>
 **If not**, create it with `python-docx` (MIT). Runner per the skill's Step 2; the package set is `python-docx`:
 
 ```python
-# uv run --quiet --no-project --with python-docx python <file>.py
+# uv run --quiet --no-project --with python-docx python "<file>.py"
 import os
 from pathlib import Path
 
@@ -58,7 +58,7 @@ A sheet holding a Table is read and filled as that Table, so a Table in a workbo
 **If not**, create it with `openpyxl` (MIT). The package set is `openpyxl`:
 
 ```python
-# uv run --quiet --no-project --with openpyxl python <file>.py
+# uv run --quiet --no-project --with openpyxl python "<file>.py"
 import os
 from pathlib import Path
 
@@ -129,7 +129,7 @@ Save to: <target>
 **If not**, create it with `python-pptx` (MIT). The package set is `python-pptx`:
 
 ```python
-# uv run --quiet --no-project --with python-pptx python <file>.py
+# uv run --quiet --no-project --with python-pptx python "<file>.py"
 import os
 from pathlib import Path
 

@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `png`, before writing any code; its **Verify** section is step 5's check.
 
-Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace the content at the top of the script with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> <file>.py`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
+Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace the content at the top of the script with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> "<file>.py"`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
 
 `Pillow` is MIT-CMU, `matplotlib` PSF-style and `numpy` BSD; every recipe below was executed and looked at under Pillow 12.3.0, matplotlib 3.11.1 and numpy 2.5.2 before it was committed.
 
@@ -48,7 +48,7 @@ def font(size, bold=False):
 Charts are the one category where the honest tool is the one real charts are made with. The content block carries the kind, the labels and the series; the four kinds are branches of the same script.
 
 ```python
-# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python <file>.py
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python "<file>.py"
 import os
 from pathlib import Path
 
@@ -124,7 +124,7 @@ A pie chart takes one number per slice, so this branch uses the last value of ea
 Nodes on a grid, arrows between them. The content block is a node list — id, label, column, row, role — and an edge list; the layout, the arrowheads and the label wrapping are handled below it. `role` picks the colour: `start`, `step`, `decision`, `end`.
 
 ```python
-# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python <file>.py
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python "<file>.py"
 import math
 import os
 from pathlib import Path
@@ -306,7 +306,7 @@ A page rendered crisply and then put through `scannerize()` — a slight skew, a
 `scannerize()` is a plain function on an image, so another recipe can end with it — a `screenshot` printed and scanned, a `chart` pasted into a report page. It is not free-standing, though: copy the function **and** its two imports (`import numpy as np`, and `ImageFilter` in the `PIL` import line), because the `diagram` and `screenshot` recipes carry neither. A `chart` is a matplotlib figure rather than a PIL image, so save it first and reopen it with `Image.open(OUT)` before passing it in.
 
 ```python
-# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python <file>.py
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python "<file>.py"
 import os
 from pathlib import Path
 
@@ -504,7 +504,7 @@ A printed form that someone has written on: ticks in a column, a corrected quant
 The font comes from the first family of `HAND_FAMILIES` the machine has: macOS ships Bradley Hand, Noteworthy and Chalkboard SE, Windows Segoe Print, Ink Free and Comic Sans MS. A machine with none of them, which is most Linux machines, falls back to DejaVu Sans Oblique, bundled with matplotlib; the recipe prints a note when it does, and the report must pass it on, because slanted print is a weaker test than a hand. To write on another recipe's page — the invoice of [Scanned document (Pillow)](#scanned-document-pillow), say — copy `hand_font()`, `ink()`, `handwrite()` and `tick()` with their imports (`ImageChops` joins the `PIL` line) and the three module-level names they read, `HAND_FAMILIES`, `HAND` and `INK`, renaming this `INK` to `HAND_INK` in its definition and in `ink()`, since the invoice has an `INK` of its own; then paste their layers onto the page before `scannerize()`.
 
 ```python
-# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python <file>.py
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python "<file>.py"
 import logging
 import os
 from pathlib import Path
@@ -690,7 +690,7 @@ Keep the marks where a person would put them: a number in the cell it corrects, 
 Window chrome, a sidebar, a header with an action button, a row of stat tiles, and either a table or a card grid. `LAYOUT` chooses the last one.
 
 ```python
-# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python <file>.py
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python "<file>.py"
 import os
 from pathlib import Path
 

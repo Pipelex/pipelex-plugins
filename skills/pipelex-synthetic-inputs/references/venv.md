@@ -2,7 +2,7 @@
 
 Read this at step 2 of the skill when `uv --version` fails, before creating or installing anything. The rung needs a Python 3 with its `venv` and `pip` modules; when none runs the script below, or the script fails, the skill's stop table sends you to the cures at the end of this file.
 
-The skill's `scripts/synth_venv.py`, at the path step 2 names, does the whole rung, the same in every shell: it builds a venv this skill owns, once, under the user's cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows and `~/.cache` elsewhere, then `pipelex-plugins/synth-venv`), fills it with the whole allowlist, and reuses it on every later invocation. It refuses to build over a path that exists and is not a venv, rebuilds a venv whose `pip` does not answer, and reports what it built and installed on stderr.
+The skill's `scripts/synth_venv.py`, at the path step 2 names, does the whole rung, the same in every shell: it builds a venv this skill owns, once, under the user's cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows and `~/.cache` elsewhere, then `pipelex-plugins/synth-venv`), fills it with the whole allowlist, and reuses it on every later invocation. It refuses to build over a path that exists and is not a venv, rebuilds a venv whose `pip` does not answer, forces a reinstall when a package's files are gone, and reports what it built and installed on stderr.
 
 Start it with the first Python launcher that runs it, trying `python3`, then `py -3`, then `python`, and quote its path:
 
@@ -10,7 +10,7 @@ Start it with the first Python launcher that runs it, trying `python3`, then `py
 python3 "<the script's path from step 2>"
 ```
 
-On success it prints the venv's interpreter, an absolute path, and that launcher with the quoted script path is the **runner**: given arguments, the script hands them to that interpreter and exits with its code, so `<runner> <file>.py` runs a recipe and `<runner> -c "…"` a verify command, each standing where `uv run … python` stands on rung 1. That is the only difference between the rungs. Make this invocation's temporary directory with it, as rung 1's preflight does:
+On success it prints the venv's interpreter, an absolute path, and that launcher with the quoted script path is the **runner**: given arguments, the script hands them to that interpreter and exits with its code, so `<runner> "<file>.py"` runs a recipe and `<runner> -c "…"` a verify command, each standing where `uv run … python` stands on rung 1. That is the only difference between the rungs. Make this invocation's temporary directory with it, as rung 1's preflight does:
 
 ```shell
 python3 "<the script's path from step 2>" -c "import tempfile; print(tempfile.mkdtemp())"
