@@ -660,8 +660,9 @@ def check_script_line_endings(base_dir: Path) -> list[str]:
     default Windows machine: bash stops on its first line (`set -euo pipefail\\r`), and a gate a
     skill copies into the user's project arrives with CRLF too. The attribute is read from the
     repository's attribute files, never the machine's global or system ones, through git itself
-    (`.git/info/attributes` still counts locally, but a clone never carries it), so a later rule that unpins a path counts as git counts it. A script written with CRLF fails as well,
-    since the attribute normalises what is committed but not a copy already on disk.
+    (`.git/info/attributes` still counts locally, but a clone never carries it), so a later rule
+    that unpins a path counts as git counts it. A script written with CRLF fails as well, since
+    the attribute normalises what is committed but not a copy already on disk.
     """
     scripts: list[tuple[str, Path]] = []
     for output_dir in _collect_output_dirs(base_dir):
