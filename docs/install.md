@@ -1,6 +1,6 @@
 # Install the plugin, agent by agent
 
-The README's quick start installs the Pipelex plugin in Claude Code and Codex in two commands. This page holds the rest: which Pipelex product each app takes, the key and where each agent takes it from, what the plugin starts there, the whole procedure for Mistral Vibe, and the Pipelex MCP that chatbots take instead.
+The README's quick start installs the Pipelex plugin in Claude Code and Codex in two commands. This page holds the rest: which Pipelex product each app takes, the key and where each agent takes it from, what the plugin starts there, Claude Code on Windows, the whole procedure for Mistral Vibe, and the Pipelex MCP that chatbots take instead.
 
 ## Which app takes what
 
@@ -14,7 +14,7 @@ An agent takes the Pipelex plugin, which builds and runs methods. A chatbot take
 | ChatGPT | The Pipelex MCP | Apps directory, or [by its address](#the-pipelex-mcp-for-chatbots) |
 | Claude chat, on the web, on mobile and in the desktop app | The Pipelex MCP | **Add custom connector**, [by its address](#the-pipelex-mcp-for-chatbots) |
 
-In every agent, the plugin needs Node.js on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The Pipelex MCP needs nothing on your machine.
+In every agent, the plugin needs Node.js 24.14.1 or later on your `PATH`: the hook runs on it, and the agent starts the Pipelex tools through `npx`. The tools, published as `@pipelex/mcp`, declare that version; the hook's own floor, 22.12, is below it. Run `node --version` to see yours. The Pipelex MCP needs nothing on your machine.
 
 ### The key
 
@@ -50,7 +50,7 @@ claude plugin marketplace add Pipelex/pipelex-plugins
 claude plugin install pipelex@pipelex-plugins
 ```
 
-Requires Claude Code 2.1.139 or later, the first release that runs a hook in the exec form the plugin's hook uses, and Node.js on your `PATH`, on macOS, Linux and Windows alike: Claude Code starts both the hook and the Pipelex tools as `node` running a script of the plugin, with no shell, so neither needs bash. Run `claude --version` to see yours.
+Requires Claude Code 2.1.139 or later, the first release that runs a hook in the exec form the plugin's hook uses, and Node.js on your `PATH`, on macOS, Linux and Windows alike: Claude Code starts both the hook and the Pipelex tools as `node` running a script of the plugin, with no shell, so neither needs bash. Run `claude --version` to see yours. Windows has [its own section below](#claude-code-on-windows).
 
 **The key.** Run the login, [above](#the-key), in a terminal. When you enable the plugin, Claude Code also opens the plugin configuration dialog, which asks for an API key and stores it in your OS keychain: leave the field empty to use the login's key, or fill it to give the plugin a key of its own, which then wins over the login's and reaches the hook too, so the hook validates as well as lints. The dialog asks for nothing else: the plugin uses the hosted API, `https://api.pipelex.com`.
 
@@ -67,6 +67,74 @@ A key set in the dialog wins over the environment, and an empty field leaves the
 **Claude Code in the Claude desktop app.** An app launched from the desktop carries no shell environment, so when the plugin runs in Claude Code inside the Claude desktop app, an `export` in your shell profile never reaches it: the tools find the login's key, and the hook validates only with a key in the plugin configuration dialog, against the hosted API alone. Where Node.js is not on the desktop app's `PATH`, the plugin's tools cannot start; add the Pipelex MCP instead, [by its address](#the-pipelex-mcp-for-chatbots), and sign in.
 
 **What loads.** The hook loads with the plugin and needs Node.js on your `PATH`: it lints and formats every `.mthds` edit on your machine, offline, and validates the whole method on the Pipelex API when a key is set. Claude Code starts the Pipelex tools at the beginning of each session, through Node, which fetches them with `npx`, and with the same key. Without Node.js the hook cannot start, and Claude Code reports a hook error while the edit stands. Without a key the tools still connect, and every call that needs the API answers with how to set one. The skills that need the tools (`pipelex-design`, `pipelex-organize`, `pipelex-edit`, `pipelex-inputs`, `pipelex-run`, `pipelex-catalog` and `pipelex-integrate`) stop with a setup instruction when the tools are absent.
+
+### Claude Code on Windows
+
+The plugin runs in Claude Code on Windows with PowerShell alone, in the terminal and in the Claude desktop app. Claude Code starts the hook and the Pipelex tools as `node` running a script of the plugin, with no shell, so neither needs bash, Git Bash or WSL. Codex and Mistral Vibe on Windows are not covered yet: their hooks are still bash scripts, and their manifests start the Pipelex tools as `npx`, which Windows cannot start without a shell.
+
+**What you need.**
+
+- **Node.js 24.14.1 or later**, from the official installer at [nodejs.org](https://nodejs.org/). The installer puts `node`, `npm` and `npx` on your `PATH`. Open a new PowerShell window afterwards and run `node --version`: a window, an editor or an app started before the install keeps the `PATH` it started with. A Node.js installed with winget, Chocolatey, nvm-windows, fnm, Volta or Scoop works the same way, since each ships npm beside `node.exe`, which is where the plugin finds `npx`.
+- **Claude Code 2.1.139 or later.** Run `claude --version` to see yours.
+- **git on your `PATH`**, which [Git for Windows](https://git-scm.com/download/win) provides, because Claude Code installs a plugin by cloning its marketplace's repository with git.
+
+**Git Bash is not required.** Whether Claude Code runs the agent's own commands in Git Bash or, when it finds none, in PowerShell, the plugin works the same way: the hook and the tools start with no shell at all, and every command the skills give the agent runs as written in Windows PowerShell 5.1 and PowerShell 7 as it does in bash. The one exception is `pipelex-scaffold`, whose method-app branch still runs the template's `make create` and `make serve` and therefore needs `make`, which Windows does not ship.
+
+**Install from the marketplace.** In PowerShell:
+
+```powershell
+claude plugin marketplace add Pipelex/pipelex-plugins
+claude plugin install pipelex@pipelex-plugins
+npx -y @pipelex/mcp@latest login
+```
+
+The last line is the login, [above](#the-key), which saves the key in `%USERPROFILE%\.pipelex\.env`, the Windows spelling of `~/.pipelex/.env`. If PowerShell answers that running scripts is disabled on this system, it picked npm's `npx.ps1`; run `npx.cmd -y @pipelex/mcp@latest login` instead. The plugin's own start of the tools does not go through `npx.ps1`: it runs npm's `npx-cli.js` with the `node` that runs the launcher.
+
+When you enable the plugin, the configuration dialog asks for an API key, as on every system: leave it empty to use the login's key, or fill it so the hook validates as well as lints. In PowerShell, `$env:PIPELEX_API_KEY = "plx_sk_..."` sets the key for the Claude Code you start from that window, as `export` does in bash, and `$env:PIPELEX_BASE_URL` likewise names another deployment.
+
+If you added the marketplace on Windows before this release, run `/plugin marketplace remove pipelex-plugins` in Claude Code and add the marketplace and the plugin again: git does not rewrite a file an update leaves unchanged, so an earlier clone can keep scripts with Windows line endings.
+
+**Install from a clone, for development.** The repository holds the built plugin, `pipelex/`, checked in, so a clone runs as it is, with no build; that matters on Windows, which has no `make` to run `make build`. In a Claude Code session, point the marketplace at the clone, the first line only when the published marketplace is already added:
+
+```
+/plugin marketplace remove pipelex-plugins
+/plugin marketplace add C:\path\to\pipelex-plugins
+/plugin install pipelex@pipelex-plugins
+/reload-plugins
+```
+
+For one session, without touching your configuration, start Claude Code with the plugin directory instead, in quotes so that a path holding a space stays one argument:
+
+```powershell
+claude --plugin-dir "C:\path\to\pipelex-plugins\pipelex"
+```
+
+A plugin path holding a space or backslashes reaches the hook and the tools intact, since Claude Code hands it to `node` as one argument. [The development page](development.md#claude-code) has the rest of the loop.
+
+**What a working install looks like.**
+
+1. **The tools connect.** In PowerShell, in your project, `claude mcp list` lists the plugin's server as `plugin:pipelex:pipelex` and reports it connected. The first start takes longer, while `npx` fetches the tools into its cache.
+2. **The hook blocks a lint error.** In a session, ask the agent to write this method as `hello.mthds`, whose pipe holds a field no pipe takes:
+
+    ```toml
+    domain = "demo"
+    description = "Demo"
+    main_pipe = "say_hello"
+
+    [pipe.say_hello]
+    type = "PipeLLM"
+    description = "Say hello"
+    output = "Text"
+    prompt = "Say hello."
+    not_a_field = 3
+    ```
+
+    The hook refuses the write with `MTHDS lint errors in` the file's path, naming `not_a_field`, and the agent fixes the file. Once the field is gone, the hook passes the edit and formats the file in place, and with a key in the configuration dialog it also validates the whole method on the Pipelex API.
+3. **The key reaches the tools.** Ask the agent to validate `hello.mthds`: it calls `mthds_validate` and reports the verdict, where a missing key would get an answer saying how to set one.
+
+**In the Claude desktop app.** Claude Code in the desktop app starts the hook and the tools the same way, as `node` with no shell, and finds `node` on the `PATH` the desktop app started with: after installing Node.js, quit the desktop app fully and start it again. The desktop app carries no PowerShell window's variables, so a `$env:PIPELEX_API_KEY` never reaches it: the tools read the login's key from `%USERPROFILE%\.pipelex\.env`, and the hook validates only with the key in the plugin configuration dialog.
+
+**WSL.** Inside WSL the plugin behaves as on Linux, with the steps above this section, provided Claude Code runs inside WSL and Node.js 24.14.1 or later is installed inside WSL too: a Node.js installed on Windows does not serve it. Run the login inside WSL as well, since it saves the key in the WSL home, `~/.pipelex/.env`, which is not the Windows one.
 
 ## Codex
 
