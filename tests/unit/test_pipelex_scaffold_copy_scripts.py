@@ -475,6 +475,17 @@ class TestUncreatedCopyScripts:
         assert _names(result.stdout.rstrip("\n")[len("refused: no-request ") :], tmp_path / REQUEST_FILE)
 
     @pytest.mark.parametrize("command", ["init", "create"])
+    def test_a_request_that_cannot_be_read_is_a_bad_request_not_a_missing_one(self, tmp_path: Path, command: str) -> None:
+        """Only a request that is not there is `no-request`, which tells the agent to write it; one that is there but
+        cannot be read, here a directory in its place, is `bad-request`, with the system's message on stderr."""
+        (tmp_path / REQUEST_FILE).mkdir()
+        result = _node(METHOD_APP, command, cwd=tmp_path)
+        assert result.stdout == "refused: bad-request\n"
+        assert result.returncode == 1
+        assert "could not be read: " in result.stderr
+        assert "EISDIR" in result.stderr
+
+    @pytest.mark.parametrize("command", ["init", "create"])
     @pytest.mark.parametrize("setting", ["child_process", "fs,CHILD_PROCESS", "child*", "*"])
     def test_node_s_child_process_log_is_refused_before_anything_spawns(self, tmp_path: Path, command: str, setting: str) -> None:
         """npm's environment carries the key, which the gesture reads, and Node's child_process log prints a spawn's
@@ -740,3 +751,36 @@ class TestUncreatedCopyScripts:
         assert "shell:" not in text, "a script spawns nothing through a shell"
         if not WINDOWS:
             assert os.access(script, os.X_OK)
+
+    @pytest.mark.skipif(not WINDOWS, reason="Windows alone runs npm as an npm-cli.js found beside an npm.cmd or node.exe")
+    def test_on_windows_the_npm_on_the_path_wins_over_the_one_beside_node(self, tmp_path: Path) -> None:
+        """An npm upgraded globally puts its `npm.cmd` on the PATH ahead of the Node installer's, and typing `npm`
+        runs it, so the script runs the `npm-cli.js` beside the first `npm.cmd` on the PATH rather than the one beside
+        `node.exe`, reading a PATH entry written in double quotes as the directory inside them."""
+        node = shutil.which("node")
+        assert node is not None
+        node_home = tmp_path / "node home"
+        (node_home / "node_modules" / "npm" / "bin").mkdir(parents=True)
+        shutil.copy2(node, node_home / "node.exe")
+        beside_node_ran = tmp_path / "beside-node-ran"
+        (node_home / "node_modules" / "npm" / "bin" / "npm-cli.js").write_text(
+            f'require("node:fs").writeFileSync({json.dumps(str(beside_node_ran))}, "");\n', encoding="utf-8"
+        )
+        upgraded = tmp_path / "upgraded npm"
+        (upgraded / "node_modules" / "npm" / "bin").mkdir(parents=True)
+        (upgraded / "npm.cmd").write_text("@echo off\r\n", encoding="utf-8")
+        (upgraded / "node_modules" / "npm" / "bin" / "npm-cli.js").write_text(FAKE_NPM_CLI, encoding="utf-8")
+        (node_home / "npm.cmd").write_text("@echo off\r\n", encoding="utf-8")
+        record = tmp_path / "record.json"
+        _request(tmp_path, {"dir": "receipt-review", "method": "mt_receipt"})
+        result = subprocess.run(
+            [str(node_home / "node.exe"), str(METHOD_APP), "init"],
+            cwd=tmp_path,
+            env=_environment({"PATH": f'"{upgraded}";{node_home}', "RECORD": str(record)}),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert record.is_file(), "the npm beside the npm.cmd on the PATH ran"
+        assert not beside_node_ran.exists()

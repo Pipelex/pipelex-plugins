@@ -33,7 +33,8 @@
 //            npm install exited <code>; the whole log is <path>
 // Either prints one line instead when nothing ran:
 //   refused: <reason>    usage (no such command), no-request <path> (no request file at <path>),
-//                        bad-request (the request is not as above; what is wrong goes to stderr),
+//                        bad-request (the request could not be read or is not as above; what is wrong,
+//                        the system's message for a failed read, goes to stderr),
 //                        no-directory (create alone: no directory at <dir>), or node-debug (`NODE_DEBUG`
 //                        names Node's child_process log, which prints every spawn's environment, the key
 //                        included, on stderr; checked before the request is read, which is kept)
@@ -55,9 +56,10 @@
 // It is Node rather than shell so that it runs the same on macOS, Linux and Windows, where a
 // PowerShell-only machine has no bash, no `mktemp` and no `grep`. npm is the `npm-cli.js` that npm names
 // in `npm_execpath` when it runs this script, `npm` on the PATH on macOS and Linux, and on Windows, where
-// `npm` is `npm.cmd`, which Node does not spawn without a shell, the `npm-cli.js` the Node installer puts
-// beside `node.exe` or, failing that, the one beside an `npm.cmd` on the PATH, run with this Node, as the
-// template's own scripts run it.
+// `npm` is `npm.cmd`, which Node does not spawn without a shell, the `npm-cli.js` beside the first `npm.cmd`
+// on the PATH, which is the npm the user would get by typing `npm`, a globally upgraded one included, or,
+// failing that, the one the Node installer puts beside `node.exe`, run with this Node, as the template's own
+// scripts run it.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -115,8 +117,9 @@ function badRequest(detail) {
 }
 
 // npm's own script under `npm run`, `npm` on the PATH elsewhere but on Windows, and there the npm-cli.js
-// beside node.exe or beside an npm.cmd on the PATH. Only npm's own script is taken from `npm_execpath`:
-// pnpm, yarn and npx name scripts of their own there.
+// beside the first npm.cmd on the PATH, else beside node.exe. Only npm's own script is taken from
+// `npm_execpath`: pnpm, yarn and npx name scripts of their own there. A PATH entry may be written in double
+// quotes, which Windows accepts and Node's path functions would keep, so they are stripped first.
 function npmInvocation() {
   const windows = process.platform === "win32";
   const pathOf = windows ? path.win32 : path.posix;
@@ -130,15 +133,16 @@ function npmInvocation() {
   const searchPath = Object.entries(process.env).find(([name]) => name.toUpperCase() === "PATH")?.[1] ?? "";
   const beside = (directory) => path.win32.join(directory, "node_modules", "npm", "bin", NPM_SCRIPT);
   const candidates = [
-    beside(path.win32.dirname(process.execPath)),
     ...searchPath
       .split(";")
+      .map((directory) => directory.trim().replace(/^"(.*)"$/, "$1"))
       .filter((directory) => directory !== "" && fs.existsSync(path.win32.join(directory, "npm.cmd")))
       .map(beside),
+    beside(path.win32.dirname(process.execPath)),
   ];
   const found = candidates.find((candidate) => fs.existsSync(candidate));
   if (found === undefined) {
-    throw new Stop("failed: npm", `no ${NPM_SCRIPT} beside ${process.execPath} or beside an npm.cmd on the PATH`);
+    throw new Stop("failed: npm", `no ${NPM_SCRIPT} beside an npm.cmd on the PATH or beside ${process.execPath}`);
   }
   return { command: process.execPath, args: [found] };
 }
@@ -177,8 +181,11 @@ function readRequest(command) {
   let raw;
   try {
     raw = fs.readFileSync(file, "utf8");
-  } catch {
-    throw new Stop(`refused: no-request ${file}`, `write the request at ${file} with your file tools first`);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new Stop(`refused: no-request ${file}`, `write the request at ${file} with your file tools first`);
+    }
+    badRequest(`${file} could not be read: ${error.message}`);
   }
   try {
     fs.rmSync(file, { force: true });

@@ -737,6 +737,7 @@ class TestMethodAppBranch:
         for text in (harness, typescript):
             assert "make add-method" not in text, "a method app's add-method is its npm script, which needs no make"
             assert "make help" not in text
+            assert "add-method --" not in text, "PowerShell can drop a `--` before npm's shim sees it"
 
 
 class TestUncreatedCopyReference:
