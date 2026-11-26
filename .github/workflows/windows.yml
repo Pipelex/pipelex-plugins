@@ -77,7 +77,7 @@ jobs:
         run: npm install --global @anthropic-ai/claude-code
 
       - name: Install the locked environment
-        run: uv sync
+        run: uv sync --all-extras
 
       # Git for Windows puts bash and sh in Git\bin and Git\usr\bin; Git\cmd
       # holds git.exe alone and stays, since the tests call git. Any other
