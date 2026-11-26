@@ -642,16 +642,24 @@ class TestMethodAppBranch:
     def test_integrate_runs_the_bundle_arm_on_a_project_that_has_one(self) -> None:
         """A project made from the method app scaffolds a local bundle with one command.
 
-        The gallery's `make add-method` refuses a bundle path, so `/pipelex-integrate` sent every
-        local bundle down the hand-written route. The method app's takes one, and its usage says so.
+        The method app's `add-method` and the gallery's take a bundle path, and their usage says so.
+        A project whose `add-method` takes only a catalog id or an address keeps the hand-written route.
+        Both are named as the npm script, which runs on Windows with no make. The gate is left to the
+        language reference, since the Python starter has only make and the gallery no `check` script.
         """
         # The harness branch left the skill body for a reference read at step 1 (the size diet, phase 2).
         harness = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "harness.md").read_text(encoding="utf-8")
-        assert "**A local bundle is one command when the project's `make add-method` takes a bundle path**" in harness
+        assert "**A local bundle is one command when the project's `npm run add-method` takes a bundle path**" in harness
         assert "**Otherwise, place the method where the project keeps them**" in harness
         typescript = (REPO_ROOT / "skills" / "pipelex-integrate" / "references" / "typescript.md").read_text(encoding="utf-8")
-        assert "a local bundle is one command when `make add-method` takes a bundle path" in typescript
-        assert "where `make add-method` takes only a catalog id or an address, as the gallery's does" in typescript
+        assert "a local bundle is one command when `npm run add-method` takes a bundle path" in typescript
+        assert "where `npm run add-method` takes only a catalog id or an address, a local bundle goes under" in typescript
+        assert "gallery's does" not in typescript, "the gallery's add-method takes a bundle path"
+        assert "the gate the language reference's harness section names" in harness
+        assert "npm run check" not in harness, "harness.md covers the Python starter, which has no npm scripts"
+        for text in (harness, typescript):
+            assert "make add-method" not in text, "a method app's add-method is its npm script, which needs no make"
+            assert "make help" not in text
 
 
 class TestUncreatedCopyReference:

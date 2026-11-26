@@ -1972,13 +1972,16 @@ class TestPipelexCatalogSkill:
         assert "ask the user for the directory name" in body
 
     def test_the_pull_stops_on_a_method_app(self) -> None:
-        """`make add-method` writes the action trio, the narrower and the registry
+        """`npm run add-method` writes the action trio, the narrower and the registry
         entry around the bundle, so a plain write leaves the app unable to see it.
-        The pull mirrors the stop `/pipelex-design` already makes."""
+        The pull mirrors the stop `/pipelex-design` already makes. Both name the npm
+        script, never the make target, which a Windows machine without make cannot run."""
         body = self.catalog_skill
-        assert "make add-method" in body
+        assert "npm run add-method" in body
+        assert "make add-method" not in body
         design = _skill_source(self.TEMPLATES / "pipelex-design")
-        assert "make add-method" in design, "the pull mirrors design's stop, so design must still carry it"
+        assert "npm run add-method" in design, "the pull mirrors design's stop, so design must still carry it"
+        assert "make add-method" not in design
 
     def test_a_failed_link_write_is_never_reported_as_unlinked(self) -> None:
         """The workshop distinguishes linked-but-stale from genuinely-unlinked, and
