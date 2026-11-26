@@ -2,7 +2,7 @@
 
 Read this at step 2 of the skill when `uv --version` fails, before creating or installing anything. The rung needs a Python 3 with its `venv` and `pip` modules; when none runs the script below, or the script fails, the skill's stop table sends you to the cures at the end of this file.
 
-The skill's `scripts/synth_venv.py`, at the path step 2 names, does the whole rung, the same in every shell: it builds a venv this skill owns, once, under the user's cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows and `~/.cache` elsewhere, then `pipelex-plugins/synth-venv`), fills it with the whole allowlist, and reuses it on every later invocation. It refuses to build over a path that exists and is not a venv, rebuilds a venv whose `pip` does not answer, forces a reinstall when a package's files are gone, and reports what it built and installed on stderr.
+The skill's `scripts/synth_venv.py`, at the path step 2 names, does the whole rung, the same in every shell: it builds a venv this skill owns, once, under the user's cache directory (the one the `XDG_CACHE_HOME` environment variable names, else `%LOCALAPPDATA%` on Windows and `~/.cache` elsewhere, then `pipelex-plugins/synth-venv`), fills it with the whole allowlist, and reuses it on every later invocation. It refuses to build over a path that exists and is not a venv, rebuilds a venv whose `pip` does not answer, forces a reinstall when a package's files are gone, and reports what it built and installed on stderr.
 
 Start it with the first Python launcher that runs it, trying `python3`, then `py -3`, then `python`, and quote its path:
 
