@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `png`, before writing any code; its **Verify** section is step 5's check.
 
-Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace the content at the top of the script with what Step 3 drafted, set the output path, run.
+Recipes for the `png` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace the content at the top of the script with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> "<file>.py"`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python -I -X utf8`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
 
 `Pillow` is MIT-CMU, `matplotlib` PSF-style and `numpy` BSD; every recipe below was executed and looked at under Pillow 12.3.0, matplotlib 3.11.1 and numpy 2.5.2 before it was committed.
 
@@ -47,28 +47,29 @@ def font(size, bold=False):
 
 Charts are the one category where the honest tool is the one real charts are made with. The content block carries the kind, the labels and the series; the four kinds are branches of the same script.
 
-```bash
-uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-OUT = "<target_dir>/test_chart.png"
+OUT = r"<target_dir>/test_chart.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
-KIND = "bar"                      # bar | line | pie | scatter
+KIND = "bar"  # bar | line | pie | scatter
 TITLE = "Units shipped by region"
 XLABEL = "Quarter"
 YLABEL = "Units shipped (thousands)"
 LABELS = ["Q1", "Q2", "Q3", "Q4"]
-SERIES = [                        # name, values (one per label)
+SERIES = [  # name, values (one per label)
     ("North", [12.4, 13.8, 15.1, 16.7]),
     ("South", [9.2, 9.9, 11.4, 12.0]),
     ("Export", [4.1, 5.6, 5.2, 7.3]),
@@ -84,20 +85,17 @@ if KIND == "bar":
     step = 0.8 / len(SERIES)
     for index, (name, values) in enumerate(SERIES):
         offset = -0.4 + step * (index + 0.5)
-        ax.bar([x + offset for x in range(len(LABELS))], values, width=step * 0.9,
-               label=name, color=COLORS[index % len(COLORS)])
+        ax.bar([x + offset for x in range(len(LABELS))], values, width=step * 0.9, label=name, color=COLORS[index % len(COLORS)])
     ax.set_xticks(range(len(LABELS)), LABELS)
 elif KIND == "line":
     for index, (name, values) in enumerate(SERIES):
         ax.plot(LABELS, values, marker="o", label=name, color=COLORS[index % len(COLORS)])
 elif KIND == "scatter":
     for index, (name, values) in enumerate(SERIES):
-        ax.scatter(range(len(values)), values, label=name, s=60,
-                   color=COLORS[index % len(COLORS)])
+        ax.scatter(range(len(values)), values, label=name, s=60, color=COLORS[index % len(COLORS)])
     ax.set_xticks(range(len(LABELS)), LABELS)
 elif KIND == "pie":
-    ax.pie([values[-1] for _, values in SERIES], labels=[name for name, _ in SERIES],
-           autopct="%1.1f%%", colors=COLORS[: len(SERIES)])
+    ax.pie([values[-1] for _, values in SERIES], labels=[name for name, _ in SERIES], autopct="%1.1f%%", colors=COLORS[: len(SERIES)])
     ax.set_aspect("equal")
 
 if KIND != "pie":
@@ -109,10 +107,12 @@ if KIND != "pie":
 
 ax.set_title(TITLE, fontsize=14, fontweight="bold")
 fig.tight_layout()
-fig.savefig(PART, dpi=DPI, format="png")
-os.replace(PART, OUT)
+try:
+    fig.savefig(PART, dpi=DPI, format="png")
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT)
-PYEOF
 ```
 
 `figsize=(WIDTH / DPI, HEIGHT / DPI)` with `fig.tight_layout()` is what makes the output exactly the declared pixel size. Do not add `bbox_inches="tight"` to `savefig` — it crops the figure and the size no longer matches what the report claims. matplotlib writes PNGs with an alpha channel, so this recipe's file opens as `RGBA` where the Pillow recipes give `RGB`; both are fine.
@@ -123,8 +123,8 @@ A pie chart takes one number per slice, so this branch uses the last value of ea
 
 Nodes on a grid, arrows between them. The content block is a node list — id, label, column, row, role — and an edge list; the layout, the arrowheads and the label wrapping are handled below it. `role` picks the colour: `start`, `step`, `decision`, `end`.
 
-```bash
-uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -I -X utf8 "<file>.py"
 import math
 import os
 from pathlib import Path
@@ -132,7 +132,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import font_manager
 
-OUT = "<target_dir>/test_diagram.png"
+OUT = r"<target_dir>/test_diagram.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -140,15 +140,15 @@ PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 TITLE = "Order fulfilment"
-NODES = [                         # id, label, column, row, role
-    ("intake",  "Order received",      0, 1, "start"),
-    ("check",   "Stock available?",    1, 1, "decision"),
-    ("pick",    "Pick and pack",       2, 0, "step"),
-    ("backord", "Create back order",   2, 2, "step"),
-    ("ship",    "Ship to customer",    3, 0, "step"),
-    ("done",    "Order closed",        4, 1, "end"),
+NODES = [  # id, label, column, row, role
+    ("intake", "Order received", 0, 1, "start"),
+    ("check", "Stock available?", 1, 1, "decision"),
+    ("pick", "Pick and pack", 2, 0, "step"),
+    ("backord", "Create back order", 2, 2, "step"),
+    ("ship", "Ship to customer", 3, 0, "step"),
+    ("done", "Order closed", 4, 1, "end"),
 ]
-EDGES = [                         # from, to, label
+EDGES = [  # from, to, label
     ("intake", "check", ""),
     ("check", "pick", "yes"),
     ("check", "backord", "no"),
@@ -160,11 +160,11 @@ EDGES = [                         # from, to, label
 
 WIDTH, HEIGHT = 1200, 800
 BACKGROUND = "#f7f7f4"
-ROLE_COLORS = {                   # fill, outline
-    "start":    ("#dbe8f2", "#2f6f9f"),
-    "step":     ("#ffffff", "#5a6470"),
+ROLE_COLORS = {  # fill, outline
+    "start": ("#dbe8f2", "#2f6f9f"),
+    "step": ("#ffffff", "#5a6470"),
     "decision": ("#fdf0e2", "#c25e3a"),
-    "end":      ("#e2efe6", "#4f9d69"),
+    "end": ("#e2efe6", "#4f9d69"),
 }
 
 _FONTS = {}
@@ -276,8 +276,7 @@ for source, target, label in EDGES:
     if label:
         mx, my = (start[0] + end[0]) / 2, (start[1] + end[1]) / 2
         text_box = draw.textbbox((mx, my), label, font=font(16), anchor="mm")
-        draw.rectangle([text_box[0] - 6, text_box[1] - 3, text_box[2] + 6, text_box[3] + 3],
-                       fill=BACKGROUND)
+        draw.rectangle([text_box[0] - 6, text_box[1] - 3, text_box[2] + 6, text_box[3] + 3], fill=BACKGROUND)
         draw.text((mx, my), label, font=font(16), fill="#3c4450", anchor="mm")
 
 for node_id, (x0, y0, x1, y1, role, label) in boxes.items():
@@ -288,10 +287,12 @@ for node_id, (x0, y0, x1, y1, role, label) in boxes.items():
     for index, line in enumerate(lines):
         draw.text(((x0 + x1) / 2, cy + line_h * index), line, font=face, fill="#20262e", anchor="mm")
 
-image.save(PART, format="PNG")
-os.replace(PART, OUT)
+try:
+    image.save(PART, format="PNG")
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT, image.size)
-PYEOF
 ```
 
 Labels are sized to fit: `fit_label()` steps the font down until the wrapped label fits its box in both directions, because box height shrinks as the graph gains rows and a two-line label comfortable in a four-row diagram will spill out of a seven-row one. Keep labels to a few words anyway — a diagram whose boxes are set in 11px is telling you the graph wants fewer nodes or shorter names.
@@ -304,8 +305,8 @@ A page rendered crisply and then put through `scannerize()` — a slight skew, a
 
 `scannerize()` is a plain function on an image, so another recipe can end with it — a `screenshot` printed and scanned, a `chart` pasted into a report page. It is not free-standing, though: copy the function **and** its two imports (`import numpy as np`, and `ImageFilter` in the `PIL` import line), because the `diagram` and `screenshot` recipes carry neither. A `chart` is a matplotlib figure rather than a PIL image, so save it first and reopen it with `Image.open(OUT)` before passing it in.
 
-```bash
-uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
@@ -313,22 +314,20 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from matplotlib import font_manager
 
-OUT = "<target_dir>/test_scan.png"
+OUT = r"<target_dir>/test_scan.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
-SELLER = ["Acme Hardware Supply", "18 rue des Forges", "69007 Lyon, France",
-          "VAT FR12345678901", "contact@acme-hardware.example"]
+SELLER = ["Acme Hardware Supply", "18 rue des Forges", "69007 Lyon, France", "VAT FR12345678901", "contact@acme-hardware.example"]
 BUYER = ["Bill to", "Example Constructions SARL", "4 avenue du Chantier", "21000 Dijon, France"]
 TITLE = "INVOICE"
 META = [("Invoice no.", "INV-2026-0042"), ("Date", "2026-03-14"), ("Due date", "2026-04-13")]
-INTRO = ("Goods delivered to the Dijon site on 2026-03-12 against purchase order "
-         "PO-8841. Payment is due within 30 days by bank transfer.")
+INTRO = "Goods delivered to the Dijon site on 2026-03-12 against purchase order PO-8841. Payment is due within 30 days by bank transfer."
 COLUMNS = ["Description", "Qty", "Unit price", "Amount"]
-ITEMS = [                         # description, quantity, unit price
+ITEMS = [  # description, quantity, unit price
     ("M8 hex bolts, zinc plated, box of 100", 12, 14.90),
     ("Cordless drill 18V with two batteries", 2, 189.00),
     ("Safety goggles, clear polycarbonate", 25, 6.50),
@@ -337,12 +336,11 @@ ITEMS = [                         # description, quantity, unit price
 ]
 TAX_RATE = 0.20
 CURRENCY = "EUR"
-FOOTER = ("Acme Hardware Supply SAS - share capital EUR 50,000 - RCS Lyon 812 345 678 - "
-          "IBAN FR76 3000 1007 9412 3456 7890 185")
+FOOTER = "Acme Hardware Supply SAS - share capital EUR 50,000 - RCS Lyon 812 345 678 - IBAN FR76 3000 1007 9412 3456 7890 185"
 SEED = 20260902
 # -----------------------------------------------------------------------
 
-WIDTH, HEIGHT = 1240, 1754       # A4 at 150 dpi
+WIDTH, HEIGHT = 1240, 1754  # A4 at 150 dpi
 MARGIN = 96
 PAPER = "#ffffff"
 INK = "#1b1b1b"
@@ -442,8 +440,7 @@ header_bottom = y + 38
 draw.rectangle([MARGIN, y, right, header_bottom], fill="#ececec")
 for index, title in enumerate(COLUMNS):
     anchor_x = xs[index] + 10 if index == 0 else xs[index] + WIDTHS[index] - 10
-    draw.text((anchor_x, y + 10), title, font=font(19, bold=True), fill=INK,
-              anchor="la" if index == 0 else "ra")
+    draw.text((anchor_x, y + 10), title, font=font(19, bold=True), fill=INK, anchor="la" if index == 0 else "ra")
 y = header_bottom
 
 subtotal = 0.0
@@ -469,8 +466,7 @@ print("total", f"{total:.2f}")
 # without a word — so a long ITEMS list pushes the totals off the page and the script
 # still exits 0 printing a total the image does not contain. Fail loudly instead.
 assert y + 110 < HEIGHT - MARGIN - 56, (
-    f"{len(ITEMS)} items overrun the page (table ends at y={y:.0f}); "
-    "split them across several pages, each rendered as its own file"
+    f"{len(ITEMS)} items overrun the page (table ends at y={y:.0f}); split them across several pages, each rendered as its own file"
 )
 y += 14
 for label, value, bold in [
@@ -489,10 +485,12 @@ for line in wrap(draw, FOOTER, font(16), right - MARGIN):
     draw.text((MARGIN, footer_y), line, font=font(16), fill="#555555")
     footer_y += 22
 
-scannerize(page, seed=SEED).save(PART, format="PNG")
-os.replace(PART, OUT)
+try:
+    scannerize(page, seed=SEED).save(PART, format="PNG")
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT, (WIDTH, HEIGHT))
-PYEOF
 ```
 
 Turn the dials in `scannerize()` down to `angle=0.2, grain=3, blur=0.4` for a clean office scan, and up to `angle=1.6, grain=14, blur=1.2` for a bad phone photo of a crumpled receipt. Leave them alone unless the method's difficulty is the point — a page nobody can read is not a better test.
@@ -505,8 +503,8 @@ A printed form that someone has written on: ticks in a column, a corrected quant
 
 The font comes from the first family of `HAND_FAMILIES` the machine has: macOS ships Bradley Hand, Noteworthy and Chalkboard SE, Windows Segoe Print, Ink Free and Comic Sans MS. A machine with none of them, which is most Linux machines, falls back to DejaVu Sans Oblique, bundled with matplotlib; the recipe prints a note when it does, and the report must pass it on, because slanted print is a weaker test than a hand. To write on another recipe's page — the invoice of [Scanned document (Pillow)](#scanned-document-pillow), say — copy `hand_font()`, `ink()`, `handwrite()` and `tick()` with their imports (`ImageChops` joins the `PIL` line) and the three module-level names they read, `HAND_FAMILIES`, `HAND` and `INK`, renaming this `INK` to `HAND_INK` in its definition and in `ink()`, since the invoice has an `INK` of its own; then paste their layers onto the page before `scannerize()`.
 
-```bash
-uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -I -X utf8 "<file>.py"
 import logging
 import os
 from pathlib import Path
@@ -516,7 +514,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 from matplotlib import font_manager
 
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)  # several hand fonts ship a bold face only
-OUT = "<target_dir>/test_handwritten.png"
+OUT = r"<target_dir>/test_handwritten.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -524,10 +522,9 @@ PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
 
 # --- content -----------------------------------------------------------
 TITLE = "GOODS RECEIVED NOTE"
-HEADER = [("Supplier", "Acme Hardware Supply"), ("Delivery note", "DN-2026-0117"),
-          ("Received at", "Example Constructions, Dijon site")]
+HEADER = [("Supplier", "Acme Hardware Supply"), ("Delivery note", "DN-2026-0117"), ("Received at", "Example Constructions, Dijon site")]
 COLUMNS = ["Item", "Description", "Shipped", "Received"]
-ROWS = [                      # item, description, quantity shipped, quantity received by hand (None = a tick)
+ROWS = [  # item, description, quantity shipped, quantity received by hand (None = a tick)
     ("AHS-1001", "M8 hex bolts, zinc plated, box of 100", 12, None),
     ("AHS-2210", "Safety goggles, clear polycarbonate", 25, 22),
     ("AHS-3002", "Wood screws 4x40, box of 200", 8, None),
@@ -535,11 +532,11 @@ ROWS = [                      # item, description, quantity shipped, quantity re
 REMARK = "3 goggles cracked - sent back"
 SIGNATURE = "J. Example"
 DATE = "12.03.26"
-INK = (22, 42, 156)           # blue ballpoint; (35, 35, 40) for black
+INK = (22, 42, 156)  # blue ballpoint; (35, 35, 40) for black
 SEED = 20260924
 # -----------------------------------------------------------------------
 
-WIDTH, HEIGHT = 1240, 874     # A5 landscape at 150 dpi
+WIDTH, HEIGHT = 1240, 874  # A5 landscape at 150 dpi
 MARGIN = 80
 TEXT = "#1b1b1b"
 HAND_FAMILIES = ["Bradley Hand", "Noteworthy", "Chalkboard SE", "Segoe Print", "Ink Free", "Comic Sans MS"]
@@ -566,8 +563,7 @@ def hand_font():
             return font_manager.findfont(font_manager.FontProperties(family=family), fallback_to_default=False)
         except ValueError:
             continue
-    print("note: no handwriting font on this machine; the marks fall back to DejaVu Sans Oblique, "
-          "which reads as slanted print rather than a hand")
+    print("note: no handwriting font on this machine; the marks fall back to DejaVu Sans Oblique, which reads as slanted print rather than a hand")
     return font_manager.findfont("DejaVu Sans:italic")
 
 
@@ -579,8 +575,10 @@ def ink(mask, rng, slant):
     mask = mask.transform(mask.size, Image.AFFINE, (1, slant, -slant * mask.height, 0, 1, 0), resample=Image.BICUBIC)
     alpha = np.asarray(mask.filter(ImageFilter.GaussianBlur(0.55)), dtype=np.float32)
     pressure = rng.normal(0.0, 1.0, alpha.shape).astype(np.float32)
-    pressure = np.asarray(Image.fromarray(np.clip(128 + 60 * pressure, 0, 255).astype(np.uint8))
-                          .filter(ImageFilter.GaussianBlur(3)), dtype=np.float32) / 255.0
+    pressure = (
+        np.asarray(Image.fromarray(np.clip(128 + 60 * pressure, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)), dtype=np.float32)
+        / 255.0
+    )
     alpha *= 0.7 + 0.5 * pressure
     rgba = np.zeros(alpha.shape + (4,), dtype=np.uint8)
     rgba[..., :3] = INK
@@ -598,8 +596,7 @@ def handwrite(text, size, rng, slant=0.18):
         advance = face.getlength(character)
         if not character.isspace():
             glyph = Image.new("L", (int(advance) + 2 * size, 3 * size), 0)
-            ImageDraw.Draw(glyph).text((size, 2 * size), character, font=face, anchor="ls",
-                                       fill=int(255 * rng.uniform(0.8, 1.0)))
+            ImageDraw.Draw(glyph).text((size, 2 * size), character, font=face, anchor="ls", fill=int(255 * rng.uniform(0.8, 1.0)))
             glyph = glyph.rotate(rng.uniform(-5, 5), resample=Image.BICUBIC, center=(size + advance / 2, 2 * size))
             wander = float(np.clip(wander + rng.normal(0, 0.8), -3, 3))
             placed = Image.new("L", mask.size, 0)
@@ -614,8 +611,10 @@ def tick(rng, size=30):
     mask = Image.new("L", (3 * size, 3 * size), 0)
     start, turn, end = (0.7 * size, 1.6 * size), (1.1 * size, 2.2 * size), (2.4 * size, 0.6 * size)
     points = [(start[0] + (turn[0] - start[0]) * t, start[1] + (turn[1] - start[1]) * t) for t in np.linspace(0, 1, 8)]
-    points += [(turn[0] + (end[0] - turn[0]) * t + rng.normal(0, 0.5), turn[1] + (end[1] - turn[1]) * t + 3 * np.sin(np.pi * t))
-               for t in np.linspace(0, 1, 14)]
+    points += [
+        (turn[0] + (end[0] - turn[0]) * t + rng.normal(0, 0.5), turn[1] + (end[1] - turn[1]) * t + 3 * np.sin(np.pi * t))
+        for t in np.linspace(0, 1, 14)
+    ]
     ImageDraw.Draw(mask).line(points, fill=235, width=3, joint="curve")
     return ink(mask, rng, slant=0.05)
 
@@ -676,10 +675,12 @@ for label, text, size in [("Remarks:", REMARK, 30), ("Signature:", SIGNATURE, 40
     y += 64
 assert y < HEIGHT - MARGIN // 2, f"the form overruns the page (ends at y={y}); drop rows or raise HEIGHT"
 
-scannerize(page, seed=SEED).save(PART, format="PNG")
-os.replace(PART, OUT)
+try:
+    scannerize(page, seed=SEED).save(PART, format="PNG")
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT, (WIDTH, HEIGHT))
-PYEOF
 ```
 
 Keep the marks where a person would put them: a number in the cell it corrects, a remark on the remarks line, a signature over its line. A mark the method must read is only a fact of the test if it is legible to a person looking at the page, so look at it at step 5 before handing it back.
@@ -688,15 +689,15 @@ Keep the marks where a person would put them: a number in the cell it corrects, 
 
 Window chrome, a sidebar, a header with an action button, a row of stat tiles, and either a table or a card grid. `LAYOUT` chooses the last one.
 
-```bash
-uv run --quiet --no-project --with pillow --with matplotlib --with numpy python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with pillow --with matplotlib --with numpy python -I -X utf8 "<file>.py"
 import os
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from matplotlib import font_manager
 
-OUT = "<target_dir>/test_screenshot.png"
+OUT = r"<target_dir>/test_screenshot.png"
 assert "<" not in OUT and ">" not in OUT, f"OUT still holds a placeholder: {OUT}"
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 # Render beside the target and rename on success, so a crash never truncates an existing file.
@@ -709,7 +710,7 @@ SIDEBAR = ["Dashboard", "Orders", "Shipments", "Inventory", "Suppliers", "Report
 ACTIVE = "Shipments"
 ACTION = "New shipment"
 STATS = [("Open shipments", "128"), ("Late", "7"), ("Delivered today", "342")]
-LAYOUT = "table"                  # table | cards
+LAYOUT = "table"  # table | cards
 COLUMNS = ["Reference", "Destination", "Carrier", "Status", "ETA"]
 ROWS = [
     ["SHP-4412", "Dijon, FR", "Transalp", "In transit", "2026-03-16"],
@@ -719,9 +720,9 @@ ROWS = [
     ["SHP-4416", "Nantes, FR", "Cargolix", "In transit", "2026-03-19"],
     ["SHP-4417", "Bilbao, ES", "Cargolix", "Delayed", "2026-03-21"],
 ]
-BADGE_COLUMN = 3                  # column whose values are drawn as status badges
+BADGE_COLUMN = 3  # column whose values are drawn as status badges
 BADGES = {"In transit": "#2f6f9f", "Delayed": "#c25e3a", "Delivered": "#4f9d69"}
-CARDS = [                         # used when LAYOUT == "cards"
+CARDS = [  # used when LAYOUT == "cards"
     ("Transalp", "Road freight", "48 shipments"),
     ("RapidFret", "Express", "31 shipments"),
     ("Cargolix", "Road freight", "27 shipments"),
@@ -767,8 +768,7 @@ for entry in SIDEBAR:
     if entry == ACTIVE:
         draw.rounded_rectangle([12, y - 9, SIDEBAR_W - 12, y + 29], radius=8, fill="#31404f")
     draw.rectangle([26, y + 5, 38, y + 17], outline="#7fb2dd" if entry == ACTIVE else "#6f7b89", width=2)
-    draw.text((52, y + 2), entry, font=font(17, bold=entry == ACTIVE),
-              fill="#ffffff" if entry == ACTIVE else MUTED)
+    draw.text((52, y + 2), entry, font=font(17, bold=entry == ACTIVE), fill="#ffffff" if entry == ACTIVE else MUTED)
     y += 46
 
 # header
@@ -776,8 +776,7 @@ left = SIDEBAR_W
 draw.text((left + 34, CHROME + 34), SCREEN, font=font(28, bold=True), fill=INK)
 button = [WIDTH - 34 - 176, CHROME + 30, WIDTH - 34, CHROME + 70]
 draw.rounded_rectangle(button, radius=8, fill="#2f6f9f")
-draw.text(((button[0] + button[2]) / 2, (button[1] + button[3]) / 2), ACTION,
-          font=font(17, bold=True), fill="#ffffff", anchor="mm")
+draw.text(((button[0] + button[2]) / 2, (button[1] + button[3]) / 2), ACTION, font=font(17, bold=True), fill="#ffffff", anchor="mm")
 
 # stat tiles
 y = CHROME + 96
@@ -808,10 +807,8 @@ if LAYOUT == "table":
             if index == BADGE_COLUMN and cell in BADGES:
                 colour = BADGES[cell]
                 width = draw.textlength(cell, font=font(14, bold=True)) + 22
-                draw.rounded_rectangle([xs[index] + 12, y + 10, xs[index] + 12 + width, y + 36],
-                                       radius=13, fill=colour)
-                draw.text((xs[index] + 12 + width / 2, y + 23), cell, font=font(14, bold=True),
-                          fill="#ffffff", anchor="mm")
+                draw.rounded_rectangle([xs[index] + 12, y + 10, xs[index] + 12 + width, y + 36], radius=13, fill=colour)
+                draw.text((xs[index] + 12 + width / 2, y + 23), cell, font=font(14, bold=True), fill="#ffffff", anchor="mm")
             else:
                 draw.text((xs[index] + 14, y + 14), cell, font=font(16), fill=INK)
         y += 46
@@ -822,16 +819,17 @@ else:
     for index, (title, subtitle, value) in enumerate(CARDS):
         cx = x0 + (index % 2) * (card_w + 18)
         cy = y + (index // 2) * 130
-        draw.rounded_rectangle([cx, cy, cx + card_w, cy + 112], radius=10, fill="#ffffff",
-                               outline=LINE, width=1)
+        draw.rounded_rectangle([cx, cy, cx + card_w, cy + 112], radius=10, fill="#ffffff", outline=LINE, width=1)
         draw.text((cx + 20, cy + 20), title, font=font(19, bold=True), fill=INK)
         draw.text((cx + 20, cy + 48), subtitle, font=font(15), fill="#69727d")
         draw.text((cx + 20, cy + 76), value, font=font(17, bold=True), fill="#2f6f9f")
 
-image.save(PART, format="PNG")
-os.replace(PART, OUT)
+try:
+    image.save(PART, format="PNG")
+    os.replace(PART, OUT)
+finally:
+    Path(PART).unlink(missing_ok=True)
 print("wrote", OUT, image.size)
-PYEOF
 ```
 
 The `widths` shares must add up to 1 and match the number of columns. Six or seven table rows fill the screen at this size; more will run off the bottom, which is what a real screen does too — but do not let the content the method must read fall outside the image.
@@ -840,8 +838,8 @@ Column widths are fixed shares, not measured, so a long cell will overlap its ne
 
 ## Verify
 
-```bash
-uv run --quiet --no-project --with pillow python -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<target_dir>/<name>.png"
+```shell
+uv run --quiet --no-project --with pillow python -I -X utf8 -c "from PIL import Image; import os, sys; im = Image.open(sys.argv[1]); print(im.format, im.size, im.mode, os.path.getsize(sys.argv[1]) // 1024, 'KB')" "<target_dir>/<name>.png"
 ```
 
 Expect `PNG`, the size the recipe declares, and `RGB` — or `RGBA` from the chart recipe, which is matplotlib's doing and not a fault. Then look at the file: on Claude Code, open it with the `Read` tool and check it reads as its category — a chart with the series drafted, a diagram whose arrows go where the process goes, a page that looks scanned and whose totals add up, a screen that looks like an app. Fix the content block and rerun if it does not; the recipes are seeded, so nothing else moves.

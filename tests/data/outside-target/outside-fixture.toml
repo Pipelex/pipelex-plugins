@@ -13,6 +13,7 @@ shared = "in-each-skill"
 
 [render.drops]
 "skills/pipelex-synthetic-inputs/references/venv.md" = "sha256:computed-by-the-test"
+"skills/pipelex-synthetic-inputs/scripts/synth_venv.py" = "sha256:computed-by-the-test"
 
 [render.pins]
 "skills/pipelex-synthetic-inputs/references/pdf.md" = "sha256:computed-by-the-test"

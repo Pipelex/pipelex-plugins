@@ -231,6 +231,7 @@ shared = "in-each-skill"    # or "beside", the plugin's own layout and the defau
 
 [render.drops]              # upstream static assets left out of the output
 "skills/pipelex-synthetic-inputs/references/venv.md" = "sha256:…"
+"skills/pipelex-synthetic-inputs/scripts/synth_venv.py" = "sha256:…"   # a fork that drops venv.md drops the script too, or names it
 
 [render.pins]               # upstream files used as they are, whose change must still stop the render
 "skills/pipelex-synthetic-inputs/references/pdf.md" = "sha256:…"

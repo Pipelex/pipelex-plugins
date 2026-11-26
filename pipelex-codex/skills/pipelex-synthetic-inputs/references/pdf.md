@@ -2,7 +2,7 @@
 
 Read this at step 4 of the skill when the format is `pdf`, before writing any code; its **Verify** section is step 5's check.
 
-Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete, runnable block: the first line is the **runner line** resolved in the skill's Step 2 (`uv run --quiet --no-project --with reportlab python << 'PYEOF'` on the `uv` rung, `<the absolute venv path Step 2 printed>/bin/python << 'PYEOF'` on the venv rung — substitute the path, never the `$VENV` reference, which is unset in a fresh shell), and everything below it is plain Python. Copy the block, replace what sits between the `CONTENT` markers with what Step 3 drafted, set the output path, run.
+Recipes for the `pdf` format of `/pipelex-synthetic-inputs`. Each one is a complete Python program: copy it, replace what sits between the `CONTENT` markers with what Step 3 drafted, set `OUT` to the request's `target`, write it to a `.py` file in Step 2's temporary directory with your file tool, and run that file with Step 2's **runner**, `<runner> "<file>.py"`, a command every shell runs as written. The comment on its first line is that command on the `uv` rung, with the format's package set; on the venv rung the runner Step 2 settled stands in place of `uv run … python -I -X utf8`. `OUT` is a raw string, `r"…"`, so a Windows path keeps its backslashes.
 
 `reportlab` is BSD-licensed and pure Python; every recipe below was executed under reportlab 4.5.1 and 5.0.1 before it was committed.
 
@@ -21,7 +21,7 @@ Page size: the recipes use `letter`; set `PAGE_SIZE = A4` in the content block w
 ## Conventions shared by every recipe
 
 - Output path: `<target_dir>/<name>.pdf` — replace with the request's `target`.
-- Built-in fonts (`Helvetica`, `Helvetica-Bold`, `Times-Roman`, `Courier`) cover Latin-1 text and need no files. For other scripts, register a TrueType font — matplotlib ships DejaVu Sans, which covers most of them: `from reportlab.pdfbase import pdfmetrics; from reportlab.pdfbase.ttfonts import TTFont; from matplotlib import font_manager; pdfmetrics.registerFont(TTFont("DejaVu", font_manager.findfont("DejaVu Sans")))` — adding `--with matplotlib` to the runner line.
+- Built-in fonts (`Helvetica`, `Helvetica-Bold`, `Times-Roman`, `Courier`) cover Latin-1 text and need no files. For other scripts, register a TrueType font — matplotlib ships DejaVu Sans, which covers most of them: `from reportlab.pdfbase import pdfmetrics; from reportlab.pdfbase.ttfonts import TTFont; from matplotlib import font_manager; pdfmetrics.registerFont(TTFont("DejaVu", font_manager.findfont("DejaVu Sans")))` — adding `--with matplotlib` to the runner on the `uv` rung.
 - Language: every word a recipe prints, labels included, and the way it writes figures sit in its content block, so a brief in another language is an edit of that block alone.
 - Fictional content only: made-up companies, people, ids, addresses.
 - Numbers that the method will read must be consistent: totals sum, tax is a stated percentage of the subtotal.
@@ -30,8 +30,8 @@ Page size: the recipes use `letter`; set `PAGE_SIZE = A4` in the content block w
 
 One page drawn with the canvas API, for letters, notes, notices and certificates. Coordinates are points (1/72 inch) up and right from the bottom-left corner; y is the text's baseline.
 
-```bash
-uv run --quiet --no-project --with reportlab python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -40,7 +40,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen.canvas import Canvas
 
-OUT = "<target_dir>/test_document.pdf"
+OUT = r"<target_dir>/test_document.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -115,7 +115,6 @@ try:
 finally:
     Path(PART).unlink(missing_ok=True)
 print(f"wrote {OUT}")
-PYEOF
 ```
 
 The canvas never wraps, so the script wraps paragraphs and fails rather than let text run off the page; real paragraph wrapping belongs in Platypus. `PAGE_SIZE = A4` gives A4.
@@ -124,8 +123,8 @@ The canvas never wraps, so the script wraps paragraphs and fails rather than let
 
 Headings and paragraphs that Platypus flows over numbered pages, for reports, policies, contracts and manuals; the title is also the PDF's title metadata.
 
-```bash
-uv run --quiet --no-project --with reportlab python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -135,7 +134,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
-OUT = "<target_dir>/test_report.pdf"
+OUT = r"<target_dir>/test_report.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -145,36 +144,53 @@ Path(OUT).parent.mkdir(parents=True, exist_ok=True)
 PAGE_SIZE = letter  # or A4
 SECTIONS_START_ON_NEW_PAGE = False
 TITLE = "Building Condition Inspection Report"
-DETAILS = [("Property", "Corran Quay Residences, 40 Tidewater Lane, Port Aldery"),
-           ("Prepared for", "Corran Quay Owners' Association"),
-           ("Inspected", "September 14, 2026, by Priya Ostrander, Halvard & Moss Building Surveyors")]
+DETAILS = [
+    ("Property", "Corran Quay Residences, 40 Tidewater Lane, Port Aldery"),
+    ("Prepared for", "Corran Quay Owners' Association"),
+    ("Inspected", "September 14, 2026, by Priya Ostrander, Halvard & Moss Building Surveyors"),
+]
 REFERENCE, PAGE_LABEL = "HM-2026-0388", "Page"
 # Items are paragraphs or (subheading, paragraph) pairs.
 SECTIONS = [
-    ("Overview", [
-        "We visually inspected the roof, elevations, garage and common parts of this block of 24 "
-        "apartments, built in 1988.",
-        "The building is in fair condition. The most serious findings are water entering at the north-east "
-        "parapet and corroded railing brackets on six south balconies, which should not be used until an engineer "
-        "has assessed them.",
-    ]),
-    ("Findings by area", [
-        ("Roof and drainage: Fair", "The membrane has blistered near the north-east corner, where the parapet "
-         "coping joints have opened. Three of the five outlets were partly blocked, and the corridor ceiling "
-         "below the corner is damp."),
-        ("Elevations and balconies: Poor", "The brickwork is sound, but the railing brackets on six south "
-         "balconies are rusting where they enter the slab, and the concrete around two of them has cracked."),
-        ("Structure: Good", "There is no sign of settlement or movement."),
-        ("Fire safety: Fair", "The alarm panel showed no faults, but the third-floor fire door to the east "
-         "stairwell no longer closes on its own."),
-    ]),
-    ("Recommendations", [
-        ("Within one week", "Keep residents off the six balconies and commission a structural engineer."),
-        ("Within one month", "Repair the closer of the third-floor fire door."),
-        ("Before winter", "Repoint the parapet coping, repair the membrane, clear the outlets, then repair the "
-         "stained ceiling."),
-        ("Within a year", "Budget for renewing the roof membrane, which is near the end of its life."),
-    ]),
+    (
+        "Overview",
+        [
+            "We visually inspected the roof, elevations, garage and common parts of this block of 24 apartments, built in 1988.",
+            "The building is in fair condition. The most serious findings are water entering at the north-east "
+            "parapet and corroded railing brackets on six south balconies, which should not be used until an engineer "
+            "has assessed them.",
+        ],
+    ),
+    (
+        "Findings by area",
+        [
+            (
+                "Roof and drainage: Fair",
+                "The membrane has blistered near the north-east corner, where the parapet "
+                "coping joints have opened. Three of the five outlets were partly blocked, and the corridor ceiling "
+                "below the corner is damp.",
+            ),
+            (
+                "Elevations and balconies: Poor",
+                "The brickwork is sound, but the railing brackets on six south "
+                "balconies are rusting where they enter the slab, and the concrete around two of them has cracked.",
+            ),
+            ("Structure: Good", "There is no sign of settlement or movement."),
+            (
+                "Fire safety: Fair",
+                "The alarm panel showed no faults, but the third-floor fire door to the east stairwell no longer closes on its own.",
+            ),
+        ],
+    ),
+    (
+        "Recommendations",
+        [
+            ("Within one week", "Keep residents off the six balconies and commission a structural engineer."),
+            ("Within one month", "Repair the closer of the third-floor fire door."),
+            ("Before winter", "Repoint the parapet coping, repair the membrane, clear the outlets, then repair the stained ceiling."),
+            ("Within a year", "Budget for renewing the roof membrane, which is near the end of its life."),
+        ],
+    ),
 ]
 # ==== END CONTENT ====
 
@@ -223,7 +239,6 @@ try:
 finally:
     Path(PART).unlink(missing_ok=True)
 print(f"wrote {OUT}")
-PYEOF
 ```
 
 Add items to `SECTIONS` to lengthen it. Sections flow on; `SECTIONS_START_ON_NEW_PAGE = True` gives each a new page, `PAGE_SIZE = A4` an A4 page.
@@ -232,8 +247,8 @@ Add items to `SECTIONS` to lengthen it. Sections flow on; `SECTIONS_START_ON_NEW
 
 A titled table for price lists, schedules, rosters and any other grid of text; every cell wraps.
 
-```bash
-uv run --quiet --no-project --with reportlab python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from pathlib import Path
@@ -245,7 +260,7 @@ from reportlab.lib.pagesizes import A4, landscape, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<target_dir>/test_table.pdf"
+OUT = r"<target_dir>/test_table.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -277,9 +292,13 @@ CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=9, leading=11.5)
 HEAD = ParagraphStyle("head", CELL, fontName="Helvetica-Bold", textColor=white)
 TEXT = ParagraphStyle("text", CELL, fontSize=10, leading=14, spaceBefore=4)
 BIG = ParagraphStyle("big", TEXT, fontName="Helvetica-Bold", fontSize=15, leading=20, textColor=NAVY)
-GRID = [("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, STRIPE]),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE), ("BOX", (0, 0), (-1, -1), 0.6, NAVY),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]
+GRID = [
+    ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, STRIPE]),
+    ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE),
+    ("BOX", (0, 0), (-1, -1), 0.6, NAVY),
+    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+]
 
 
 def right(style):
@@ -308,8 +327,14 @@ def render(path):
         if len(row) != len(COLUMNS):
             raise ValueError(f"Row {n} {row!r} has {len(row)} values for {len(COLUMNS)} columns")
         rows.append([cell(v, s) for v, s in zip(row, body)])
-    doc.build([cell(HEADING, BIG), Paragraph(f"<b>{escape(TITLE)}</b>", TEXT), cell(INFO, TEXT),
-               Table(rows, colWidths=COL_WIDTHS, repeatRows=1, hAlign="LEFT", style=GRID, spaceBefore=10)])
+    doc.build(
+        [
+            cell(HEADING, BIG),
+            Paragraph(f"<b>{escape(TITLE)}</b>", TEXT),
+            cell(INFO, TEXT),
+            Table(rows, colWidths=COL_WIDTHS, repeatRows=1, hAlign="LEFT", style=GRID, spaceBefore=10),
+        ]
+    )
 
 
 PART = str(Path(OUT).with_name(f".{Path(OUT).stem}.part{Path(OUT).suffix}"))
@@ -319,7 +344,6 @@ try:
 finally:
     Path(PART).unlink(missing_ok=True)
 print(f"wrote {OUT}")
-PYEOF
 ```
 
 A table too wide for the page runs off it silently, so the widths are checked against the 456 pt Letter frame, and a row with the wrong number of values is refused. Use `landscape(letter)` when the columns cannot fit, `A4` for A4.
@@ -328,8 +352,8 @@ A table too wide for the page runs off it silently, so the widths are checked ag
 
 Measurements judged against limits, for lab results, inspections and test reports: the script computes each verdict from the values as printed, highlights failing values and states the limits beneath the table. Widths are checked as in the table report; `A4` gives A4 and `landscape(letter)` room for more columns.
 
-```bash
-uv run --quiet --no-project --with reportlab python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from decimal import ROUND_HALF_UP, Decimal
@@ -342,7 +366,7 @@ from reportlab.lib.pagesizes import A4, landscape, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<target_dir>/test_results.pdf"
+OUT = r"<target_dir>/test_results.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -355,8 +379,7 @@ TITLE = "Drinking-water results, August 2026"
 INFO = "Client: Marrowby District Water Board. Report OVW-26-0913."
 DESCRIPTORS = ["Sample", "Site", "Sampled"]
 # (header, decimals shown, lower limit, upper limit); None means no limit on that side.
-MEASURES = [("pH", 1, 6.5, 9.0), ("Turbidity (NTU)", 1, None, 4.0),
-            ("Nitrate (mg/L)", 1, None, 50.0), ("Lead (µg/L)", 1, None, 10.0)]
+MEASURES = [("pH", 1, 6.5, 9.0), ("Turbidity (NTU)", 1, None, 4.0), ("Nitrate (mg/L)", 1, None, 50.0), ("Lead (µg/L)", 1, None, 10.0)]
 VERDICT, PASS, FAIL = "Verdict", "Pass", "Fail"
 COL_WIDTHS = [52, 108, 60, 34, 52, 44, 40, 46]  # points: descriptors, measures, verdict
 # A word wider than its column breaks mid-word: give dates and long headers room.
@@ -384,9 +407,13 @@ HEAD = ParagraphStyle("head", CELL, fontName="Helvetica-Bold", textColor=white)
 BAD = ParagraphStyle("bad", CELL, fontName="Helvetica-Bold", textColor=FAIL_INK)
 TEXT = ParagraphStyle("text", CELL, fontSize=10, leading=14, spaceBefore=4)
 BIG = ParagraphStyle("big", TEXT, fontName="Helvetica-Bold", fontSize=15, leading=20, textColor=NAVY)
-GRID = [("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, STRIPE]),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE), ("BOX", (0, 0), (-1, -1), 0.6, NAVY),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]
+GRID = [
+    ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, STRIPE]),
+    ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE),
+    ("BOX", (0, 0), (-1, -1), 0.6, NAVY),
+    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+]
 
 
 def right(style):
@@ -432,17 +459,21 @@ def render(path):
         if len(described) != first or len(values) != len(MEASURES):
             raise ValueError(f"Sample {r} {list(described)} needs {first} descriptor values and {len(MEASURES)} values")
         printed = [shown(v, m[1]) for v, m in zip(values, MEASURES)]
-        bad = [i for i, (p, (lo, hi)) in enumerate(zip(printed, bounds))
-               if (lo is not None and p < lo) or (hi is not None and p > hi)]
-        rows.append([cell(d, CELL) for d in described]
-                    + [cell(figure(p, m[1]), right(BAD if i in bad else CELL))
-                       for i, (p, m) in enumerate(zip(printed, MEASURES))]
-                    + [cell(FAIL if bad else PASS, BAD if bad else CELL)])
+        bad = [i for i, (p, (lo, hi)) in enumerate(zip(printed, bounds)) if (lo is not None and p < lo) or (hi is not None and p > hi)]
+        rows.append(
+            [cell(d, CELL) for d in described]
+            + [cell(figure(p, m[1]), right(BAD if i in bad else CELL)) for i, (p, m) in enumerate(zip(printed, MEASURES))]
+            + [cell(FAIL if bad else PASS, BAD if bad else CELL)]
+        )
         # Highlights come after the stripes: backgrounds paint in command order.
         cols = [first + i for i in bad] + ([ncols - 1] if bad else [])
         marks += [("BACKGROUND", (c, r), (c, r), FAIL_FILL) for c in cols]
-    story = [cell(LAB, BIG), Paragraph(f"<b>{escape(TITLE)}</b>", TEXT), cell(INFO, TEXT),
-             Table(rows, colWidths=COL_WIDTHS, repeatRows=1, hAlign="LEFT", style=marks, spaceBefore=10)]
+    story = [
+        cell(LAB, BIG),
+        Paragraph(f"<b>{escape(TITLE)}</b>", TEXT),
+        cell(INFO, TEXT),
+        Table(rows, colWidths=COL_WIDTHS, repeatRows=1, hAlign="LEFT", style=marks, spaceBefore=10),
+    ]
     if limits:
         story.append(cell(LIMITS.format(limits="; ".join(limits)), TEXT))
     doc.build(story)
@@ -455,15 +486,14 @@ try:
 finally:
     Path(PART).unlink(missing_ok=True)
 print(f"wrote {OUT}")
-PYEOF
 ```
 
 ## Line-item document (composed)
 
 The shape of an invoice, statement, purchase order or receipt: header, parties, line items, totals and a closing line, every figure computed exactly with `Decimal`.
 
-```bash
-uv run --quiet --no-project --with reportlab python << 'PYEOF'
+```python
+# uv run --quiet --no-project --with reportlab python -I -X utf8 "<file>.py"
 import os
 import sys
 from decimal import ROUND_HALF_UP, Decimal
@@ -476,7 +506,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
 
-OUT = "<target_dir>/test_invoice.pdf"
+OUT = r"<target_dir>/test_invoice.pdf"
 if "<" in OUT or ">" in OUT:
     sys.exit(f"Refusing to run: OUT still holds a placeholder: {OUT}")
 Path(OUT).parent.mkdir(parents=True, exist_ok=True)
@@ -492,8 +522,7 @@ COLUMNS = ["Description", "Qty", "Unit price", "Amount"]
 COL_WIDTHS = [235, 44, 74, 80]  # points; a word wider than its column breaks mid-word
 # (description, quantity, unit price); write numbers as strings, a fractional quantity as "2.5".
 LINE_ITEMS = [
-    ("Match-day programmes, 24 pages, saddle-stitched, full colour on 130 gsm silk, with a "
-     "foil-stamped crest", "400", "1.85"),
+    ("Match-day programmes, 24 pages, saddle-stitched, full colour on 130 gsm silk, with a foil-stamped crest", "400", "1.85"),
     ("Membership cards, laminated, printed on both sides", "350", "0.62"),
     ("Redrawing the club crest as vector artwork, per hour", "2.5", "46.00"),
     ("Roll-up banner, 85 × 200 cm, with carry case", "2", "89.00"),
@@ -525,9 +554,13 @@ BIG = ParagraphStyle("big", TEXT, fontName="Helvetica-Bold", fontSize=19, leadin
 
 
 def grid(last):
-    return [("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, last), [white, STRIPE]),
-            ("LINEBELOW", (0, 1), (-1, last), 0.25, RULE), ("BOX", (0, 0), (-1, last), 0.6, NAVY),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]
+    return [
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("ROWBACKGROUNDS", (0, 1), (-1, last), [white, STRIPE]),
+        ("LINEBELOW", (0, 1), (-1, last), 0.25, RULE),
+        ("BOX", (0, 0), (-1, last), 0.6, NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
 
 
 def right(style):
@@ -564,23 +597,29 @@ def render(path):
     if len(COLUMNS) != 4 or len(COL_WIDTHS) != 4 or width > frame:
         raise ValueError(f"Need 4 columns and 4 widths totalling at most {frame:.0f} pt")
     rows = [[cell(h, right(HEAD) if i else HEAD) for i, h in enumerate(COLUMNS)]]
-    rows += [[cell(d, CELL), cell(plain(q), right(CELL)), cell(money(p), right(CELL)), cell(money(a), right(CELL))]
-             for d, q, p, a in LINES]
+    rows += [[cell(d, CELL), cell(plain(q), right(CELL)), cell(money(p), right(CELL)), cell(money(a), right(CELL))] for d, q, p, a in LINES]
     n = len(rows) - 1
     tax = TAX_LABEL.format(rate=plain(Decimal(TAX_RATE)))
-    rows += [[cell(label, right(s)), "", "", cell(money(v), right(s))]
-             for label, v, s in [(SUBTOTAL_LABEL, SUBTOTAL, CELL), (tax, TAX, CELL), (TOTAL_LABEL, TOTAL, BOLD)]]
+    rows += [
+        [cell(label, right(s)), "", "", cell(money(v), right(s))]
+        for label, v, s in [(SUBTOTAL_LABEL, SUBTOTAL, CELL), (tax, TAX, CELL), (TOTAL_LABEL, TOTAL, BOLD)]
+    ]
     meta = "<br/>".join(f"{escape(k)}  <b>{escape(v)}</b>" for k, v in [(NUMBER_LABEL, NUMBER)] + DATES)
     head = Table(
-        [[cell(ISSUER[0], BIG), [cell(KIND, right(BIG)), Paragraph(meta, right(TEXT))]],
-         [party(ISSUER_LABEL, ISSUER), party(CLIENT_LABEL, CLIENT)]],
-        colWidths=[width * 0.55, width * 0.45], hAlign="LEFT",
-        style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, 0), 1.2, NAVY),
-               ("TOPPADDING", (0, 1), (-1, 1), 14)],
+        [[cell(ISSUER[0], BIG), [cell(KIND, right(BIG)), Paragraph(meta, right(TEXT))]], [party(ISSUER_LABEL, ISSUER), party(CLIENT_LABEL, CLIENT)]],
+        colWidths=[width * 0.55, width * 0.45],
+        hAlign="LEFT",
+        style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, 0), 1.2, NAVY), ("TOPPADDING", (0, 1), (-1, 1), 14)],
     )
-    items = Table(rows, colWidths=COL_WIDTHS, repeatRows=1, hAlign="LEFT", spaceBefore=18, spaceAfter=18,
-                  style=grid(n) + [("LINEABOVE", (2, -1), (-1, -1), 1, NAVY)]
-                  + [("SPAN", (0, r), (2, r)) for r in range(n + 1, n + 4)])  # a long total label gets room
+    items = Table(
+        rows,
+        colWidths=COL_WIDTHS,
+        repeatRows=1,
+        hAlign="LEFT",
+        spaceBefore=18,
+        spaceAfter=18,
+        style=grid(n) + [("LINEABOVE", (2, -1), (-1, -1), 1, NAVY)] + [("SPAN", (0, r), (2, r)) for r in range(n + 1, n + 4)],
+    )  # a long total label gets room
     doc.build([head, items, cell(CLOSING, TEXT)])
 
 
@@ -591,18 +630,16 @@ try:
 finally:
     Path(PART).unlink(missing_ok=True)
 print(f"wrote {OUT} (total {TOTAL:.2f})")
-PYEOF
 ```
 
 Every printed word and the way figures are written sit in the content block, as in every recipe, so another language is an edit of that block alone, and `PAGE_SIZE = A4` gives A4. For a purchase order, credit note or receipt, edit `KIND`, `NUMBER_LABEL`, `DATES`, the party labels, `TOTAL_LABEL` and `CLOSING`, with the buyer as `ISSUER` on a purchase order.
 
 ## Verify
 
-```bash
-head -c 5 "<target_dir>/<name>.pdf"; echo; wc -c "<target_dir>/<name>.pdf"
-uv run --quiet --no-project python -c "import re, sys; print('pages:', len(re.findall(rb'/Type\s*/Page[^s]', open(sys.argv[1], 'rb').read())))" "<target_dir>/<name>.pdf"
+```shell
+uv run --quiet --no-project python -I -X utf8 -c "import re, sys; data = open(sys.argv[1], 'rb').read(); print(data[:5], len(data) // 1024, 'KB', 'pages:', len(re.findall(rb'/Type\s*/Page[^s]', data)))" "<target_dir>/<name>.pdf"
 ```
 
-The page count needs no packages, so it runs under whichever interpreter Step 2 resolved — the `uv run` above on rung 1, the absolute venv interpreter path on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
+The check needs no packages, so it runs under whichever runner Step 2 settled — the `uv run` above on rung 1, the venv rung's runner in place of `uv run … python -I -X utf8` on rung 2. Do not reach for a bare `python3`: a machine that got `uv` from the installer has no such command.
 
-Expect `%PDF-`, a size in the kilobytes, and the page count the brief asked for. A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.
+Expect `b'%PDF-'`, a size in the kilobytes, and the page count the brief asked for. A failed render is cleaned up as the skill's step 4 says, partial file included, before anything is rerun.

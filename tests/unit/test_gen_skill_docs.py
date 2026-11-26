@@ -2477,17 +2477,18 @@ class TestSyntheticInputsSkill:
 
     def test_environment_ladder_has_both_rungs_and_a_graceful_stop(self) -> None:
         body = self.synthetic
-        assert "**Rung 1 — `uv` is on `PATH`**" in body
-        assert "**Rung 2 — no `uv`, but `python3` with `venv` and `pip`.**" in body
-        assert "pipelex-plugins/synth-venv" in body
-        # The venv rung is read from its reference when `uv` is absent (the size diet, phase 6).
-        assert "When `uv` is not on `PATH` (the preflight prints nothing, and `command -v uv` finds nothing" in body
-        assert "for a format that has no preflight), read [venv.md](references/venv.md) before creating anything" in body
+        assert "**Rung 1 — `uv --version` answers**" in body
+        assert "**Rung 2 — no `uv`, but a Python 3 with `venv` and `pip`.**" in body
+        # The venv rung is read from its reference when `uv` is absent (the size diet, phase 6), and its procedure
+        # is a script every shell runs by path (the Windows campaign).
+        assert "When `uv --version` fails, read [venv.md](references/venv.md) before creating anything." in body
+        assert "The rung runs `{{ skill_dir }}/scripts/synth_venv.py`" in body
         venv = (self.REPO_ROOT / "skills" / "pipelex-synthetic-inputs" / "references" / "venv.md").read_text(encoding="utf-8")
-        assert "the runner line becomes `\"$VENV/bin/python\" << 'PYEOF'`" in venv
-        assert "That substitution is the only difference between the rungs" in venv
-        assert "**substitute the absolute path this command printed**" in venv, "the runner line must not be handed over as a $VENV reference"
-        assert "curl -LsSf https://astral.sh/uv/install.sh" in body
+        assert "pipelex-plugins/synth-venv" in venv
+        assert "That is the only difference between the rungs" in venv
+        assert "Call the interpreter through the runner, never by its printed path" in venv
+        assert "curl -LsSf https://astral.sh/uv/install.sh" in venv
+        assert 'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"' in venv
         assert "return **no path** with the reason" in body
 
     def test_declares_no_mcp_tool(self) -> None:

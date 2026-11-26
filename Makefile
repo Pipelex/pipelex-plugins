@@ -56,7 +56,7 @@ li: lock install ## Lock + install
 cleanderived: ## Remove caches/compiled files
 	@find . -name '.coverage' -delete && \
 	find . -wholename '**/*.pyc' -delete && \
-	find . -type d -wholename '__pycache__' -exec rm -rf {} + && \
+	find . -type d -name '__pycache__' -exec rm -rf {} + && \
 	find . -type d -wholename './.cache' -exec rm -rf {} + && \
 	find . -type d -wholename './.mypy_cache' -exec rm -rf {} + && \
 	find . -type d -wholename './.ruff_cache' -exec rm -rf {} + && \
