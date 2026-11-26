@@ -40,7 +40,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ## Prerequisites
 
-`git`; `node` at {{ floors.node }} or later with `npm`, for the method app and TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
+`git`; `node` at {{ floors.node }} or later with `npm` on every branch, before anything is created; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest.
 
 {% set python_ceiling = floors.python_max.split(".")[0] ~ "." ~ (floors.python_max.split(".")[1] | int + 1) %}**On Python, find an interpreter from {{ floors.python_min }} to {{ floors.python_max }} before anything is created, and create the project on it**. With uv, `uv python find '>={{ floors.python_min }},<{{ python_ceiling }}'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 

@@ -19,7 +19,8 @@
 //                       not-a-repository (<dir> is not where the pristine commit leaves it: it
 //                       has not run), not-ignored, write-failed (a file in <dir> could not be
 //                       written, or, except on Windows, a `.env` without a key could not be closed
-//                       to other users, or the file system failed otherwise, its message on stderr)
+//                       to other users, or the file system failed otherwise, its message on stderr;
+//                       or the shell's PIPELEX_BASE_URL holds a line break, and nothing was written)
 // The exit code is presentation: 0 unless refused.
 //
 // Why the key the shell exports is never copied: it is whichever key was exported last, often a
@@ -39,7 +40,6 @@
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 const PRODUCTION = "https://api.pipelex.com";
@@ -122,11 +122,12 @@ function noIndex(ownRules) {
 
 // Ignored by a .gitignore the project carries. This machine's global excludes file and the
 // repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
-// only this machine ignores. The global file is pointed at the OS's null device, which is
-// `/dev/null` or `\\.\nul`, and the name goes in and the rule's source comes out NUL-terminated,
-// so that no character either holds, a colon of a Windows drive included, is read as a separator.
+// only this machine ignores. The global file is pointed at `/dev/null`, the null device on POSIX,
+// which Git for Windows opens as `nul`, and the name goes in and the rule's source comes out
+// NUL-terminated, so that no character either holds, a colon of a Windows drive included, is read
+// as a separator.
 function ignoredByTheProject(dir, ownRules, name) {
-  const options = ["-c", `core.excludesFile=${os.devNull}`, "check-ignore", ...noIndex(ownRules)];
+  const options = ["-c", "core.excludesFile=/dev/null", "check-ignore", ...noIndex(ownRules)];
   if (!projectGit(dir, ownRules, [...options, "-q", "--", name]).ok) {
     return false;
   }
@@ -140,9 +141,11 @@ function ignoredByTheProject(dir, ownRules, name) {
 // ending in a carriage return reads as the same line.
 const SPACE = "[ \\t\\n\\v\\f\\r]";
 
+// A file's text, without the byte-order mark an editor may put first, which would otherwise hide
+// the name on line 1 from every test below.
 function readText(file) {
   try {
-    return fs.readFileSync(file, "utf8");
+    return fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
   } catch {
     return "";
   }
@@ -151,8 +154,8 @@ function readText(file) {
 function append(file, text) {
   try {
     fs.appendFileSync(file, text);
-  } catch {
-    refuse("write-failed");
+  } catch (error) {
+    refuse("write-failed", error.message);
   }
 }
 
@@ -204,6 +207,12 @@ function writeEnvFile(args) {
   const dir = physicalDirectory(args[0]);
   if (dir === null) {
     refuse("no-directory");
+  }
+  // A line break in the shell's base URL would write lines of its own into `.env`, an assignment of
+  // any name included, so nothing is written at all. The message names the variable, never its value.
+  const baseUrl = process.env.PIPELEX_BASE_URL ?? "";
+  if (/[\r\n]/.test(baseUrl)) {
+    refuse("write-failed", "PIPELEX_BASE_URL holds a line break, which .env cannot carry in one line; nothing was written.");
   }
 
   // The pristine commit left <dir> the root of a repository of its own, a repository planted inside
@@ -264,8 +273,8 @@ function writeEnvFile(args) {
   if (!fs.existsSync(env)) {
     try {
       fs.writeFileSync(env, fs.readFileSync(example), { mode: 0o600, flag: "wx" });
-    } catch {
-      refuse("write-failed");
+    } catch (error) {
+      refuse("write-failed", error.message);
     }
   }
 
@@ -288,11 +297,10 @@ function writeEnvFile(args) {
     if (!WINDOWS) {
       try {
         fs.chmodSync(env, fs.statSync(env).mode & 0o7700);
-      } catch {
-        refuse("write-failed");
+      } catch (error) {
+        refuse("write-failed", error.message);
       }
     }
-    const baseUrl = process.env.PIPELEX_BASE_URL ?? "";
     if (baseUrl !== "") {
       append(env, `\n# Copied from the shell environment; a later line overrides an earlier one.\nPIPELEX_BASE_URL=${baseUrl}\n`);
       origin = "copied";

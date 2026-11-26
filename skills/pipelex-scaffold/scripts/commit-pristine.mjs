@@ -35,7 +35,6 @@
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 // The helpers below are the same in commit-pristine.mjs and write-env-file.mjs, each of which runs
@@ -115,11 +114,12 @@ function noIndex(ownRules) {
 
 // Ignored by a .gitignore the project carries. This machine's global excludes file and the
 // repository's info/exclude never travel with a clone, so a teammate's `git add` would take what
-// only this machine ignores. The global file is pointed at the OS's null device, which is
-// `/dev/null` or `\\.\nul`, and the name goes in and the rule's source comes out NUL-terminated,
-// so that no character either holds, a colon of a Windows drive included, is read as a separator.
+// only this machine ignores. The global file is pointed at `/dev/null`, the null device on POSIX,
+// which Git for Windows opens as `nul`, and the name goes in and the rule's source comes out
+// NUL-terminated, so that no character either holds, a colon of a Windows drive included, is read
+// as a separator.
 function ignoredByTheProject(dir, ownRules, name) {
-  const options = ["-c", `core.excludesFile=${os.devNull}`, "check-ignore", ...noIndex(ownRules)];
+  const options = ["-c", "core.excludesFile=/dev/null", "check-ignore", ...noIndex(ownRules)];
   if (!projectGit(dir, ownRules, [...options, "-q", "--", name]).ok) {
     return false;
   }
@@ -132,8 +132,8 @@ function ignoredByTheProject(dir, ownRules, name) {
 function append(file, text) {
   try {
     fs.appendFileSync(file, text);
-  } catch {
-    refuse("write-failed");
+  } catch (error) {
+    refuse("write-failed", error.message);
   }
 }
 

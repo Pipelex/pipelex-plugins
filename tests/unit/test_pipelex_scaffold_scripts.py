@@ -851,6 +851,36 @@ class TestWriteEnvFile:
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_BASE_URL": FAKE_URL})
         assert result.stdout == "refused: write-failed\n"
         assert result.returncode == 1
+        # The refusal carries the system's cause on stderr, which names the file and never the value.
+        assert ".env" in result.stderr
+        assert FAKE_URL not in result.stderr
+
+    @pytest.mark.parametrize("line_break", ["\n", "\r", "\r\n"], ids=["lf", "cr", "crlf"])
+    def test_a_base_url_holding_a_line_break_writes_nothing(self, tmp_path: Path, line_break: str) -> None:
+        """A line break in the shell's base URL would write lines of its own into `.env`, a key's included, so
+        the script refuses before it writes anything, and names the variable, never its value."""
+        project = self.project(tmp_path)
+        injected = f"{FAKE_URL}{line_break}PIPELEX_API_KEY={FAKE_KEY}"
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_BASE_URL": injected})
+        assert result.stdout == "refused: write-failed\n"
+        assert result.returncode == 1
+        assert "PIPELEX_BASE_URL" in result.stderr
+        assert FAKE_URL not in result.stderr and FAKE_KEY not in result.stderr
+        assert not (project / ".env").exists()
+        assert not (project / ".gitignore").exists()
+        assert (project / ".env.example").read_text(encoding="utf-8") == EXAMPLE
+
+    def test_a_byte_order_mark_never_hides_the_key_on_line_one(self, tmp_path: Path) -> None:
+        """An editor may save `.env` with a UTF-8 byte-order mark, which would hide the name on line 1 from the
+        key test: the script would then append an empty key that every dotenv reader takes over the user's."""
+        project = self.project(tmp_path)
+        carried = "\ufeffPIPELEX_API_KEY=plx_the_users_own_fake_key\n"
+        (project / ".gitignore").write_text(".env\n", encoding="utf-8")
+        (project / ".env").write_bytes(carried.encode("utf-8"))
+        result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "kept base-url=file plane=production\n"
+        assert (project / ".env").read_bytes() == carried.encode("utf-8")
 
     def test_a_directory_inside_the_user_s_repository_is_written_under_its_rules(self, tmp_path: Path) -> None:
         """The pristine commit leaves such a `<dir>` as new files of the enclosing repository, so `.env` is
@@ -1112,13 +1142,13 @@ def test_both_scripts_judge_an_ignore_rule_the_same_way() -> None:
     assert block(COMMIT_PRISTINE) == block(WRITE_ENV_FILE)
     shared = block(COMMIT_PRISTINE)
     # Both read `<dir>` where it physically is, never ask about it from inside, which adds the slash, spawn
-    # git with no shell and an environment of their own, and point the global excludes file at this OS's
-    # null device.
+    # git with no shell and an environment of their own, and point the global excludes file at `/dev/null`,
+    # which Git for Windows maps to `nul` itself, where Node's `os.devNull` would differ by OS.
     assert "fs.realpathSync.native(" in shared
     assert '"check-ignore", "-q", "--", `./${path.basename(dir)}`' in shared
     assert "shell:" not in shared
-    assert "core.excludesFile=${os.devNull}" in shared
-    assert "/dev/null" not in shared.replace("`/dev/null` or", "")
+    assert '"core.excludesFile=/dev/null"' in shared
+    assert "os.devNull" not in shared
     # Handed no `env`, a spawn's environment is built from `process.env` and printed whole by Node's debug
     # log, so git's leaves out every PIPELEX_* name, in any letter case, as Windows reads names.
     assert '!name.toUpperCase().startsWith("PIPELEX_")' in shared

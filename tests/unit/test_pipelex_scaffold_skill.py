@@ -142,6 +142,9 @@ class TestPipelexScaffoldSkill:
         "One thing always confirms, in every mode: **`gh repo create`**",
         "Add **no** SDK dependency and create **no** empty `methods/` directory",
         "Nothing beyond what the initializer writes is authored by this skill",
+        # Both scripts run on `node`, so every branch needs it, Python's included, and finds that out before
+        # an initializer has created anything.
+        "or later with `npm` on every branch, before anything is created;",
         # A version manager that downloads a version is the toolchain install the step forbids.
         "**Never install a toolchain, and never let a version manager download one.**",
         # The default TS branch is prescribed in the reference, whose costs it states.

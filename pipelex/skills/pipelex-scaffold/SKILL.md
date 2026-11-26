@@ -46,7 +46,7 @@ Automatic by default; an explicit signal wins ("just do it", "walk me through").
 
 ## Prerequisites
 
-`git`; `node` at 22.12 or later with `npm`, for the method app and TypeScript; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest themselves.
+`git`; `node` at 22.12 or later with `npm` on every branch, before anything is created; `uv` for Python, or the tool the user named instead. **Never install a toolchain, and never let a version manager download one.** When `node` or `uv` is missing, or `node` is below the floor, read [references/version-managers.md](references/version-managers.md) before stopping. The initializer and `make serve` check the rest.
 
 **On Python, find an interpreter from 3.11 to 3.14 before anything is created, and create the project on it**. With uv, `uv python find '>=3.11,<3.15'` must print one, because uv downloads a Python it lacks; `uv init` takes its version as `--python <X.Y>`.
 
