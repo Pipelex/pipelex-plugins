@@ -74,11 +74,11 @@ The plugin runs in Claude Code on Windows with PowerShell alone, in the terminal
 
 **What you need.**
 
-- **Node.js 24.14.1 or later**, from the official installer at [nodejs.org](https://nodejs.org/). The installer puts `node`, `npm` and `npx` on your `PATH`. Open a new PowerShell window afterwards and run `node --version`: a window, an editor or an app started before the install keeps the `PATH` it started with. A Node.js installed with winget, Chocolatey, nvm-windows, fnm, Volta or Scoop works the same way, since each ships npm beside `node.exe`, which is where the plugin finds `npx`.
+- **Node.js 24.14.1 or later**, from the official installer at [nodejs.org](https://nodejs.org/). The installer puts `node`, `npm` and `npx` on your `PATH`. Open a new PowerShell window afterwards and run `node --version`: a window, an editor or an app started before the install keeps the `PATH` it started with. A Node.js installed with winget, Chocolatey, nvm-windows, Volta or Scoop works the same way: each ships npm beside `node.exe`, which is where the plugin finds `npx`, and puts `node` on the Windows `PATH` that every app starts with. fnm ships npm the same way but puts `node` on the `PATH` only in a terminal whose profile runs `fnm env`, so it serves Claude Code in that terminal and not in the Claude desktop app, which loads no shell profile and needs `node` on the persistent Windows `PATH`.
 - **Claude Code 2.1.139 or later.** Run `claude --version` to see yours.
 - **git on your `PATH`**, which [Git for Windows](https://git-scm.com/download/win) provides, because Claude Code installs a plugin by cloning its marketplace's repository with git.
 
-**Git Bash is not required.** Whether Claude Code runs the agent's own commands in Git Bash or, when it finds none, in PowerShell, the plugin works the same way: the hook and the tools start with no shell at all, and every command the skills give the agent runs as written in Windows PowerShell 5.1 and PowerShell 7 as it does in bash. The one exception is `pipelex-scaffold`, whose method-app branch still runs the template's `make create` and `make serve` and therefore needs `make`, which Windows does not ship.
+**Git Bash is not required.** Whether Claude Code runs the agent's own commands in Git Bash or, when it finds none, in PowerShell, the plugin works the same way: the hook and the tools start with no shell at all, and every command the skills give the agent runs as written in Windows PowerShell 5.1 and PowerShell 7 as it does in bash, with one exception: `pipelex-scaffold`, which creates a new project, is not covered on Windows yet, since some of the commands it gives still need bash or `make`, and the work to change that is in progress.
 
 **Install from the marketplace.** In PowerShell:
 
