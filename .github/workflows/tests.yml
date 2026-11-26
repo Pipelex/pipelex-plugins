@@ -48,10 +48,12 @@ jobs:
 
       # `tests/unit/test_hook_corpus.py` runs the vendored hook bundle, built for
       # node22, over the MTHDS Test Corpus. It fails under `CI` when no `node` is
-      # on the PATH rather than skipping, so this step is what lets it run.
+      # on the PATH rather than skipping, so this step is what lets it run. The
+      # version is the floor docs/install.md states, the `engines.node`
+      # @pipelex/mcp declares, which is above the bundle's own.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24.14.1"
 
       - name: Install uv (with cache)
         uses: astral-sh/setup-uv@v7
