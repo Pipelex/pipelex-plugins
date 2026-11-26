@@ -37,7 +37,7 @@ Pass exactly one selector to every tool call:
 
 **The project** is the nearest directory holding a `package.json`, a `pyproject.toml`, a `setup.py` or a `requirements.txt` at or above the working directory; several is a question, none means offering the `pipelex-scaffold` skill (`../pipelex-scaffold/SKILL.md`). Read its language reference now: [typescript.md](references/typescript.md) or [python.md](references/python.md).
 
-**Check containment before writing anything**: the project root must sit at or under the directory this session was launched in, both resolved (`pwd -P`, `realpath`), or STOP: relaunch the harness from the project root. **Never write the tree into the workshop's directory and move it across.**
+**Check containment before writing anything**: the project root must sit at or under the session's launch directory, both resolved (`node -p "fs.realpathSync(process.argv[1])" "<path>"`), or STOP: relaunch the harness from the project root. **Never write the tree into the workshop's directory and move it across.**
 
 Before step 2, read your branch: a `codegen` script or Makefile target, or a `sources.json` with a `derived` map → [references/harness.md](references/harness.md); this method's `sources.json` (`"generator": "pipelex-integrate"`), a refresh request or an editing skill's hand-off → [references/refresh.md](references/refresh.md).
 
@@ -105,10 +105,10 @@ One module per method from the language reference's template, in the project's s
 
 ### 10. The offline gate
 
-`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with `cp`, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
+`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with its script, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
 
-- `ts-zod`: `mkdir -p scripts && cp "<skill-dir>/references/codegen-check.mjs" scripts/codegen-check.mjs`
-- `python-pydantic`: `mkdir -p scripts && cp "<skill-dir>/references/codegen_check.py" scripts/codegen_check.py`
+- `ts-zod`: `node "<skill-dir>/scripts/copy-gate.mjs" codegen-check.mjs`
+- `python-pydantic`: `node "<skill-dir>/scripts/copy-gate.mjs" codegen_check.py`
 
 Wire it, or `python-structures`' `pipelex codegen check`, into the project's existing gate as the language reference shows; with none, the report says where to call it.
 

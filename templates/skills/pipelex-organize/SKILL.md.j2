@@ -46,7 +46,7 @@ Map the structure from the main pipe down: the subtrees, the pipes and concepts 
 - **Progressive discovery is the test**: the root plus one module file holds everything relevant to one step.
 - A still-pending signature sits in the module of the controller that wires it.
 
-**A `PipeDocGen` step's template is the file its `template_file` reaches from the directory of the `.mthds` file holding the step**: record each one's real path (`realpath`) before composing, and never move or rename a template file. When the plan moves a step to a file in another directory, its `template_file` becomes the forward-slash path that reaches the same file from there; when only a path through `..` would, which the runner refuses, that step does not move.
+**A `PipeDocGen` step's template is the file its `template_file` reaches from the directory of the `.mthds` file holding the step**: record each one's real path (`node -p "fs.realpathSync(process.argv[1])" "<path>"`) before composing, and never move or rename a template file. When the plan moves a step to a file in another directory, its `template_file` becomes the forward-slash path that reaches the same file from there; when only a path through `..` would, which the runner refuses, that step does not move.
 
 State the plan in one line (`main.mthds + extract.mthds + report.mthds`) and proceed; never ask. Compose every file in memory, **copying each declaration verbatim** into its file, one declaration per concept and one entry per pipe, top-down within each file.
 

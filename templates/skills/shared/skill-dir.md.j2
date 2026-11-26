@@ -11,9 +11,11 @@
    so there `skill_dir` is the `<skill-dir>` placeholder and this sentence
    defines it — the size diet's facts (L-260923-a9bdfe), sections 3 to 5.
 
-   A copy named this way is a `cp`, never a read and a rewrite: on Vibe the
-   model once copied a gate script by reading it and writing it back through
-   its own output, which is a copy only by luck and caps at the tool's size.
+   A copy named this way is a script run through `node` by its path, never a
+   read and a rewrite: on Vibe the model once copied a gate script by reading
+   it and writing it back through its own output, which is a copy only by luck
+   and caps at the tool's size. It is a script rather than `mkdir -p` and `cp`
+   because Windows PowerShell runs neither as written (L-261126-4c4a95).
 
    Include it just before the first sentence that uses `{{ skill_dir }}`. It
    ends with a space and strips its own trailing newline (the closing comment
