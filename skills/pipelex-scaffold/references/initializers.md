@@ -62,7 +62,7 @@ Every `uv init` above also takes `--python <X.Y>`, the interpreter the skill's p
 
 **`nested:`**, from the pristine-commit script: say that `<dir>` is a repository inside `<root>`'s work tree, which does not ignore it, and that nothing was committed in either, because a commit there would leave `<root>` holding a pointer that no clone of it can fetch instead of the project's files. **When `<dir>` held no `.git` before step 1**, the initializer made it: offer, never perform, the removal of `<dir>/.git`, which deletes whatever history the initializer gave it; afterwards the project is new files of `<root>` to review and commit there unless `<root>` ignores them, and keeping it is the user's choice. **When `<dir>` held a `.git` before step 1**, that repository and its history are the user's: never offer to remove it, and say that committing in it is theirs to decide, since `<root>` would then hold a pointer to it. Its `.gitignore` keeps the dependency tree and `.env` out either way.
 
-`write-env-file.sh` prints `<key> base-url=<origin> plane=<plane>` and never a value, and the report turns each part into words without printing the URL:
+`write-env-file.mjs` prints `<key> base-url=<origin> plane=<plane>` and never a value, and the report turns each part into words without printing the URL:
 
 - **`kept`**: `.env` already carried a key, and both of its lines were left as they were.
 - **`empty`**: say that the user puts their own key on `.env`'s `PIPELEX_API_KEY=` line, and where a key comes from: `app.pipelex.com` issues production's keys. The script never copies the key the shell exports, whatever key that is, so never offer to copy it there either, and never ask for the key in the conversation.

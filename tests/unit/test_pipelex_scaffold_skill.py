@@ -124,7 +124,7 @@ class TestPipelexScaffoldSkill:
     SKILLS = REPO_ROOT / "templates" / "skills"
     TEMPLATE = SKILL_TEMPLATE
     REFERENCES = ("initializers.md", "version-managers.md", "github.md", "uncreated-copy.md")
-    SCRIPTS = ("commit-pristine.sh", "write-env-file.sh")
+    SCRIPTS = ("commit-pristine.mjs", "write-env-file.mjs")
     SCRIPTS_DIR = REPO_ROOT / "skills" / "pipelex-scaffold" / "scripts"
     RULES = (
         "exactly two branches and carries no templates of its own",
@@ -147,8 +147,8 @@ class TestPipelexScaffoldSkill:
         # The default TS branch is prescribed in the reference, whose costs it states.
         "**Read [references/initializers.md](references/initializers.md) before running any initializer**",
         # The initializer branch's programs are scripts, run by path and never retyped.
-        "/scripts/commit-pristine.sh\" '<dir>' 'Scaffold <framework or language> project'",
-        "/scripts/write-env-file.sh\" '<dir>'",
+        "/scripts/commit-pristine.mjs\" '<dir>' 'Scaffold <framework or language> project'",
+        "/scripts/write-env-file.mjs\" '<dir>'",
     )
 
     @property
@@ -243,7 +243,7 @@ class TestPipelexScaffoldSkill:
         for body in _bodies():
             assert "A second confirms on branch B: a pristine commit into a directory that already held a repository." in body
             ask = body.index("**When `<dir>` held a `.git` before step 1, ask before running the script**")
-            assert ask < body.index("scripts/commit-pristine.sh\" '<dir>'")
+            assert ask < body.index("scripts/commit-pristine.mjs\" '<dir>'")
             assert "showing `git -C <dir> status --short`" in body
         reference = UNCREATED_COPY_REFERENCE.read_text(encoding="utf-8")
         assert "The directory is the user's, so this commit confirms in every mode" in reference
@@ -590,10 +590,10 @@ class TestMethodAppBranch:
     def test_the_key_reaches_the_gesture_without_crossing_the_conversation(self) -> None:
         for body in _bodies():
             assert "`make create` reads it there, and **the user writes their own key into either file, never you**" in body
-            # Neither `make create` nor `write-env-file.sh` copies the shell's key into a file, so the skill
+            # Neither `make create` nor `write-env-file.mjs` copies the shell's key into a file, so the skill
             # never says a script moves one, and never reports a key as `filled`.
             assert "the method app's `.env.local` hold" not in body
-            assert "`write-env-file.sh` moves it" not in body
+            assert "`write-env-file.mjs` moves it" not in body
             assert "`filled`" not in body
             row = next(line for line in body.splitlines() if line.startswith("| `refused: no-key` |"))
             assert "a harness restarted from a shell that exports the key" in row
