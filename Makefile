@@ -21,7 +21,7 @@ UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/
 	help env check-uv install lock li \
 	gen-skill-docs build render-outside-smoke vendor-hook check-hook-fresh check check-shared check-claude check-codex agent-check \
 	format lint ruff-format ruff-lint pyright mypy fix-unused-imports fui \
-	test agent-test test-recipes check-outside-smoke tp \
+	test agent-test test-cross-os test-recipes check-outside-smoke tp \
 	cleanderived cleanenv cleanall reinstall ri \
 	codex-use-local codex-use-official codex-refresh codex-status \
 	claude-local-mcp codex-local-mcp
@@ -143,6 +143,10 @@ tp: install ## Run tests with prints (TEST=name to filter)
 	else \
 		$(VENV_PYTEST) tests/ -s -v; \
 	fi
+
+# The selection the Windows job runs under PowerShell with no bash (.github/workflows/windows.yml), run here.
+test-cross-os: install ## Run the tests that must also pass on Windows (the cross_os marker)
+	@$(VENV_PYTEST) tests/ -m cross_os -v
 
 test-recipes: install ## Execute the shipped synthetic-inputs recipes (slow; runs uv, downloads packages)
 	@$(VENV_PYTEST) tests/recipes -m recipes -v

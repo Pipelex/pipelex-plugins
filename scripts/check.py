@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import yaml
 
-from scripts.gen_skill_docs import CLAUDE_MCP_LAUNCHER_COMMAND, MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
+from scripts.gen_skill_docs import CLAUDE_MCP_LAUNCHER_ARGS, CLAUDE_MCP_LAUNCHER_COMMAND, MCP_SERVER_NAME, SHARED_TEMPLATES, Platform
 from scripts.hook_bundle import HOOK_BUNDLE_PATH, HOOK_NOTICES_PATH, inlined_packages, read_bundle, read_provenance, unpublished_sources
 from scripts.skill_links import skill_link_errors
 
@@ -1360,7 +1360,15 @@ def check_vibe_target_artifacts(base_dir: Path) -> list[str]:
         else:
             errors.extend(_vibe_mcp_fragment_errors(target_name, mcp_fragment))
 
-        for filename in ("hooks.json", "codex-hooks.json", "check-mthds.sh", "check-mthds-codex.sh"):
+        for filename in (
+            "hooks.json",
+            "codex-hooks.json",
+            "check-mthds.mjs",
+            "check-mthds.sh",
+            "launch-pipelex-mcp.mjs",
+            "launch-pipelex-mcp.sh",
+            "check-mthds-codex.sh",
+        ):
             if (output_dir / "hooks" / filename).exists():
                 errors.append(f"[{target_name}] hooks/{filename} is not an artifact of the native Vibe plugin")
 
@@ -1396,9 +1404,10 @@ def check_credential_wiring(base_dir: Path) -> list[str]:
     missing: a table override used to replace the defaults' table whole and do exactly that.
 
     - Claude: the manifest's `userConfig` offers every option, a sensitive one still sensitive; its
-      `pipelex` server spawns the `launch-pipelex-mcp.sh` launcher with each option substituted into
-      `PIPELEX_PLUGIN_<KEY>`; the launcher promotes each to `PIPELEX_<KEY>` only when it is non-empty,
-      and the hook wrapper promotes `CLAUDE_PLUGIN_OPTION_<KEY>` the same way.
+      `pipelex` server spawns `node` on the `launch-pipelex-mcp.mjs` launcher with each option
+      substituted into `PIPELEX_PLUGIN_<KEY>`; the launcher promotes each to `PIPELEX_<KEY>` only when
+      it is non-empty, and the hook wrapper `check-mthds.mjs` promotes `CLAUDE_PLUGIN_OPTION_<KEY>` the
+      same way.
     - Codex: the manifest's `pipelex` server forwards every `env_vars` name into the spawn.
     - Mistral Vibe: nothing to forward. The fragment carries no `env` table, which
       `check_vibe_target_artifacts` holds it to, because the workshop reads the key its login saved.
@@ -1456,8 +1465,11 @@ def _mcp_server_entry(manifest: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _promotes(text: str, source: str, target: str) -> bool:
-    """Whether a shell script exports `target` from `source`, guarded so an empty `source` changes nothing."""
-    pattern = re.escape(f'if [[ -n "${{{source}:-}}" ]]; then') + r"\s+" + re.escape(f'export {target}="${source}"') + r"\s+fi\b"
+    """Whether a Node script sets `target` in the child's `env` from `source`, guarded so an empty `source` changes nothing.
+
+    An empty string is falsy in JavaScript, so `if (process.env.X)` is the non-empty guard.
+    """
+    pattern = re.escape(f"if (process.env.{source}) {{") + r"\s+" + re.escape(f"env.{target} = process.env.{source};") + r"\s+\}"
     return re.search(pattern, text) is not None
 
 
@@ -1481,10 +1493,9 @@ def _claude_credential_errors(label: str, output_dir: Path, options: dict[str, d
         if entry is None:
             errors.append(f"{where}: declares no `{MCP_SERVER_NAME}` MCP server")
         else:
-            if entry.get("command") != CLAUDE_MCP_LAUNCHER_COMMAND:
-                errors.append(
-                    f"{where}: the `{MCP_SERVER_NAME}` server does not spawn {CLAUDE_MCP_LAUNCHER_COMMAND}, the launcher that promotes the options"
-                )
+            if entry.get("command") != CLAUDE_MCP_LAUNCHER_COMMAND or entry.get("args") != CLAUDE_MCP_LAUNCHER_ARGS:
+                launcher = " ".join([CLAUDE_MCP_LAUNCHER_COMMAND, *CLAUDE_MCP_LAUNCHER_ARGS])
+                errors.append(f"{where}: the `{MCP_SERVER_NAME}` server does not spawn `{launcher}`, the launcher that promotes the options")
             raw_env: object = entry.get("env")
             env = cast(dict[str, object], raw_env) if isinstance(raw_env, dict) else {}
             for key in options:
@@ -1492,7 +1503,7 @@ def _claude_credential_errors(label: str, output_dir: Path, options: dict[str, d
                 substitution = f"${{user_config.{key}}}"
                 if env.get(name) != substitution:
                     errors.append(f"{where}: the `{MCP_SERVER_NAME}` server's env does not set {name} to {substitution}")
-    for script, prefix in (("launch-pipelex-mcp.sh", "PIPELEX_PLUGIN_"), ("check-mthds.sh", "CLAUDE_PLUGIN_OPTION_")):
+    for script, prefix in (("launch-pipelex-mcp.mjs", "PIPELEX_PLUGIN_"), ("check-mthds.mjs", "CLAUDE_PLUGIN_OPTION_")):
         script_path = output_dir / "hooks" / script
         if not script_path.is_file():
             continue
@@ -1522,6 +1533,56 @@ def _codex_credential_errors(label: str, output_dir: Path, env_vars: list[str]) 
         f"{where}: the `{MCP_SERVER_NAME}` server's env_vars forwards no {', '.join(missing)}; "
         "Codex spawns it with a whitelisted environment, so the workshop would never see it"
     ]
+
+
+CLAUDE_PLUGIN_ROOT_PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}"
+
+
+def check_claude_exec_form(base_dir: Path) -> list[str]:
+    """Check that Claude Code starts the plugin's hook and workshop as `node <script>`, with no shell on any OS.
+
+    Claude Code spawns an exec-form hook, a `command` with an `args` array, and a stdio MCP server
+    directly. On Windows only a real executable can be spawned that way, and a hook in the shell form
+    needs a POSIX shell PowerShell is not, so every command hook in `hooks/hooks.json` and the
+    manifest's `pipelex` server must name `node` and pass a script under `${CLAUDE_PLUGIN_ROOT}` that
+    the target ships (docs/decisions.md, "The MCP launcher and the Claude Code hook run on Node").
+    A file that is missing or does not parse is left to the checks that report exactly that.
+    """
+    errors: list[str] = []
+    defaults = load_defaults_vars(base_dir)
+    for target_name, config in load_target_configs(base_dir).items():
+        if _platform_for_config(config, defaults) is not Platform.CLAUDE:
+            continue
+        source = config.get("plugin", {}).get("source", "./")
+        output_dir = base_dir if source == "./" else base_dir / str(source).rstrip("/")
+        label = f"[{target_name}] {output_dir.relative_to(base_dir).as_posix()}"
+        starts: list[tuple[str, object, object]] = []
+        hooks_config = _read_json_object(output_dir / "hooks" / "hooks.json")
+        if hooks_config is not None:
+            raw_events: object = hooks_config.get("hooks", {})
+            events = cast(dict[str, object], raw_events) if isinstance(raw_events, dict) else {}
+            for event, raw_groups in events.items():
+                for group in cast(list[object], raw_groups) if isinstance(raw_groups, list) else []:
+                    raw_hooks: object = cast(dict[str, object], group).get("hooks", []) if isinstance(group, dict) else []
+                    for hook in cast(list[object], raw_hooks) if isinstance(raw_hooks, list) else []:
+                        if isinstance(hook, dict) and cast(dict[str, object], hook).get("type") == "command":
+                            entry = cast(dict[str, object], hook)
+                            starts.append((f"{label}/hooks/hooks.json: a {event} hook", entry.get("command"), entry.get("args")))
+        manifest = _read_json_object(output_dir / ".claude-plugin" / "plugin.json")
+        server = _mcp_server_entry(manifest) if manifest is not None else None
+        if server is not None:
+            starts.append((f"{label}/.claude-plugin/plugin.json: the `{MCP_SERVER_NAME}` server", server.get("command"), server.get("args")))
+        for where, command, args in starts:
+            if command != "node" or not isinstance(args, list) or not args:
+                errors.append(f"{where} is not started as `node <script>` with no shell, so it cannot start on Windows: {command!r} {args!r}")
+                continue
+            script = str(cast(list[object], args)[0])
+            prefix = f"{CLAUDE_PLUGIN_ROOT_PLACEHOLDER}/"
+            if not script.startswith(prefix):
+                errors.append(f"{where} runs {script!r}, which is not a script under {CLAUDE_PLUGIN_ROOT_PLACEHOLDER}")
+            elif not (output_dir / script.removeprefix(prefix)).is_file():
+                errors.append(f"{where} runs {script!r}, which the target does not ship")
+    return errors
 
 
 def _run_check(title: str, errors: list[str], failure_message: str, success_message: str) -> bool:
@@ -1681,6 +1742,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_vibe_target_artifacts(base_dir),
         "FAIL: Mistral Vibe target artifacts are inconsistent.",
         "  Mistral Vibe target artifacts are consistent.",
+    )
+    failed |= _run_check(
+        "Checking that Claude Code starts the hook and the workshop as `node <script>`...",
+        check_claude_exec_form(base_dir),
+        "FAIL: A Claude Code hook or the workshop is started through a shell or by a script's own path, which Windows cannot run.",
+        "  The Claude Code hook and workshop start as `node <script>`, with no shell.",
     )
     failed |= _run_check(
         "Checking every target's credential wiring against targets/defaults.toml...",

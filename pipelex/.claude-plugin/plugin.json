@@ -19,8 +19,10 @@
   "mcpServers": {
     "pipelex": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-      "args": [],
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"
+      ],
       "env": {
         "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}"
       }

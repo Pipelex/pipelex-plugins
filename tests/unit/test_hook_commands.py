@@ -14,7 +14,9 @@ import pytest
 from scripts.gen_skill_docs import load_target_config, render_templates
 
 REPO_ROOT = Path(__file__).parents[2]
-TARGETS = ("prod", "codex", "mistral-vibe")
+# The targets whose harness runs the hook command through a shell. Claude Code spawns the prod target's hook in its
+# exec form, `node` with an `args` array, with no shell on any OS (tests/unit/test_claude_hook.py).
+SHELL_FORM_TARGETS = ("codex", "mistral-vibe")
 # The placeholders a harness replaces with the plugin root. Codex honours the Claude spelling too.
 ROOT_PLACEHOLDERS = ("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
 SPACED_ROOT_NAME = "plug in"
@@ -197,7 +199,16 @@ class TestHookCommands:
     def codex(self, tmp_path: Path, node: str) -> CodexHookRun:
         return CodexHookRun(tmp_path=tmp_path, node=node)
 
-    @pytest.mark.parametrize("target_name", TARGETS)
+    def test_the_claude_hooks_use_no_shell(self, tmp_path: Path) -> None:
+        """Every Claude hook is in the exec form, so no shell runs it, PowerShell included, and none is in the shell form."""
+        hooks = _render_hooks("prod", tmp_path / SPACED_ROOT_NAME)
+        config = json.loads(hooks[tmp_path / SPACED_ROOT_NAME / "hooks" / "hooks.json"])
+        entries = [hook for groups in config["hooks"].values() for group in groups for hook in group["hooks"]]
+        assert entries
+        assert _shell_commands(hooks) == []
+        assert all(entry["command"] == "node" and entry["args"] == ["${CLAUDE_PLUGIN_ROOT}/hooks/check-mthds.mjs"] for entry in entries)
+
+    @pytest.mark.parametrize("target_name", SHELL_FORM_TARGETS)
     def test_every_hook_command_starts_its_script_from_a_root_with_a_space(self, target_name: str, tmp_path: Path) -> None:
         """Each harness runs a hook command through a shell, so an unquoted root holding a space splits and the hook never starts."""
         plugin_root = tmp_path / SPACED_ROOT_NAME
@@ -246,13 +257,13 @@ class TestHookCommands:
     def test_an_unquoted_root_fails_the_same_run(self, tmp_path: Path) -> None:
         """The run above tells a quoted command from an unquoted one: the form the hooks had exits 127."""
         plugin_root = tmp_path / SPACED_ROOT_NAME
-        script = plugin_root / "hooks" / "check-mthds.sh"
+        script = plugin_root / "hooks" / "check-mthds-codex.sh"
         script.parent.mkdir(parents=True)
         script.write_text(f'#!/bin/sh\necho "{STUB_MARKER}"\n', encoding="utf-8")
         script.chmod(0o755)
 
-        unquoted = _run_in_shell("${CLAUDE_PLUGIN_ROOT}/hooks/check-mthds.sh", plugin_root=plugin_root, cwd=tmp_path)
-        quoted = _run_in_shell('"${CLAUDE_PLUGIN_ROOT}"/hooks/check-mthds.sh', plugin_root=plugin_root, cwd=tmp_path)
+        unquoted = _run_in_shell("${PLUGIN_ROOT}/hooks/check-mthds-codex.sh", plugin_root=plugin_root, cwd=tmp_path)
+        quoted = _run_in_shell('"${PLUGIN_ROOT}"/hooks/check-mthds-codex.sh', plugin_root=plugin_root, cwd=tmp_path)
 
         assert unquoted.returncode == 127
         assert STUB_MARKER not in unquoted.stdout

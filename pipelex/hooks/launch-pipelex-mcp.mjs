@@ -1,0 +1,123 @@
+// MCP launcher: spawn the local Pipelex workshop server with the plugin's
+// user-config credentials applied. One script for macOS, Linux and Windows.
+//
+// The Claude Code manifest declares the plugin's `pipelex` MCP server as
+// `node` running this file, in place of the workshop command itself, because
+// Claude Code substitutes each `userConfig` value into a PIPELEX_PLUGIN_*
+// variable (the mcpServers env block in plugin.json). This launcher promotes
+// each one to its real PIPELEX_* name ONLY when non-empty, so an unset option
+// never clobbers a value inherited from the session environment (terminal
+// launches keep working off the shell env). GUI launches (Claude Desktop)
+// carry no shell environment at all: there the user-config values are the
+// only credential channel.
+//
+// The workshop inherits stdin, stdout and stderr, which carry the MCP stdio
+// transport; its exit code is this process's. A termination signal that ends
+// it (SIGTERM, SIGINT, SIGHUP, SIGKILL) ends this process the same way; any
+// other signal becomes the exit code a shell gives it, 128 plus its number,
+// because Node handles some itself (SIGUSR1 starts its inspector, SIGPIPE is
+// ignored). A termination signal sent to this process is passed on to the
+// workshop.
+//
+// How the command is spawned (docs/decisions.md, "The MCP launcher and the
+// Claude Code hook run on Node"):
+// - macOS and Linux: by name, found on the PATH, with no shell, exactly as the
+//   bash launcher's `exec` did.
+// - Windows: `npx` is the batch file `npx.cmd`, which Node 20.12 and later
+//   refuse to spawn without a shell (CVE-2024-27980). The launcher runs npm's
+//   `npx-cli.js` with the Node running this file, from the npm that every
+//   Windows distribution of Node ships beside `node.exe`, and falls back to
+//   the shell, with each argument in double quotes, when that file is absent.
+//   The npm beside the binary is looked for on Windows alone: Homebrew and nvm
+//   lay npm out differently on macOS and Linux.
+
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { constants } from "node:os";
+import { dirname, join } from "node:path";
+import process from "node:process";
+
+const COMMAND = "npx";
+const ARGS = ["-y", "@pipelex/mcp@latest"];
+const TAG = "[pipelex-mcp-launcher]";
+
+const env = { ...process.env };
+if (process.env.PIPELEX_PLUGIN_API_KEY) {
+  env.PIPELEX_API_KEY = process.env.PIPELEX_PLUGIN_API_KEY;
+}
+
+if (process.platform === "win32") {
+  // The workshop starts in Claude Code's own directory, the user's project, and
+  // cmd.exe (the shell route below, and npm's own run-script on the other) looks
+  // for a command in the current directory before the PATH: a project's own
+  // `npx.cmd` or `<bin>.cmd` would run with the key in its environment. This
+  // variable turns that search off for cmd.exe and every process spawned under it;
+  // only its existence counts (Microsoft's NeedCurrentDirectoryForExePathW). A copy
+  // of the environment has lost Windows' case-insensitive names, so any spelling
+  // of it is replaced by this one.
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase() === "NODEFAULTCURRENTDIRECTORYINEXEPATH") {
+      delete env[name];
+    }
+  }
+  env.NoDefaultCurrentDirectoryInExePath = "1";
+}
+
+function windowsNpxCli() {
+  const cli = join(dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js");
+  return existsSync(cli) ? cli : null;
+}
+
+function quotedForCmd(arg) {
+  // cmd.exe acts on `%` even inside double quotes, and a `"` would end the quoted word.
+  if (/["%]/.test(arg)) {
+    console.error(`${TAG} cannot pass ${JSON.stringify(arg)} through cmd.exe: it holds a double quote or a percent sign`);
+    process.exit(1);
+  }
+  return `"${arg}"`;
+}
+
+function startWorkshop() {
+  const options = { stdio: "inherit", env };
+  if (process.platform === "win32" && COMMAND === "npx") {
+    const cli = windowsNpxCli();
+    if (cli !== null) {
+      return spawn(process.execPath, [cli, ...ARGS], options);
+    }
+    return spawn([COMMAND, ...ARGS.map(quotedForCmd)].join(" "), { ...options, shell: true });
+  }
+  return spawn(COMMAND, ARGS, options);
+}
+
+const workshop = startWorkshop();
+
+const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
+// The signals Node leaves at their default action once the forwarding listeners are off, so raising one ends this
+// process of it; SIGKILL cannot be handled at all.
+const RERAISED_SIGNALS = new Set([...FORWARDED_SIGNALS, "SIGKILL"]);
+const forward = (signal) => {
+  workshop.kill(signal);
+};
+for (const signal of FORWARDED_SIGNALS) {
+  process.on(signal, forward);
+}
+
+workshop.on("error", (error) => {
+  console.error(`${TAG} could not start ${COMMAND}: ${error.message}`);
+  process.exit(127);
+});
+
+workshop.on("exit", (code, signal) => {
+  for (const name of FORWARDED_SIGNALS) {
+    process.off(name, forward);
+  }
+  if (signal !== null) {
+    // End the same way the workshop did, so the harness sees the signal; Windows has no such signals.
+    const shellCode = 128 + (constants.signals[signal] ?? 0);
+    if (RERAISED_SIGNALS.has(signal)) {
+      process.kill(process.pid, signal);
+    }
+    process.exit(shellCode);
+  }
+  process.exit(code ?? 1);
+});
