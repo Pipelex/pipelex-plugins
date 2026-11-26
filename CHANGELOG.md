@@ -2,13 +2,13 @@
 
 ## [Unreleased]
 
-### Removed
-
-- **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login as `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which saves the address beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty and `PIPELEX_API_KEY` unset, since the saved address is used only with the saved key. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell, and that the hook validates only with a key given in the dialog or the shell.
-
 ### Fixed
 
 - **Shipped scripts keep LF line endings on a Windows clone**: the repository now carries a `.gitattributes` that commits and checks out every text file with LF, and every script explicitly, whatever `core.autocrlf` the clone uses. Git for Windows installs with `core.autocrlf=true` and Claude Code installs the plugin with `git clone`, so a default Windows machine received the hook wrappers, the MCP launcher and the scaffold's scripts with CRLF, where bash stops on their first line, and the gates `pipelex-integrate` copies into a project arrived with CRLF too. `make check` now refuses a shipped script that `.gitattributes` does not pin to LF, or that holds CRLF.
+
+### Removed
+
+- **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login as `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which saves the address beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty and `PIPELEX_API_KEY` unset, since the saved address is used only with the saved key. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell, and that the hook validates only with a key given in the dialog or the shell.
 
 ## [0.23.1] - 2026-11-25
 
