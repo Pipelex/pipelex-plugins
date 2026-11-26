@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The skills' commands run in PowerShell as in bash**: every command the skills give, outside `pipelex-synthetic-inputs` and `pipelex-scaffold`, now runs in bash, zsh, PowerShell 7 and Windows PowerShell 5.1 alike. `pipelex-integrate` copies its offline gate with `node "<skill dir>/scripts/copy-gate.mjs" <gate>` instead of `mkdir -p` and `cp`, and that script now refuses to replace a `scripts/` file of the same name that is the project's own until you agree; `pipelex-inputs` makes its temporary directories with Node instead of `mktemp -d`; the search for a method's linked directory and for the generated trees a change may have outdated is the agent's own rather than a `grep`; and Mistral Vibe's message for a missing workshop says where the entry to append is rather than giving a `cat` command.
+
 ### Removed
 
 - **The Claude Code plugin no longer asks for the API base URL (Breaking)**: enabling the plugin asks for the API key alone, and the plugin uses the hosted API, `https://api.pipelex.com`. A base URL typed in the plugin configuration dialog before is no longer read: to reach another deployment, export `PIPELEX_BASE_URL`, or run the login as `PIPELEX_BASE_URL=<api origin> PIPELEX_APP_URL=<app origin> npx -y @pipelex/mcp@latest login`, which saves the address beside the key in `~/.pipelex/.env`, and leave the dialog's key field empty and `PIPELEX_API_KEY` unset, since the saved address is used only with the saved key. The key field's description now says that an empty field uses the login's key or `PIPELEX_API_KEY` from your shell, and that the hook validates only with a key given in the dialog or the shell.

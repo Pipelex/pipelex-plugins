@@ -105,10 +105,10 @@ One module per method from the language reference's template, in the project's s
 
 ### 10. The offline gate
 
-`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with `cp`, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
+`<skill-dir>` stands for the directory holding this `SKILL.md`, the one Codex named when it loaded the skill. Copy the gate from the project root with its script, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
 
-- `ts-zod`: `mkdir -p scripts && cp "<skill-dir>/references/codegen-check.mjs" scripts/codegen-check.mjs`
-- `python-pydantic`: `mkdir -p scripts && cp "<skill-dir>/references/codegen_check.py" scripts/codegen_check.py`
+- `ts-zod`: `node "<skill-dir>/scripts/copy-gate.mjs" codegen-check.mjs`
+- `python-pydantic`: `node "<skill-dir>/scripts/copy-gate.mjs" codegen_check.py`
 
 Wire it, or `python-structures`' `pipelex codegen check`, into the project's existing gate as the language reference shows; with none, the report says where to call it.
 

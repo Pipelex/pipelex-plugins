@@ -116,10 +116,10 @@ One module per method from the language reference's template, in the project's s
 
 ### 10. The offline gate
 
-Copy the gate from the project root with `cp`, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
+Copy the gate from the project root with its script, never by rewriting it, and never format the copy. **A file already there without the line `Copied verbatim into a project by /pipelex-integrate` is the user's: ask first.**
 
-- `ts-zod`: `mkdir -p scripts && cp "${CLAUDE_SKILL_DIR}/references/codegen-check.mjs" scripts/codegen-check.mjs`
-- `python-pydantic`: `mkdir -p scripts && cp "${CLAUDE_SKILL_DIR}/references/codegen_check.py" scripts/codegen_check.py`
+- `ts-zod`: `node "${CLAUDE_SKILL_DIR}/scripts/copy-gate.mjs" codegen-check.mjs`
+- `python-pydantic`: `node "${CLAUDE_SKILL_DIR}/scripts/copy-gate.mjs" codegen_check.py`
 
 Wire it, or `python-structures`' `pipelex codegen check`, into the project's existing gate as the language reference shows; with none, the report says where to call it.
 

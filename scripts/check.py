@@ -644,6 +644,101 @@ def check_skill_links(base_dir: Path) -> list[str]:
     return errors
 
 
+# Shell-neutral skill text (L-261126-4c4a95). A command a skill gives the model, or the model gives the user,
+# must run in every shell the harness may use: bash and zsh, and on Windows PowerShell 7 and Windows
+# PowerShell 5.1, which has neither `&&` nor `||` between commands. Where no shared form exists, the step is a
+# Node script run by path or the agent's own file tools (docs/build-targets.md, "Commands every shell runs").
+#
+# Only code is read: inline code spans, and fenced blocks whose language is a shell's or unnamed. A fence in
+# another language (`ts`, `json`, `python`, `toml`, `make`…) is code for another reader, such as an npm
+# script, which npm runs through cmd.exe on Windows, where `&&` works. `${CLAUDE_SKILL_DIR}` and
+# `${CLAUDE_PLUGIN_ROOT}` are substituted by Claude Code before any shell runs, so they are not constructs.
+POSIX_SHELL_FENCE_LANGUAGES = frozenset({"", "bash", "sh", "shell", "zsh", "console", "powershell", "pwsh", "ps1", "cmd", "bat"})
+POSIX_SHELL_CONSTRUCTS: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    ("command -v", re.compile(r"\bcommand -v\b"), "run the tool with `--version`, which every shell runs"),
+    ("mkdir -p", re.compile(r"\bmkdir -p\b"), "PowerShell's `mkdir` takes no `-p`; let a script or the agent's file tools create it"),
+    ("mktemp", re.compile(r"\bmktemp\b"), "Windows has no `mktemp`; make the directory with Node's `fs.mkdtempSync`"),
+    ("${VAR:-…}", re.compile(r"\$\{[A-Za-z_]\w*:?[-=?+]"), "a POSIX parameter expansion, which PowerShell does not read"),
+    ("/tmp", re.compile(r"(?<![\w.~/-])/tmp(?![\w-])"), "Windows has no `/tmp`; use the OS's temporary directory"),
+    ("/dev/null", re.compile(r"/dev/null\b"), "Windows has no `/dev/null`"),
+    ("&&", re.compile(r"&&"), "Windows PowerShell 5.1 cannot chain commands with `&&`; give each command on its own"),
+    ("||", re.compile(r"\|\|"), "Windows PowerShell 5.1 cannot chain commands with `||`; give each command on its own"),
+    ("heredoc", re.compile(r"<<-?\s*['\"]?[A-Za-z_]\w*"), "PowerShell has no heredoc; write the file with the agent's file tools and run it by path"),
+    (
+        "cp from the skill's directory",
+        re.compile(r"\bcp\b[^\n]*(?:\$\{CLAUDE_SKILL_DIR\}|<skill-dir>)"),
+        "copy a skill's file with a Node script run by path",
+    ),
+    ("grep", re.compile(r"(?:^|[\s|;(])grep\s"), "Windows has no `grep`; search with the agent's own tools"),
+    ("export VAR=", re.compile(r"\bexport\s+[A-Za-z_]\w*="), "PowerShell sets a variable with `$env:`, not `export`"),
+)
+# A construct quoted as an example rather than given as a command, keyed on the file's path under a target's
+# `skills/` and the code span or fenced line exactly as rendered, with the reason it may stay. An entry that no
+# longer matches anything is reported, so the list cannot outlive what it excuses.
+POSIX_SHELL_ALLOWED: dict[tuple[str, str], str] = {}
+# Skills whose commands other items of the Windows epic are making shell-neutral; each is removed from this
+# table by the change that lands its item, after which the rule holds that skill too.
+POSIX_SHELL_PENDING_SKILLS: dict[str, str] = {
+    "pipelex-synthetic-inputs": "L-261126-ab3733",
+    "pipelex-scaffold": "L-261126-b121b5, L-261126-54e9af",
+}
+_FENCE_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})\s*([\w+-]*)")
+_INLINE_CODE_PATTERN = re.compile(r"(`+)(.+?)\1")
+
+
+def _shell_code(text: str) -> list[tuple[int, str]]:
+    """The code a shell might run, with its line number: inline code spans, and the lines of shell or unnamed fences."""
+    found: list[tuple[int, str]] = []
+    fence: str | None = None
+    language = ""
+    for idx, line in enumerate(text.splitlines(), start=1):
+        if fence is None:
+            opening = _FENCE_PATTERN.match(line)
+            if opening:
+                fence, language = opening.group(1), opening.group(2).lower()
+                continue
+            found.extend((idx, span.group(2)) for span in _INLINE_CODE_PATTERN.finditer(line))
+        elif line.strip().startswith(fence) and not line.strip().strip(fence[0]):
+            fence = None
+        elif language in POSIX_SHELL_FENCE_LANGUAGES:
+            found.append((idx, line))
+    return found
+
+
+def check_skill_posix_shell(
+    base_dir: Path,
+    allowed: dict[tuple[str, str], str] | None = None,
+    pending: dict[str, str] | None = None,
+) -> list[str]:
+    """Refuse a POSIX-only shell construct in the skill text every target ships (L-261126-4c4a95).
+
+    Every Markdown file under each target's `skills/` is read, SKILL.md, references and shared files alike,
+    as rendered, so a template and a static reference are held to the same rule.
+    """
+    allowed = POSIX_SHELL_ALLOWED if allowed is None else allowed
+    pending = POSIX_SHELL_PENDING_SKILLS if pending is None else pending
+    errors: list[str] = []
+    used: set[tuple[str, str]] = set()
+    for output_dir in _collect_output_dirs(base_dir):
+        skills_dir = output_dir / "skills"
+        for path in sorted(skills_dir.rglob("*.md")):
+            key_path = path.relative_to(skills_dir).as_posix()
+            if key_path.split("/", 1)[0] in pending:
+                continue
+            rel = path.relative_to(base_dir)
+            for idx, code in _shell_code(path.read_text(encoding="utf-8")):
+                for name, pattern, advice in POSIX_SHELL_CONSTRUCTS:
+                    if not pattern.search(code):
+                        continue
+                    if (key_path, code) in allowed:
+                        used.add((key_path, code))
+                        continue
+                    shown = code.strip() if len(code.strip()) <= 100 else code.strip()[:97] + "..."
+                    errors.append(f"{rel}:{idx}: `{name}` in `{shown}`: {advice}")
+    errors.extend(f"allowlisted `{code}` in {key_path} no longer appears in any target" for key_path, code in sorted(allowed.keys() - used))
+    return errors
+
+
 def load_version_floors(base_dir: Path) -> dict[str, str]:
     """Read `[vars.floors]` from the target defaults."""
     defaults_path = base_dir / TARGETS_DIR_NAME / DEFAULTS_FILE
@@ -1435,6 +1530,12 @@ def run_shared_checks(base_dir: Path) -> bool:
         check_skill_links(base_dir),
         "FAIL: A link names no file or heading, or a shipped reference, script or shared file is named by nothing.",
         "  Every link resolves, and every shipped reference, script and shared file is named.",
+    )
+    failed |= _run_check(
+        "Checking skill text for commands only a POSIX shell runs...",
+        check_skill_posix_shell(base_dir),
+        "FAIL: A skill gives a command PowerShell cannot run. Give one form every shell runs, or a Node script run by path.",
+        "  Every command in the skill text runs in bash, zsh and PowerShell alike.",
     )
     failed |= _report_skill_ceiling(base_dir)
     failed |= _run_check(
