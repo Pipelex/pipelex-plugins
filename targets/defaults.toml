@@ -92,7 +92,7 @@ pipelex = "0.79.0"
 # - Claude: the `user_config` table below becomes the manifest's `userConfig`
 #   (Claude prompts for each option when the plugin is enabled; sensitive
 #   values go to the OS keychain), and each is injected into the spawn as PIPELEX_PLUGIN_*
-#   via `${user_config.*}` substitution. The launch-pipelex-mcp.sh wrapper
+#   via `${user_config.*}` substitution. The launch-pipelex-mcp.mjs launcher
 #   promotes each one to its real PIPELEX_* name only when non-empty, so the
 #   session env still works as a fallback. This is required for GUI launches
 #   (Claude Desktop), which carry no shell environment at all. Do not

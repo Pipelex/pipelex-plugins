@@ -53,14 +53,14 @@ FRONTMATTER_BODY = '{%- if platform == "claude" -%}\nallowed-tools:\n  - Bash\n{
 
 
 # Minimal hook templates for every platform. render_templates declares hooks
-# per platform (Claude: hooks.json + check-mthds.sh; Codex: codex-hooks.json;
+# per platform (Claude: hooks.json + check-mthds.mjs + launch-pipelex-mcp.mjs; Codex: codex-hooks.json;
 # Vibe: ai.mistral.vibe/hooks.toml + check-mthds-vibe.sh + the mcp/vibe-mcp.toml
 # launcher fragment), so any test tree that reaches skill/hook rendering must
 # provide them or render fails with "hook template not found".
 HOOK_TEMPLATE_BODIES = {
     "hooks/hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
-    "hooks/check-mthds.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
-    "hooks/launch-pipelex-mcp.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
+    "hooks/check-mthds.mjs.j2": "process.exit(0);\n",
+    "hooks/launch-pipelex-mcp.mjs.j2": "process.exit(0);\n",
     "hooks/codex-hooks.json.j2": '{"hooks": {"PostToolUse": []}}\n',
     "hooks/check-mthds-codex.sh.j2": "#!/usr/bin/env bash\nexit 0\n",
     "ai.mistral.vibe/hooks.toml.j2": (
@@ -733,17 +733,17 @@ class TestTargetConfig:
         assert manifest["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
-                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-                "args": [],
+                "command": "node",
+                "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"],
                 "env": {"PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}"},
             }
         }
         rendered = render_templates(self.REPO_ROOT / "templates", self.REPO_ROOT, config.template_vars, include_skills=[], target_name="prod")
-        launcher = rendered[self.REPO_ROOT / "hooks" / "launch-pipelex-mcp.sh"]
-        hook = rendered[self.REPO_ROOT / "hooks" / "check-mthds.sh"]
-        assert 'export PIPELEX_API_KEY="$PIPELEX_PLUGIN_API_KEY"' in launcher
-        assert 'export PIPELEX_API_KEY="$CLAUDE_PLUGIN_OPTION_API_KEY"' in hook
-        assert launcher.rstrip().endswith('exec node "../pipelex-mcp/dist/main.js"')
+        launcher = rendered[self.REPO_ROOT / "hooks" / "launch-pipelex-mcp.mjs"]
+        hook = rendered[self.REPO_ROOT / "hooks" / "check-mthds.mjs"]
+        assert "env.PIPELEX_API_KEY = process.env.PIPELEX_PLUGIN_API_KEY;" in launcher
+        assert "env.PIPELEX_API_KEY = process.env.CLAUDE_PLUGIN_OPTION_API_KEY;" in hook
+        assert 'const COMMAND = "node";\nconst ARGS = ["../pipelex-mcp/dist/main.js"];' in launcher
 
     def test_the_plugin_asks_for_the_key_alone(self) -> None:
         """The base URL is not a plugin option: the hosted API is the default, and another plane is
@@ -811,7 +811,7 @@ class TestPluginManifests:
     def test_claude_plugin_json_declares_mcp_server_with_user_config(self, tmp_path: Path) -> None:
         """With a user_config block, the Claude manifest declares userConfig
         (prompted at enable time) and routes the MCP spawn through the
-        launch-pipelex-mcp.sh wrapper, injecting each option as
+        launch-pipelex-mcp.mjs launcher run by `node`, injecting each option as
         PIPELEX_PLUGIN_<KEY> via `${user_config.*}` substitution — the only
         credential channel on GUI launches (Claude Desktop has no shell env).
 
@@ -829,8 +829,8 @@ class TestPluginManifests:
         assert plugin_json["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
-                "command": "${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.sh",
-                "args": [],
+                "command": "node",
+                "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"],
                 "env": {
                     "PIPELEX_PLUGIN_API_KEY": "${user_config.api_key}",
                     "PIPELEX_PLUGIN_BASE_URL": "${user_config.base_url}",
@@ -838,10 +838,10 @@ class TestPluginManifests:
             }
         }
 
-    def test_claude_plugin_json_without_user_config_spawns_directly(self, tmp_path: Path) -> None:
-        """Without a user_config block, the Claude manifest spawns the workshop
-        command directly — Claude Code passes the full shell env to the spawned
-        server (verified in live plugin-dir sessions)."""
+    def test_claude_plugin_json_without_user_config_still_starts_the_launcher(self, tmp_path: Path) -> None:
+        """Without a user_config block, the Claude manifest still starts the Node
+        launcher, never `npx` itself, which is a batch file Claude Code cannot
+        spawn on Windows; with nothing to promote, the entry carries no env."""
         tree = _create_codex_tree(tmp_path)
         config = load_target_config(tree / "targets", "prod")
         mcp_server = config.template_vars["mcp_server"]
@@ -852,8 +852,8 @@ class TestPluginManifests:
         assert plugin_json["mcpServers"] == {
             "pipelex": {
                 "type": "stdio",
-                "command": "npx",
-                "args": ["-y", "@pipelex/mcp@latest"],
+                "command": "node",
+                "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/launch-pipelex-mcp.mjs"],
             }
         }
 
@@ -3057,7 +3057,7 @@ class TestHookRendering:
         Every platform has an entry, an empty one where it has no hooks, so the renderer looks a platform
         up by index and an unmapped one fails instead of rendering Claude's hooks."""
         assert set(HOOK_TEMPLATES_BY_PLATFORM) == set(Platform)
-        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.sh.j2", "hooks/launch-pipelex-mcp.sh.j2"]
+        assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CLAUDE] == ["hooks/hooks.json.j2", "hooks/check-mthds.mjs.j2", "hooks/launch-pipelex-mcp.mjs.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.CODEX] == ["hooks/codex-hooks.json.j2", "hooks/check-mthds-codex.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.MISTRAL_VIBE] == ["ai.mistral.vibe/hooks.toml.j2", "hooks/check-mthds-vibe.sh.j2"]
         assert HOOK_TEMPLATES_BY_PLATFORM[Platform.AGENT_SKILLS] == []
@@ -3085,7 +3085,8 @@ class TestHookRendering:
         results = render_templates(template_tree / "templates", template_tree, DEFAULT_VARS)
         output_names = {path.name for path in results}
         assert "hooks.json" in output_names
-        assert "check-mthds.sh" in output_names
+        assert "check-mthds.mjs" in output_names
+        assert "launch-pipelex-mcp.mjs" in output_names
         assert "codex-hooks.json" not in output_names
 
     def test_codex_renders_only_codex_hook(self, tmp_path: Path) -> None:
@@ -3095,7 +3096,7 @@ class TestHookRendering:
         assert "codex-hooks.json" in output_names
         assert "check-mthds-codex.sh" in output_names
         assert "hooks.json" not in output_names
-        assert "check-mthds.sh" not in output_names
+        assert "check-mthds.mjs" not in output_names
         assert "vibe-mcp.toml" not in output_names
 
     def test_vibe_renders_toml_and_vibe_script(self, tmp_path: Path) -> None:
@@ -3106,11 +3107,20 @@ class TestHookRendering:
         assert tree / "mcp" / "vibe-mcp.toml" in results
         assert not any(path.name == "vibe-hooks.toml" for path in results)
 
-    def test_generate_makes_hook_script_executable(self, template_tree: Path) -> None:
-        generate(template_tree, "prod")
-        hook_script = template_tree / "pipelex" / "hooks" / "check-mthds.sh"
+    def test_generate_makes_hook_script_executable(self, tmp_path: Path) -> None:
+        tree = _create_codex_tree(tmp_path)
+        generate(tree, "codex")
+        hook_script = tree / "pipelex-codex" / "hooks" / "check-mthds-codex.sh"
         assert hook_script.is_file()
         assert os.access(hook_script, os.X_OK)
+
+    @pytest.mark.cross_os
+    def test_generate_writes_lf_line_endings(self, template_tree: Path) -> None:
+        """The build writes `\n` whatever the OS, so a build on Windows matches the checked-in trees byte for byte."""
+        generate(template_tree, "prod")
+        for path in (template_tree / "pipelex").rglob("*"):
+            if path.is_file():
+                assert b"\r\n" not in path.read_bytes(), f"{path} was written with CRLF line endings"
 
     def test_all_platforms_declare_check_mjs_static_asset(self) -> None:
         """One vendored check.mjs bundle serves every hook platform, and its MIT notice ships beside it on each."""
