@@ -4,7 +4,11 @@
 
 ### Changed
 
-- **`pipelex-scaffold`'s two scripts are Node, so its initializer branch runs on Windows**: the pristine commit and the env file are now written by `commit-pristine.mjs` and `write-env-file.mjs`, which the skill runs with `node` where it ran `commit-pristine.sh` and `write-env-file.sh` with `bash`, so a Windows machine with PowerShell and no bash can create a project from a framework's or a language's initializer, with nothing to install beyond the Node the workshop and the hook already need. Their verdict lines are unchanged, and on Windows, which has no owner-only file mode, the new `.env` is left to the access rules of the folder it is in.
+- **`pipelex-scaffold`'s scripts are Node, so they run on any OS**: the pristine commit and the env file of the initializer branch are now written by `commit-pristine.mjs` and `write-env-file.mjs`, which the skill runs with `node` where it ran `commit-pristine.sh` and `write-env-file.sh` with `bash`, so they need no bash, only the Node the workshop and the hook already need, which the skill now requires on every initializer branch, Python's included. Their verdict lines are unchanged, except that a `PIPELEX_BASE_URL` holding a line break is now refused, a leading byte-order mark no longer hides an existing key in `.env`, and a failed write names its cause on stderr. On macOS and Linux the new `.env` is readable by its owner alone; on Windows, which has no such file mode, it takes the access rules of its folder.
+
+### Fixed
+
+- **Shipped scripts keep LF line endings on a Windows clone**: the repository now carries a `.gitattributes` that commits and checks out every text file with LF, and every script explicitly, whatever `core.autocrlf` the clone uses. Git for Windows installs with `core.autocrlf=true` and Claude Code installs the plugin with `git clone`, so a default Windows machine received the hook wrappers, the MCP launcher and the scaffold's scripts with CRLF, where bash stops on their first line, and the gates `pipelex-integrate` copies into a project arrived with CRLF too. `make check` now refuses a shipped script that `.gitattributes` does not pin to LF, or that holds CRLF, and `make build` writes every generated file with LF on every OS. Git does not rewrite a file an update leaves unchanged, so on Windows remove the Pipelex marketplace and add it again to replace scripts an earlier clone received with CRLF.
 
 ### Removed
 
