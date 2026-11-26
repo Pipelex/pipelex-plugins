@@ -167,7 +167,18 @@ def _remove_tree(path: Path) -> None:
 
 
 def _has_no_commit(repository: Path) -> bool:
-    return subprocess.run(["git", "-C", str(repository), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+    return (
+        subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "-q", "--verify", "HEAD"], env=_environment(), capture_output=True, check=False
+        ).returncode
+        != 0
+    )
+
+
+def _is_ignored(repository: Path, path: str) -> bool:
+    """Whether git ignores `path` in `repository`, read under the same environment as every other git call here,
+    so that no configuration of this machine's, such as a global excludes file, decides the answer."""
+    return subprocess.run(["git", "-C", str(repository), "check-ignore", "-q", path], env=_environment(), check=False).returncode == 0
 
 
 def _staged_once_made_a_repository(project: Path) -> list[str]:
@@ -326,7 +337,7 @@ class TestCommitPristine:
         (project / ".env").write_text("SECRET=generated\n", encoding="utf-8")
         result = _run(COMMIT_PRISTINE, str(project), "Scaffold Python project", cwd=tmp_path)
         assert result.stdout == "refused: write-failed\n"
-        assert subprocess.run(["git", "-C", str(project), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+        assert _has_no_commit(project)
 
     @pytest.mark.parametrize("history", [False, True], ids=["unborn", "with-a-commit"])
     def test_a_directory_inside_the_user_s_repository_is_new_files_of_it(self, tmp_path: Path, history: bool) -> None:
@@ -357,7 +368,7 @@ class TestCommitPristine:
         if history:
             assert _git(outer, "rev-parse", "HEAD") == head_before
         else:
-            assert subprocess.run(["git", "-C", str(outer), "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False).returncode != 0
+            assert _has_no_commit(outer)
         assert _git(outer, "diff", "--cached", "--name-only") == "staged.md"
         # The project is new, untracked files of that repository, and its .gitignore keeps the dependency
         # tree and the `.env` out of the user's own `git add`.
@@ -698,7 +709,7 @@ class TestWriteEnvFile:
         base_url = credentials.get("PIPELEX_BASE_URL")
         assert appended == ([COMMENT_LINE, f"PIPELEX_BASE_URL={base_url}"] if base_url else [])
         # `.env` is ignored, and closed to other users, before the user's key can reach it.
-        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
+        assert _is_ignored(project, ".env")
         if not WINDOWS:
             assert (project / ".env").stat().st_mode & 0o077 == 0
 
@@ -752,8 +763,8 @@ class TestWriteEnvFile:
         (project / ".gitignore").write_text("node_modules\n.env*\n", encoding="utf-8")
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path)
         assert result.returncode == 0, result.stderr
-        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env.example"], check=False).returncode == 1
-        assert subprocess.run(["git", "-C", str(project), "check-ignore", "-q", ".env"], check=False).returncode == 0
+        assert not _is_ignored(project, ".env.example")
+        assert _is_ignored(project, ".env")
         assert (project / ".gitignore").read_text(encoding="utf-8") == "node_modules\n.env*\n\n!.env.example\n"
 
     @pytest.mark.parametrize(
@@ -894,7 +905,7 @@ class TestWriteEnvFile:
         result = _run(WRITE_ENV_FILE, str(project), cwd=tmp_path, credentials={"PIPELEX_API_KEY": FAKE_KEY})
         assert result.stdout == "empty base-url=file plane=production\n"
         assert (project / ".gitignore").read_text(encoding="utf-8") == "\n.env\n"
-        assert subprocess.run(["git", "-C", str(outer), "check-ignore", "-q", "app/.env"], check=False).returncode == 0
+        assert _is_ignored(outer, "app/.env")
         assert not (outer / ".gitignore").exists()
         assert _git(outer, "diff", "--cached", "--name-only") == "staged.md"
 
